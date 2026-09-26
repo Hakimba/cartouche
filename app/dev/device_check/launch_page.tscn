@@ -1,0 +1,71 @@
+[gd_scene format=3 uid="uid://ilkgmkcyi8xo"]
+
+[ext_resource type="Script" uid="uid://brkgx62hxm7vs" path="res://dev/device_check/launch_page.gd" id="1"]
+
+[node name="Launch" type="HBoxContainer"]
+script = ExtResource("1")
+
+[node name="FolderColumn" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.8
+
+[node name="Title" type="Label" parent="FolderColumn"]
+layout_mode = 2
+text = "1. Folder"
+
+[node name="Folders" type="ItemList" parent="FolderColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="FileColumn" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.4
+
+[node name="Title" type="Label" parent="FileColumn"]
+layout_mode = 2
+text = "2. File"
+
+[node name="Path" type="Label" parent="FileColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Hint"
+clip_text = true
+
+[node name="Entries" type="ItemList" parent="FileColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PlayerColumn" type="VBoxContainer" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Title" type="Label" parent="PlayerColumn"]
+layout_mode = 2
+text = "3. Installed player"
+
+[node name="Players" type="ItemList" parent="PlayerColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LaunchButton" type="Button" parent="PlayerColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Launch"
+
+[node name="Outcome" type="Label" parent="PlayerColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Hint"
+autowrap_mode = 3
+
+[connection signal="item_activated" from="FolderColumn/Folders" to="." method="_on_folders_item_activated"]
+[connection signal="item_selected" from="FileColumn/Entries" to="." method="_on_entries_item_selected"]
+[connection signal="item_activated" from="FileColumn/Entries" to="." method="_on_entries_item_activated"]
+[connection signal="item_activated" from="PlayerColumn/Players" to="." method="_on_launch_pressed" unbinds=1]
+[connection signal="pressed" from="PlayerColumn/LaunchButton" to="." method="_on_launch_pressed"]

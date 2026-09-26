@@ -1,0 +1,72 @@
+[gd_scene format=3 uid="uid://d16fd0yctissn"]
+
+[ext_resource type="Script" uid="uid://i5u72d6afolg" path="res://dev/device_check/device_check.gd" id="1"]
+[ext_resource type="Theme" uid="uid://dsq5253mlvx0h" path="res://dev/device_check/device_check_theme.tres" id="2"]
+[ext_resource type="PackedScene" uid="uid://uvaf2eqf2kf2" path="res://dev/device_check/storage_page.tscn" id="3"]
+[ext_resource type="PackedScene" uid="uid://ilkgmkcyi8xo" path="res://dev/device_check/launch_page.tscn" id="4"]
+[ext_resource type="PackedScene" uid="uid://c0rwoe4r15bls" path="res://dev/device_check/pad_page.tscn" id="5"]
+[ext_resource type="PackedScene" uid="uid://c0ukix1ea6bs8" path="res://dev/device_check/perf_page.tscn" id="6"]
+[ext_resource type="PackedScene" uid="uid://c5prx7e1hs7en" path="res://dev/device_check/apps_page.tscn" id="7"]
+
+[node name="DeviceCheck" type="PanelContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2")
+script = ExtResource("1")
+
+[node name="Rows" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Rows/Header"]
+layout_mode = 2
+text = "Cartouche · device check"
+
+[node name="Status" type="Label" parent="Rows/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 2
+
+[node name="Tabs" type="TabContainer" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 3.0
+
+[node name="Storage" parent="Rows/Tabs" instance=ExtResource("3")]
+layout_mode = 2
+
+[node name="Launch" parent="Rows/Tabs" instance=ExtResource("4")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Controller" parent="Rows/Tabs" instance=ExtResource("5")]
+layout_mode = 2
+
+[node name="3D" parent="Rows/Tabs" instance=ExtResource("6")]
+layout_mode = 2
+
+[node name="Apps" parent="Rows/Tabs" instance=ExtResource("7")]
+layout_mode = 2
+
+[node name="Log" type="RichTextLabel" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_type_variation = &"LogText"
+focus_mode = 0
+bbcode_enabled = true
+scroll_following = true
+
+[node name="Clock" type="Timer" parent="."]
+autostart = true
+
+[connection signal="tab_changed" from="Rows/Tabs" to="." method="_on_tabs_tab_changed"]
+[connection signal="leave_requested" from="Rows/Tabs/Controller" to="Rows/Tabs" method="select_previous_available"]
+[connection signal="timeout" from="Clock" to="." method="_on_clock_timeout"]

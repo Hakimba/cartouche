@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://cays3y3jtrsli"]
+
+[ext_resource type="Script" uid="uid://chqwsorvq1uq1" path="res://dev/device_check/perf_bench.gd" id="1"]
+
+[sub_resource type="Environment" id="environment"]
+background_mode = 1
+background_color = Color(0.788, 0.8, 0.827, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.6, 0.6, 0.65, 1)
+
+[node name="PerfBench" type="Node3D"]
+script = ExtResource("1")
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = SubResource("environment")
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 6)
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.321, 0.383, 0, 0.766, 0.643, -0.5, -0.557, 0.663, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Boxes" type="Node3D" parent="."]
+unique_name_in_owner = true

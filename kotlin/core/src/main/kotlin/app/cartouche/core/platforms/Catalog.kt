@@ -1,0 +1,206 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+package app.cartouche.core.platforms
+
+import app.cartouche.core.FileName
+import app.cartouche.core.launch.GameFile
+import app.cartouche.core.launch.LaunchSpec
+import app.cartouche.core.launch.LaunchTemplate
+import app.cartouche.core.launch.RunningInstance
+import app.cartouche.core.launch.Template
+import app.cartouche.core.launch.TemplateError
+import arrow.core.Either
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Some
+import arrow.core.firstOrNone
+import arrow.core.getOrElse
+import arrow.core.raise.Raise
+import arrow.core.raise.either
+import arrow.core.raise.ensure
+import arrow.core.raise.ensureNotNull
+import arrow.core.raise.withError
+import arrow.core.separateEither
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+
+@JvmInline public value class PlatformId(public val value: String)
+
+@JvmInline public value class PlayerId(public val value: String)
+
+/** A Daijishō file name pattern, matched case-insensitively (ROM sets mix `.chd` and `.CHD`). */
+public class FileNamePattern private constructor(public val source: String, private val regex: Regex) {
+    public fun matches(name: FileName): Boolean = regex.matches(name.value)
+
+    override fun equals(other: Any?): Boolean = other is FileNamePattern && other.source == source
+
+    override fun hashCode(): Int = source.hashCode()
+
+    override fun toString(): String = source
+
+    public companion object {
+        public fun of(source: String): Option<FileNamePattern> =
+            Either.catch { FileNamePattern(source, Regex(source, RegexOption.IGNORE_CASE)) }.getOrNone()
+    }
+}
+
+/** A way to run games of a platform: an emulator (or one of its cores) and its launch template. */
+public data class Player(
+    public val id: PlayerId,
+    public val name: String,
+    public val template: Template,
+    public val runningInstance: RunningInstance,
+    public val accepts: FileNamePattern,
+)
+
+public data class Platform(
+    public val id: PlatformId,
+    public val name: String,
+    public val players: List<Player>,
+    public val accepts: FileNamePattern,
+)
+
+/** A player able to open a given file, with its platform. */
+public data class Candidate(public val platform: Platform, public val player: Player)
+
+public data class Launch(public val spec: LaunchSpec, public val runningInstance: RunningInstance)
+
+/** One definition file, as read from disk. */
+public data class DefinitionSource(public val name: String, public val text: String)
+
+public sealed interface LaunchError {
+    public data class UnknownPlayer(public val id: PlayerId) : LaunchError
+
+    public data class UnsupportedFile(public val player: PlayerId, public val file: FileName) : LaunchError
+
+    public data class InvalidTemplate(public val error: TemplateError) : LaunchError
+
+    /** English description, for logs. */
+    public val message: String
+        get() =
+            when (this) {
+                is UnknownPlayer -> "No player ${id.value}"
+                is UnsupportedFile -> "${player.value} cannot open ${file.value}"
+                is InvalidTemplate -> error.message
+            }
+}
+
+public sealed interface CatalogError {
+    public val source: String
+
+    public data class InvalidJson(override val source: String, public val detail: String) : CatalogError
+
+    public data class MissingField(override val source: String, public val key: String) : CatalogError
+
+    public data class InvalidPattern(override val source: String, public val pattern: String) : CatalogError
+
+    public data class InvalidTemplate(override val source: String, public val player: PlayerId, public val error: TemplateError) :
+        CatalogError
+
+    public data class DuplicatePlatform(override val source: String, public val platform: PlatformId) : CatalogError
+
+    public data class DuplicatePlayer(override val source: String, public val player: PlayerId) : CatalogError
+
+    /** English description, for logs. */
+    public val message: String
+        get() =
+            when (this) {
+                is InvalidJson -> "Not valid JSON: $detail"
+                is MissingField -> "Missing or mistyped field \"$key\""
+                is InvalidPattern -> "Invalid file name pattern $pattern"
+                is InvalidTemplate -> "Player ${player.value}: ${error.message}"
+                is DuplicatePlatform -> "Platform ${platform.value} is already defined"
+                is DuplicatePlayer -> "Player ${player.value} is already defined"
+            }
+}
+
+/**
+ * The platforms and players Cartouche knows, read from Daijishō definition files (a `platform`
+ * object and a `playerList` array, see `app/data/platforms/daijishou/`).
+ *
+ * A broken or duplicate player is rejected on its own and the rest of its platform is kept; a broken
+ * or duplicate platform file is rejected whole. Every rejection is kept in [rejected]: bad data is visible, never
+ * silently missing. Hidden files are never offered to a player, whatever the patterns say.
+ */
+public data class Catalog(public val platforms: List<Platform> = emptyList(), public val rejected: List<CatalogError> = emptyList()) {
+    private val all: List<Candidate> get() = platforms.flatMap { platform -> platform.players.map { Candidate(platform, it) } }
+
+    /** Players able to open [file], in definition order. */
+    public fun candidates(file: FileName): List<Candidate> =
+        if (file.isHidden) emptyList() else all.filter { it.platform.accepts.matches(file) && it.player.accepts.matches(file) }
+
+    public fun find(id: PlayerId): Option<Candidate> = all.firstOrNone { it.player.id == id }
+
+    /** Resolves how [id] opens [file]. */
+    public fun launch(id: PlayerId, file: GameFile): Either<LaunchError, Launch> = either {
+        val player = find(id).getOrElse { raise(LaunchError.UnknownPlayer(id)) }.player
+        ensure(candidates(file.name).any { it.player.id == id }) { LaunchError.UnsupportedFile(id, file.name) }
+        Launch(withError(LaunchError::InvalidTemplate) { player.template.resolve(file).bind() }, player.runningInstance)
+    }
+
+    public companion object {
+        public fun parse(sources: List<DefinitionSource>): Catalog = sources.fold(Catalog()) { catalog, source ->
+            either { DefinitionReader(source.name, this).platform(source.text) }.fold(
+                { catalog.copy(rejected = catalog.rejected + it) },
+                { (platform, rejectedPlayers) -> catalog.withPlatform(source.name, platform, rejectedPlayers) },
+            )
+        }
+    }
+
+    /** Adds [platform], rejecting it if its id is taken, and its players whose id is taken. */
+    private fun withPlatform(source: String, platform: Platform, rejectedPlayers: List<CatalogError>): Catalog =
+        if (platforms.any { it.id == platform.id }) {
+            copy(rejected = rejected + CatalogError.DuplicatePlatform(source, platform.id))
+        } else {
+            // `add` is false for an id taken by another platform or earlier in this one.
+            val taken = all.map { it.player.id }.toMutableSet()
+            val (kept, duplicates) = platform.players.partition { taken.add(it.id) }
+            Catalog(
+                platforms + platform.copy(players = kept),
+                rejected + rejectedPlayers + duplicates.map { CatalogError.DuplicatePlayer(source, it.id) },
+            )
+        }
+}
+
+/** Reads one definition file; every missing or mistyped field raises a [CatalogError] naming it. */
+private class DefinitionReader(val source: String, raise: Raise<CatalogError>) : Raise<CatalogError> by raise {
+    /** The platform and the players rejected from it. */
+    fun platform(text: String): Pair<Platform, List<CatalogError>> {
+        val root = Either.catch { Json.parseToJsonElement(text) }.getOrElse { raise(CatalogError.InvalidJson(source, it.toString())) }
+        val platform = field(root, "platform") { it as? JsonObject }
+        val (rejected, players) =
+            field(root, "playerList") { it as? JsonArray }.separateEither { either { DefinitionReader(source, this).player(it) } }
+        val id = PlatformId(text(platform, "uniqueId"))
+        return Platform(id, text(platform, "name"), players, pattern(platform, "acceptedFilenameRegex")) to rejected
+    }
+
+    fun player(element: JsonElement): Player {
+        val id = PlayerId(text(element, "uniqueId"))
+        val arguments = text(element, "amStartArguments")
+        val template = LaunchTemplate.parse(arguments).getOrElse { raise(CatalogError.InvalidTemplate(source, id, it)) }
+        val stops = optional(element, "killPackageProcesses") { (it as? JsonPrimitive)?.booleanOrNull }.getOrElse { false }
+        return Player(
+            id = id,
+            name = text(element, "name"),
+            template = template,
+            runningInstance = if (stops) RunningInstance.STOP else RunningInstance.KEEP,
+            accepts = pattern(element, "acceptedFilenameRegex"),
+        )
+    }
+
+    private fun text(parent: JsonElement, key: String): String =
+        field(parent, key) { (it as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content }
+
+    private fun pattern(parent: JsonElement, key: String): FileNamePattern =
+        text(parent, key).let { regex -> FileNamePattern.of(regex).getOrElse { raise(CatalogError.InvalidPattern(source, regex)) } }
+
+    private fun <T : Any> optional(parent: JsonElement, key: String, cast: (JsonElement) -> T?): Option<T> =
+        if (parent is JsonObject && key in parent) Some(field(parent, key, cast)) else None
+
+    // kotlinx.serialization reports absent or mistyped JSON values as nulls; they stop here.
+    private fun <T : Any> field(parent: JsonElement, key: String, cast: (JsonElement) -> T?): T =
+        ensureNotNull((parent as? JsonObject)?.get(key)?.let(cast)) { CatalogError.MissingField(source, key) }
+}

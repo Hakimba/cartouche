@@ -1,0 +1,57 @@
+[gd_resource type="Theme" format=3 uid="uid://dsq5253mlvx0h"]
+
+[sub_resource type="StyleBoxFlat" id="pad_idle"]
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+bg_color = Color(0.227, 0.239, 0.271, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="pad_active"]
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+bg_color = Color(0.941, 0.706, 0.161, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="pad_seen"]
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+bg_color = Color(0.184, 0.561, 0.275, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="background"]
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+bg_color = Color(0.114, 0.122, 0.141, 1)
+
+[resource]
+default_font_size = 22
+Hint/base_type = &"Label"
+Hint/colors/font_color = Color(0.702, 0.718, 0.761, 1)
+Hint/font_sizes/font_size = 17
+LogText/base_type = &"RichTextLabel"
+LogText/font_sizes/normal_font_size = 17
+PadCell/base_type = &"Label"
+PadCell/styles/normal = SubResource("pad_idle")
+PadCellActive/base_type = &"Label"
+PadCellActive/colors/font_color = Color(0.086, 0.09, 0.102, 1)
+PadCellActive/styles/normal = SubResource("pad_active")
+PadCellSeen/base_type = &"Label"
+PadCellSeen/styles/normal = SubResource("pad_seen")
+PanelContainer/styles/panel = SubResource("background")

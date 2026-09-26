@@ -1,0 +1,25 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{gd,tscn,tres,cfg,godot}]
+indent_style = tab
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+max_line_length = 140
+ktlint_code_style = ktlint_official
+# Wrap signatures and chains only when they exceed the line length.
+ktlint_class_signature_rule_force_multiline_when_parameter_count_greater_or_equal_than = unset
+ktlint_function_signature_rule_force_multiline_when_parameter_count_greater_or_equal_than = unset
+ktlint_chain_method_rule_force_multiline_when_chain_operator_count_greater_or_equal_than = unset
+ktlint_function_signature_body_expression_wrapping = default
+
+[*.{md,toml,json,yml,yaml}]
+indent_style = space
+indent_size = 2

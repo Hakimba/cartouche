@@ -1,0 +1,10 @@
+build/
+.gradle/
+.kotlin/
+local.properties
+app/.godot/
+app/android/
+app/addons/cartouche_android/bin/
+*.apk
+*.aab
+*.keystore

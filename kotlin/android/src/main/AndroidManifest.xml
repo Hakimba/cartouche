@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Library scans read ROM folders through the filesystem, one to two orders of magnitude faster
+         than through the Storage Access Framework on large SD cards. Not accepted on Google Play;
+         Cartouche is distributed outside it. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- Stops an emulator left in the background so it loads the new game (effective up to Android 13,
+         see Launcher.stopBackgroundInstance). -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+
+    <!-- Emulators and the apps shown in the Apps menu all have a launcher entry, which is all the
+         package visibility Cartouche needs. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application>
+        <meta-data
+            android:name="org.godotengine.plugin.v2.${godotPluginName}"
+            android:value="app.cartouche.android.CartouchePlugin" />
+    </application>
+
+</manifest>
