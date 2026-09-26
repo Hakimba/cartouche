@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://c0rwoe4r15bls" path="res://dev/device_check/pad_page.tscn" id="5"]
 [ext_resource type="PackedScene" uid="uid://c0ukix1ea6bs8" path="res://dev/device_check/perf_page.tscn" id="6"]
 [ext_resource type="PackedScene" uid="uid://c5prx7e1hs7en" path="res://dev/device_check/apps_page.tscn" id="7"]
+[ext_resource type="PackedScene" uid="uid://d2knflybwahgh" path="res://dev/device_check/library_page.tscn" id="8"]
 
 [node name="DeviceCheck" type="PanelContainer"]
 anchors_preset = 15
@@ -42,8 +43,11 @@ size_flags_stretch_ratio = 3.0
 [node name="Storage" parent="Rows/Tabs" instance=ExtResource("3")]
 layout_mode = 2
 
-[node name="Launch" parent="Rows/Tabs" instance=ExtResource("4")]
+[node name="Library" parent="Rows/Tabs" instance=ExtResource("8")]
 unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Launch" parent="Rows/Tabs" instance=ExtResource("4")]
 layout_mode = 2
 
 [node name="Controller" parent="Rows/Tabs" instance=ExtResource("5")]

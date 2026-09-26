@@ -19,11 +19,14 @@ func _ready() -> void:
 	_log_line("Device: %s · Android plugin %s" % [DeviceCheckPage.plain(Android.device_name()),
 			"loaded" if Android.is_available() else "MISSING"])
 	var catalog := Android.load_catalog()
-	_log_line("Platforms: %s" % DeviceCheckPage.plain(", ".join(catalog.platform_names)))
+	var names := PackedStringArray(catalog.platforms.map(
+			func(platform: AndroidServices.Platform) -> String: return platform.name))
+	_log_line("Platforms: %s" % DeviceCheckPage.plain(", ".join(names)))
 	for rejection in catalog.rejected:
-		_log_line("[color=salmon]Rejected definition: %s[/color]" % DeviceCheckPage.plain(rejection))
-	# Opens on the Launch page; tab_changed refreshes it.
-	_tabs.current_tab = (%Launch as Control).get_index()
+		var line := DeviceCheckPage.plain(rejection)
+		_log_line("[color=salmon]Rejected definition: %s[/color]" % line)
+	# Opens on the Library page; tab_changed refreshes it.
+	_tabs.current_tab = (%Library as Control).get_index()
 	_on_clock_timeout()
 
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
 }
 
@@ -13,8 +14,9 @@ kotlin {
 dependencies {
     api(libs.arrow.core)
     implementation(libs.serialization.json)
+    implementation(libs.arrow.serialization)
     testImplementation(libs.bundles.test)
 }
 
 // The tests check the definition files shipped with the app, not copies.
-tasks.test { systemProperty("cartouche.platformData", rootProject.file("../app/data/platforms/daijishou").path) }
+tasks.test { systemProperty("cartouche.data", rootProject.file("../app/data").path) }

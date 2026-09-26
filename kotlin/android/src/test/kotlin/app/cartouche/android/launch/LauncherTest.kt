@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.launch
 
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
@@ -38,5 +39,21 @@ class LauncherTest {
         launcher.prepareGame(launch("com.armsx2")).shouldBeRight().component.shouldNotBeNull().packageName shouldBe "com.armsx2"
         launcher.prepareGame(launch("not.installed")).shouldBeLeft() shouldBe
             LaunchFailure.NotInstalled(PackageName.parse("not.installed").shouldBeSome())
+    }
+
+    @Test
+    fun `a disabled emulator is not offered, since it could not start`() {
+        val info =
+            PackageInfo().apply {
+                packageName = "com.armsx2"
+                applicationInfo =
+                    ApplicationInfo().apply {
+                        packageName = "com.armsx2"
+                        enabled = false
+                    }
+            }
+        shadowOf(context.packageManager).installPackage(info)
+        launcher.prepareGame(launch("com.armsx2")).shouldBeLeft() shouldBe
+            LaunchFailure.NotInstalled(PackageName.parse("com.armsx2").shouldBeSome())
     }
 }

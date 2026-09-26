@@ -12,27 +12,43 @@ import android.util.Log
 import app.cartouche.android.apps.InstalledApps
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.launch.Launcher
+import app.cartouche.android.library.LibraryFailure
+import app.cartouche.android.library.LibraryService
 import app.cartouche.android.storage.Folders
+import app.cartouche.android.storage.LibraryStore
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
 import app.cartouche.core.launch.GameFile
-import app.cartouche.core.platforms.Candidate
+import app.cartouche.core.library.DiscGrouping
+import app.cartouche.core.library.FolderDepth
+import app.cartouche.core.library.GameId
+import app.cartouche.core.library.PlatformSetup
+import app.cartouche.core.library.TitleIndex
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.CatalogError
 import app.cartouche.core.platforms.DefinitionSource
+import app.cartouche.core.platforms.Platform
+import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.platforms.Player
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
 import arrow.core.Some
+import arrow.core.firstOrNone
 import arrow.core.flatMap
 import arrow.core.getOrElse
+import arrow.core.getOrNone
+import arrow.core.merge
+import arrow.core.raise.Raise
+import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.raise.option
 import arrow.core.recover
 import arrow.core.separateEither
 import arrow.core.toOption
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,7 +60,9 @@ import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin
 import org.godotengine.godot.plugin.SignalInfo
 import org.godotengine.godot.plugin.UsedByGodot
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.TimeSource
 
 /**
  * Cartouche's Android services, reached from GDScript as `Engine.get_singleton("CartoucheAndroid")`
@@ -62,8 +80,17 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private val launcher by lazy { Launcher(context) }
     private val pendingPick = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
 
-    /** Only read and written on the render thread. */
-    private var catalog = Catalog()
+    /** Written on the render thread, read by operations too; immutable, so publishing it is enough. */
+    @Volatile private var catalog = Catalog()
+
+    /** Reference lists by platform, as loaded; each is indexed on its first scan. */
+    @Volatile private var titleLists: Map<PlatformId, String> = emptyMap()
+
+    @Volatile private var titleIndexes = ConcurrentHashMap<PlatformId, TitleIndex>()
+
+    /** Runs every library call, one at a time (see [LibraryService]). */
+    private val libraryThread = Dispatchers.IO.limitedParallelism(1)
+    private val library by lazy { LibraryService(LibraryStore(File(context.filesDir, "library.json")), folders) }
 
     /** Whether each package is installed, forgotten on resume since apps may be installed meanwhile. */
     private val installed = ConcurrentHashMap<PackageName, Boolean>()
@@ -78,21 +105,35 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     // Getters
 
-    /** Loads platform definitions given as `{file name: JSON text}`, in file name order; returns the catalog summary. */
+    /**
+     * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
+     * profiles file's text and the reference lists as `{platform id: text}`; returns the catalog summary.
+     */
     @UsedByGodot
-    public fun loadCatalog(sources: Dictionary): Dictionary {
-        val (notText, definitions) =
-            sources.keys.sorted().separateEither { name ->
-                sources.text(name).map { DefinitionSource(name, it) }.toEither { CatalogError.InvalidJson(name, "not text") }
+    public fun loadCatalog(definitions: Dictionary, profiles: String, titles: Dictionary): Dictionary {
+        val (notText, sources) =
+            definitions.keys.sorted().separateEither { name ->
+                definitions.text(name).map { DefinitionSource(name, it) }.toEither { CatalogError.InvalidJson(name, "not text") }
             }
-        catalog = Catalog.parse(definitions).let { it.copy(rejected = notText + it.rejected) }
+        titleLists = titles.keys.flatMap { id -> titles.text(id).map { PlatformId(id) to it }.toList() }.toMap()
+        titleIndexes = ConcurrentHashMap()
+        catalog = Catalog.parse(sources, DefinitionSource("profiles.json", profiles)).let { it.copy(rejected = notText + it.rejected) }
+        // Indexing takes a second or so on a handheld: done now, the first scan does not wait for it.
+        scope.launch { Either.catch { titleLists.keys.forEach(::titles) }.onLeft(::unexpected) }
         return catalog.toWire()
     }
 
     /** Installed players able to open [fileName], in definition order. */
     @UsedByGodot
     public fun candidates(fileName: String): Array<Any> =
-        catalog.candidates(FileName(fileName)).filter(::isAvailable).toWireArray { it.toWire() }
+        catalog.candidates(FileName(fileName)).filter { isAvailable(it.player) }.toWireArray { it.toWire() }
+
+    /** The installed players of [platformId], in definition order: `[{"player_id", "player_name"}]`. */
+    @UsedByGodot
+    public fun installedPlayers(platformId: String): Array<Any> = catalog
+        .platform(PlatformId(platformId))
+        .fold({ emptyList() }) { it.players.filter(::isAvailable) }
+        .toWireArray { dictionary("player_id" to it.id.value, "player_name" to it.name) }
 
     @UsedByGodot
     public fun hasAllFilesAccess(): Boolean = Environment.isExternalStorageManager()
@@ -166,7 +207,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     public fun listFolder(requestId: Int, location: Dictionary): Unit = inBackground(requestId) {
         val tree = location.text("tree_uri").flatMap(ContentUri::parse)
-        tree.fold({ failure(ErrorCode.INVALID_REQUEST, "listFolder needs a tree URI") }) { uri ->
+        tree.fold({ invalid("listFolder needs a tree URI") }) { uri ->
             folders
                 .list(uri, location.text("document_id").map(::DocumentId))
                 .fold({ it.toWire() }, { entries -> success("entries" to entries.toWireArray { it.toWire() }) })
@@ -181,13 +222,67 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     public fun launchApp(requestId: Int, packageName: String): Unit =
-        PackageName.parse(packageName).fold({ answer(requestId) { failure(ErrorCode.INVALID_REQUEST, "Invalid package $packageName") } }) {
+        PackageName.parse(packageName).fold({ answer(requestId) { invalid("Invalid package $packageName") } }) {
             withActivity(requestId) { act -> start(act, launcher.appIntent(it)) }
         }
 
-    /** Launches the game `{"name", "uri", "path"?}` with [playerId]. */
+    /** Answers with `{"library"}`, read from its file on first use. */
     @UsedByGodot
-    public fun launchGame(requestId: Int, playerId: String, file: Dictionary) {
+    public fun library(requestId: Int): Unit = answering(requestId, libraryThread) {
+        library.run { success("library" to library().toWire()).putSome("load_problem", loadProblem) }
+    }
+
+    /**
+     * Stores the choices `{"folder_uri"?, "player_id"?, "disc_grouping", "folder_depth"}` for
+     * [platformId]; answers with `{"library"}`.
+     */
+    @UsedByGodot
+    public fun setUpPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = answering(requestId, libraryThread) {
+        val platform = platform(PlatformId(platformId))
+
+        fun <T> code(key: String, values: List<T>, wire: (T) -> String): T = setup
+            .text(key)
+            .flatMap { text ->
+                values.firstOrNone { wire(it) == text }
+            }.getOrElse { raise(invalid("$key is missing or unknown")) }
+        val folder = setup.text("folder_uri").map { ContentUri.parse(it).getOrElse { raise(invalid("folder_uri is not a content URI")) } }
+        val discs = code("disc_grouping", DiscGrouping.entries) { it.wire }
+        val depth = code("folder_depth", FolderDepth.entries) { it.wire }
+        val choices = PlatformSetup(folder, setup.text("player_id").map(::PlayerId), discs, depth)
+        success("library" to inLibrary { setUp(platform.id, choices) }.toWire())
+    }
+
+    /** Scans [platformId]'s folder; answers with `{"library", "report"}`. */
+    @UsedByGodot
+    public fun scanPlatform(requestId: Int, platformId: String): Unit = answering(requestId, libraryThread) {
+        val platform = platform(PlatformId(platformId))
+        val titles = titles(platform.id)
+        val (library, report) = inLibrary { scan(platform, titles) }
+        success("library" to library.toWire(), "report" to report.toWire())
+    }
+
+    /** Launches the library game `{"game_id", "disc"?}` (a disc index; the last launched by default) with its platform's player. */
+    @UsedByGodot
+    public fun launchGame(requestId: Int, request: Dictionary): Unit = onActivity(requestId) { act ->
+        answering(requestId, libraryThread) {
+            val id = request.text("game_id").map(::GameId).getOrElse { raise(invalid("launchGame needs a game_id")) }
+            val choice = inLibrary { launchChoice(id, request.integer("disc")) }
+            val platform = platform(choice.game.platform)
+            val player =
+                choice.setup.playerFor(platform, choice.file.name, ::isAvailable).getOrElse {
+                    raise(LaunchFailure.NoPlayer(platform.id).toWire())
+                }
+            trace("launch") { "${choice.file.name.value} with ${player.id.value} (chosen: ${choice.setup.player})" }
+            start(act, prepared(player.id, choice.file.asGameFile)).mapLeft { it.toWire() }.bind()
+            // The game is running: a failure to remember its disc must not report the launch as failed.
+            onLibrary { recordLaunch(id, choice.disc) }.onLeft { failure -> trace("library") { "last disc not saved: ${failure.message}" } }
+            success()
+        }
+    }
+
+    /** Launches the file `{"name", "uri", "path"?}` with [playerId], outside the library. */
+    @UsedByGodot
+    public fun launchFile(requestId: Int, playerId: String, file: Dictionary) {
         val game =
             option {
                 GameFile(
@@ -196,17 +291,45 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
                     file.text("path").map(::FilePath),
                 )
             }
-        game.fold({ answer(requestId) { failure(ErrorCode.INVALID_REQUEST, "launchGame needs a name and a content URI") } }) {
-            val launch = catalog.launch(PlayerId(playerId), it).mapLeft(LaunchFailure::Rejected)
-            withActivity(requestId) { act -> start(act, launch.flatMap(launcher::prepareGame)) }
+        game.fold({ answer(requestId) { invalid("launchFile needs a name and a content URI") } }) {
+            withActivity(requestId) { act -> start(act, prepared(PlayerId(playerId), it)) }
         }
     }
 
     // Plumbing
 
+    private suspend fun <T> onLibrary(block: LibraryService.() -> T): T = withContext(libraryThread) { library.block() }
+
+    /** [onLibrary] for a call that can fail: its failure becomes the answer. */
+    private suspend fun <T> Raise<Dictionary>.inLibrary(block: LibraryService.() -> Either<LibraryFailure, T>): T =
+        onLibrary(block).mapLeft { it.toWire() }.bind()
+
+    /**
+     * Answers [requestId] with what [work] returns, or with the failure it raises. Library calls
+     * start on [libraryThread] itself, which runs them in the order they arrive.
+     */
+    private fun answering(requestId: Int, on: CoroutineDispatcher = Dispatchers.IO, work: suspend Raise<Dictionary>.() -> Dictionary) {
+        scope.launch(on) { answer(requestId) { either { work() }.merge() } }
+    }
+
+    private fun prepared(player: PlayerId, file: GameFile): Either<LaunchFailure, Intent> =
+        catalog.launch(player, file).mapLeft(LaunchFailure::Rejected).flatMap(launcher::prepareGame)
+
+    private fun Raise<Dictionary>.platform(id: PlatformId): Platform =
+        catalog.platform(id).getOrElse { raise(failure(ErrorCode.UNKNOWN_PLATFORM, "No platform ${id.value}")) }
+
+    private fun titles(platform: PlatformId): TitleIndex = titleIndexes.computeIfAbsent(platform) {
+        val started = TimeSource.Monotonic.markNow()
+        titleLists.getOrNone(platform).fold({ TitleIndex.EMPTY }, TitleIndex::parse).also {
+            trace("titles") { "${platform.value}: ${it.size} indexed in ${started.elapsedNow().inWholeMilliseconds} ms" }
+        }
+    }
+
+    private fun invalid(detail: String): Dictionary = failure(ErrorCode.INVALID_REQUEST, detail)
+
     // The system resolves implicit intents, so they are always available.
-    private fun isAvailable(candidate: Candidate): Boolean =
-        candidate.player.template.targetPackage.fold({ true }) { installed.getOrPut(it) { isInstalled(it) } }
+    private fun isAvailable(player: Player): Boolean =
+        player.template.targetPackage.fold({ true }) { installed.getOrPut(it) { isInstalled(it) } }
 
     private fun isInstalled(packageName: PackageName): Boolean =
         InstalledApps.isInstalled(context.packageManager, packageName).also { trace("installed") { "${packageName.value}: $it" } }

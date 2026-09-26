@@ -14,6 +14,7 @@ import app.cartouche.core.PackageName
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.platforms.Launch
 import app.cartouche.core.platforms.LaunchError
+import app.cartouche.core.platforms.PlatformId
 import arrow.core.Either
 import arrow.core.getOrElse
 import arrow.core.raise.catch
@@ -31,6 +32,9 @@ internal sealed interface LaunchFailure {
 
     data class PermissionDenied(val reason: String) : LaunchFailure
 
+    /** No installed player of [platform] opens the game. */
+    data class NoPlayer(val platform: PlatformId) : LaunchFailure
+
     val message: String
         get() =
             when (this) {
@@ -38,6 +42,7 @@ internal sealed interface LaunchFailure {
                 is NotInstalled -> "${packageName.value} is not installed"
                 is ActivityNotFound -> "No activity for $target"
                 is PermissionDenied -> "Permission denied: $reason"
+                is NoPlayer -> "No installed emulator for ${platform.value} opens this game"
             }
 }
 

@@ -8,15 +8,19 @@ import android.net.Uri
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import app.cartouche.android.trace
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.library.FolderDepth
+import app.cartouche.core.library.ListedFile
 import app.cartouche.core.storage.DocumentId
 import app.cartouche.core.storage.DocumentPaths
 import app.cartouche.core.storage.VolumeId
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.filterOption
 import arrow.core.getOrElse
 import arrow.core.raise.Raise
@@ -35,6 +39,8 @@ internal data class DocumentEntry(
     val documentId: DocumentId,
     val uri: ContentUri,
     val path: Option<FilePath>,
+    /** None when the provider does not report it. */
+    val sizeBytes: Option<Long>,
 )
 
 internal enum class EntryKind { DIRECTORY, FILE }
@@ -74,13 +80,48 @@ internal class Folders(private val context: Context) {
 
     /** Lists one level of [tree]: its root, or the sub-folder [documentId]. Nothing is filtered out. */
     fun list(tree: ContentUri, documentId: Option<DocumentId>): Either<StorageFailure, List<DocumentEntry>> = guard {
-        val treeUri = Uri.parse(tree.value)
-        val parent = documentId.getOrElse { DocumentId(DocumentsContract.getTreeDocumentId(treeUri)) }
+        entries(tree, documentId, volumeRoots())
+    }
+
+    /**
+     * Every file of [tree], and with [FolderDepth.SUBFOLDERS] those of its sub-folders, except
+     * hidden ones (`.Trash`) and those deeper than [MAX_DEPTH]. A sub-folder that cannot be read is
+     * skipped, and traced; folders themselves are not listed.
+     */
+    fun files(tree: ContentUri, depth: FolderDepth): Either<StorageFailure, List<ListedFile>> = guard {
         val roots = volumeRoots()
-        queryAll(DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parent.value), CHILD_COLUMNS)
+
+        fun walk(entries: List<DocumentEntry>, level: Int): List<ListedFile> = entries.flatMap { entry ->
+            when (entry.kind) {
+                EntryKind.FILE -> listOf(ListedFile(entry.name, entry.uri, entry.path, entry.sizeBytes))
+                EntryKind.DIRECTORY ->
+                    if (depth == FolderDepth.TOP_LEVEL || entry.name.isHidden) {
+                        emptyList()
+                    } else if (level >= MAX_DEPTH) {
+                        trace("scan") { "skipped ${entry.name.value}: deeper than $MAX_DEPTH folders" }
+                        emptyList()
+                    } else {
+                        guard { entries(tree, Some(entry.documentId), roots) }.fold({ failure ->
+                            trace("scan") { "skipped ${entry.name.value}: ${failure.message}" }
+                            emptyList()
+                        }) { walk(it, level + 1) }
+                    }
+            }
+        }
+        walk(entries(tree, None, roots), level = 1)
+    }
+
+    private fun Raise<StorageFailure>.entries(
+        tree: ContentUri,
+        folder: Option<DocumentId>,
+        roots: Map<VolumeId, FilePath>,
+    ): List<DocumentEntry> {
+        val treeUri = Uri.parse(tree.value)
+        val parent = folder.getOrElse { DocumentId(DocumentsContract.getTreeDocumentId(treeUri)) }
+        return queryAll(DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parent.value), CHILD_COLUMNS)
             .getOrElse { raise(StorageFailure.Unavailable("the documents provider returned nothing (storage removed?)")) }
             .use { cursor ->
-                val (idColumn, nameColumn, mimeColumn) = CHILD_COLUMNS.map(cursor::getColumnIndexOrThrow)
+                val (idColumn, nameColumn, mimeColumn, sizeColumn) = CHILD_COLUMNS.map(cursor::getColumnIndexOrThrow)
                 buildList {
                     while (cursor.moveToNext()) {
                         val id =
@@ -92,6 +133,7 @@ internal class Folders(private val context: Context) {
                                 documentId = id,
                                 uri = contentUri(DocumentsContract.buildDocumentUriUsingTree(treeUri, id.value)),
                                 path = DocumentPaths.pathOf(treeUri.authority.orEmpty(), id, roots),
+                                sizeBytes = if (cursor.isNull(sizeColumn)) None else Some(cursor.getLong(sizeColumn)),
                             ),
                         )
                     }
@@ -146,6 +188,10 @@ internal class Folders(private val context: Context) {
     }
 
     private companion object {
-        val CHILD_COLUMNS = arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE)
+        /** Deep enough for any ROM layout, shallow enough never to exhaust the stack. */
+        const val MAX_DEPTH = 8
+
+        val CHILD_COLUMNS =
+            arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE)
     }
 }

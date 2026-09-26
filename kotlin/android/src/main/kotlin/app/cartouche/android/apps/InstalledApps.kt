@@ -16,14 +16,14 @@ internal data class LaunchableApp(val packageName: PackageName, val label: Strin
  * manifest, which covers every emulator since they all have a launcher icon.
  */
 internal object InstalledApps {
+    /** Whether [packageName] is installed and enabled: a disabled app cannot be started. */
     fun isInstalled(packageManager: PackageManager, packageName: PackageName): Boolean = catch({
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager.getPackageInfo(packageName.value, PackageManager.PackageInfoFlags.of(0))
+            packageManager.getApplicationInfo(packageName.value, PackageManager.ApplicationInfoFlags.of(0)).enabled
         } else {
-            @Suppress("DEPRECATION") // Replaced by the PackageInfoFlags overload from API 33.
-            packageManager.getPackageInfo(packageName.value, 0)
+            @Suppress("DEPRECATION") // Replaced by the ApplicationInfoFlags overload from API 33.
+            packageManager.getApplicationInfo(packageName.value, 0).enabled
         }
-        true
     }) { _: PackageManager.NameNotFoundException -> false }
 
     /** Apps with a launcher icon, sorted by label. Loading labels is slow: call off the main thread. */

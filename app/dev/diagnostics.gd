@@ -16,13 +16,14 @@ const _NOTIFICATIONS: Dictionary[int, String] = {
 	NOTIFICATION_WM_CLOSE_REQUEST: "close request",
 }
 
-var _enabled := OS.is_debug_build()
+## Whether traces are written; check it before building an expensive detail.
+var enabled := OS.is_debug_build()
 ## Whether each joypad axis (keyed by device * 100 + axis) is past half-way.
 var _axes_past_half: Dictionary[int, bool] = {}
 
 
 func _ready() -> void:
-	if _enabled:
+	if enabled:
 		get_tree().root.window_input.connect(_on_window_input)
 		get_viewport().gui_focus_changed.connect(_on_focus_changed)
 
@@ -34,7 +35,7 @@ func _notification(what: int) -> void:
 
 ## Writes one `area: detail` line to the log, in debug builds only; long details are cut.
 func trace(area: String, detail: String) -> void:
-	if _enabled:
+	if enabled:
 		var shown := detail if detail.length() <= _MAX_DETAIL else detail.left(_MAX_DETAIL) + "…"
 		print("Cartouche %s: %s" % [area, shown])
 

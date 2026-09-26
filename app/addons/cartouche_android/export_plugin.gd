@@ -34,7 +34,8 @@ class AndroidExportPlugin extends EditorExportPlugin:
 			-> PackedStringArray:
 		# Written by the Gradle build, so dependency versions live only in its version catalog.
 		var listed := FileAccess.get_file_as_string("res://addons/" + BIN + "dependencies.txt")
-		# Export plugins cannot stop an export: the Gradle build fails on the missing AARs, this says why.
+		# Export plugins cannot stop an export: the Gradle build fails on the missing AARs,
+		# and this says why.
 		if listed.is_empty():
 			push_error("CartoucheAndroid: no bin/dependencies.txt; build kotlin/ first")
 		return listed.strip_edges().split("\n", false)

@@ -1,0 +1,102 @@
+[gd_scene format=3 uid="uid://d2knflybwahgh"]
+
+[ext_resource type="Script" uid="uid://b4m1m00plmcqo" path="res://dev/device_check/library_page.gd" id="1"]
+
+[node name="Library" type="VBoxContainer"]
+script = ExtResource("1")
+
+[node name="Source" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Platform" type="OptionButton" parent="Source"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+clip_text = true
+fit_to_longest_item = false
+
+[node name="Folder" type="OptionButton" parent="Source"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+clip_text = true
+fit_to_longest_item = false
+
+[node name="Options" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="Player" type="OptionButton" parent="Options"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+clip_text = true
+fit_to_longest_item = false
+
+[node name="GroupDiscs" type="CheckBox" parent="Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Group discs"
+
+[node name="Subfolders" type="CheckBox" parent="Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Subfolders"
+
+[node name="Scan" type="Button" parent="Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Scan"
+
+[node name="Status" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Hint"
+
+[node name="Columns" type="HBoxContainer" parent="."]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Games" type="ItemList" parent="Columns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
+
+[node name="Side" type="VBoxContainer" parent="Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Disc" type="OptionButton" parent="Columns/Side"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="LaunchButton" type="Button" parent="Columns/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Launch"
+
+[node name="Details" type="Label" parent="Columns/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="IgnoredTitle" type="Label" parent="Columns/Side"]
+layout_mode = 2
+text = "Ignored files"
+
+[node name="Ignored" type="ItemList" parent="Columns/Side"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[connection signal="item_selected" from="Source/Platform" to="." method="_on_platform_selected"]
+[connection signal="item_selected" from="Source/Folder" to="." method="_on_setup_changed" unbinds=1]
+[connection signal="item_selected" from="Options/Player" to="." method="_on_setup_changed" unbinds=1]
+[connection signal="toggled" from="Options/GroupDiscs" to="." method="_on_setup_changed" unbinds=1]
+[connection signal="toggled" from="Options/Subfolders" to="." method="_on_setup_changed" unbinds=1]
+[connection signal="pressed" from="Options/Scan" to="." method="_on_scan_pressed"]
+[connection signal="item_selected" from="Columns/Games" to="." method="_on_game_selected"]
+[connection signal="item_activated" from="Columns/Games" to="." method="_on_launch_pressed" unbinds=1]
+[connection signal="pressed" from="Columns/Side/LaunchButton" to="." method="_on_launch_pressed"]

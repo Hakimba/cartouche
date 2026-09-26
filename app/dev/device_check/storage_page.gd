@@ -8,7 +8,8 @@ extends DeviceCheckPage
 
 
 func refresh() -> void:
-	_access.text = "All files access: " + ("granted" if Android.has_all_files_access() else "NOT granted")
+	var granted := "granted" if Android.has_all_files_access() else "NOT granted"
+	_access.text = "All files access: " + granted
 	_grant.grab_focus()
 	var listed := await Android.persisted_folders()
 	_folders.clear()

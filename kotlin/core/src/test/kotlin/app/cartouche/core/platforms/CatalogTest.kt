@@ -4,6 +4,7 @@ package app.cartouche.core.platforms
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.Shipped
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.launch.TemplateError
@@ -26,16 +27,13 @@ import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
-import java.io.File
 
 class CatalogTest {
-    private val shipped =
-        File(checkNotNull(System.getProperty("cartouche.platformData")) { "Run the tests through Gradle" })
-            .listFiles { file -> file.extension == "json" }
-            .orEmpty()
-            .map { DefinitionSource(it.name, it.readText()) }
+    private val shipped = Shipped.definitions
+    private val catalog = Shipped.catalog
 
-    private val catalog = Catalog.parse(shipped)
+    private fun parse(definitions: List<DefinitionSource>) =
+        Catalog.parse(definitions, DefinitionSource("profiles.json", """{"ps2": {"media": "dvd", "minimumGameBytes": 1000000}}"""))
 
     private fun player(id: String, template: String = "-n com.armsx2/.Main -d {file.uri}", pattern: String = "^.*\\\\.chd$") =
         """{"uniqueId": "$id", "name": "$id", "acceptedFilenameRegex": "$pattern",
@@ -76,7 +74,7 @@ class CatalogTest {
     @Test
     fun `INV-E0-08 a broken or duplicate player is rejected alone, a duplicate platform whole, and every rejection is reported`() {
         val parsed =
-            Catalog.parse(
+            parse(
                 listOf(
                     definition(player("good"), player("bad", template = "-n nopackage"), player("good")),
                     definition(player("other"), name = "again.json"),
@@ -94,27 +92,31 @@ class CatalogTest {
     @Test
     fun `killPackageProcesses is optional`() {
         val player = """{"uniqueId": "p", "name": "p", "acceptedFilenameRegex": ".*", "amStartArguments": "-n a.b/.C"}"""
-        Catalog.parse(listOf(definition(player))).find(PlayerId("p")).shouldBeSome().player.runningInstance shouldBe RunningInstance.KEEP
+        parse(listOf(definition(player))).find(PlayerId("p")).shouldBeSome().player.runningInstance shouldBe RunningInstance.KEEP
     }
 
     @Test
     fun `INV-E0-08 a broken definition file is rejected whole and reported`() {
-        Catalog.parse(listOf(DefinitionSource("broken.json", "{"))).rejected.single().shouldBeInstanceOf<CatalogError.InvalidJson>()
-        Catalog.parse(listOf(DefinitionSource("empty.json", "{}"))).rejected.single() shouldBe
+        parse(listOf(DefinitionSource("broken.json", "{"))).rejected.single().shouldBeInstanceOf<CatalogError.InvalidJson>()
+        parse(listOf(DefinitionSource("empty.json", "{}"))).rejected.single() shouldBe
             CatalogError.MissingField("empty.json", "platform")
-        Catalog.parse(listOf(definition(pattern = "("))).rejected.single() shouldBe CatalogError.InvalidPattern("test.json", "(")
+        parse(listOf(definition(pattern = "("))).rejected.single() shouldBe CatalogError.InvalidPattern("test.json", "(")
+        Catalog.parse(listOf(definition()), DefinitionSource("profiles.json", "{}")).rejected.single() shouldBe
+            CatalogError.MissingProfile("test.json", PlatformId("ps2"))
+        Catalog.parse(listOf(definition()), DefinitionSource("profiles.json", "[")).rejected.map { it::class } shouldBe
+            listOf(CatalogError.InvalidJson::class, CatalogError.MissingProfile::class)
     }
 
     @Test
     fun `INV-E0-09 hidden files are never offered to a player, whatever the patterns`() = runBlocking<Unit> {
-        val permissive = Catalog.parse(listOf(definition(player("any", pattern = ".*"))))
+        val permissive = parse(listOf(definition(player("any", pattern = ".*"))))
         checkAll(Arb.string()) { name -> permissive.candidates(FileName(".$name")).shouldBeEmpty() }
     }
 
     @Test
     fun `INV-E0-10 catalog parsing and file matching are total`() = runBlocking<Unit> {
         checkAll(Arb.choice(definitions, Arb.string()), Arb.string()) { text, fileName ->
-            Catalog.parse(listOf(DefinitionSource("fuzz.json", text))).candidates(FileName(fileName))
+            parse(listOf(DefinitionSource("fuzz.json", text))).candidates(FileName(fileName))
             catalog.candidates(FileName(fileName))
         }
     }

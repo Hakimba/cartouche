@@ -51,7 +51,7 @@ func _on_entries_item_selected(index: int) -> void:
 	_players.clear()
 	if not entry.is_directory:
 		for candidate in Android.candidates(entry.name):
-			var label := "%s — %s" % [candidate.platform_name, candidate.player_name]
+			var label := "%s — %s" % [candidate.platform_name, candidate.name]
 			_players.set_item_metadata(_players.add_item(label), candidate)
 	if _players.item_count > 0:
 		_players.select(0)
@@ -82,13 +82,13 @@ func _on_launch_pressed() -> void:
 		logged.emit("[color=salmon]Cannot write the launch marker: restarts go unnoticed.[/color]")
 	_launching = true
 	_launch.disabled = true
-	var result := await Android.launch_game(candidate.player_id, entry)
+	var result := await Android.launch_file(candidate.id, entry)
 	_launching = false
 	# The player list may have changed meanwhile (back, another file).
 	_launch.disabled = _players.get_selected_items().is_empty()
 	_outcome.text = "Launched." if result.ok else "Failed (%s): %s" % [result.code, result.detail]
 	var outcome := "ok" if result.ok else String(result.code)
-	logged.emit("%s → %s: %s" % [plain(entry.name), plain(candidate.player_name), outcome])
+	logged.emit("%s → %s: %s" % [plain(entry.name), plain(candidate.name), outcome])
 	if not result.ok:
 		DirAccess.remove_absolute(_LAUNCH_MARKER)
 

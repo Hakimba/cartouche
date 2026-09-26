@@ -20,6 +20,8 @@ import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
 import arrow.core.raise.withError
 import arrow.core.separateEither
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -27,9 +29,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 
-@JvmInline public value class PlatformId(public val value: String)
+@Serializable @JvmInline
+public value class PlatformId(public val value: String)
 
-@JvmInline public value class PlayerId(public val value: String)
+@Serializable @JvmInline
+public value class PlayerId(public val value: String)
 
 /** A Daijishō file name pattern, matched case-insensitively (ROM sets mix `.chd` and `.CHD`). */
 public class FileNamePattern private constructor(public val source: String, private val regex: Regex) {
@@ -61,7 +65,27 @@ public data class Platform(
     public val name: String,
     public val players: List<Player>,
     public val accepts: FileNamePattern,
+    public val profile: PlatformProfile,
 )
+
+@Serializable
+public enum class MediaType {
+    @SerialName("dvd")
+    DVD,
+
+    @SerialName("cartridge")
+    CARTRIDGE,
+
+    @SerialName("minidisc")
+    MINIDISC,
+}
+
+/**
+ * What Cartouche adds to a Daijishō platform, from `app/data/platforms/profiles.json`: the physical
+ * medium its games are shown as, and the size under which an unknown file is not taken for a game.
+ */
+@Serializable
+public data class PlatformProfile(public val media: MediaType, public val minimumGameBytes: Long)
 
 /** A player able to open a given file, with its platform. */
 public data class Candidate(public val platform: Platform, public val player: Player)
@@ -104,6 +128,8 @@ public sealed interface CatalogError {
 
     public data class DuplicatePlayer(override val source: String, public val player: PlayerId) : CatalogError
 
+    public data class MissingProfile(override val source: String, public val platform: PlatformId) : CatalogError
+
     /** English description, for logs. */
     public val message: String
         get() =
@@ -114,15 +140,17 @@ public sealed interface CatalogError {
                 is InvalidTemplate -> "Player ${player.value}: ${error.message}"
                 is DuplicatePlatform -> "Platform ${platform.value} is already defined"
                 is DuplicatePlayer -> "Player ${player.value} is already defined"
+                is MissingProfile -> "Platform ${platform.value} has no Cartouche profile"
             }
 }
 
 /**
  * The platforms and players Cartouche knows, read from Daijishō definition files (a `platform`
- * object and a `playerList` array, see `app/data/platforms/daijishou/`).
+ * object and a `playerList` array, see `app/data/platforms/daijishou/`) and Cartouche's own
+ * profiles ([PlatformProfile]). Adding a platform takes data only: a definition and a profile.
  *
  * A broken or duplicate player is rejected on its own and the rest of its platform is kept; a broken
- * or duplicate platform file is rejected whole. Every rejection is kept in [rejected]: bad data is visible, never
+ * or duplicate platform file, or one without a profile, is rejected whole. Every rejection is kept in [rejected]: bad data is visible, never
  * silently missing. Hidden files are never offered to a player, whatever the patterns say.
  */
 public data class Catalog(public val platforms: List<Platform> = emptyList(), public val rejected: List<CatalogError> = emptyList()) {
@@ -134,6 +162,8 @@ public data class Catalog(public val platforms: List<Platform> = emptyList(), pu
 
     public fun find(id: PlayerId): Option<Candidate> = all.firstOrNone { it.player.id == id }
 
+    public fun platform(id: PlatformId): Option<Platform> = platforms.firstOrNone { it.id == id }
+
     /** Resolves how [id] opens [file]. */
     public fun launch(id: PlayerId, file: GameFile): Either<LaunchError, Launch> = either {
         val player = find(id).getOrElse { raise(LaunchError.UnknownPlayer(id)) }.player
@@ -142,11 +172,19 @@ public data class Catalog(public val platforms: List<Platform> = emptyList(), pu
     }
 
     public companion object {
-        public fun parse(sources: List<DefinitionSource>): Catalog = sources.fold(Catalog()) { catalog, source ->
-            either { DefinitionReader(source.name, this).platform(source.text) }.fold(
-                { catalog.copy(rejected = catalog.rejected + it) },
-                { (platform, rejectedPlayers) -> catalog.withPlatform(source.name, platform, rejectedPlayers) },
-            )
+        /** Reads the Daijishō [definitions] and the [profiles] file (`{platform id: profile}`). */
+        public fun parse(definitions: List<DefinitionSource>, profiles: DefinitionSource): Catalog {
+            val readProfiles =
+                Either
+                    .catch { Json.decodeFromString<Map<PlatformId, PlatformProfile>>(profiles.text) }
+                    .mapLeft { CatalogError.InvalidJson(profiles.name, it.toString()) }
+            val initial = Catalog(rejected = readProfiles.fold({ listOf(it) }, { emptyList() }))
+            return definitions.fold(initial) { catalog, source ->
+                either { DefinitionReader(source.name, readProfiles.getOrElse { emptyMap() }, this).platform(source.text) }.fold(
+                    { catalog.copy(rejected = catalog.rejected + it) },
+                    { (platform, rejectedPlayers) -> catalog.withPlatform(source.name, platform, rejectedPlayers) },
+                )
+            }
         }
     }
 
@@ -166,15 +204,17 @@ public data class Catalog(public val platforms: List<Platform> = emptyList(), pu
 }
 
 /** Reads one definition file; every missing or mistyped field raises a [CatalogError] naming it. */
-private class DefinitionReader(val source: String, raise: Raise<CatalogError>) : Raise<CatalogError> by raise {
+private class DefinitionReader(val source: String, val profiles: Map<PlatformId, PlatformProfile>, raise: Raise<CatalogError>) :
+    Raise<CatalogError> by raise {
     /** The platform and the players rejected from it. */
     fun platform(text: String): Pair<Platform, List<CatalogError>> {
         val root = Either.catch { Json.parseToJsonElement(text) }.getOrElse { raise(CatalogError.InvalidJson(source, it.toString())) }
         val platform = field(root, "platform") { it as? JsonObject }
         val (rejected, players) =
-            field(root, "playerList") { it as? JsonArray }.separateEither { either { DefinitionReader(source, this).player(it) } }
+            field(root, "playerList") { it as? JsonArray }.separateEither { either { DefinitionReader(source, profiles, this).player(it) } }
         val id = PlatformId(text(platform, "uniqueId"))
-        return Platform(id, text(platform, "name"), players, pattern(platform, "acceptedFilenameRegex")) to rejected
+        val profile = profiles.getOrElse(id) { raise(CatalogError.MissingProfile(source, id)) }
+        return Platform(id, text(platform, "name"), players, pattern(platform, "acceptedFilenameRegex"), profile) to rejected
     }
 
     fun player(element: JsonElement): Player {

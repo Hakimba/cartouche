@@ -1,0 +1,5 @@
+{
+  "ps2": { "media": "dvd", "minimumGameBytes": 16000000 },
+  "gc": { "media": "minidisc", "minimumGameBytes": 16000000 },
+  "gba": { "media": "cartridge", "minimumGameBytes": 8192 }
+}
