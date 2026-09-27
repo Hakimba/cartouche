@@ -11,7 +11,7 @@ extends RefCounted
 ## position shown, fractional while the row moves.
 
 ## Places shown on each side of the selected game; one more on each side slides in and out.
-const REACH := 3
+const REACH := 1
 const WHOLE_SHELF := 2 * REACH + 2
 ## A held direction steps once, waits [constant FIRST_REPEAT_S], then repeats faster and faster,
 ## never faster than every [constant FASTEST_REPEAT_S]: just under three frames at 60 fps, so that
@@ -22,9 +22,9 @@ const FASTEST_REPEAT_S := 0.048
 ## The row covers one step in this time, and faster when it is behind.
 const STEP_S := 0.16
 ## Distance from the centre, in world units, of the first place, then between the next ones.
-const CENTRE_GAP := 1.05
-const SIDE_GAP := 0.62
-const SIDE_SCALE := 0.5
+const CENTRE_GAP := 1.5
+const SIDE_GAP := 0.9
+const SIDE_SCALE := 0.6
 ## How transparent the neighbours of the selected game are; farther places fade out.
 const SIDE_FADE := 0.35
 
@@ -47,13 +47,14 @@ static func stepped(position: int, direction: int, count: int) -> int:
 	return position + direction if count > WHOLE_SHELF else posmod(position + direction, count)
 
 
-## How a game [param offset] places from the centre stands.
+## How a game [param offset] places from the centre stands; the selected game is then posed (see
+## [ShelfRow.Pose]).
 static func place(offset: float) -> Transform3D:
 	var distance := absf(offset)
 	var near := minf(distance, 1.0)
 	var x := signf(offset) * (near * CENTRE_GAP + maxf(distance - 1.0, 0.0) * SIDE_GAP)
 	var scale := lerpf(1.0, SIDE_SCALE, near)
-	var turned := Basis.from_euler(Vector3(-0.18 * (1.0 - near), -0.45 * signf(offset) * near, 0.0))
+	var turned := Basis.from_euler(Vector3(0.0, -0.45 * signf(offset) * near, 0.0))
 	return Transform3D(turned.scaled(Vector3.ONE * scale), Vector3(x, 0.0, -0.9 * near))
 
 

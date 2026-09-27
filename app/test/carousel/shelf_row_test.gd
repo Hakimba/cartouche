@@ -125,9 +125,12 @@ func test_a_shelf_of_one_game_does_not_move() -> void:
 	assert_str(row.selected_game().id).is_equal("test/0")
 
 
-## A row showing [param count] test games from [param selected], moved only by the test.
-func _row(count: int, selected: int) -> ShelfRow:
+## A row showing [param count] test games from [param selected], moved only by the test, with no
+## label images whatever the developer's own folder holds.
+func _row(count: int, selected: int, pose := ShelfRow.Pose.new()) -> ShelfRow:
 	var row: ShelfRow = auto_free(ShelfRow.new())
+	row.label_images = Fixtures.FakeLabels.new()
+	row.pose = pose
 	add_child(row)
 	row.show_shelf(Fixtures.games(count), selected, Fixtures.DVD, ShelfRow.LabelLook.new())
 	row.set_process(false)
@@ -154,3 +157,118 @@ func _assert_places(row: ShelfRow, count: int) -> void:
 	var in_view := offsets.keys()
 	in_view.sort()
 	assert_array(shown).is_equal(in_view)
+
+
+func test_INV_E2_5_06_the_pose_is_the_selected_game_s_alone_within_its_angles() -> void:
+	var random := Fixtures.cases(50)
+	for i in Fixtures.CASES:
+		var pose := _pose(random)
+		var clock := random.randf_range(0.0, 1000.0)
+		assert_bool(pose.at(clock, 0.0).is_equal_approx(Basis.IDENTITY)).is_true()
+		var centred := random.randf_range(0.0, 1.0)
+		var angles := pose.at(clock, centred).get_euler() * (180.0 / PI)
+		assert_float(absf(angles.x)).is_less_equal((absf(pose.tilt) + pose.sway) * centred + 0.001)
+		assert_float(absf(angles.y)).is_less_equal((absf(pose.turn) + pose.sway) * centred + 0.001)
+		pose.sway = 0.0
+		var still := pose.at(clock, 1.0).get_euler() * (180.0 / PI)
+		assert_vector(still).is_equal_approx(Vector3(-pose.tilt, pose.turn, 0.0), Vector3.ONE * 0.001)
+
+
+func test_INV_E2_5_06_on_a_stopped_row_the_selected_game_is_posed_and_the_others_stand_as_laid_out() -> void:
+	var random := Fixtures.cases(52)
+	for i in 100:
+		var row := _row(random.randi_range(1, 20), 0, _pose(random))
+		_frames(row, random.randi_range(1, 300), Fixtures.FRAME_S)
+		var offsets := CarouselLayout.offsets(row._games.size(), row._scroll)
+		for place: ShelfRow.Place in row.get_children():
+			if place.visible:
+				var laid_out := CarouselLayout.place(offsets[place.game]).basis
+				if place.game == row.selected_index():
+					laid_out *= row.pose.at(row._clock_s, 1.0)
+				assert_bool(place.transform.basis.is_equal_approx(laid_out)).is_true()
+
+
+func test_INV_E2_5_07_the_stick_turns_the_selected_game_any_way_up_to_its_back() -> void:
+	for stick: Vector2 in [Vector2(1.0, 0.0), Vector2(-1.0, 0.0), Vector2(0.0, 1.0), Vector2(0.0, -1.0)]:
+		var row := _row(5, 0)
+		var front := _centre(row).transform.basis
+		row.inspect(stick)
+		# Half a turn, at the stick's speed.
+		_frames(row, roundi(PI / ShelfRow._TURN_SPEED / Fixtures.FRAME_S), Fixtures.FRAME_S)
+		row.inspect(Vector2.ZERO)
+		_frames(row, 120, Fixtures.FRAME_S)
+		var turned := _centre(row).transform.basis
+		# Its back faces the camera, turned about the axis the stick pushes on.
+		assert_float(turned.z.dot(front.z)).is_equal_approx(-1.0, 0.02)
+		var axis := Vector3.UP if stick.y == 0.0 else Vector3.RIGHT
+		assert_vector(turned * axis).is_equal_approx(front * axis, Vector3.ONE * 0.02)
+
+
+func test_INV_E2_5_07_the_stick_turns_the_selected_game_which_stays_turned_until_another_is_selected() -> void:
+	var random := Fixtures.cases(51)
+	for i in 100:
+		var row := _row(random.randi_range(2, 20), 0)
+		var front := _centre(row).transform.basis
+		row.inspect(Vector2(1.0, 0.0))
+		_frames(row, 30, Fixtures.FRAME_S)
+		for push in random.randi_range(0, 4):
+			row.inspect(Vector2(random.randf_range(-1.0, 1.0), random.randf_range(-1.0, 1.0)))
+			_frames(row, random.randi_range(1, 120), Fixtures.FRAME_S)
+		row.inspect(Vector2.ZERO)
+		_frames(row, 60, Fixtures.FRAME_S)
+		var let_go := _centre(row).transform.basis
+		assert_bool(let_go.is_equal_approx(front)).override_failure_message("the game turned back when the stick was let go").is_false()
+		var offsets := CarouselLayout.offsets(row._games.size(), row._scroll)
+		for place: ShelfRow.Place in row.get_children():
+			if place.visible and place.game != row.selected_index():
+				assert_bool(place.transform.basis.is_equal_approx(CarouselLayout.place(offsets[place.game]).basis)) \
+					.override_failure_message("the stick turned a game beside the selected one").is_true()
+		_frames(row, random.randi_range(60, 600), Fixtures.FRAME_S)
+		assert_bool(_centre(row).transform.basis.is_equal_approx(let_go)) \
+			.override_failure_message("the game did not stay as the stick left it").is_true()
+		var turned_game := row.selected_index()
+		row.hold(Fixtures.direction(random))
+		row.release(1)
+		row.release(-1)
+		_frames(row, 120, Fixtures.FRAME_S)
+		# The game turned is front again as it leaves, and the one arriving is front.
+		assert_bool(_centre(row).transform.basis.is_equal_approx(front)).override_failure_message("not front again").is_true()
+		var laid_out := CarouselLayout.offsets(row._games.size(), row._scroll)
+		for place: ShelfRow.Place in row.get_children():
+			if place.visible and place.game == turned_game:
+				assert_bool(place.transform.basis.is_equal_approx(CarouselLayout.place(laid_out[place.game]).basis)) \
+					.override_failure_message("the game turned did not turn back as it left").is_true()
+
+
+func test_INV_E2_5_07_a_game_just_selected_turns_from_the_front_whatever_the_last_one_was_turned_to() -> void:
+	var row := _row(5, 0)
+	row.inspect(Vector2(1.0, 0.0))
+	_frames(row, 60, Fixtures.FRAME_S)
+	row.inspect(Vector2.ZERO)
+	row.hold(1)
+	row.release(1)
+	_frames(row, 1, Fixtures.FRAME_S)
+	row.inspect(Vector2(1.0, 0.0))
+	_frames(row, 3, Fixtures.FRAME_S)
+	# Three frames of stick: a small turn, from where the row stands it now.
+	var standing := CarouselLayout.place(CarouselLayout.offsets(5, row._scroll)[row.selected_index()]).basis
+	var turned := _centre(row).transform.basis
+	assert_float(turned.z.angle_to(standing.z)).is_less(3.0 * Fixtures.FRAME_S * ShelfRow._TURN_SPEED + 0.01)
+
+
+## A pose [param random] draws.
+func _pose(random: RandomNumberGenerator) -> ShelfRow.Pose:
+	var pose := ShelfRow.Pose.new()
+	pose.tilt = random.randf_range(-45.0, 45.0)
+	pose.turn = random.randf_range(-45.0, 45.0)
+	pose.sway = random.randf_range(0.0, 15.0)
+	pose.sway_period_s = random.randf_range(1.0, 20.0)
+	return pose
+
+
+## The place of the selected game.
+func _centre(row: ShelfRow) -> ShelfRow.Place:
+	for place: ShelfRow.Place in row.get_children():
+		if place.game == row.selected_index():
+			return place
+	return null

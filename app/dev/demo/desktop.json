@@ -1,0 +1,533 @@
+{
+    "catalog": {
+        "rejected": [],
+        "platforms": [
+            {
+                "name": "Nintendo - Game Boy Advance",
+                "id": "gba",
+                "media": "cartridge"
+            },
+            {
+                "name": "Nintendo - GameCube",
+                "id": "gc",
+                "media": "minidisc"
+            },
+            {
+                "name": "Sony PlayStation 2",
+                "id": "ps2",
+                "media": "dvd"
+            }
+        ]
+    },
+    "library": {
+        "setups": {},
+        "games": [
+            {
+                "id": "demo/0",
+                "platform_id": "gba",
+                "title": "Crystal Knights 0",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Crystal Knights 0.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/1",
+                "platform_id": "gc",
+                "title": "Shadow Knights II 1",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Shadow Knights II 1.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/2",
+                "platform_id": "ps2",
+                "title": "Neon Knights: Director's Cut 2",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Neon Knights: Director's Cut 2.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/3",
+                "platform_id": "gba",
+                "title": "Iron Knights 3 3",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Iron Knights 3 3.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/4",
+                "platform_id": "gc",
+                "title": "Silent Knights 4",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Silent Knights 4.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/5",
+                "platform_id": "ps2",
+                "title": "Solar Knights 5",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Solar Knights 5.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/6",
+                "platform_id": "gba",
+                "title": "Wild Knights II 6",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Wild Knights II 6.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/7",
+                "platform_id": "gc",
+                "title": "Ōkami no Knights: Director's Cut 7",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Ōkami no Knights: Director's Cut 7.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/8",
+                "platform_id": "ps2",
+                "title": "Étoile Knights 3 8",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Étoile Knights 3 8.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/9",
+                "platform_id": "gba",
+                "title": "Last Knights 9",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Last Knights 9.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/10",
+                "platform_id": "gc",
+                "title": "Crystal Racer 10",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Crystal Racer 10.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/11",
+                "platform_id": "ps2",
+                "title": "Shadow Racer II 11",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Shadow Racer II 11.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/12",
+                "platform_id": "gba",
+                "title": "Neon Racer: Director's Cut 12",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Neon Racer: Director's Cut 12.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/13",
+                "platform_id": "gc",
+                "title": "Iron Racer 3 13",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Iron Racer 3 13.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/14",
+                "platform_id": "ps2",
+                "title": "Silent Racer 14",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Silent Racer 14.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/15",
+                "platform_id": "gba",
+                "title": "Solar Racer 15",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Solar Racer 15.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/16",
+                "platform_id": "gc",
+                "title": "Wild Racer II 16",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Wild Racer II 16.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/17",
+                "platform_id": "ps2",
+                "title": "Ōkami no Racer: Director's Cut 17",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Ōkami no Racer: Director's Cut 17.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/18",
+                "platform_id": "gba",
+                "title": "Étoile Racer 3 18",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Étoile Racer 3 18.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/19",
+                "platform_id": "gc",
+                "title": "Last Racer 19",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Last Racer 19.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/20",
+                "platform_id": "ps2",
+                "title": "Crystal Tactics 20",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Crystal Tactics 20.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/21",
+                "platform_id": "gba",
+                "title": "Shadow Tactics II 21",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Shadow Tactics II 21.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/22",
+                "platform_id": "gc",
+                "title": "Neon Tactics: Director's Cut 22",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Neon Tactics: Director's Cut 22.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/23",
+                "platform_id": "ps2",
+                "title": "Iron Tactics 3 23",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Iron Tactics 3 23.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/24",
+                "platform_id": "gba",
+                "title": "Silent Tactics 24",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Silent Tactics 24.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/25",
+                "platform_id": "gc",
+                "title": "Solar Tactics 25",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Solar Tactics 25.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/26",
+                "platform_id": "ps2",
+                "title": "Wild Tactics II 26",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Wild Tactics II 26.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/27",
+                "platform_id": "gba",
+                "title": "Ōkami no Tactics: Director's Cut 27",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Ōkami no Tactics: Director's Cut 27.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/28",
+                "platform_id": "gc",
+                "title": "Étoile Tactics 3 28",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Étoile Tactics 3 28.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/29",
+                "platform_id": "ps2",
+                "title": "Last Tactics 29",
+                "regions": [],
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Last Tactics 29.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            }
+        ],
+        "not_games": {},
+        "ignored_counts": {},
+        "skipped_folders": {},
+        "shelves": {
+            "shelves": [
+                {
+                    "platform": "gba",
+                    "games": [
+                        0,
+                        18,
+                        3,
+                        9,
+                        12,
+                        27,
+                        21,
+                        24,
+                        15,
+                        6
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "gc",
+                    "games": [
+                        10,
+                        28,
+                        13,
+                        19,
+                        22,
+                        7,
+                        1,
+                        4,
+                        25,
+                        16
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "ps2",
+                    "games": [
+                        20,
+                        8,
+                        23,
+                        29,
+                        2,
+                        17,
+                        11,
+                        14,
+                        5,
+                        26
+                    ],
+                    "selected": 0
+                }
+            ],
+            "selected": 0
+        }
+    }
+}

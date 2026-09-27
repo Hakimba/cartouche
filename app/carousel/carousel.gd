@@ -5,8 +5,10 @@ extends Control
 ## selected game, the right stick turns it. Where the user was is remembered across restarts.
 ##
 ## In debug builds, holding Select opens the device check, and command-line arguments set up
-## measurements: `--demo-games=N` shows a made-up library of N games, `--bench=scroll` or
-## `--bench=switch` runs [CarouselBench].
+## measurements: `--demo-games=N` shows a made-up library of N games, `--bench=scroll`, `switch` or
+## `turn` runs [CarouselBench], `--turntable=T` turns the selected game T times a second to show
+## all its sides, `--shelf=gba` opens on that platform's shelf. Without the Android plugin (the
+## editor, a desktop run), the demo library is shown.
 
 const _APPEARANCE := "res://data/carousel/appearance.json"
 const _DEVICE_CHECK := "res://dev/device_check/device_check.tscn"
@@ -23,6 +25,8 @@ var _platforms: Dictionary[String, AndroidServices.Platform] = {}
 var _models: Dictionary[String, PackedScene] = {}
 var _colors: Dictionary[String, Color] = {}
 var _default_color: Color
+## Whether the library shown is made up: its labels get made-up artwork.
+var _demo := false
 ## Set once the library is shown: until then there is nothing to move, launch or remember.
 var _shown := false
 var _switching := false
@@ -49,10 +53,12 @@ func _ready() -> void:
 		_platforms[platform.id] = platform
 	_load_appearance()
 	_row.prepare(_models.values())
+	_row.turntable = Diagnostics.argument("turntable").to_float()
 	_on_clock_timeout()
 	var demo_games := Diagnostics.argument("demo-games").to_int()
 	var answer: AndroidServices.LibraryAnswer
-	if demo_games > 0:
+	_demo = demo_games > 0 or not Android.is_available()
+	if _demo:
 		answer = await Android.use_demo_library(demo_games)
 	else:
 		answer = await Android.library()
@@ -113,6 +119,10 @@ func _show_library(library: AndroidServices.Library) -> void:
 	var started := Time.get_ticks_usec()
 	_shelves = library.shelves
 	_shelf = library.selected_shelf
+	var asked := Diagnostics.argument("shelf")
+	for i in _shelves.size():
+		if _shelves[i].platform_id == asked:
+			_shelf = i
 	var has_games := not _shelves.is_empty()
 	_empty.visible = not has_games
 	_pill.visible = has_games
@@ -138,6 +148,7 @@ func _show_shelf() -> void:
 	var look := ShelfRow.LabelLook.new()
 	look.color = _colors.get(shelf.platform_id, _default_color)
 	look.platform_name = platform.name
+	look.demo_art = _demo
 	_row.show_shelf(shelf.games, _positions[shelf.platform_id], _models[platform.media], look)
 	_show_tabs()
 	_on_row_selection_changed(_row.selected_game())
@@ -223,6 +234,13 @@ func _load_appearance() -> void:
 		_colors[platform_id] = Color(color)
 	var default_color: String = appearance["default_color"]
 	_default_color = Color(default_color)
+	var pose: Dictionary = appearance["pose"]
+	_row.pose.tilt = pose["tilt_degrees"]
+	_row.pose.turn = pose["turn_degrees"]
+	_row.pose.sway = pose["sway_degrees"]
+	var period: float = pose["sway_period_s"]
+	# A sway never takes no time.
+	_row.pose.sway_period_s = maxf(period, 0.5)
 
 
 func _on_row_selection_changed(game: AndroidServices.Game) -> void:

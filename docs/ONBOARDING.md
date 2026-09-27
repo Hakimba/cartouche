@@ -14,7 +14,8 @@ code: it only describes what exists.
 │  data/platforms/          platform and emulator definitions (Daijishō, MIT)         │
 │                           and Cartouche's own platform profiles                     │
 │  data/redump/             disc titles and serials (libretro-database, CC BY-SA 4.0) │
-│  data/carousel/           a model per media and a colour per platform               │
+│  data/carousel/           a model per media, label colours, the selected game's pose│
+│  dev/demo/                the catalog and a demo library, to run without Android    │
 │  test/                    GDScript tests (GdUnit4, fetched by dev/test_godot.sh)    │
 └─────────────────────────────────────┬───────────────────────────────────────────────┘
                                       │ JNI: Dictionaries and one `answered` signal
@@ -55,7 +56,12 @@ The same words are used in the code, the tests and this document.
   platform shown last and each platform's selected game, and places the user back when the app
   starts.
 - **Place**: one of the carousel's recycled slots, showing a game's **model** (the 3D media of
-  its platform) with a **label** drawn on it.
+  its platform) with a **label** on it: an image of the real one, or the game's title drawn on the
+  platform's label colour.
+- **Shape**: the dimensions, in millimetres, a model is built from (`DiscShape`,
+  `CartridgeShape`); each **part** of the model (label, mirror, shell) is a mesh built from them.
+- **Pose**: how the selected game is shown, leaning back, turned and slowly swaying, so that the
+  light moves over it. The right stick turns it further, as far as the user likes.
 - **Demo library**: a made-up library of any size, in debug builds, for measuring at scale.
 - **Wire format**: what crosses the JNI bridge between the plugin and GDScript.
 
@@ -130,11 +136,21 @@ The same words are used in the code, the tests and this document.
   the app). `ShelfRow` moves the row and recycles a fixed pool of places, so its cost does not
   depend on the number of games; labels are drawn in each place's small `SubViewport`, one per
   frame. `CarouselLayout` holds the mechanics as pure functions.
-- **Models** are data: `data/carousel/appearance.json` names a scene per media, and a colour per
-  platform. A model is any scene with a `Label` mesh whose material uses
-  `carousel/models/label.gdshader` (the carousel draws the label into `label_texture`); replacing
-  a model is changing that file. Every place makes its model of each media at start, as the first
-  instance of a model takes 10 to 30 ms on a handheld.
+- **Models** are data: `data/carousel/appearance.json` names a scene per media, a label colour
+  per platform and the pose. A model is any scene with a `Label` mesh whose material uses
+  `carousel/models/label.gdshader` (the carousel sets `label_texture`); replacing a model is
+  changing that file. Every place makes its model of each media at start, as the first instance
+  of a model takes 10 to 30 ms on a handheld.
+- **The shipped models are built from their shapes** (`carousel/models/*_shape.tres`): each part
+  is a `ShapedMesh` naming one of the shape's `parts()`, which asks the shape for its arrays;
+  `DiscGeometry` turns profiles around the disc's axis, `CartridgeGeometry` sweeps rounded
+  outlines with bevels, both in millimetres through `MeshBuilder`, which scales them to world
+  units, turns every face the way its normals point and squares tangents to normals. Changing a
+  dimension in the inspector rebuilds the model in the editor. Impossible dimensions build
+  nothing: the shape's `problems()` names the rules they break. Materials: the label's varnish,
+  grain and grooves (`label.gdshader`), a disc's mirror underside, whose `light()` draws the
+  rainbow streak of its grooves (`disc_mirror.gdshader`), clear plastic (`clear_plastic.gdshader`),
+  and what they all reflect, a studio sky that is never drawn (`carousel/studio_sky.gdshader`).
 - **`AndroidServices`** (the `Android` autoload) turns plugin answers into typed values
   (`Folder`, `Entry`, `Candidate`…) and exposes operations as coroutines, such as
   `await Android.list_folder(folder)`; see its header for running without the plugin.
@@ -165,6 +181,18 @@ The same words are used in the code, the tests and this document.
   `dev/test_godot.sh` runs the GDScript tests.
 - `dev/bench.sh` measures a debug build on a device at several library sizes (the device's own,
   and demo ones of 150 to 5,000 games) and can record every measurement as a JSON line.
+- **Without the plugin** (the editor, a desktop run), the carousel shows the demo library of
+  `dev/demo/desktop.json`, with made-up label artwork: models and materials are tuned on a
+  computer. The file is what the plugin would send; `DesktopDemoTest` (Kotlin) fails when it is out
+  of date and writes the new one. In debug builds, images put in `user://dev-labels/`, named after
+  a game's first serial (`SLES-52584.png`) or its title, are shown as its label (`DevLabels`, the
+  row's `label_images`, which tests replace); they are never part of the repository.
+- **Debug arguments** (`--esa arguments` on the device, after `--` on a desktop):
+  `--turntable=0.25` turns the selected game to show all its sides, `--shelf=gba` opens on a
+  platform's shelf, `--demo-games=N` and `--bench=…` as in `dev/bench.sh`.
+- **Shaders are only compiled when something is drawn**: the headless runs of `dev/build.sh` do
+  not see their errors. After changing one, run the desktop demo or the device and look for
+  `SHADER ERROR` in the log.
 - The Vulkan pipeline cache is saved as soon as it grows (`save_chunk_size_mb` in
   `project.godot`), since Android kills apps rather than quitting them: a start then compiles no
   pipeline twice (about 100 ms per frame that needs one).

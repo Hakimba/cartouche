@@ -32,6 +32,11 @@ android {
 
 base { archivesName = "cartouche-android" }
 
+tasks.withType<Test>().configureEach {
+    systemProperty("cartouche.app", rootProject.file("../app").path)
+    systemProperty("cartouche.build", layout.buildDirectory.get().asFile.path)
+}
+
 kotlin {
     jvmToolchain(17)
     explicitApi()

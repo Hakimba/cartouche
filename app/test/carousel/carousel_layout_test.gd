@@ -93,3 +93,11 @@ func test_the_selected_game_is_in_front_opaque_and_larger_than_the_others() -> v
 		assert_float(side.basis.get_scale().x).is_less(centre.basis.get_scale().x)
 		assert_float(side.origin.z).is_less(centre.origin.z)
 		assert_float(CarouselLayout.fade(offset)).is_greater(0.0)
+
+
+func test_INV_E2_02_a_shelf_of_4_games_is_shown_whole_and_one_of_5_goes_round() -> void:
+	# The screen shows the selected game and one on each side, and one more slides in and out.
+	assert_array(CarouselLayout.offsets(4, 0.0).keys()).contains_exactly_in_any_order([0, 1, 2])
+	assert_int(CarouselLayout.stepped(3, 1, 4)).is_equal(0)
+	assert_array(CarouselLayout.offsets(5, 0.0).keys()).contains_exactly_in_any_order([3, 4, 0, 1, 2])
+	assert_int(CarouselLayout.stepped(4, 1, 5)).is_equal(5)

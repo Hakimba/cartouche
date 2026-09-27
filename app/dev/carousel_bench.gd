@@ -2,9 +2,10 @@
 class_name CarouselBench
 extends Node
 ## Measures the carousel in debug builds, driven like a user would: `scroll` holds right for
-## [constant _DURATION_S], `switch` changes platform every [constant _SWITCH_EVERY_S]. Then traces
-## one `bench` line of `key=value` frame statistics, read by `dev/bench.sh`. It starts once the
-## start has settled, which is measured on its own.
+## [constant _DURATION_S], `switch` changes platform every [constant _SWITCH_EVERY_S], `turn` holds
+## the right stick, so that the selected game keeps turning, underside and clear parts shown. Then
+## traces one `bench` line of `key=value` frame statistics, read by `dev/bench.sh`. It starts once
+## the start has settled, which is measured on its own.
 
 const _SETTLE_S := 5.0
 const _DURATION_S := 30.0
@@ -30,6 +31,8 @@ func _ready() -> void:
 	_row.selection_changed.connect(func(_game: AndroidServices.Game) -> void: _steps += 1)
 	if _scenario == "scroll":
 		_act(&"carousel_right", true)
+	elif _scenario == "turn":
+		_act(&"inspect_right", true)
 	Diagnostics.trace("bench", "%s started" % _scenario)
 
 
@@ -43,6 +46,8 @@ func _process(delta: float) -> void:
 	if _elapsed_s >= _DURATION_S:
 		if _scenario == "scroll":
 			_act(&"carousel_right", false)
+		elif _scenario == "turn":
+			_act(&"inspect_right", false)
 		_report()
 		queue_free()
 

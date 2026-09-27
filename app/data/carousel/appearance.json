@@ -5,9 +5,15 @@
     "cartridge": "res://carousel/models/cartridge.tscn"
   },
   "colors": {
-    "ps2": "#2f4f9e",
-    "gc": "#6a4fa3",
-    "gba": "#3f7f6e"
+    "ps2": "#f2f2ee",
+    "gc": "#f2f2ee",
+    "gba": "#e9e6dc"
   },
-  "default_color": "#5a6070"
+  "default_color": "#5a6070",
+  "pose": {
+    "tilt_degrees": 14,
+    "turn_degrees": 22,
+    "sway_degrees": 7,
+    "sway_period_s": 7
+  }
 }

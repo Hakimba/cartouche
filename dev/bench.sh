@@ -3,8 +3,8 @@
 # Measures a debug build on the device connected through adb, at several library sizes: the
 # user's own library ("real") and made-up ones of N games (`--demo-games`). For each size: cold
 # starts (start to carousel shown, library read and sent, title indexing, first frames), then the
-# carousel held scrolling and changing platform for 30 s each (frame times), the app's memory and
-# the save of the selection. Run it after `dev/build.sh --install`.
+# carousel held scrolling, changing platform and turning the selected game for 30 s each (frame
+# times), the app's memory and the save of the selection. Run it after `dev/build.sh --install`.
 #
 # Prints one line per measurement; with --record FILE, also appends each one to FILE as a JSON
 # record: {"date", "commit", "build", "device", "android", "scenario", "games", "metric",
@@ -83,7 +83,7 @@ for size in "${sizes[@]}"; do
     indexed=$(first 'titles: ps2: [0-9]+ indexed in [0-9]+ ms' || true)
     [ -z "$indexed" ] || emit titles "$size" title_index_ps2 "$indexed" ms "$run"
   done
-  for scenario in scroll switch; do
+  for scenario in scroll switch turn; do
     start "$args--bench=$scenario"
     wait_for "bench: $scenario:" 60
     line=$("$adb" logcat -d | grep -oE "bench: $scenario: .*" | head -1)

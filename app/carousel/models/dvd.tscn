@@ -1,34 +1,48 @@
-[gd_scene load_steps=6 format=3 uid="uid://xijitdl3fy5b"]
+[gd_scene load_steps=12 format=3 uid="uid://xijitdl3fy5b"]
 
-[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="1"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/models/dvd_shape.tres" id="2"]
+[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/disc_mirror.gdshader" id="4"]
+[ext_resource type="Shader" path="res://carousel/models/clear_plastic.gdshader" id="5"]
 
-[sub_resource type="CylinderMesh" id="body_mesh"]
-top_radius = 0.6
-bottom_radius = 0.6
-height = 0.014
-radial_segments = 64
-rings = 1
-
-[sub_resource type="StandardMaterial3D" id="body_material"]
-albedo_color = Color(0.8, 0.82, 0.86, 1)
-metallic = 0.7
-roughness = 0.25
-
-[sub_resource type="QuadMesh" id="label_mesh"]
-size = Vector2(1.2, 1.2)
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
 
 [sub_resource type="ShaderMaterial" id="label_material"]
-shader = ExtResource("1")
-shader_parameter/round = true
+shader = ExtResource("3")
+shader_parameter/silver = 0.8
+shader_parameter/grooves = 0.5
+
+[sub_resource type="PrimitiveMesh" id="mirror_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"mirror"
+
+[sub_resource type="ShaderMaterial" id="mirror_material"]
+shader = ExtResource("4")
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+render_priority = 1
+shader = ExtResource("5")
 
 [node name="Dvd" type="Node3D"]
 
-[node name="Body" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
-mesh = SubResource("body_mesh")
-surface_material_override/0 = SubResource("body_material")
-
 [node name="Label" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.0075)
 mesh = SubResource("label_mesh")
 surface_material_override/0 = SubResource("label_material")
+
+[node name="Mirror" type="MeshInstance3D" parent="."]
+mesh = SubResource("mirror_mesh")
+surface_material_override/0 = SubResource("mirror_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")

@@ -10,13 +10,19 @@ signal selection_changed(game: AndroidServices.Game)
 
 ## Every game [method CarouselLayout.offsets] can show at once.
 const _PLACES := 2 * CarouselLayout.REACH + 3
-## Largest turn of the selected game with the right stick, in radians.
-const _INSPECT_ANGLE := 1.1
+## How fast the right stick turns the selected game, pushed all the way, in radians a second.
+const _TURN_SPEED := 2.6
 const _BOB_HEIGHT := 0.05
 const _BOB_SPEED := 1.6
 ## How much a fast-moving row stretches its games.
 const _STRETCH := 0.012
 const _MAX_STRETCH := 0.1
+
+## Debug builds: turns per second of the selected game around its vertical axis, to see every side.
+var turntable := 0.0
+## Where label images come from; a game without one gets its title drawn.
+var label_images := DevLabels.new()
+var pose := Pose.new()
 
 var _games: Array[AndroidServices.Game] = []
 var _look := LabelLook.new()
@@ -29,8 +35,12 @@ var _held := 0
 var _held_steps := 0
 var _next_repeat_s := 0.0
 var _clock_s := 0.0
-var _inspect := Vector2.ZERO
-var _inspect_target := Vector2.ZERO
+var _stick := Vector2.ZERO
+## How the right stick has turned a game, the one selected when it was pushed, and how that game is
+## shown turned, catching up; it turns back when another is selected, as it leaves.
+var _turned := Basis.IDENTITY
+var _shown_turn := Basis.IDENTITY
+var _turned_game := -1
 var _places: Array[Place] = []
 var _placed: Dictionary[int, Place] = {}
 ## Places waiting for their label, drawn one per frame so that a fast move never stalls.
@@ -46,7 +56,8 @@ func _ready() -> void:
 	set_process(false)
 
 
-# Runs every frame: the selected game floats. Arranging nine places is negligible next to drawing them.
+# Runs every frame: the selected game floats. Arranging five places is negligible next to drawing
+# them.
 func _process(delta: float) -> void:
 	_clock_s += delta
 	if _held != 0 and _clock_s >= _next_repeat_s:
@@ -56,12 +67,25 @@ func _process(delta: float) -> void:
 	var before := _scroll
 	_scroll = CarouselLayout.scrolled(_scroll, _position, delta)
 	_speed = (_scroll - before) / delta if delta > 0.0 else 0.0
-	_inspect = _inspect.lerp(_inspect_target, 1.0 - exp(-10.0 * delta))
+	if not _stick.is_zero_approx():
+		if _turned_game != selected_index():
+			_shown_turn = Basis.IDENTITY
+			_turned_game = selected_index()
+		var push := _stick * _TURN_SPEED * delta
+		_turned = (Basis.from_euler(Vector3(push.y, push.x, 0.0)) * _turned).orthonormalized()
+	_shown_turn = _shown_turn.slerp(_turned, 1.0 - exp(-10.0 * delta))
+	# Then exactly there: a game let go stays still.
+	if _shown_turn.get_rotation_quaternion().angle_to(_turned.get_rotation_quaternion()) < 0.001:
+		_shown_turn = _turned
 	_arrange()
 	if not _unlabelled.is_empty():
 		var place: Place = _unlabelled.pop_front()
 		if place.game >= 0:
-			place.shown.draw_label(_games[place.game].title, _look)
+			var game := _games[place.game]
+			if label_images.has_label(game):
+				place.shown.show_label(label_images.label(game), true)
+			else:
+				place.shown.draw_label(game.title, _look)
 
 
 ## Makes every place's model of each of [param models] now, rather than when a shelf of that media
@@ -80,6 +104,9 @@ func show_shelf(games: Array[AndroidServices.Game], selected: int, model: Packed
 	_look = look
 	_position = selected
 	_scroll = selected
+	_turned = Basis.IDENTITY
+	_shown_turn = Basis.IDENTITY
+	_turned_game = -1
 	_held = 0
 	set_process(true)
 	_placed.clear()
@@ -118,15 +145,18 @@ func release(direction: int) -> void:
 		_held = 0
 
 
-## Turns the selected game towards [param stick] (each axis from -1 to 1); zero lets it go back.
+## Turns the selected game while [param stick] (each axis from -1 to 1) is pushed, any way and as
+## far as it goes, up to its back; it stays turned when the stick is let go, and turns back to the
+## front when another game is selected.
 func inspect(stick: Vector2) -> void:
-	_inspect_target = stick
+	_stick = stick
 
 
 func _step(direction: int) -> void:
 	if _games.size() < 2:
 		return
 	_position = CarouselLayout.stepped(_position, direction, _games.size())
+	_turned = Basis.IDENTITY
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "step %d to %d (held for %d steps)" % [direction, selected_index(), _held_steps])
 	selection_changed.emit(selected_game())
@@ -154,8 +184,11 @@ func _arrange() -> void:
 			var centred := clampf(1.0 - 2.0 * absf(offset), 0.0, 1.0)
 			var stand := CarouselLayout.place(offset)
 			stand.origin.y += sin(_clock_s * _BOB_SPEED) * _BOB_HEIGHT * centred
-			var turn := Basis.from_euler(Vector3(_inspect.y, _inspect.x, 0.0) * _INSPECT_ANGLE * centred)
-			place.transform = Transform3D(stand.basis * turn * Basis.from_scale(Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0)), stand.origin)
+			var spun := Basis(Vector3.UP, TAU * turntable * _clock_s * centred)
+			var turn := spun * (_shown_turn if place.game == _turned_game else Basis.IDENTITY)
+			var stretched := Basis.from_scale(Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0))
+			var posed := stand.basis * pose.at(_clock_s, centred) * turn * stretched
+			place.transform = Transform3D(posed, stand.origin)
 			place.shown.fade(CarouselLayout.fade(offset))
 
 
@@ -168,10 +201,27 @@ func _free_place() -> Place:
 	return _places[0]
 
 
+## How the selected game is shown: leaning back and turned a little, it sways slowly so that the
+## light moves over it. Angles in degrees.
+class Pose:
+	var tilt := 0.0
+	var turn := 0.0
+	var sway := 0.0
+	var sway_period_s := 6.0
+
+	## The pose at [param clock_s], [param centred] from 0 (beside the centre, not posed) to 1.
+	func at(clock_s: float, centred: float) -> Basis:
+		var phase := TAU * clock_s / sway_period_s
+		var angles := Vector3(-tilt - sway * sin(phase), turn + sway * sin(phase * 0.71 + 1.0), 0.0)
+		return Basis.from_euler(angles * (PI / 180.0) * centred)
+
+
 ## How labels look on one shelf.
 class LabelLook:
 	var color := Color(0.35, 0.37, 0.42)
 	var platform_name := ""
+	## Made-up artwork instead of a plain colour, for demo libraries.
+	var demo_art := false
 
 
 ## One game's place in the row, showing the model of the shelf's media. Each media's model is kept
@@ -197,7 +247,12 @@ class Place extends Node3D:
 ## mesh.
 class LabelledModel extends Node3D:
 	const _LABEL_VIEW := preload("res://carousel/label_view.tscn")
-	const _LABEL_WIDTH := 256
+	const _DEMO_ART := preload("res://carousel/demo_label.gdshader")
+	const _LABEL_WIDTH := 512
+	## A title area at least this tall, as a fraction of the label, takes the theme's font size;
+	## a smaller one shrinks it.
+	const _FULL_TITLE_HEIGHT := 0.22
+	const _DARK_INK := Color(0.12, 0.13, 0.15)
 
 	var _geometry: Array[GeometryInstance3D] = []
 	var _material: ShaderMaterial
@@ -205,6 +260,7 @@ class LabelledModel extends Node3D:
 	var _background: ColorRect = _view.get_node("Background")
 	var _title: Label = _view.get_node("Title")
 	var _platform: Label = _view.get_node("Platform")
+	var _demo_art := ShaderMaterial.new()
 
 	func _init(model: PackedScene) -> void:
 		var instance: Node3D = model.instantiate()
@@ -214,31 +270,48 @@ class LabelledModel extends Node3D:
 		var label: MeshInstance3D = instance.get_node("Label")
 		_material = label.get_surface_override_material(0).duplicate()
 		label.set_surface_override_material(0, _material)
-		_material.set_shader_parameter(&"label_texture", _view.get_texture())
 		var face := label.get_aabb().size
 		_view.size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH * face.y / face.x))
-		# A round label leaves its centre to the hole: the title goes above it, the platform below.
-		# A parameter the material leaves at its default reads as null.
-		var round_label: bool = _material.get_shader_parameter(&"round") == true
+		# Where the title and the platform go is the shape's: round a disc's hub, for one.
+		var title := ModelShape.TITLE_AREA
+		var platform := ModelShape.PLATFORM_AREA
+		if label.mesh is ShapedMesh:
+			var shape := (label.mesh as ShapedMesh).shape
+			title = shape.title_area()
+			platform = shape.platform_area()
 		var size := Vector2(_view.size)
-		if round_label:
-			_title.position = size * Vector2(0.2, 0.1)
-			_title.size = size * Vector2(0.6, 0.22)
-			_platform.position = size * Vector2(0.2, 0.74)
-		else:
-			_title.position = size * Vector2(0.06, 0.08)
-			_title.size = size * Vector2(0.88, 0.6)
-			_platform.position = size * Vector2(0.1, 0.72)
-		_platform.size = Vector2(size.x - 2.0 * _platform.position.x, size.y * 0.18)
+		_title.position = size * title.position
+		_title.size = size * title.size
+		var font_size := ThemeDB.get_project_theme().get_font_size(&"font_size", &"LabelTitle")
+		var shrink := minf(1.0, title.size.y / _FULL_TITLE_HEIGHT)
+		_title.add_theme_font_size_override(&"font_size", roundi(font_size * shrink))
+		_platform.position = size * platform.position
+		_platform.size = size * platform.size
+		_demo_art.shader = _DEMO_ART
 
 	func clear_label() -> void:
 		_material.set_shader_parameter(&"has_label", false)
 
 	func draw_label(title: String, look: LabelLook) -> void:
 		_background.color = look.color
+		_background.material = _demo_art if look.demo_art else null
+		_demo_art.set_shader_parameter(&"seed", fposmod(title.hash() / 1000.0, 1.0))
+		# The ink that stands out most from the label, and white with a dark outline on artwork.
+		var shade := look.color.get_luminance()
+		var dark := absf(shade - _DARK_INK.get_luminance()) > absf(shade - 1.0)
+		var ink := _DARK_INK if dark and not look.demo_art else Color.WHITE
+		for text: Label in [_title, _platform]:
+			text.add_theme_color_override(&"font_color", Color(ink, 1.0 if text == _title else 0.7))
+			text.add_theme_constant_override(&"outline_size", 10 if look.demo_art else 0)
 		_title.text = title
 		_platform.text = look.platform_name
 		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+		show_label(_view.get_texture(), false)
+
+	## Shows [param label] as the model's label, an image of a real one when [param scanned].
+	func show_label(label: Texture2D, scanned: bool) -> void:
+		_material.set_shader_parameter(&"label_texture", label)
+		_material.set_shader_parameter(&"scanned", scanned)
 		_material.set_shader_parameter(&"has_label", true)
 
 	## Sets how transparent the model is, from 0 (opaque) to 1 (gone).

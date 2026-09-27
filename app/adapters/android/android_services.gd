@@ -8,7 +8,7 @@ extends Node
 ##
 ## Getters answer at once. Operations are coroutines (`await Android.list_folder(folder)`); without
 ## the plugin (editor, desktop) they fail with `code == &"unavailable"` and getters return empty
-## values.
+## values, except the catalog and the demo library, read from [constant DESKTOP_DEMO].
 
 ## Every operation's answer; callers await the one carrying their request id.
 signal _answered(payload: Dictionary)
@@ -19,6 +19,9 @@ const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
 ## One reference list per platform, named after its id (`ps2.tsv`).
 const _TITLE_LISTS := "res://data/redump"
 const _DATA_FOLDERS := "res://data/scan/data_folders.json"
+## The catalog and a demo library as the plugin sends them, for running without it: see
+## `DesktopDemoTest.kt`, which keeps it up to date.
+const DESKTOP_DEMO := "res://dev/demo/desktop.json"
 
 ## The catalog, loaded when the app starts.
 var catalog := CatalogSummary.new({})
@@ -46,7 +49,8 @@ func _load_catalog() -> void:
 	var definitions := _files_in(_PLATFORM_DEFINITIONS, ".json")
 	var titles := _files_in(_TITLE_LISTS, ".tsv", true)
 	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
-	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders], {})
+	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders],
+		_desktop_demo("catalog"))
 	catalog = CatalogSummary.new(summary)
 
 
@@ -152,8 +156,11 @@ func select_game(game: Game) -> Result:
 
 
 ## Debug builds only: replaces the library with a made-up one of [param games] games, stored apart
-## from the user's, for measuring at scale.
+## from the user's, for measuring at scale. Without the plugin, the desktop demo's, whatever
+## [param games].
 func use_demo_library(games: int) -> LibraryAnswer:
+	if not is_available():
+		return LibraryAnswer.new({"ok": true, "library": JSON.stringify(_desktop_demo("library"))})
 	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games]))
 
 
@@ -172,6 +179,14 @@ static func _files_in(folder: String, extension: String, by_base_name := false) 
 			var key := file_name.get_basename() if by_base_name else file_name
 			texts[key] = FileAccess.get_file_as_string(folder.path_join(file_name))
 	return texts
+
+
+## Part [param key] of the desktop demo; none where it is not shipped (exports leave it out).
+static func _desktop_demo(key: String) -> Dictionary:
+	if not FileAccess.file_exists(DESKTOP_DEMO):
+		return {}
+	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DESKTOP_DEMO))
+	return demo[key]
 
 
 ## The texts listed under [param key] of [param item]; none when it is absent.
