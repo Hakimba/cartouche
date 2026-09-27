@@ -1,0 +1,71 @@
+[gd_resource type="Theme" load_steps=6 format=3 uid="uid://voyem7672a04"]
+
+[ext_resource type="FontFile" uid="uid://h83bs6afufuh" path="res://fonts/AtkinsonHyperlegible-Regular.ttf" id="1"]
+[ext_resource type="FontFile" uid="uid://c8656vpk8yx63" path="res://fonts/AtkinsonHyperlegible-Bold.ttf" id="2"]
+
+[sub_resource type="StyleBoxFlat" id="pill"]
+content_margin_left = 10.0
+content_margin_top = 8.0
+content_margin_right = 28.0
+content_margin_bottom = 8.0
+bg_color = Color(1, 1, 1, 0.92)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+shadow_color = Color(0, 0, 0, 0.12)
+shadow_size = 6
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxFlat" id="glyph"]
+content_margin_left = 12.0
+content_margin_top = 2.0
+content_margin_right = 12.0
+content_margin_bottom = 2.0
+bg_color = Color(0.16, 0.17, 0.2, 1)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+
+[sub_resource type="StyleBoxFlat" id="hint"]
+content_margin_left = 10.0
+content_margin_top = 2.0
+content_margin_right = 10.0
+content_margin_bottom = 2.0
+bg_color = Color(0.16, 0.17, 0.2, 0.85)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[resource]
+default_font = ExtResource("1")
+default_font_size = 26
+Label/colors/font_color = Color(0.13, 0.14, 0.17, 1)
+CurrentTab/base_type = &"Label"
+CurrentTab/fonts/font = ExtResource("2")
+OtherTab/base_type = &"Label"
+OtherTab/colors/font_color = Color(0.45, 0.47, 0.52, 1)
+Pill/base_type = &"PanelContainer"
+Pill/styles/panel = SubResource("pill")
+Glyph/base_type = &"PanelContainer"
+Glyph/styles/panel = SubResource("glyph")
+GlyphText/base_type = &"Label"
+GlyphText/colors/font_color = Color(1, 1, 1, 1)
+GlyphText/font_sizes/font_size = 24
+GlyphText/fonts/font = ExtResource("2")
+LabelPlatform/base_type = &"Label"
+LabelPlatform/colors/font_color = Color(1, 1, 1, 1)
+LabelPlatform/font_sizes/font_size = 14
+LabelTitle/base_type = &"Label"
+LabelTitle/colors/font_color = Color(1, 1, 1, 1)
+LabelTitle/font_sizes/font_size = 24
+Hint/base_type = &"Label"
+Hint/colors/font_color = Color(1, 1, 1, 1)
+Hint/font_sizes/font_size = 18
+Hint/fonts/font = ExtResource("2")
+Hint/styles/normal = SubResource("hint")
+Title/base_type = &"Label"
+Title/font_sizes/font_size = 30
+Title/fonts/font = ExtResource("2")

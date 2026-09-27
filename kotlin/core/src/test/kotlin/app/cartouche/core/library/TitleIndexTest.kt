@@ -12,7 +12,7 @@ import org.junit.Test
 
 class TitleIndexTest {
     private val ps2Text = Shipped.text("redump/ps2.tsv")
-    private val ps2 = TitleIndex.parse(ps2Text)
+    private val ps2 = Shipped.ps2Titles
 
     private fun identify(fileName: String) = ps2.identify(GameName.parse(fileName))
 

@@ -1,0 +1,13 @@
+{
+  "models": {
+    "dvd": "res://carousel/models/dvd.tscn",
+    "minidisc": "res://carousel/models/minidisc.tscn",
+    "cartridge": "res://carousel/models/cartridge.tscn"
+  },
+  "colors": {
+    "ps2": "#2f4f9e",
+    "gc": "#6a4fa3",
+    "gba": "#3f7f6e"
+  },
+  "default_color": "#5a6070"
+}

@@ -3,13 +3,13 @@ package app.cartouche.android.launch
 
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
-import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.PackageName
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.launch.LaunchTemplate
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.platforms.Launch
+import app.cartouche.core.uri
 import arrow.core.None
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
@@ -26,7 +26,7 @@ import org.robolectric.Shadows.shadowOf
 class LauncherTest {
     private val context = RuntimeEnvironment.getApplication()
     private val launcher = Launcher(context)
-    private val game = GameFile(FileName("g.chd"), ContentUri.parse("content://p/document/g").shouldBeSome(), None)
+    private val game = GameFile(FileName("g.chd"), uri("content://p/document/g"), None)
 
     private fun launch(packageName: String) = Launch(
         LaunchTemplate.parse("-n $packageName/.Main -d {file.uri}").shouldBeRight().resolve(game).shouldBeRight(),

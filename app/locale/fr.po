@@ -1,0 +1,21 @@
+# French translation of Cartouche.
+# SPDX-License-Identifier: GPL-3.0-or-later
+msgid ""
+msgstr ""
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "No games yet."
+msgstr "Aucun jeu pour l’instant."
+
+msgid "Hold Select to open the device check, then choose a folder and scan it."
+msgstr "Maintenez Select pour ouvrir l’outil de test, puis choisissez un dossier et scannez-le."
+
+msgid "No emulator for this game is installed."
+msgstr "Aucun émulateur n’est installé pour ce jeu."
+
+msgid "The game could not be launched."
+msgstr "Le jeu n’a pas pu être lancé."

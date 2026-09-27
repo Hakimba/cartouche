@@ -16,14 +16,18 @@ import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.LibraryService
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
+import app.cartouche.android.storage.SelectionStore
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
 import app.cartouche.core.launch.GameFile
+import app.cartouche.core.library.DataFolders
+import app.cartouche.core.library.DemoLibrary
 import app.cartouche.core.library.DiscGrouping
 import app.cartouche.core.library.FolderDepth
 import app.cartouche.core.library.GameId
+import app.cartouche.core.library.LibraryFormat
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.TitleIndex
 import app.cartouche.core.platforms.Catalog
@@ -88,9 +92,13 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     @Volatile private var titleIndexes = ConcurrentHashMap<PlatformId, TitleIndex>()
 
+    @Volatile private var dataFolders = DataFolders.NONE
+
     /** Runs every library call, one at a time (see [LibraryService]). */
     private val libraryThread = Dispatchers.IO.limitedParallelism(1)
-    private val library by lazy { LibraryService(LibraryStore(File(context.filesDir, "library.json")), folders) }
+
+    /** Only used on [libraryThread], which [useDemoLibrary] replaces it on. */
+    private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
 
     /** Whether each package is installed, forgotten on resume since apps may be installed meanwhile. */
     private val installed = ConcurrentHashMap<PackageName, Boolean>()
@@ -107,17 +115,23 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /**
      * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
-     * profiles file's text and the reference lists as `{platform id: text}`; returns the catalog summary.
+     * profiles file's text, the reference lists as `{platform id: text}` and the emulator data
+     * folder names (`data_folders.json`); returns the catalog summary.
      */
     @UsedByGodot
-    public fun loadCatalog(definitions: Dictionary, profiles: String, titles: Dictionary): Dictionary {
+    public fun loadCatalog(definitions: Dictionary, profiles: String, titles: Dictionary, dataFolderNames: String): Dictionary {
         val (notText, sources) =
             definitions.keys.sorted().separateEither { name ->
                 definitions.text(name).map { DefinitionSource(name, it) }.toEither { CatalogError.InvalidJson(name, "not text") }
             }
         titleLists = titles.keys.flatMap { id -> titles.text(id).map { PlatformId(id) to it }.toList() }.toMap()
         titleIndexes = ConcurrentHashMap()
-        catalog = Catalog.parse(sources, DefinitionSource("profiles.json", profiles)).let { it.copy(rejected = notText + it.rejected) }
+        val folderNames = DataFolders.parse(DefinitionSource("data_folders.json", dataFolderNames))
+        dataFolders = folderNames.getOrElse { DataFolders.NONE }
+        catalog =
+            Catalog.parse(sources, DefinitionSource("profiles.json", profiles)).let {
+                it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + it.rejected)
+            }
         // Indexing takes a second or so on a handheld: done now, the first scan does not wait for it.
         scope.launch { Either.catch { titleLists.keys.forEach(::titles) }.onLeft(::unexpected) }
         return catalog.toWire()
@@ -150,6 +164,19 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /** Such as `Acme Handheld 2, Android 13`. */
     @UsedByGodot
     public fun deviceName(): String = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}"
+
+    /**
+     * Debug builds only: the `arguments` string array extra of the launch intent, such as
+     * `am start -n app.cartouche/com.godot.game.GodotAppLauncher --esa arguments --demo-games=150`,
+     * which sets up measurements. Godot's own command line is not passed through the launcher. A
+     * `String[]` reaches GDScript as a PackedStringArray.
+     */
+    @UsedByGodot
+    public fun launchArguments(): Array<String> = activity
+        .toOption()
+        .flatMap { it.intent.getStringArrayExtra("arguments").toOption() }
+        .filter { BuildConfig.DEBUG }
+        .getOrElse { emptyArray() }
 
     // Operations
 
@@ -229,7 +256,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /** Answers with `{"library"}`, read from its file on first use. */
     @UsedByGodot
     public fun library(requestId: Int): Unit = answering(requestId, libraryThread) {
-        library.run { success("library" to library().toWire()).putSome("load_problem", loadProblem) }
+        library.value.run { success("library" to wire(this)).putSome("load_problem", loadProblem) }
     }
 
     /**
@@ -249,7 +276,8 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val discs = code("disc_grouping", DiscGrouping.entries) { it.wire }
         val depth = code("folder_depth", FolderDepth.entries) { it.wire }
         val choices = PlatformSetup(folder, setup.text("player_id").map(::PlayerId), discs, depth)
-        success("library" to inLibrary { setUp(platform.id, choices) }.toWire())
+        inLibrary { setUp(platform.id, choices) }
+        success("library" to wire(library.value))
     }
 
     /** Scans [platformId]'s folder; answers with `{"library", "report"}`. */
@@ -257,8 +285,33 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun scanPlatform(requestId: Int, platformId: String): Unit = answering(requestId, libraryThread) {
         val platform = platform(PlatformId(platformId))
         val titles = titles(platform.id)
-        val (library, report) = inLibrary { scan(platform, titles) }
-        success("library" to library.toWire(), "report" to report.toWire())
+        val report = inLibrary { scan(platform, titles, dataFolders) }.second
+        success("library" to wire(library.value), "report" to report.toWire())
+    }
+
+    /** Remembers [gameId] as the selected game of its platform, and that platform as the one shown. */
+    @UsedByGodot
+    public fun selectGame(requestId: Int, gameId: String): Unit = answering(requestId, libraryThread) {
+        inLibrary { select(GameId(gameId)) }
+        success()
+    }
+
+    /**
+     * Debug builds only: replaces the library with a made-up one of [games] games spread over the
+     * catalog's platforms, stored apart (the user's library is left alone), for measuring at
+     * scale; answers with `{"library"}`.
+     */
+    @UsedByGodot
+    public fun useDemoLibrary(requestId: Int, games: Int): Unit = answering(requestId, libraryThread) {
+        ensure(BuildConfig.DEBUG) { invalid("The demo library only exists in debug builds") }
+        // Named after the library format: a library saved by an older build is never measured again.
+        val folder = File(context.filesDir, "demo-${LibraryFormat.VERSION}-$games").apply { mkdirs() }
+        val store = LibraryStore(File(folder, LIBRARY_FILE))
+        if (store.load().fold({ true }) { it.library.games.isEmpty() }) {
+            store.save(DemoLibrary.of(games, catalog.platforms.map { it.id })).mapLeft { it.toWire() }.bind()
+        }
+        library = lazyOf(libraryIn(folder))
+        success("library" to wire(library.value))
     }
 
     /** Launches the library game `{"game_id", "disc"?}` (a disc index; the last launched by default) with its platform's player. */
@@ -298,7 +351,10 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     // Plumbing
 
-    private suspend fun <T> onLibrary(block: LibraryService.() -> T): T = withContext(libraryThread) { library.block() }
+    private suspend fun <T> onLibrary(block: LibraryService.() -> T): T = withContext(libraryThread) { library.value.block() }
+
+    private fun libraryIn(folder: File): LibraryService =
+        LibraryService(LibraryStore(File(folder, LIBRARY_FILE)), SelectionStore(File(folder, "selection.json")), folders)
 
     /** [onLibrary] for a call that can fail: its failure becomes the answer. */
     private suspend fun <T> Raise<Dictionary>.inLibrary(block: LibraryService.() -> Either<LibraryFailure, T>): T =
@@ -322,6 +378,14 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val started = TimeSource.Monotonic.markNow()
         titleLists.getOrNone(platform).fold({ TitleIndex.EMPTY }, TitleIndex::parse).also {
             trace("titles") { "${platform.value}: ${it.size} indexed in ${started.elapsedNow().inWholeMilliseconds} ms" }
+        }
+    }
+
+    /** The library of [service] and its shelves, for Godot. */
+    private fun wire(service: LibraryService): String {
+        val started = TimeSource.Monotonic.markNow()
+        return service.library().toWireJson(service.shelves(catalog.platforms.map { it.id })).also {
+            trace("library") { "${it.length} characters of JSON in ${started.elapsedNow().inWholeMilliseconds} ms" }
         }
     }
 
@@ -366,5 +430,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         // Godot forwards every activity result to every plugin: this code only has to be unique
         // among the plugins bundled with the app.
         const val REQUEST_PICK_FOLDER = 0xCA27
+
+        const val LIBRARY_FILE = "library.json"
     }
 }

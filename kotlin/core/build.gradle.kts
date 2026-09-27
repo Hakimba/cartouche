@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 plugins {
+    `java-test-fixtures`
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
@@ -16,6 +17,8 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.arrow.serialization)
     testImplementation(libs.bundles.test)
+    // Generators, fixtures and fakes shared by the tests of both modules.
+    testFixturesImplementation(libs.kotest.property)
 }
 
 // The tests check the definition files shipped with the app, not copies.

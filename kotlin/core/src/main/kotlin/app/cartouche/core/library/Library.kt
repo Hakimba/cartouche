@@ -105,6 +105,26 @@ public enum class FolderDepth {
 @Serializable
 public data class IgnoredFile(public val file: ListedFile, public val reason: IgnoreReason)
 
+/** Why a file that is not a game is only counted, as a folder may hold thousands of them. */
+@Serializable
+public enum class CountedReason {
+    @SerialName("hidden")
+    HIDDEN,
+
+    @SerialName("unsupported")
+    UNSUPPORTED,
+}
+
+/** How many files a scan set aside for one reason, with the first of their names. */
+@Serializable
+public data class IgnoredCount(public val count: Int, public val examples: List<FileName>) {
+    public companion object {
+        public const val EXAMPLES: Int = 20
+
+        public fun of(files: List<ListedFile>): IgnoredCount = IgnoredCount(files.size, files.take(EXAMPLES).map { it.name })
+    }
+}
+
 /** The user's choices for one platform. */
 @Serializable
 public data class PlatformSetup(
@@ -121,17 +141,24 @@ public data class PlatformSetup(
     }
 }
 
-/** What a scan found in a platform's folder: every file ends up either in one game's discs or ignored. */
-public data class Scan(public val games: List<Game>, public val ignored: List<IgnoredFile>) {
+/**
+ * What a scan found in a platform's folder: every file ends up either in one game's discs or
+ * ignored, and the sub-folders it did not look into are in [skippedFolders].
+ */
+public data class Scan(
+    public val games: List<Game>,
+    public val ignored: List<IgnoredFile>,
+    public val skippedFolders: List<SkippedFolder>,
+) {
     public companion object {
         /**
-         * Sorts [files] into games and ignored files. A file is a game when a player of [platform]
+         * Sorts the files of [folder] into games and ignored files, and keeps its skipped sub-folders. A file is a game when a player of [platform]
          * accepts it, unless it looks like a BIOS, or is unknown to [titles] and smaller than any
          * game of the platform. With [DiscGrouping.GROUPED], `Game (Disc 1)` and `Game (Disc 2)` make one game.
-         * Pure and total; the result does not depend on the order of [files].
+         * Pure and total; the result does not depend on the order of the files.
          */
-        public fun of(platform: Platform, files: List<ListedFile>, titles: TitleIndex, discs: DiscGrouping): Scan {
-            val (ignored, kept) = files.sortedWith(FILE_ORDER).separateEither { classify(platform, titles, it) }
+        public fun of(platform: Platform, folder: FolderContents, titles: TitleIndex, discs: DiscGrouping): Scan {
+            val (ignored, kept) = folder.files.sortedWith(FILE_ORDER).separateEither { classify(platform, titles, it) }
             val groups =
                 when (discs) {
                     DiscGrouping.GROUPED -> kept.groupBy { it.name.copy(disc = None) }.values.flatMap(::asDiscs)
@@ -140,6 +167,7 @@ public data class Scan(public val games: List<Game>, public val ignored: List<Ig
             return Scan(
                 groups.map { it.sortedWith(DISC_ORDER).toNonEmptyListOrNone() }.filterOption().map { game(platform.id, it) },
                 ignored,
+                folder.skipped.sortedWith(compareBy({ it.path.value }, { it.reason })),
             )
         }
 
@@ -189,12 +217,19 @@ public data class Scan(public val games: List<Game>, public val ignored: List<Ig
     }
 }
 
-/** The games of every platform, and the user's choices for each platform. */
+/**
+ * The games of every platform, the user's choices for each platform, and what its last scan set
+ * aside. Its size follows the games, not the folders: hidden and unsupported files are only
+ * counted, since a folder may hold tens of thousands of them.
+ */
 @Serializable
 public data class Library(
     public val setups: Map<PlatformId, PlatformSetup> = emptyMap(),
     public val games: List<Game> = emptyList(),
-    public val ignored: Map<PlatformId, List<IgnoredFile>> = emptyMap(),
+    /** Files a player of the platform opens that were not taken for games (a BIOS, too small): all of them, as one may be a game. */
+    public val notGames: Map<PlatformId, List<ListedFile>> = emptyMap(),
+    public val ignoredCounts: Map<PlatformId, Map<CountedReason, IgnoredCount>> = emptyMap(),
+    public val skippedFolders: Map<PlatformId, List<SkippedFolder>> = emptyMap(),
 ) {
     public fun setup(platform: PlatformId): PlatformSetup = setups.getOrElse(platform) { PlatformSetup() }
 
@@ -209,7 +244,28 @@ public data class Library(
             scan.games.map { game ->
                 previous.getOrNone(game.id).fold({ game }) { game.copy(lastDisc = it.lastDisc.coerceIn(game.discs.indices)) }
             }
-        return copy(games = games.filter { it.platform != platform } + scanned, ignored = ignored + (platform to scan.ignored))
+        return copy(
+            games = games.filter { it.platform != platform } + scanned,
+            skippedFolders =
+                skippedFolders + (platform to scan.skippedFolders),
+        ).withIgnored(platform, scan.ignored)
+    }
+
+    /** Keeps [platform]'s files that are not games, and counts the others. */
+    internal fun withIgnored(platform: PlatformId, ignored: List<IgnoredFile>): Library {
+        val byReason = ignored.groupBy({ it.reason }, { it.file })
+        val counts =
+            byReason.entries.flatMap { (reason, files) ->
+                when (reason) {
+                    IgnoreReason.HIDDEN -> listOf(CountedReason.HIDDEN to IgnoredCount.of(files))
+                    IgnoreReason.UNSUPPORTED -> listOf(CountedReason.UNSUPPORTED to IgnoredCount.of(files))
+                    IgnoreReason.NOT_A_GAME -> emptyList()
+                }
+            }
+        return copy(
+            notGames = notGames + (platform to byReason.getOrElse(IgnoreReason.NOT_A_GAME) { emptyList() }),
+            ignoredCounts = ignoredCounts + (platform to counts.toMap()),
+        )
     }
 
     /** Records [disc] (an index into the game's discs, kept within them) as the one launched last. */

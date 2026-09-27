@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends DeviceCheckPage
-## One platform's library: its folder, emulator and scan options, the games a scan found and the
-## files it set aside. Games launch with the platform's emulator, from the disc chosen here.
+## One platform's library: its folder, emulator and scan options, the games a scan found, and the
+## files and sub-folders it set aside. Games launch with the platform's emulator, from the disc chosen here.
 
 const _AUTOMATIC := "Emulator: first installed (%s)"
 const _NO_FOLDER := "No folder (add one in the Storage tab)"
@@ -90,8 +90,9 @@ func _on_scan_pressed() -> void:
 	if _platform_id() != platform_id:
 		return
 	var report := answer.report
-	_status.text = "%d games, %d identified · %d files ignored · %d files in %d ms" % [
-		report.games, report.identified, report.ignored, report.files, report.milliseconds]
+	_status.text = "%d games, %d identified · %d files ignored · %d folders skipped · %d files in %d ms" % [
+		report.games, report.identified, report.ignored, report.skipped_folders, report.files,
+		report.milliseconds]
 	logged.emit("Scan: " + _status.text)
 	_show_games()
 
@@ -222,8 +223,13 @@ func _show_games() -> void:
 			parts.append("not identified")
 		_games.set_item_metadata(_games.add_item("  ·  ".join(parts)), game)
 	_ignored.clear()
-	for file in _library.ignored_of(platform_id):
-		_ignored.add_item("%s  —  %s" % [file.name, file.reason.replace("_", " ")])
+	for file_name in _library.not_games_of(platform_id):
+		_ignored.add_item("%s  —  not a game" % file_name)
+	for counted in _library.ignored_counts_of(platform_id):
+		_ignored.add_item("%d %s files, such as %s" % [counted.count, counted.reason,
+				", ".join(counted.examples.slice(0, 3))])
+	for folder in _library.skipped_folders_of(platform_id):
+		_ignored.add_item("%s/  —  %s" % [folder.path, folder.reason.replace("_", " ")])
 	_details.text = "%d games" % _games.item_count
 	_disc.visible = false
 	_launch.disabled = true

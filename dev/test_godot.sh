@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Runs the GDScript tests of app/test with GdUnit4, headless. GdUnit4 (MIT) is not part of the
+# repository: the pinned release is downloaded once into build/, checked, and linked into
+# app/addons/gdUnit4 (ignored by git, left out of exports).
+#
+# Needs Godot on PATH or in GODOT.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+GODOT="${GODOT:-godot}"
+VERSION=6.2.1
+SHA256=ffb48847c46f386bf0c7a716fd68c6dace7d67730775cf7f748adce8ef3ed794
+archive="build/gdunit4-$VERSION.zip"
+
+fail() { echo "error: $*" >&2; exit 1; }
+mkdir -p build
+if [ ! -d "build/gdUnit4-$VERSION" ]; then
+  curl -sSfL -o "$archive" "https://github.com/MikeSchulze/gdUnit4/archive/refs/tags/v$VERSION.zip"
+  echo "$SHA256  $archive" | sha256sum -c --quiet - || fail "unexpected GdUnit4 archive"
+  unzip -q -o "$archive" -d build
+fi
+ln -sfn "../../build/gdUnit4-$VERSION/addons/gdUnit4" app/addons/gdUnit4
+# A clean clone has no import cache yet: GdUnit4's classes must be registered first.
+"$GODOT" --headless --path app --import > build/test-import.log 2>&1 || { tail -20 build/test-import.log; fail "import failed"; }
+"$GODOT" --headless --path app -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
+  --ignoreHeadlessMode -a res://test -rd ../build/gdunit-reports -c > build/test-godot.log 2>&1 \
+  || { grep -E "FAILED|failed|Error|ERROR" build/test-godot.log | head -40; fail "GDScript tests failed (full log: build/test-godot.log)"; }
+grep -E "Overall Summary|Executed test" build/test-godot.log | tail -3

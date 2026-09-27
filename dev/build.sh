@@ -21,10 +21,17 @@ command -v "$GODOT" > /dev/null || fail "Godot not found: put it on PATH or set 
 java_version=$("${JAVA_HOME:?JAVA_HOME is not set}/bin/java" -version 2>&1 | head -1)
 [[ $java_version =~ \"17[.\"] ]] || fail "JDK 17 required, JAVA_HOME points to: $java_version"
 
-(cd kotlin && ./gradlew --quiet ktlintCheck :core:test :android:testDebugUnitTest :android:assemble)
+(cd kotlin && ./gradlew --quiet ktlintCheck :core:test :android:testDebugUnitTest :android:lintDebug :android:assemble)
 mkdir -p build
-# A clean clone has no import cache yet: global class names must be registered before exporting.
-"$GODOT" --headless --path app --import > build/import.log 2>&1 || { tail -20 build/import.log; fail "import failed"; }
+GODOT="$GODOT" dev/test_godot.sh
+# The export packs scripts that fail to compile: run the project briefly to catch them first.
+# `timeout` is GNU coreutils (`gtimeout` on macOS with Homebrew); without either, the run is not bounded.
+bounded=$(command -v timeout || command -v gtimeout || true)
+status=0
+${bounded:+"$bounded" -k 10 120} "$GODOT" --headless --path app --quit-after 30 > build/run.log 2>&1 || status=$?
+[ "$status" -ne 124 ] || fail "the project did not stop within 120 s (full log: build/run.log)"
+[ "$status" -eq 0 ] || fail "the project did not run (exit $status, full log: build/run.log)"
+! grep -E "SCRIPT ERROR|Parse Error|Failed to load script" build/run.log || fail "GDScript errors (full log: build/run.log)"
 "$GODOT" --headless --path app --install-android-build-template --export-debug Android "../$APK" > build/export.log 2>&1 \
   || { tail -40 build/export.log; fail "export failed (full log: build/export.log)"; }
 echo "APK: $APK ($(du -h "$APK" | cut -f1))"

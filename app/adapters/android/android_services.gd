@@ -18,8 +18,9 @@ const _PLATFORM_DEFINITIONS := "res://data/platforms/daijishou"
 const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
 ## One reference list per platform, named after its id (`ps2.tsv`).
 const _TITLE_LISTS := "res://data/redump"
+const _DATA_FOLDERS := "res://data/scan/data_folders.json"
 
-## The catalog loaded by [method load_catalog].
+## The catalog, loaded when the app starts.
 var catalog := CatalogSummary.new({})
 
 var _plugin: Object
@@ -30,6 +31,7 @@ func _ready() -> void:
 	if Engine.has_singleton(_SINGLETON):
 		_plugin = Engine.get_singleton(_SINGLETON)
 		_plugin.connect(&"answered", _answered.emit)
+	_load_catalog()
 
 
 func is_available() -> bool:
@@ -38,15 +40,14 @@ func is_available() -> bool:
 
 # Getters
 
-## Loads the bundled platform definitions, profiles and reference lists into the plugin. Call
-## once at startup.
-func load_catalog() -> CatalogSummary:
+## Loads the bundled platform definitions, profiles and reference lists into the plugin, once.
+func _load_catalog() -> void:
 	var profiles := FileAccess.get_file_as_string(_PLATFORM_PROFILES)
 	var definitions := _files_in(_PLATFORM_DEFINITIONS, ".json")
 	var titles := _files_in(_TITLE_LISTS, ".tsv", true)
-	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles], {})
+	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
+	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders], {})
 	catalog = CatalogSummary.new(summary)
-	return catalog
 
 
 ## Installed players of [param platform_id], in definition order.
@@ -76,9 +77,15 @@ func battery() -> Battery:
 	return Battery.new(state)
 
 
-## Such as "Acme Handheld 2, Android 13"; the OS name without the plugin.
+## The manufacturer, model and Android version, such as "Acme Handheld 2, Android 13"; the OS name
+## without the plugin.
 func device_name() -> String:
 	return _query(&"deviceName", [], OS.get_name())
+
+
+## Debug builds: the arguments the app was started with (see `launchArguments` in the plugin).
+func launch_arguments() -> PackedStringArray:
+	return _query(&"launchArguments", [], PackedStringArray())
 
 
 # Operations
@@ -139,6 +146,17 @@ func scan_platform(platform_id: String) -> ScanAnswer:
 	return ScanAnswer.new(await _request(&"scanPlatform", [platform_id]))
 
 
+## Remembers [param game] as the selected game of its platform, and that platform as the one shown.
+func select_game(game: Game) -> Result:
+	return Result.new(await _request(&"selectGame", [game.id]))
+
+
+## Debug builds only: replaces the library with a made-up one of [param games] games, stored apart
+## from the user's, for measuring at scale.
+func use_demo_library(games: int) -> LibraryAnswer:
+	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games]))
+
+
 ## Launches disc [param disc] (an index into [member Game.discs]) of [param game].
 func launch_game(game: Game, disc: int) -> Result:
 	return Result.new(await _request(&"launchGame", [{"game_id": game.id, "disc": disc}]))
@@ -154,6 +172,12 @@ static func _files_in(folder: String, extension: String, by_base_name := false) 
 			var key := file_name.get_basename() if by_base_name else file_name
 			texts[key] = FileAccess.get_file_as_string(folder.path_join(file_name))
 	return texts
+
+
+## The texts listed under [param key] of [param item]; none when it is absent.
+static func _strings(item: Dictionary, key: String) -> PackedStringArray:
+	var texts: Array = item.get(key, [])
+	return PackedStringArray(texts)
 
 
 func _query(method: StringName, args: Array, fallback: Variant) -> Variant:
@@ -179,7 +203,10 @@ func _request(method: StringName, args: Array = []) -> Dictionary:
 		payload = await _answered
 	if Diagnostics.enabled:
 		var elapsed := Time.get_ticks_msec() - started
-		Diagnostics.trace("plugin", "#%d answered in %d ms: %s" % [id, elapsed, payload])
+		# The library is traced once read (LibraryAnswer): here it would cost as much as the games.
+		var shown := payload.duplicate()
+		shown.erase("library")
+		Diagnostics.trace("plugin", "#%d answered in %d ms: %s" % [id, elapsed, shown])
 	return payload
 
 
@@ -391,12 +418,9 @@ class Game:
 		id = item["id"]
 		platform_id = item["platform_id"]
 		title = item["title"]
-		var texts: Array = item["regions"]
-		regions = PackedStringArray(texts)
-		texts = item["languages"]
-		languages = PackedStringArray(texts)
-		texts = item["serials"]
-		serials = PackedStringArray(texts)
+		regions = AndroidServices._strings(item, "regions")
+		languages = AndroidServices._strings(item, "languages")
+		serials = AndroidServices._strings(item, "serials")
 		has_version = item.has("version")
 		version = item.get("version", "")
 		identified = item["identified"]
@@ -407,20 +431,56 @@ class Game:
 		last_disc = item["last_disc"]
 
 
-class IgnoredFile:
-	var name: String
-	## `hidden`, `unsupported` or `not_a_game`.
+## A sub-folder a scan did not look into.
+class SkippedFolder:
+	## Relative to the scanned folder, such as `Saves/memcards`.
+	var path: String
+	## `hidden`, `emulator_data`, `too_deep` or `unreadable`.
 	var reason: String
 
 	func _init(item: Dictionary) -> void:
-		name = item["name"]
+		path = item["path"]
 		reason = item["reason"]
 
 
+## How many hidden or unsupported files a scan set aside, with the first of their names.
+class IgnoredCount:
+	## `hidden` or `unsupported`.
+	var reason: String
+	var count: int
+	var examples := PackedStringArray()
+
+	func _init(reason_name: String, item: Dictionary) -> void:
+		reason = reason_name
+		count = item["count"]
+		examples = AndroidServices._strings(item, "examples")
+
+
+## The games of one platform, in the order the carousel shows them.
+class Shelf:
+	var platform_id: String
+	var games: Array[Game] = []
+	## Index into [member games] of the game to show first.
+	var selected: int
+
+	func _init(item: Dictionary, all_games: Array[Game]) -> void:
+		platform_id = item["platform"]
+		for index: int in item["games"]:
+			games.append(all_games[index])
+		selected = item["selected"]
+
+
+## The library, sent as JSON (see `toWireJson` in `Wire.kt`).
 class Library:
 	var games: Array[Game] = []
+	## One per platform that has games, in catalog order; none when the library has no games.
+	var shelves: Array[Shelf] = []
+	## Index into [member shelves] of the shelf to show first.
+	var selected_shelf: int
 	var _setups: Dictionary[String, PlatformSetup] = {}
-	var _ignored: Dictionary[String, Array] = {}
+	var _not_games: Dictionary[String, Array] = {}
+	var _ignored_counts: Dictionary[String, Dictionary] = {}
+	var _skipped: Dictionary[String, Array] = {}
 
 	func _init(item: Dictionary) -> void:
 		var setups: Dictionary = item.get("setups", {})
@@ -429,8 +489,16 @@ class Library:
 			_setups[platform_id] = PlatformSetup.new(setup)
 		for game: Dictionary in item.get("games", []):
 			games.append(Game.new(game))
-		var ignored: Dictionary = item.get("ignored", {})
-		_ignored.assign(ignored)
+		var not_games: Dictionary = item.get("not_games", {})
+		_not_games.assign(not_games)
+		var skipped: Dictionary = item.get("skipped_folders", {})
+		_skipped.assign(skipped)
+		var counts: Dictionary = item.get("ignored_counts", {})
+		_ignored_counts.assign(counts)
+		var found: Dictionary = item.get("shelves", {"shelves": [], "selected": 0})
+		for shelf: Dictionary in found["shelves"]:
+			shelves.append(Shelf.new(shelf, games))
+		selected_shelf = found["selected"]
 
 	func setup_of(platform_id: String) -> PlatformSetup:
 		return _setups.get(platform_id, PlatformSetup.new())
@@ -438,11 +506,23 @@ class Library:
 	func games_of(platform_id: String) -> Array[Game]:
 		return games.filter(func(game: Game) -> bool: return game.platform_id == platform_id)
 
-	func ignored_of(platform_id: String) -> Array[IgnoredFile]:
-		var files: Array[IgnoredFile] = []
-		for item: Dictionary in _ignored.get(platform_id, []):
-			files.append(IgnoredFile.new(item))
-		return files
+	## Files a player opens that were not taken for games (a BIOS, too small).
+	func not_games_of(platform_id: String) -> PackedStringArray:
+		return AndroidServices._strings(_not_games, platform_id)
+
+	func ignored_counts_of(platform_id: String) -> Array[IgnoredCount]:
+		var counts: Array[IgnoredCount] = []
+		var by_reason: Dictionary = _ignored_counts.get(platform_id, {})
+		for reason: String in by_reason:
+			var count: Dictionary = by_reason[reason]
+			counts.append(IgnoredCount.new(reason, count))
+		return counts
+
+	func skipped_folders_of(platform_id: String) -> Array[SkippedFolder]:
+		var folders: Array[SkippedFolder] = []
+		for item: Dictionary in _skipped.get(platform_id, []):
+			folders.append(SkippedFolder.new(item))
+		return folders
 
 
 class LibraryAnswer extends Result:
@@ -453,8 +533,14 @@ class LibraryAnswer extends Result:
 
 	func _init(payload: Dictionary) -> void:
 		super(payload)
-		var item: Dictionary = payload.get("library", {})
+		var text: String = payload.get("library", "{}")
+		var started := Time.get_ticks_usec()
+		var item: Dictionary = JSON.parse_string(text)
 		library = Library.new(item)
+		if Diagnostics.enabled:
+			var elapsed := (Time.get_ticks_usec() - started) / 1000.0
+			Diagnostics.trace("library", "%d games read from %d characters in %.1f ms" % [
+				library.games.size(), text.length(), elapsed])
 		has_load_problem = payload.has("load_problem")
 		load_problem = payload.get("load_problem", "")
 
@@ -464,6 +550,7 @@ class ScanReport:
 	var games: int
 	var identified: int
 	var ignored: int
+	var skipped_folders: int
 	var milliseconds: int
 
 	func _init(item: Dictionary) -> void:
@@ -471,6 +558,7 @@ class ScanReport:
 		games = item.get("games", 0)
 		identified = item.get("identified", 0)
 		ignored = item.get("ignored", 0)
+		skipped_folders = item.get("skipped_folders", 0)
 		milliseconds = item.get("milliseconds", 0)
 
 

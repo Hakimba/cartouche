@@ -7,16 +7,13 @@ import app.cartouche.core.FilePath
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Some
-import arrow.core.flatMap
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.choice
-import io.kotest.property.arbitrary.constant
-import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
@@ -27,11 +24,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
 class LaunchTemplateTest {
-    private val sdPath = "/storage/1A2B-3C4D/ROMs/ps2/Burnout 3 - Takedown (Europe).chd"
-    private val sdGame =
-        GameFile(FileName("Burnout 3 - Takedown (Europe).chd"), ContentUri.parse(SD_URI).shouldBeSome(), Some(FilePath(sdPath)))
-    private val otherGame = sdGame.copy(uri = ContentUri.parse("$SD_URI-other").shouldBeSome())
-
     private fun parse(template: String) = LaunchTemplate.parse(template).shouldBeRight()
 
     private fun resolve(template: String, file: GameFile = sdGame) = parse(template).resolve(file)
@@ -53,7 +45,7 @@ class LaunchTemplateTest {
         spec.targetPackage.map { it.value } shouldBe Some("com.retroarch.aarch64")
         spec.extras.map { it.key to it.value } shouldBe
             listOf(
-                "ROM" to ExtraValue.Text(sdPath),
+                "ROM" to ExtraValue.Text("/storage/1A2B-3C4D/ROMs/ps2/Burnout 3 - Takedown (Europe).chd"),
                 "LIBRETRO" to ExtraValue.Text("mgba"),
                 "CONFIGFILE" to ExtraValue.Text("/storage/emulated/0/Android/data/com.retroarch.aarch64/files/retroarch.cfg"),
             )
@@ -71,7 +63,7 @@ class LaunchTemplateTest {
     @Test
     fun `ARMSX2 template uses the data URI and activity switches`() {
         val spec = spec("-n com.armsx2/.Main -a android.intent.action.VIEW -d {file.uri} --activity-clear-task --activity-clear-top")
-        spec.data shouldBe Some(SD_URI)
+        spec.data shouldBe Some(GAME_URI)
         spec.switches shouldBe setOf(ActivitySwitch.CLEAR_TASK, ActivitySwitch.CLEAR_TOP)
     }
 
@@ -123,13 +115,13 @@ class LaunchTemplateTest {
 
     @Test
     fun `INV-E0-02 no content URI but the game's is handed where Android would grant it`() {
-        resolve("-n a.b/.C -d {file.uri}.sav").shouldBeLeft() shouldBe TemplateError.ForeignUri("$SD_URI.sav")
+        resolve("-n a.b/.C -d {file.uri}.sav").shouldBeLeft() shouldBe TemplateError.ForeignUri("$GAME_URI.sav")
         resolve("-n a.b/.C --eu android.intent.extra.STREAM ' Content://other'").shouldBeLeft() shouldBe
             TemplateError.ForeignUri(" Content://other")
         spec("-n a.b/.C -e NOTE content://other -d file:///x").grant shouldBe None
         // Written literally, the game's URI would get no ClipData, and Android would grant the extra itself.
-        resolve("-n a.b/.C -a android.media.action.IMAGE_CAPTURE --eu output $SD_URI").shouldBeLeft() shouldBe
-            TemplateError.ForeignUri(SD_URI)
+        resolve("-n a.b/.C -a android.media.action.IMAGE_CAPTURE --eu output $GAME_URI").shouldBeLeft() shouldBe
+            TemplateError.ForeignUri(GAME_URI)
     }
 
     @Test
@@ -143,24 +135,22 @@ class LaunchTemplateTest {
 
     @Test
     fun `INV-E0-02 only the game's own URI is granted, exactly when the launch depends on it`() = runBlocking<Unit> {
-        checkAll(templates) { template ->
-            LaunchTemplate.parse(template).onRight { parsed ->
-                parsed.resolve(sdGame).onRight { spec ->
-                    parsed.resolve(otherGame).onRight { other ->
-                        spec.grant shouldBe if (spec.copy(grant = None) != other.copy(grant = None)) Some(sdGame.uri) else None
-                    }
-                }
+        var granted = 0
+        forEveryResolvedTemplate { template, spec ->
+            template.resolve(otherGame).onRight { other ->
+                spec.grant shouldBe if (spec.copy(grant = None) != other.copy(grant = None)) Some(sdGame.uri) else None
             }
+            if (spec.grant.isSome()) granted++
         }
+        // Enough generated launches hand the game over for the law to be tested both ways.
+        granted shouldBeGreaterThan 100
     }
 
     @Test
     fun `INV-E0-02 the data URI and URI extras are never a content URI other than the game's`() = runBlocking<Unit> {
-        checkAll(templates) { template ->
-            LaunchTemplate.parse(template).flatMap { it.resolve(sdGame) }.onRight { spec ->
-                val uris = spec.data.toList() + spec.extras.map { it.value }.filterIsInstance<ExtraValue.UriText>().map { it.value }
-                uris.filter { it.trim().startsWith("content:", ignoreCase = true) }.forEach { it shouldBe SD_URI }
-            }
+        forEveryResolvedTemplate { _, spec ->
+            val uris = spec.data.toList() + spec.extras.map { it.value }.filterIsInstance<ExtraValue.UriText>().map { it.value }
+            uris.filter { it.trim().startsWith("content:", ignoreCase = true) }.forEach { it shouldBe GAME_URI }
         }
     }
 
@@ -196,47 +186,6 @@ class LaunchTemplateTest {
         resolve("-n a.b/.C -e ROM {file.path}", sdGame.copy(path = None)).shouldBeLeft() shouldBe
             TemplateError.UnknownPlaceholder("file.path")
         // Whatever the template, a launch resolved without a path is the same with one: it never used it.
-        checkAll(templates) { template ->
-            LaunchTemplate.parse(template).onRight { parsed ->
-                parsed.resolve(sdGame.copy(path = None)).onRight { parsed.resolve(sdGame) shouldBe Either.Right(it) }
-            }
-        }
-    }
-
-    private companion object {
-        const val SD_URI = "content://com.android.externalstorage.documents/tree/1A2B-3C4D%3AROMs%2Fps2/document/game"
-
-        val values: Arb<String> =
-            Arb.choice(
-                Arb.element(
-                    "{file.uri}",
-                    SD_URI,
-                    "{file.uri}.sav",
-                    "{file.path}",
-                    " CONTENT://x",
-                    "content://evil/document/x",
-                    "content://com.android.externalstorage.documents/tree/X",
-                ),
-                Arb.string(0..12),
-            )
-
-        val option: Arb<List<String>> =
-            Arb.choice(
-                Arb.bind(
-                    Arb.element("-e", "--es", "--ez", "--ei", "--eu", "--esa"),
-                    Arb.string(1..6),
-                    values,
-                ) { o, k, v -> listOf(o, k, v) },
-                Arb.bind(Arb.element("-a", "-d", "-t", "-c", "-f"), values) { o, v -> listOf(o, v) },
-                Arb.element(ActivitySwitch.entries.map { listOf(it.option) }),
-                Arb.constant(listOf("--esn", "key")),
-            )
-
-        /** Templates built from the grammar, most of them valid, with placeholders and literal URIs mixed in. */
-        val templates: Arb<String> =
-            Arb.bind(
-                Arb.element(listOf("-n", "com.a/.Main"), listOf("-n", "b.c/d.E"), listOf("-a", "android.intent.action.VIEW")),
-                Arb.list(option, 0..8),
-            ) { target, options -> (target + options.flatten()).joinToString(" ") { "'${it.replace("'", "")}'" } }
+        forEveryResolvedTemplate(sdGame.copy(path = None)) { template, spec -> template.resolve(sdGame) shouldBe Either.Right(spec) }
     }
 }

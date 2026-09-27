@@ -2,11 +2,13 @@
 extends Node
 ## Traces what the app receives to the log in debug builds, registered as the `Diagnostics`
 ## autoload: input events with the actions they match, focus changes, lifecycle notifications,
-## and whatever other code passes to [method trace] (plugin traffic, for instance). On a device,
-## `dev/logs.sh` follows them together with the Kotlin plugin's traces. Release builds trace
-## nothing.
+## frames that miss 60 fps, and whatever other code passes to [method trace] (plugin traffic, for
+## instance). On a device, `dev/logs.sh` follows them together with the Kotlin plugin's traces.
+## Release builds trace nothing.
 
 const _MAX_DETAIL := 500
+## Longer frames are traced: at 60 fps, a frame takes 16.7 ms.
+const SLOW_FRAME_MS := 20.0
 const _NOTIFICATIONS: Dictionary[int, String] = {
 	NOTIFICATION_WM_GO_BACK_REQUEST: "back request",
 	NOTIFICATION_APPLICATION_RESUMED: "resumed",
@@ -16,16 +18,48 @@ const _NOTIFICATIONS: Dictionary[int, String] = {
 	NOTIFICATION_WM_CLOSE_REQUEST: "close request",
 }
 
+## Rendering pipelines compiled while drawing, which stall the frame they are needed in.
+const _PIPELINE_MONITORS: Dictionary[String, Performance.Monitor] = {
+	"canvas": Performance.PIPELINE_COMPILATIONS_CANVAS,
+	"mesh": Performance.PIPELINE_COMPILATIONS_MESH,
+	"surface": Performance.PIPELINE_COMPILATIONS_SURFACE,
+	"draw": Performance.PIPELINE_COMPILATIONS_DRAW,
+	"specialization": Performance.PIPELINE_COMPILATIONS_SPECIALIZATION,
+}
+
 ## Whether traces are written; check it before building an expensive detail.
 var enabled := OS.is_debug_build()
+## Pipelines compiled so far, by monitor name.
+var _pipelines: Dictionary[String, int] = {}
 ## Whether each joypad axis (keyed by device * 100 + axis) is past half-way.
 var _axes_past_half: Dictionary[int, bool] = {}
 
 
 func _ready() -> void:
+	set_process(enabled)
 	if enabled:
+		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 		get_tree().root.window_input.connect(_on_window_input)
 		get_viewport().gui_focus_changed.connect(_on_focus_changed)
+
+
+func _process(delta: float) -> void:
+	var compiled := PackedStringArray()
+	for monitor in _PIPELINE_MONITORS:
+		var count := int(Performance.get_monitor(_PIPELINE_MONITORS[monitor]))
+		var before: int = _pipelines.get(monitor, 0)
+		if count != before:
+			compiled.append("%s %d" % [monitor, count - before])
+			_pipelines[monitor] = count
+	if delta * 1000.0 > SLOW_FRAME_MS:
+		# Where the time went in the previous frame: scripts and engine on the main thread, drawing
+		# on the CPU and the GPU.
+		var viewport := get_viewport().get_viewport_rid()
+		var pipelines := ", pipelines compiled: " + ", ".join(compiled) if compiled else ""
+		trace("frame", "slow frame: %.1f ms (process %.1f ms, draw %.1f ms, gpu %.1f ms)%s" % [
+			delta * 1000.0, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			RenderingServer.viewport_get_measured_render_time_cpu(viewport),
+			RenderingServer.viewport_get_measured_render_time_gpu(viewport), pipelines])
 
 
 func _notification(what: int) -> void:
@@ -38,6 +72,21 @@ func trace(area: String, detail: String) -> void:
 	if enabled:
 		var shown := detail if detail.length() <= _MAX_DETAIL else detail.left(_MAX_DETAIL) + "…"
 		print("Cartouche %s: %s" % [area, shown])
+
+
+## The value of `--[param option]=value` among the arguments the app was started with, in debug
+## builds; empty otherwise. On Android they come from the launch intent (see
+## [method AndroidServices.launch_arguments]).
+func argument(option: String) -> String:
+	if not enabled:
+		return ""
+	var prefix := "--%s=" % option
+	var arguments := OS.get_cmdline_user_args()
+	arguments.append_array(Android.launch_arguments())
+	for given in arguments:
+		if given.begins_with(prefix):
+			return given.trim_prefix(prefix)
+	return ""
 
 
 # Every event reaches this signal before any node handles it, including those a page consumes.

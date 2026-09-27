@@ -10,24 +10,37 @@ import app.cartouche.android.storage.DocumentEntry
 import app.cartouche.android.storage.EntryKind
 import app.cartouche.android.storage.Folder
 import app.cartouche.android.storage.StorageFailure
+import app.cartouche.core.library.CountedReason
+import app.cartouche.core.library.Disc
 import app.cartouche.core.library.DiscGrouping
 import app.cartouche.core.library.FolderDepth
 import app.cartouche.core.library.Game
-import app.cartouche.core.library.IgnoreReason
-import app.cartouche.core.library.IgnoredFile
+import app.cartouche.core.library.GameId
+import app.cartouche.core.library.IgnoredCount
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlatformSetup
+import app.cartouche.core.library.SkipReason
+import app.cartouche.core.library.SkippedFolder
 import app.cartouche.core.platforms.Candidate
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.MediaType
+import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
+import app.cartouche.core.shelves.Shelves
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.filterIsInstance
 import arrow.core.toOption
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.godotengine.godot.Dictionary
 
 // The Dictionary format shared with the GDScript adapter (app/adapters/android/android_services.gd).
@@ -60,6 +73,7 @@ internal enum class ErrorCode(val wire: String) {
     ACTIVITY_NOT_FOUND("activity_not_found"),
     PERMISSION_DENIED("permission_denied"),
     FOLDER_UNAVAILABLE("folder_unavailable"),
+    TOO_MANY_FILES("too_many_files"),
     UNEXPECTED("unexpected"),
 }
 
@@ -70,10 +84,11 @@ internal fun success(vararg payload: Pair<String, Any>): Dictionary = dictionary
 internal fun failure(code: ErrorCode, detail: String): Dictionary = dictionary("ok" to false, "code" to code.wire, "detail" to detail)
 
 /**
- * The wire form of a list. Godot's JNI bridge only turns an `Object[]` into an Array: a `String[]`
- * becomes a PackedStringArray and any other typed array an opaque object.
+ * The wire form of a list of Dictionaries. Godot's JNI bridge only turns an `Object[]` into an
+ * Array, and a String inside one stays an opaque JavaObject: lists of texts are sent as `String[]`,
+ * which becomes a PackedStringArray. Any other typed array is an opaque object.
  */
-internal fun <T> List<T>.toWireArray(transform: (T) -> Any): Array<Any> = map(transform).toTypedArray()
+internal fun <T> List<T>.toWireArray(transform: (T) -> Dictionary): Array<Any> = map(transform).toTypedArray()
 
 /** Puts [value] under [key] when there is one: absence is an absent key. */
 internal fun Dictionary.putSome(key: String, value: Option<Any>): Dictionary = apply { value.onSome { put(key, it) } }
@@ -132,39 +147,100 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
     is LibraryFailure.NoFolder -> failure(ErrorCode.NO_FOLDER, message)
     is LibraryFailure.UnknownGame -> failure(ErrorCode.UNKNOWN_GAME, message)
     is LibraryFailure.NoDisc -> failure(ErrorCode.INVALID_REQUEST, message)
+    is LibraryFailure.TooManyEntries -> failure(ErrorCode.TOO_MANY_FILES, message)
 }
 
-internal fun Library.toWire(): Dictionary = dictionary(
-    "setups" to Dictionary().apply { setups.forEach { (id, setup) -> put(id.value, setup.toWire()) } },
-    "games" to games.toWireArray { it.toWire() },
-    "ignored" to Dictionary().apply { ignored.forEach { (id, files) -> put(id.value, files.toWireArray { it.toWire() }) } },
-)
+/**
+ * The library and its [shelves] as JSON text, read on the Godot side with its JSON parser: a few
+ * hundred games as Dictionaries take about a second to cross the JNI bridge, as JSON a few
+ * milliseconds. The shape is the one Dictionaries would have: `{"setups": {platform id: setup},
+ * "games": [game], "not_games": {platform id: [file name]}, "ignored_counts": {platform id:
+ * {"hidden" or "unsupported": {"count", "examples"}}}, "skipped_folders": {platform id: [{"path",
+ * "reason"}]}, "shelves"?: {"shelves": [{"platform", "games": [index into games], "selected"}],
+ * "selected"}}`, with the keys below; a missing value is an absent key.
+ */
+internal fun Library.toWireJson(shelves: Option<Shelves>): String = buildJsonObject {
+    put("setups", setups.toJson(PlatformId::value) { it.toJson() })
+    put("games", games.toJson { it.toJson() })
+    put("not_games", notGames.toJson(PlatformId::value) { files -> files.toJson { JsonPrimitive(it.name.value) } })
+    put("ignored_counts", ignoredCounts.toJson(PlatformId::value) { counts -> counts.toJson({ it.wire }) { it.toJson() } })
+    put("skipped_folders", skippedFolders.toJson(PlatformId::value) { folders -> folders.toJson { it.toJson() } })
+    shelves.onSome { put("shelves", it.toJson(games.withIndex().associate { (at, game) -> game.id to at })) }
+}.toString()
 
-internal fun PlatformSetup.toWire(): Dictionary = dictionary("disc_grouping" to discs.wire, "folder_depth" to depth.wire)
-    .putSome("folder_uri", folder.map { it.value })
-    .putSome("player_id", player.map { it.value })
+private fun <K, V> Map<K, V>.toJson(key: (K) -> String, value: (V) -> JsonElement): JsonObject =
+    JsonObject(entries.associate { key(it.key) to value(it.value) })
 
-internal fun Game.toWire(): Dictionary = dictionary(
-    "id" to id.value,
-    "platform_id" to platform.value,
-    "title" to title,
-    "regions" to regions.toWireArray { it },
-    "languages" to languages.toWireArray { it },
-    "serials" to serials.toWireArray { it },
-    "discs" to discs.toWireArray { dictionary("name" to it.file.name.value).putSome("number", it.number) },
-    "last_disc" to lastDisc,
-    "identified" to identified,
-).putSome("version", version).putSome("redump_name", redumpName)
+private fun <T> List<T>.toJson(item: (T) -> JsonElement): JsonArray = JsonArray(map(item))
 
-internal fun IgnoredFile.toWire(): Dictionary = dictionary(
-    "name" to file.name.value,
-    "reason" to
-        when (reason) {
-            IgnoreReason.HIDDEN -> "hidden"
-            IgnoreReason.UNSUPPORTED -> "unsupported"
-            IgnoreReason.NOT_A_GAME -> "not_a_game"
+private fun JsonObjectBuilder.putSome(key: String, value: Option<String>) = value.onSome { put(key, it) }
+
+private fun PlatformSetup.toJson(): JsonObject = buildJsonObject {
+    put("disc_grouping", discs.wire)
+    put("folder_depth", depth.wire)
+    putSome("folder_uri", folder.map { it.value })
+    putSome("player_id", player.map { it.value })
+}
+
+private fun Game.toJson(): JsonObject = buildJsonObject {
+    put("id", id.value)
+    put("platform_id", platform.value)
+    put("title", title)
+    put("regions", regions.toJson(::JsonPrimitive))
+    put("languages", languages.toJson(::JsonPrimitive))
+    put("serials", serials.toJson(::JsonPrimitive))
+    put("discs", discs.toJson { it.toJson() })
+    put("last_disc", lastDisc)
+    put("identified", identified)
+    putSome("version", version)
+    putSome("redump_name", redumpName)
+}
+
+private fun Disc.toJson(): JsonObject = buildJsonObject {
+    put("name", file.name.value)
+    number.onSome { put("number", it) }
+}
+
+private fun IgnoredCount.toJson(): JsonObject = buildJsonObject {
+    put("count", count)
+    put("examples", examples.toJson { JsonPrimitive(it.value) })
+}
+
+/** [indexes] places each game in the library's games; the shelves are made of those games, so each has one. */
+private fun Shelves.toJson(indexes: Map<GameId, Int>): JsonObject = buildJsonObject {
+    put(
+        "shelves",
+        shelves.toJson { shelf ->
+            buildJsonObject {
+                put("platform", shelf.platform.value)
+                put("games", shelf.games.toJson { JsonPrimitive(indexes.getValue(it.id)) })
+                put("selected", shelf.selected)
+            }
         },
-)
+    )
+    put("selected", selected)
+}
+
+private fun SkippedFolder.toJson(): JsonObject = buildJsonObject {
+    put("path", path.value)
+    put("reason", reason.wire)
+}
+
+private val CountedReason.wire: String
+    get() =
+        when (this) {
+            CountedReason.HIDDEN -> "hidden"
+            CountedReason.UNSUPPORTED -> "unsupported"
+        }
+
+internal val SkipReason.wire: String
+    get() =
+        when (this) {
+            SkipReason.HIDDEN -> "hidden"
+            SkipReason.EMULATOR_DATA -> "emulator_data"
+            SkipReason.TOO_DEEP -> "too_deep"
+            SkipReason.UNREADABLE -> "unreadable"
+        }
 
 internal val DiscGrouping.wire: String
     get() =
@@ -188,8 +264,14 @@ internal val MediaType.wire: String
             MediaType.MINIDISC -> "minidisc"
         }
 
-internal fun ScanReport.toWire(): Dictionary =
-    dictionary("files" to files, "games" to games, "identified" to identified, "ignored" to ignored, "milliseconds" to milliseconds)
+internal fun ScanReport.toWire(): Dictionary = dictionary(
+    "files" to files,
+    "games" to games,
+    "identified" to identified,
+    "ignored" to ignored,
+    "skipped_folders" to skippedFolders,
+    "milliseconds" to milliseconds,
+)
 
 internal fun Catalog.toWire(): Dictionary = dictionary(
     "platforms" to

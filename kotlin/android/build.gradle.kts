@@ -44,7 +44,9 @@ dependencies {
     testImplementation(libs.godot)
     implementation(project(":core"))
     implementation(libs.coroutines.android)
+    implementation(libs.serialization.json)
     testImplementation(libs.bundles.test)
+    testImplementation(testFixtures(project(":core")))
     testImplementation(libs.robolectric)
 }
 

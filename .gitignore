@@ -8,3 +8,4 @@ app/addons/cartouche_android/bin/
 *.apk
 *.aab
 *.keystore
+app/addons/gdUnit4

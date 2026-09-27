@@ -4,7 +4,13 @@ package app.cartouche.android.storage
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
+import android.database.CursorIndexOutOfBoundsException
+import android.database.SQLException
+import android.database.StaleDataException
 import android.net.Uri
+import android.os.BadParcelableException
+import android.os.Bundle
+import android.os.OperationCanceledException
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -12,8 +18,13 @@ import app.cartouche.android.trace
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.library.DataFolders
+import app.cartouche.core.library.FolderContents
 import app.cartouche.core.library.FolderDepth
+import app.cartouche.core.library.FolderEntry
+import app.cartouche.core.library.FolderWalk
 import app.cartouche.core.library.ListedFile
+import app.cartouche.core.library.WalkFailure
 import app.cartouche.core.storage.DocumentId
 import app.cartouche.core.storage.DocumentPaths
 import app.cartouche.core.storage.VolumeId
@@ -22,10 +33,12 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.filterOption
+import arrow.core.flatMap
 import arrow.core.getOrElse
 import arrow.core.raise.Raise
 import arrow.core.raise.catch
 import arrow.core.raise.either
+import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
 import arrow.core.raise.option
 import arrow.core.toOption
@@ -44,6 +57,13 @@ internal data class DocumentEntry(
 )
 
 internal enum class EntryKind { DIRECTORY, FILE }
+
+private val DocumentEntry.asFolderEntry: FolderEntry
+    get() =
+        when (kind) {
+            EntryKind.DIRECTORY -> FolderEntry.Folder(name, documentId)
+            EntryKind.FILE -> FolderEntry.File(ListedFile(name, uri, path, sizeBytes))
+        }
 
 internal sealed interface StorageFailure {
     data class Unavailable(val reason: String) : StorageFailure
@@ -83,62 +103,55 @@ internal class Folders(private val context: Context) {
         entries(tree, documentId, volumeRoots())
     }
 
-    /**
-     * Every file of [tree], and with [FolderDepth.SUBFOLDERS] those of its sub-folders, except
-     * hidden ones (`.Trash`) and those deeper than [MAX_DEPTH]. A sub-folder that cannot be read is
-     * skipped, and traced; folders themselves are not listed.
-     */
-    fun files(tree: ContentUri, depth: FolderDepth): Either<StorageFailure, List<ListedFile>> = guard {
-        val roots = volumeRoots()
-
-        fun walk(entries: List<DocumentEntry>, level: Int): List<ListedFile> = entries.flatMap { entry ->
-            when (entry.kind) {
-                EntryKind.FILE -> listOf(ListedFile(entry.name, entry.uri, entry.path, entry.sizeBytes))
-                EntryKind.DIRECTORY ->
-                    if (depth == FolderDepth.TOP_LEVEL || entry.name.isHidden) {
-                        emptyList()
-                    } else if (level >= MAX_DEPTH) {
-                        trace("scan") { "skipped ${entry.name.value}: deeper than $MAX_DEPTH folders" }
-                        emptyList()
-                    } else {
-                        guard { entries(tree, Some(entry.documentId), roots) }.fold({ failure ->
-                            trace("scan") { "skipped ${entry.name.value}: ${failure.message}" }
-                            emptyList()
-                        }) { walk(it, level + 1) }
-                    }
+    /** The files of [tree] and, with [FolderDepth.SUBFOLDERS], of its sub-folders, as [FolderWalk] finds them. */
+    fun files(tree: ContentUri, depth: FolderDepth, dataFolders: DataFolders): Either<WalkFailure<StorageFailure>, FolderContents> =
+        guard { volumeRoots() }.mapLeft { WalkFailure.Unlisted(it) }.flatMap { roots ->
+            FolderWalk.files(depth, dataFolders) { folder, atMost ->
+                // The walk reports a sub-folder it cannot list without its reason: the log keeps it.
+                guard { entries(tree, folder, roots, atMost).map(DocumentEntry::asFolderEntry) }.onLeft { failure ->
+                    folder.onSome { trace("scan") { "cannot list ${it.value}: ${failure.message}" } }
+                }
             }
         }
-        walk(entries(tree, None, roots), level = 1)
-    }
 
     private fun Raise<StorageFailure>.entries(
         tree: ContentUri,
         folder: Option<DocumentId>,
         roots: Map<VolumeId, FilePath>,
+        /** Rows past one more than this are not read: the caller only needs to know there are more. */
+        atMost: Int = Int.MAX_VALUE,
     ): List<DocumentEntry> {
         val treeUri = Uri.parse(tree.value)
         val parent = folder.getOrElse { DocumentId(DocumentsContract.getTreeDocumentId(treeUri)) }
         return queryAll(DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parent.value), CHILD_COLUMNS)
             .getOrElse { raise(StorageFailure.Unavailable("the documents provider returned nothing (storage removed?)")) }
             .use { cursor ->
-                val (idColumn, nameColumn, mimeColumn, sizeColumn) = CHILD_COLUMNS.map(cursor::getColumnIndexOrThrow)
-                buildList {
-                    while (cursor.moveToNext()) {
-                        val id =
-                            DocumentId(ensureNotNull(cursor.getString(idColumn)) { StorageFailure.Unavailable("a document has no id") })
-                        add(
-                            DocumentEntry(
-                                name = FileName(cursor.getString(nameColumn).toOption().getOrElse { DocumentPaths.fallbackName(id) }),
-                                kind = if (cursor.getString(mimeColumn) == Document.MIME_TYPE_DIR) EntryKind.DIRECTORY else EntryKind.FILE,
-                                documentId = id,
-                                uri = contentUri(DocumentsContract.buildDocumentUriUsingTree(treeUri, id.value)),
-                                path = DocumentPaths.pathOf(treeUri.authority.orEmpty(), id, roots),
-                                sizeBytes = if (cursor.isNull(sizeColumn)) None else Some(cursor.getLong(sizeColumn)),
-                            ),
-                        )
-                    }
+                val columns = CHILD_COLUMNS.map(cursor::getColumnIndexOrThrow)
+                val rows = buildList { while (size <= atMost && cursor.moveToNext()) add(entry(cursor, columns, treeUri, roots)) }
+                // Across processes, a window the provider can no longer fill only makes the cursor end early.
+                ensure(rows.size > atMost || rows.size == cursor.count) {
+                    StorageFailure.Unavailable("the documents provider sent ${rows.size} of ${cursor.count} entries")
                 }
+                rows
             }
+    }
+
+    private fun Raise<StorageFailure>.entry(
+        cursor: Cursor,
+        columns: List<Int>,
+        treeUri: Uri,
+        roots: Map<VolumeId, FilePath>,
+    ): DocumentEntry {
+        val (idColumn, nameColumn, mimeColumn, sizeColumn) = columns
+        val id = DocumentId(ensureNotNull(cursor.getString(idColumn)) { StorageFailure.Unavailable("a document has no id") })
+        return DocumentEntry(
+            name = FileName(cursor.getString(nameColumn).toOption().getOrElse { DocumentPaths.fallbackName(id) }),
+            kind = if (cursor.getString(mimeColumn) == Document.MIME_TYPE_DIR) EntryKind.DIRECTORY else EntryKind.FILE,
+            documentId = id,
+            uri = contentUri(DocumentsContract.buildDocumentUriUsingTree(treeUri, id.value)),
+            path = DocumentPaths.pathOf(treeUri.authority.orEmpty(), id, roots),
+            sizeBytes = if (cursor.isNull(sizeColumn)) None else Some(cursor.getLong(sizeColumn)),
+        )
     }
 
     private fun Raise<StorageFailure>.describe(treeUri: Uri, roots: Map<VolumeId, FilePath>): Folder {
@@ -154,11 +167,13 @@ internal class Folders(private val context: Context) {
         ContentUri.parse(uri.toString()).getOrElse { raise(StorageFailure.Unavailable("$uri is not a content URI")) }
 
     /**
-     * Queries every row of [uri]. The framework signals "no selection, default order" with nulls and
-     * "provider unavailable" with a null cursor; both stay inside this function.
+     * Queries every row of [uri]. On Android the selection form of `query` only wraps this one;
+     * Robolectric reaches a `DocumentsProvider` through this one alone, which the tests need. The
+     * framework signals "no arguments" with nulls and "provider unavailable" with a null cursor;
+     * both stay inside this function.
      */
     private fun queryAll(uri: Uri, projection: Array<String>): Option<Cursor> =
-        context.contentResolver.query(uri, projection, null, null, null).toOption()
+        context.contentResolver.query(uri, projection, null as Bundle?, null).toOption()
 
     private fun volumeRoots(): Map<VolumeId, FilePath> =
         context.getSystemService(StorageManager::class.java).toOption().fold({ emptyMap() }) { manager ->
@@ -178,8 +193,14 @@ internal class Folders(private val context: Context) {
             raise(
                 when (e) {
                     is SecurityException -> StorageFailure.PermissionDenied(e.toString())
-                    // Malformed or stale URIs and document ids, removed storage, unsupported providers.
-                    is IllegalArgumentException, is IllegalStateException, is UnsupportedOperationException ->
+                    // Malformed or stale URIs and document ids, removed storage, unsupported providers, and
+                    // the other exceptions a provider's answer carries across processes (Parcel.writeException).
+                    is IllegalArgumentException, is IllegalStateException, is UnsupportedOperationException,
+                    is NullPointerException, is BadParcelableException,
+                    // Reading a row a provider filled wrongly (a blob), or a listing it cancelled.
+                    is SQLException, is OperationCanceledException,
+                    is StaleDataException, is CursorIndexOutOfBoundsException,
+                    ->
                         StorageFailure.Unavailable(e.toString())
                     else -> throw e
                 },
@@ -188,9 +209,6 @@ internal class Folders(private val context: Context) {
     }
 
     private companion object {
-        /** Deep enough for any ROM layout, shallow enough never to exhaust the stack. */
-        const val MAX_DEPTH = 8
-
         val CHILD_COLUMNS =
             arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE)
     }

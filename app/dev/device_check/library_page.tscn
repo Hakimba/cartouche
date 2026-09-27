@@ -84,7 +84,7 @@ autowrap_mode = 3
 
 [node name="IgnoredTitle" type="Label" parent="Columns/Side"]
 layout_mode = 2
-text = "Ignored files"
+text = "Ignored files and folders"
 
 [node name="Ignored" type="ItemList" parent="Columns/Side"]
 unique_name_in_owner = true

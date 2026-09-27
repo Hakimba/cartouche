@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends Control
 ## Developer tool that checks a device can run Cartouche: storage access, launching emulators,
-## controller input, 3D performance and installed apps. Not part of the product UI.
+## controller input, 3D performance and installed apps. Not part of the product UI: debug builds
+## open it from the carousel, and back from its root returns there.
+
+const _CAROUSEL := "res://carousel/carousel.tscn"
 
 const _BATTERY_EVERY_TICKS := 10
 
@@ -18,7 +21,7 @@ func _ready() -> void:
 		page.logged.connect(_log_line)
 	_log_line("Device: %s · Android plugin %s" % [DeviceCheckPage.plain(Android.device_name()),
 			"loaded" if Android.is_available() else "MISSING"])
-	var catalog := Android.load_catalog()
+	var catalog := Android.catalog
 	var names := PackedStringArray(catalog.platforms.map(
 			func(platform: AndroidServices.Platform) -> String: return platform.name))
 	_log_line("Platforms: %s" % DeviceCheckPage.plain(", ".join(names)))
@@ -35,8 +38,7 @@ func _notification(what: int) -> void:
 		NOTIFICATION_APPLICATION_RESUMED:
 			_current_page().refresh()
 		NOTIFICATION_WM_GO_BACK_REQUEST:
-			# Cartouche is a launcher: at the root, back does nothing rather than quit.
-			_current_page().go_back()
+			_go_back()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -44,7 +46,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_tabs.select_next_available()
 	elif event.is_action_pressed(&"tab_previous"):
 		_tabs.select_previous_available()
-	elif not (event.is_action_pressed(&"app_back") and _current_page().go_back()):
+	elif event.is_action_pressed(&"app_back"):
+		# Handled first: going back may leave the scene, and its viewport with it.
+		get_viewport().set_input_as_handled()
+		_go_back()
+		return
+	else:
 		return
 	get_viewport().set_input_as_handled()
 
@@ -61,6 +68,11 @@ func _on_clock_timeout() -> void:
 	_ticks += 1
 	var time := Time.get_time_string_from_system().left(5)
 	_status.text = "%s   ·   %s   ·   %d fps" % [time, _battery, Engine.get_frames_per_second()]
+
+
+func _go_back() -> void:
+	if not _current_page().go_back():
+		get_tree().change_scene_to_file(_CAROUSEL)
 
 
 func _current_page() -> DeviceCheckPage:
