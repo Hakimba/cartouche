@@ -28,8 +28,8 @@ code: it only describes what exists.
 - **`kotlin/core`** holds the domain rules as pure functions over immutable values: no Android, no
   IO, no `null`. Everything there is tested on the JVM, including property-based tests.
 - **`kotlin/android`** adapts Android APIs and exposes the core to Godot. It holds the only state:
-  the loaded catalog and reference lists, the library and the selection, the pending folder pick,
-  and which apps are installed (until the next resume).
+  the loaded catalog, reference lists and art extracts, the library and the selection, the pending
+  folder pick, the scraping run, and which apps are installed (until the next resume).
 - **GDScript** is the UI shell: scenes, input and display, with no domain rules. The carousel's
   screen mechanics (which game stands where, how a held direction repeats) are pure functions in
   `CarouselLayout`, tested headless.
@@ -71,6 +71,15 @@ The same words are used in the code, the tests and this document.
 - **Curtain**: a black window over every app, raised as the emulator starts and lowered once the
   emulator shows its game (a time per emulator) or the user is back, so that the emulator's own
   screens never show between the insertion's black and the game.
+- **Art**: a game's label image, always a **scan** of its real medium's printed face (never its
+  box's cover); a game without one is drawn as a **blank** of its console (for the PS2, a silver
+  disc with a dark band) with its title. The **art extract** (`app/data/art/<platform>.tsv`) lists,
+  per game of the LaunchBox Games Database, its disc scans by region; a platform's **serial source**
+  (`scansBySerial` in its profile, psxdatacenter for the PS2) names scans after a disc's serial.
+- **Scraping**: looking for the art of the games that have none, in the background. A **run** hands
+  out **requests** (a game and where to look, best first); a **stall** (offline, a server refusing,
+  no room to store) stops it until the network is back or a delay passes. Games no source has are
+  remembered as **absent** until the extract changes.
 - **Demo library**: a made-up library of any size, in debug builds, for measuring at scale.
 - **Wire format**: what crosses the JNI bridge between the plugin and GDScript.
 
@@ -112,6 +121,13 @@ The same words are used in the code, the tests and this document.
   (`data/launch/curtains.json`, milliseconds per package name, from 0 for none to 10 s): the time
   its own screens (splash, game list) take to give way to the game, measured on a device by
   recording the screen through a launch (`adb shell screenrecord`).
+- **`art/`** decides where a game's art comes from: `ArtIndex` reads an art extract and finds a
+  game by title (case, accents, punctuation and spaces aside; a title naming several games finds
+  none), `Regions` orders scans by how close their region is to the game's (NTSC-U, PAL, NTSC-J
+  groups), `SerialScans` names a serial source's scans, `ArtSources.requestFor` makes a game's
+  request (the extract's scans, then the serial source's). `Scraping` is a run's state (waiting,
+  under way, done, stall, retry delay), changed only by its operations; `AbsentArt` stores the games
+  no source has, with the version of the sources they were looked for in.
 - **`library/DemoLibrary.kt`** makes up libraries of any size, the same for the same arguments.
 - **`storage/DocumentPaths.kt`** maps document ids such as `1A2B-3C4D:ROMs/ps2` to paths such as
   `/storage/1A2B-3C4D/ROMs/ps2`.
@@ -145,14 +161,26 @@ The same words are used in the code, the tests and this document.
   whose unreadable file is only replaced.
 - **`library/LibraryService.kt`** runs scans, choices, selections and library launches on one
   thread, in the order they arrive.
+- **`art/`** runs scraping: `Scraper` hands a run's requests to four workers, which download
+  through the `Fetch` port (`HttpFetch` in the app, `FakeFetch` in tests), cut the scan to a
+  square label (`ArtImages`: to its disc, 1,024 pixels at most, JPEG)
+  and store it (`ArtStore`: one file per game, named after a hash of its id, written atomically).
+  It stops while the app is paused (a game is played), resumes on the network callback or after a
+  growing delay, and tells Godot through the `art_changed` signal. It starts after the library is
+  read and after each scan, never for a demo library.
 - **`AndroidManifest.xml`** lists the permissions, each justified in a comment.
 
 ### Godot (`app/`)
 - **The carousel** (`carousel/`, the main scene) shows the shelves. `carousel.gd` handles input,
   platforms, launches and remembering the selection (before leaving a shelf, launching, or leaving
   the app). `ShelfRow` moves the row and recycles a fixed pool of places, so its cost does not
-  depend on the number of games; labels are drawn in each place's small `SubViewport`, one per
-  frame. `CarouselLayout` holds the mechanics as pure functions.
+  depend on the number of games; titles are drawn in each place's small `SubViewport`, one per
+  frame, until a game's art is read (`GameArt`: on a worker thread, one texture sent to the GPU a
+  frame, the latest 24 kept); a game without a scan gets its shelf's blank (`LabelLook`, colours
+  and band from `appearance.json`). `CarouselLayout` holds the mechanics as pure functions.
+  Scraping's progress is a bar under the title: it moves to each count, greys with the reason while
+  the run waits, fades once full, hides for a launch's message, and fades with the controls at a
+  launch.
 - **Launches**: `GameLaunch` (`carousel/launch/`) runs a launch from A to the carousel shown again;
   `Insertion` holds the motion as pure functions of time, its timings, distances and sounds per
   media in `appearance.json` (`insertions`), tuned without code; `carousel/models/spindle.tscn` is
@@ -206,16 +234,18 @@ The same words are used in the code, the tests and this document.
 - **Without the plugin** (the editor, a desktop run), the carousel shows the demo library of
   `dev/demo/desktop.json`, with made-up label artwork: models and materials are tuned on a
   computer. The file is what the plugin would send; `DesktopDemoTest` (Kotlin) fails when it is out
-  of date and writes the new one. In debug builds, images put in `user://dev-labels/`, named after
-  a game's first serial (`SLES-52584.png`) or its title, are shown as its label (`DevLabels`, the
-  row's `label_images`, which tests replace); sounds put in `user://dev-sounds/`, named after an
-  insertion's cues (`ps2-clip.mp3`), are played as it runs (`DevSounds`). Neither is ever part of
+  of date and writes the new one. In debug builds, sounds put in `user://dev-sounds/`, named after
+  an insertion's cues (`ps2-clip.mp3`), are played as it runs (`DevSounds`). They are never part of
   the repository: the insertions play silently until freely licensed sounds are chosen.
+- **Art data**: `dev/launchbox_art.py` makes a platform's extract from the LaunchBox Games
+  Database dump (`Metadata.zip`, published daily); `dev/redump_titles.py` does the same for the
+  reference lists. Images are never part of the repository: they are downloaded on the device.
 - **Without the plugin**, pressing A plays the insertion, then the launch fails: insertions are
   tuned on a computer too.
 - **Debug arguments** (`--esa arguments` on the device, after `--` on a desktop):
   `--turntable=0.25` turns the selected game to show all its sides, `--shelf=gba` opens on a
-  platform's shelf, `--demo-games=N` and `--bench=…` as in `dev/bench.sh`.
+  platform's shelf, `--art-refused` makes every art server refuse (to see the message and the
+  retries), `--demo-games=N` and `--bench=…` as in `dev/bench.sh`.
 - **Shaders are only compiled when something is drawn**: the headless runs of `dev/build.sh` do
   not see their errors. After changing one, run the desktop demo or the device and look for
   `SHADER ERROR` in the log.

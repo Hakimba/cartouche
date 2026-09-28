@@ -5,9 +5,12 @@
     "cartridge": "res://carousel/models/cartridge.tscn"
   },
   "colors": {
-    "ps2": "#f2f2ee",
+    "ps2": "#c9ccd1",
     "gc": "#f2f2ee",
     "gba": "#e9e6dc"
+  },
+  "bands": {
+    "ps2": { "color": "#17181c", "text": "PlayStation 2" }
   },
   "default_color": "#5a6070",
   "pose": {

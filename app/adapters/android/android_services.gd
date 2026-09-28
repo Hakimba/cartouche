@@ -11,6 +11,8 @@ extends Node
 ## values, except the catalog and the demo library, read from [constant DESKTOP_DEMO], and the
 ## launch check, which lets every game's insertion play.
 
+## Looking for the games' art went on: [param change] tells how, and the art just found, if any.
+signal art_changed(change: ArtChange)
 ## Every operation's answer; callers await the one carrying their request id.
 signal _answered(payload: Dictionary)
 
@@ -21,6 +23,8 @@ const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
 const _TITLE_LISTS := "res://data/redump"
 const _DATA_FOLDERS := "res://data/scan/data_folders.json"
 const _CURTAINS := "res://data/launch/curtains.json"
+## One art extract per platform, named after its id (`ps2.tsv`).
+const _ART := "res://data/art"
 ## The catalog and a demo library as the plugin sends them, for running without it: see
 ## `DesktopDemoTest.kt`, which keeps it up to date.
 const DESKTOP_DEMO := "res://dev/demo/desktop.json"
@@ -36,6 +40,7 @@ func _ready() -> void:
 	if Engine.has_singleton(_SINGLETON):
 		_plugin = Engine.get_singleton(_SINGLETON)
 		_plugin.connect(&"answered", _answered.emit)
+		_plugin.connect(&"art_changed", func(payload: Dictionary) -> void: art_changed.emit(ArtChange.new(payload)))
 	_load_catalog()
 
 
@@ -52,7 +57,8 @@ func _load_catalog() -> void:
 	var titles := _files_in(_TITLE_LISTS, ".tsv", true)
 	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
 	var curtains := FileAccess.get_file_as_string(_CURTAINS)
-	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders, curtains],
+	var art := _files_in(_ART, ".tsv", true)
+	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders, curtains, art],
 		_desktop_demo("catalog"))
 	catalog = CatalogSummary.new(summary)
 
@@ -150,7 +156,8 @@ func launch_file(player_id: String, file: Entry) -> Result:
 	return Result.new(await _request(&"launchFile", [player_id, game]))
 
 
-## The library, read from its file on first use.
+## The library, read from its file on first use, with the art stored for its games; looking for
+## the others' art starts, as [signal art_changed] tells.
 func library() -> LibraryAnswer:
 	return LibraryAnswer.new(await _request(&"library"))
 
@@ -567,6 +574,8 @@ class Library:
 
 class LibraryAnswer extends Result:
 	var library: Library
+	## The art stored for its games (sent by [method AndroidServices.library] only).
+	var art: Array[Art] = []
 	## Why the stored library could not be read, when it could not: it then started empty.
 	var has_load_problem: bool
 	var load_problem: String
@@ -583,6 +592,10 @@ class LibraryAnswer extends Result:
 				library.games.size(), text.length(), elapsed])
 		has_load_problem = payload.has("load_problem")
 		load_problem = payload.get("load_problem", "")
+		var art_text: String = payload.get("art", "[]")
+		var stored: Array = JSON.parse_string(art_text)
+		for found: Dictionary in stored:
+			art.append(Art.new(found))
 
 
 class ScanReport:
@@ -609,3 +622,43 @@ class ScanAnswer extends LibraryAnswer:
 		super(payload)
 		var item: Dictionary = payload.get("report", {})
 		report = ScanReport.new(item)
+
+
+## A game's disc scan, as the plugin stored it.
+class Art:
+	var game_id: String
+	## An absolute path to a JPEG.
+	var path: String
+
+	func _init(item: Dictionary) -> void:
+		game_id = item["game_id"]
+		path = item["path"]
+
+
+## How looking for the games' art goes.
+class ArtProgress:
+	## Games of this run done, and looked for in it, done or not.
+	var done: int
+	var total: int
+	## Why it waits: `offline`, `refused` (a server busy or failing) or `storage`; empty when it
+	## does not.
+	var stall: StringName
+
+	func _init(item: Dictionary) -> void:
+		done = item.get("done", 0)
+		total = item.get("total", 0)
+		stall = item.get("stall", &"")
+
+
+class ArtChange:
+	var progress: ArtProgress
+	var has_found: bool
+	var found: Art
+
+	func _init(payload: Dictionary) -> void:
+		progress = ArtProgress.new(payload)
+		has_found = payload.has("found")
+		if has_found:
+			var item: Dictionary = payload["found"]
+			found = Art.new(item)
+

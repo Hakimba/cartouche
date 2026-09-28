@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=6 format=3 uid="uid://voyem7672a04"]
+[gd_resource type="Theme" load_steps=9 format=3 uid="uid://voyem7672a04"]
 
 [ext_resource type="FontFile" uid="uid://h83bs6afufuh" path="res://fonts/AtkinsonHyperlegible-Regular.ttf" id="1"]
 [ext_resource type="FontFile" uid="uid://c8656vpk8yx63" path="res://fonts/AtkinsonHyperlegible-Bold.ttf" id="2"]
@@ -39,6 +39,27 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
+[sub_resource type="StyleBoxFlat" id="art_track"]
+bg_color = Color(0.13, 0.14, 0.16, 0.14)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="art_fill"]
+bg_color = Color(0.13, 0.14, 0.16, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="art_fill_stalled"]
+bg_color = Color(0.6, 0.62, 0.66, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
 [resource]
 default_font = ExtResource("1")
 default_font_size = 26
@@ -71,3 +92,12 @@ Hint/styles/normal = SubResource("hint")
 Title/base_type = &"Label"
 Title/font_sizes/font_size = 30
 Title/fonts/font = ExtResource("2")
+Status/base_type = &"Label"
+Status/colors/font_color = Color(0.23, 0.24, 0.27, 1)
+Status/font_sizes/font_size = 20
+ArtBar/base_type = &"ProgressBar"
+ArtBar/styles/background = SubResource("art_track")
+ArtBar/styles/fill = SubResource("art_fill")
+ArtBarStalled/base_type = &"ProgressBar"
+ArtBarStalled/styles/background = SubResource("art_track")
+ArtBarStalled/styles/fill = SubResource("art_fill_stalled")

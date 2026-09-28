@@ -3,6 +3,8 @@ package app.cartouche.android
 
 import android.app.Activity
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
@@ -10,6 +12,12 @@ import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import app.cartouche.android.apps.InstalledApps
+import app.cartouche.android.art.ArtStore
+import app.cartouche.android.art.Fetch
+import app.cartouche.android.art.FetchFailure
+import app.cartouche.android.art.FoundArt
+import app.cartouche.android.art.HttpFetch
+import app.cartouche.android.art.Scraper
 import app.cartouche.android.launch.Curtain
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.launch.Launcher
@@ -23,6 +31,10 @@ import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
+import app.cartouche.core.art.ArtIndex
+import app.cartouche.core.art.ArtSources
+import app.cartouche.core.art.Scraping
+import app.cartouche.core.art.SerialScans
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DemoLibrary
@@ -43,11 +55,13 @@ import app.cartouche.core.platforms.Player
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
+import arrow.core.Option
 import arrow.core.Some
 import arrow.core.firstOrNone
 import arrow.core.flatMap
 import arrow.core.getOrElse
 import arrow.core.getOrNone
+import arrow.core.left
 import arrow.core.merge
 import arrow.core.raise.Raise
 import arrow.core.raise.either
@@ -57,6 +71,7 @@ import arrow.core.recover
 import arrow.core.separateEither
 import arrow.core.toOption
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -83,11 +98,23 @@ import kotlin.time.TimeSource
  * exception stops at [answer], except the cancellation of [scope] when the activity is destroyed.
  */
 public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // A failure no operation stops is logged, and ends only its own coroutine.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e -> unexpected(e) })
     private val folders by lazy { Folders(context) }
     private val launcher by lazy { Launcher(context, folders) }
     private val curtain by lazy { Curtain(context.applicationContext, scope) }
     private val pendingPick = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
+    private val artStore by lazy { ArtStore(File(context.filesDir, "art")) }
+    private val scraper by lazy { Scraper(artStore, artFetch(), scope, ::artChanged) }
+    private val network =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = scraper.networkBack()
+        }
+
+    /** Watches the network from the first art looked for on, to resume as soon as it comes back. */
+    private val watchingNetwork = lazy { Either.catch { connectivity.registerDefaultNetworkCallback(network) }.isRight() }
+
+    private val connectivity by lazy { context.getSystemService(ConnectivityManager::class.java) }
 
     /** Written on the render thread, read by operations too; immutable, so publishing it is enough. */
     @Volatile private var catalog = Catalog()
@@ -101,6 +128,14 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     @Volatile private var curtainTimes = CurtainTimes.NONE
 
+    /** Art extracts by platform, as loaded; each is indexed on first use. */
+    @Volatile private var artLists: Map<PlatformId, String> = emptyMap()
+
+    @Volatile private var artSources = ConcurrentHashMap<PlatformId, ArtSources>()
+
+    /** Whether the library shown is a demo one, whose games have no art to look for. */
+    @Volatile private var demo = false
+
     /** Runs every library call, one at a time (see [LibraryService]). */
     private val libraryThread = Dispatchers.IO.limitedParallelism(1)
 
@@ -112,15 +147,23 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     override fun getPluginName(): String = BuildConfig.GODOT_PLUGIN_NAME
 
-    override fun getPluginSignals(): Set<SignalInfo> = setOf(SignalInfo(ANSWERED_SIGNAL, Dictionary::class.java))
+    override fun getPluginSignals(): Set<SignalInfo> =
+        setOf(SignalInfo(ANSWERED_SIGNAL, Dictionary::class.java), SignalInfo(ART_SIGNAL, Dictionary::class.java))
 
     override fun onMainResume() {
         installed.clear()
         curtain.lower()
+        scraper.start()
     }
+
+    // Nothing is downloaded while a game is played.
+    override fun onMainPause(): Unit = scraper.stop()
 
     override fun onMainDestroy() {
         curtain.lower()
+        if (watchingNetwork.isInitialized() && watchingNetwork.value) {
+            Either.catch { connectivity.unregisterNetworkCallback(network) }
+        }
         scope.cancel()
     }
 
@@ -129,7 +172,8 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /**
      * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
      * profiles file's text, the reference lists as `{platform id: text}`, the emulator data folder
-     * names (`data_folders.json`) and the curtain times (`curtains.json`); returns the catalog summary.
+     * names (`data_folders.json`), the curtain times (`curtains.json`) and the art extracts as
+     * `{platform id: text}`; returns the catalog summary.
      */
     @UsedByGodot
     public fun loadCatalog(
@@ -138,13 +182,16 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         titles: Dictionary,
         dataFolderNames: String,
         curtains: String,
+        art: Dictionary,
     ): Dictionary {
         val (notText, sources) =
             definitions.keys.sorted().separateEither { name ->
                 definitions.text(name).map { DefinitionSource(name, it) }.toEither { CatalogError.InvalidJson(name, "not text") }
             }
-        titleLists = titles.keys.flatMap { id -> titles.text(id).map { PlatformId(id) to it }.toList() }.toMap()
+        titleLists = titles.textsByPlatform()
         titleIndexes = ConcurrentHashMap()
+        artLists = art.textsByPlatform()
+        artSources = ConcurrentHashMap()
         val folderNames = DataFolders.parse(DefinitionSource("data_folders.json", dataFolderNames))
         dataFolders = folderNames.getOrElse { DataFolders.NONE }
         val times = CurtainTimes.parse(DefinitionSource("curtains.json", curtains))
@@ -277,10 +324,19 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             withActivity(requestId) { act -> start(act, launcher.appIntent(it)) }
         }
 
-    /** Answers with `{"library"}`, read from its file on first use. */
+    /**
+     * Answers with `{"library", "art"}`, the library read from its file on first use and the label
+     * images stored for its games (see [artWireJson]); then looks for the others' art.
+     */
     @UsedByGodot
-    public fun library(requestId: Int): Unit = answering(requestId, libraryThread) {
-        library.value.run { success("library" to wire(this)).putSome("load_problem", loadProblem) }
+    public fun library(requestId: Int) {
+        answering(requestId, libraryThread) {
+            library.value.run {
+                val stored = library().games.flatMap { game -> artStore.stored(game.id).map { FoundArt(game.id, it) }.toList() }
+                success("library" to wire(this), "art" to stored.artWireJson()).putSome("load_problem", loadProblem)
+            }
+        }
+        lookForArt()
     }
 
     /**
@@ -310,7 +366,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val platform = platform(PlatformId(platformId))
         val titles = titles(platform.id)
         val report = inLibrary { scan(platform, titles, dataFolders) }.second
-        success("library" to wire(library.value), "report" to report.toWire())
+        success("library" to wire(library.value), "report" to report.toWire()).also { lookForArt() }
     }
 
     /** Remembers [gameId] as the selected game of its platform, and that platform as the one shown. */
@@ -335,6 +391,8 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             store.save(DemoLibrary.of(games, catalog.platforms.map { it.id })).mapLeft { it.toWire() }.bind()
         }
         library = lazyOf(libraryIn(folder))
+        demo = true
+        scraper.lookFor(emptyList())
         success("library" to wire(library.value))
     }
 
@@ -393,6 +451,42 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     // Plumbing
+
+    /**
+     * Looks for the art of the library's games that have none, in library order, on [libraryThread]
+     * after the calls already there: an answer never waits for it, and its failure fails no answer.
+     */
+    private fun lookForArt() {
+        scope.launch(libraryThread) {
+            if (demo) return@launch
+            val requests =
+                library.value.library().games.flatMap { game ->
+                    sources(game.platform).requestFor(game).toList()
+                }
+            scraper.lookFor(requests)
+            if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
+        }
+    }
+
+    private fun artChanged(run: Scraping, found: Option<FoundArt>): Unit =
+        emitSignal(ART_SIGNAL, run.toWire().putSome("found", found.map { it.toWire() }))
+
+    private fun sources(platform: PlatformId): ArtSources = artSources.computeIfAbsent(platform) {
+        val started = TimeSource.Monotonic.markNow()
+        val bySerial = catalog.platform(platform).flatMap { it.profile.scansBySerial }.flatMap(SerialScans::of)
+        ArtSources(artLists.getOrNone(platform).fold({ ArtIndex.EMPTY }, ArtIndex::parse), bySerial).also {
+            trace("art") { "${platform.value}: ${it.size} games indexed in ${started.elapsedNow().inWholeMilliseconds} ms" }
+        }
+    }
+
+    /** Downloads over HTTP; in debug builds, `--art-refused` makes every server refuse, to try the message and the retries. */
+    private fun artFetch(): Fetch = if (BuildConfig.DEBUG &&
+        "--art-refused" in launchArguments()
+    ) {
+        Fetch { FetchFailure.Refused(503).left() }
+    } else {
+        HttpFetch("Cartouche")
+    }
 
     private suspend fun <T> onLibrary(block: LibraryService.() -> T): T = withContext(libraryThread) { library.value.block() }
 
@@ -457,6 +551,12 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         }
     }
 
+    /** `{platform id: text}` as sent by the adapter, texts of another type left out. */
+    private fun Dictionary.textsByPlatform(): Map<PlatformId, String> = keys
+        .flatMap { id ->
+            text(id).map { PlatformId(id) to it }.toList()
+        }.toMap()
+
     private fun invalid(detail: String): Dictionary = failure(ErrorCode.INVALID_REQUEST, detail)
 
     // The system resolves implicit intents, so they are always available.
@@ -500,5 +600,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         const val REQUEST_PICK_FOLDER = 0xCA27
 
         const val LIBRARY_FILE = "library.json"
+
+        const val ART_SIGNAL = "art_changed"
     }
 }

@@ -3,6 +3,7 @@ package app.cartouche.android
 
 import android.util.Log
 import app.cartouche.android.apps.LaunchableApp
+import app.cartouche.android.art.FoundArt
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.ScanReport
@@ -10,6 +11,8 @@ import app.cartouche.android.storage.DocumentEntry
 import app.cartouche.android.storage.EntryKind
 import app.cartouche.android.storage.Folder
 import app.cartouche.android.storage.StorageFailure
+import app.cartouche.core.art.Scraping
+import app.cartouche.core.art.Stall
 import app.cartouche.core.library.CountedReason
 import app.cartouche.core.library.Disc
 import app.cartouche.core.library.DiscGrouping
@@ -264,6 +267,31 @@ internal val MediaType.wire: String
             MediaType.DVD -> "dvd"
             MediaType.CARTRIDGE -> "cartridge"
             MediaType.MINIDISC -> "minidisc"
+        }
+
+/**
+ * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`,
+ * and the art just found, if any, under `"found"` ([FoundArt.toWire]).
+ */
+internal fun Scraping.toWire(): Dictionary = dictionary("done" to done, "total" to total).putSome("stall", stall.map { it.wire })
+
+/** `{"game_id", "path"}`, the path an absolute one to a JPEG. */
+internal fun FoundArt.toWire(): Dictionary = dictionary("game_id" to game.value, "path" to art.file.path)
+
+/** Stored art as JSON text, `[{"game_id", "path"}]`: a library's worth of Dictionaries would cost as much as its games (see [toWireJson]). */
+internal fun List<FoundArt>.artWireJson(): String = toJson { found ->
+    buildJsonObject {
+        put("game_id", found.game.value)
+        put("path", found.art.file.path)
+    }
+}.toString()
+
+internal val Stall.wire: String
+    get() =
+        when (this) {
+            Stall.OFFLINE -> "offline"
+            Stall.REFUSED -> "refused"
+            Stall.STORAGE -> "storage"
         }
 
 internal fun ScanReport.toWire(): Dictionary = dictionary(

@@ -20,8 +20,12 @@ const _MAX_STRETCH := 0.1
 
 ## Debug builds: turns per second of the selected game around its vertical axis, to see every side.
 var turntable := 0.0
-## Where label images come from; a game without one gets its title drawn.
-var label_images := DevLabels.new()
+## Where label images come from; a game gets its title drawn until its image is ready, or for good
+## without one.
+var label_images: GameArt:
+	set(art):
+		label_images = art
+		art.loaded.connect(refresh_label)
 var pose := Pose.new()
 
 var _games: Array[AndroidServices.Game] = []
@@ -88,9 +92,7 @@ func _process(delta: float) -> void:
 		var place: Place = _unlabelled.pop_front()
 		if place.game >= 0:
 			var game := _games[place.game]
-			if label_images.has_label(game):
-				place.shown.show_label(label_images.label(game), true)
-			else:
+			if not _show_image(place, game):
 				place.shown.draw_label(game.title, _look)
 
 
@@ -188,6 +190,23 @@ func selected_stand() -> Transform3D:
 	return place.transform if place else Transform3D.IDENTITY
 
 
+## Shows [param game_id]'s image on its place, once read, if the game is in view: it replaces the
+## title drawn there.
+func refresh_label(game_id: String) -> void:
+	for place: Place in _placed.values():
+		if _games[place.game].id == game_id and place not in _unlabelled:
+			_show_image(place, _games[place.game])
+
+
+## Shows [param game]'s image on [param place] when it is read; otherwise asks for it and is false.
+func _show_image(place: Place, game: AndroidServices.Game) -> bool:
+	if label_images.has_texture(game):
+		place.shown.show_label(label_images.texture(game), true)
+		return true
+	label_images.request(game)
+	return false
+
+
 func _step(direction: int) -> void:
 	if _games.size() < 2:
 		return
@@ -256,10 +275,14 @@ class Pose:
 		return Basis.from_euler(angles * (PI / 180.0) * centred)
 
 
-## How labels look on one shelf.
+## How labels look on one shelf; a game without a scan is drawn so, like a blank of its console.
 class LabelLook:
 	var color := Color(0.35, 0.37, 0.42)
 	var platform_name := ""
+	## A band along the bottom, as printed on the discs of some consoles, and what it reads
+	## instead of the platform's name; none when transparent.
+	var band := Color.TRANSPARENT
+	var band_text := ""
 	## Made-up artwork instead of a plain colour, for demo libraries.
 	var demo_art := false
 
@@ -293,6 +316,8 @@ class LabelledModel extends Node3D:
 	## a smaller one shrinks it.
 	const _FULL_TITLE_HEIGHT := 0.22
 	const _DARK_INK := Color(0.12, 0.13, 0.15)
+	## How far above the platform's name the band starts, as a fraction of the label.
+	const _BAND_ABOVE := 0.02
 
 	var _geometry: Array[GeometryInstance3D] = []
 	var _material: ShaderMaterial
@@ -300,6 +325,7 @@ class LabelledModel extends Node3D:
 	var _background: ColorRect = _view.get_node("Background")
 	var _title: Label = _view.get_node("Title")
 	var _platform: Label = _view.get_node("Platform")
+	var _band: ColorRect = _view.get_node("Band")
 	var _demo_art := ShaderMaterial.new()
 
 	func _init(model: PackedScene) -> void:
@@ -327,6 +353,9 @@ class LabelledModel extends Node3D:
 		_title.add_theme_font_size_override(&"font_size", roundi(font_size * shrink))
 		_platform.position = size * platform.position
 		_platform.size = size * platform.size
+		# From just above the platform's name to the bottom, where the label's edge rounds it.
+		_band.position = Vector2(0.0, _platform.position.y - size.y * _BAND_ABOVE)
+		_band.size = Vector2(size.x, size.y - _band.position.y)
 		_demo_art.shader = _DEMO_ART
 
 	func clear_label() -> void:
@@ -343,8 +372,12 @@ class LabelledModel extends Node3D:
 		for text: Label in [_title, _platform]:
 			text.add_theme_color_override(&"font_color", Color(ink, 1.0 if text == _title else 0.7))
 			text.add_theme_constant_override(&"outline_size", 10 if look.demo_art else 0)
+		_band.visible = look.band.a > 0.0 and not look.demo_art
+		_band.color = look.band
+		if _band.visible:
+			_platform.add_theme_color_override(&"font_color", Color.WHITE)
 		_title.text = title
-		_platform.text = look.platform_name
+		_platform.text = look.band_text if _band.visible else look.platform_name
 		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 		show_label(_view.get_texture(), false)
 

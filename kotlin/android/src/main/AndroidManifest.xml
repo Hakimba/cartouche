@@ -14,6 +14,10 @@
     <!-- A black window over the emulator hides its own screens until its game shows (Curtain). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- Games' label images are downloaded (Scraper), and looked for again as soon as the network comes back. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- Emulators and the apps shown in the Apps menu all have a launcher entry, which is all the
          package visibility Cartouche needs. -->
     <queries>

@@ -7,7 +7,10 @@
 # times), the app's memory and the save of the selection. With the user's own library, it also
 # launches the selected game once (insertion frames, times to check it and to start its emulator,
 # time for the emulator to show), then comes back and stops that emulator, just started: nothing
-# of the user's is running in it. Run it after `dev/build.sh --install`.
+# of the user's is running in it. First, with the user's own library, the art downloaded so far is
+# deleted and downloaded again while the carousel scrolls (time for 40 games and for all, frame
+# times meanwhile); the starts that follow read it from the device (the selected game's label
+# shown, the slowest label read). Run it after `dev/build.sh --install`, with the device online.
 #
 # Prints one line per measurement; with --record FILE, also appends each one to FILE as a JSON
 # record: {"date", "commit", "build", "device", "android", "scenario", "games", "metric",
@@ -75,9 +78,28 @@ emit_bench() {
 # first NUMBER-PATTERN: the first number the log shows in a line matching the extended regex.
 first() { "$adb" logcat -d | grep -oE "$1" | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' | tail -1; }
 
+# seconds_between START-PATTERN END-PATTERN [NTH]: seconds from the first line matching START to
+# the NTH (default: first) line matching END, by the device's clock.
+seconds_between() {
+  "$adb" logcat -d -v epoch | awk -v start="$1" -v end="$2" -v nth="${3:-1}" '
+    $0 ~ start && !s { s = $1 } $0 ~ end && s { if (++n == nth) { printf "%.1f", $1 - s; exit } }'
+}
+
 for size in "${sizes[@]}"; do
   demo=$([ "$size" = real ] || echo "--demo-games=$size")
   args=${demo:+$demo,}
+  if [ "$size" = real ]; then
+    # Cartouche's own downloads, downloaded again below: nothing else is deleted.
+    "$adb" shell run-as app.cartouche rm -rf files/art
+    start "--bench=scrape"
+    wait_for "bench: scrape:" 90
+    emit_bench scrape "$size" fps worst_ms p95_ms slow_frames steps
+    wait_for "art: run over" 300
+    emit scrape "$size" scrape_40_games "$(seconds_between 'games to look for' ', stored in ' 40)" s 1
+    emit scrape "$size" scrape_all "$(first 'run over: [0-9]+ games in [0-9]+ s')" s 1
+    emit scrape "$size" scrape_games "$(first 'run over: [0-9]+ games')" count 1
+    emit scrape "$size" labels_stored "$("$adb" logcat -d | grep -c ', stored in ')" count 1
+  fi
   for run in $(seq "$starts"); do
     start "$demo"
     wait_for "carousel: shown" 30
@@ -95,6 +117,10 @@ for size in "${sizes[@]}"; do
     emit first_frames "$size" first_frames_worst "$worst" ms "$run"
     indexed=$(first 'titles: ps2: [0-9]+ indexed in [0-9]+ ms' || true)
     [ -z "$indexed" ] || emit titles "$size" title_index_ps2 "$indexed" ms "$run"
+    selected=$(first 'selected label shown [0-9]+ ms after' || true)
+    [ -z "$selected" ] || emit art "$size" selected_label_shown "$selected" ms "$run"
+    read_worst=$("$adb" logcat -d | grep -oE "art: .* read in [0-9.]+" | grep -oE "[0-9.]+$" | sort -n | tail -1 || true)
+    [ -z "$read_worst" ] || emit art "$size" label_read_worst "$read_worst" ms "$run"
   done
   for scenario in scroll switch turn; do
     start "$args--bench=$scenario"

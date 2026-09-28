@@ -129,7 +129,7 @@ func test_a_shelf_of_one_game_does_not_move() -> void:
 ## label images whatever the developer's own folder holds.
 func _row(count: int, selected: int, pose := ShelfRow.Pose.new()) -> ShelfRow:
 	var row: ShelfRow = auto_free(ShelfRow.new())
-	row.label_images = Fixtures.FakeLabels.new()
+	row.label_images = auto_free(Fixtures.FakeArt.new())
 	row.pose = pose
 	add_child(row)
 	row.show_shelf(Fixtures.games(count), selected, Fixtures.DVD, ShelfRow.LabelLook.new())

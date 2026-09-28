@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+@file:UseSerializers(OptionSerializer::class)
+
 package app.cartouche.core.platforms
 
 import app.cartouche.core.FileName
@@ -20,8 +22,10 @@ import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
 import arrow.core.raise.withError
 import arrow.core.separateEither
+import arrow.core.serialization.OptionSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -82,10 +86,15 @@ public enum class MediaType {
 
 /**
  * What Cartouche adds to a Daijishō platform, from `app/data/platforms/profiles.json`: the physical
- * medium its games are shown as, and the size under which an unknown file is not taken for a game.
+ * medium its games are shown as, the size under which an unknown file is not taken for a game, and
+ * where its disc scans are named after their serial, if anywhere (see `SerialScans`).
  */
 @Serializable
-public data class PlatformProfile(public val media: MediaType, public val minimumGameBytes: Long)
+public data class PlatformProfile(
+    public val media: MediaType,
+    public val minimumGameBytes: Long,
+    public val scansBySerial: Option<String> = None,
+)
 
 /** A player able to open a given file, with its platform. */
 public data class Candidate(public val platform: Platform, public val player: Player)

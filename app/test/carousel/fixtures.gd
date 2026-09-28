@@ -125,18 +125,29 @@ static func stand(random: RandomNumberGenerator) -> Transform3D:
 	return Transform3D(turned.scaled_local(scale), origin)
 
 
-## Label images kept in memory, by title; none unless given.
-class FakeLabels extends DevLabels:
+## Disc scans kept in memory by title, ready at once; none unless given.
+class FakeArt extends GameArt:
 	var _images: Dictionary[String, Texture2D]
 
 	func _init(images: Dictionary[String, Texture2D] = {}) -> void:
 		_images = images
 
-	func has_label(game: AndroidServices.Game) -> bool:
+	## [param game]'s scan arrives, as the plugin finds it.
+	func arrive(game: AndroidServices.Game, image: Texture2D) -> void:
+		_images[game.title] = image
+		loaded.emit(game.id)
+
+	func has_art(game: AndroidServices.Game) -> bool:
 		return game.title in _images
 
-	func label(game: AndroidServices.Game) -> Texture2D:
+	func has_texture(game: AndroidServices.Game) -> bool:
+		return has_art(game)
+
+	func texture(game: AndroidServices.Game) -> Texture2D:
 		return _images[game.title]
+
+	func request(_game: AndroidServices.Game) -> void:
+		pass
 
 
 ## The Android services answering launches as the test says, counting them: a game can start

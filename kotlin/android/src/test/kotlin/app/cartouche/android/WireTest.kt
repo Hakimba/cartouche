@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android
 
+import app.cartouche.android.art.FoundArt
+import app.cartouche.android.art.StoredArt
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.ScanReport
 import app.cartouche.android.storage.DocumentEntry
@@ -9,8 +11,13 @@ import app.cartouche.android.storage.Folder
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
+import app.cartouche.core.art.ArtRequest
+import app.cartouche.core.art.ArtUrl
+import app.cartouche.core.art.Scraping
+import app.cartouche.core.art.Stall
 import app.cartouche.core.library.Disc
 import app.cartouche.core.library.FolderPath
+import app.cartouche.core.library.GameId
 import app.cartouche.core.library.IgnoreReason
 import app.cartouche.core.library.IgnoredCount
 import app.cartouche.core.library.IgnoredFile
@@ -43,8 +50,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.godotengine.godot.Dictionary
 import org.junit.Test
+import java.io.File
 
 class WireTest {
+    private val found = FoundArt(GameId("ps2/a"), StoredArt(File("/data/art/a.jpg")))
+
     /** The values Godot's JNI bridge converts to Variants; see [toWireArray]. */
     private fun Any.isGodotValue(): Boolean = when (this) {
         is String, is Boolean, is Int, is Long, is Double -> true
@@ -89,10 +99,23 @@ class WireTest {
             success("entries" to listOf(entry).toWireArray { it.toWire() }),
             broken.toWire(),
             failure(ErrorCode.CANCELLED, "x"),
+            Scraping.NONE.toWire().putSome("found", Some(found.toWire())),
+            success("library" to library.toWireJson(None), "art" to listOf(found).artWireJson()),
         ).forEach { it.isGodotValue() shouldBe true }
         arrayOf("a").isGodotValue() shouldBe true
         listOf("a").toTypedArray<Any>().isGodotValue() shouldBe false
         arrayOf(dictionary()).isGodotValue() shouldBe false
+    }
+
+    @Test
+    fun `a run's progress and the art found reach Godot with the keys and codes the GDScript adapter reads`() {
+        val request = ArtRequest(GameId("ps2/a"), "A", nonEmptyListOf(ArtUrl("https://a/a.png")), None)
+        val (_, underWay) = Scraping.NONE.with(listOf(request)).take().shouldBeSome()
+        underWay.toWire() shouldBe dictionary("done" to 0, "total" to 1)
+        Stall.entries.map { underWay.stalled(request.game, it).toWire()["stall"] } shouldBe listOf("offline", "refused", "storage")
+        found.toWire() shouldBe dictionary("game_id" to "ps2/a", "path" to "/data/art/a.jpg")
+        Json.parseToJsonElement(listOf(found).artWireJson()) shouldBe
+            Json.parseToJsonElement("""[{"game_id": "ps2/a", "path": "/data/art/a.jpg"}]""")
     }
 
     @Test

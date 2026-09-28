@@ -10,10 +10,13 @@ import java.io.File
 import java.io.IOException
 
 /** Replaces the file with [text] in one step: an interrupted write leaves the previous content intact. */
-internal fun AtomicFile.write(text: String): Either<StorageFailure, Unit> = either {
+internal fun AtomicFile.write(text: String): Either<StorageFailure, Unit> = write(text.encodeToByteArray())
+
+/** Replaces the file with [bytes] in one step: an interrupted write leaves the previous content, or no file, never part of [bytes]. */
+internal fun AtomicFile.write(bytes: ByteArray): Either<StorageFailure, Unit> = either {
     val out = catch({ startWrite() }) { e: IOException -> raise(StorageFailure.Unavailable(e.toString())) }
     catch({
-        out.write(text.encodeToByteArray())
+        out.write(bytes)
         finishWrite(out)
     }) { e: IOException ->
         failWrite(out)

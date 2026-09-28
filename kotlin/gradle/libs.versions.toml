@@ -24,11 +24,12 @@ junit = { module = "junit:junit", version.ref = "junit" }
 kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotest-assertions-arrow = { module = "io.kotest.extensions:kotest-assertions-arrow", version.ref = "kotest-arrow" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 [bundles]
-test = ["junit", "kotest-property", "kotest-assertions", "kotest-assertions-arrow", "coroutines-core"]
+test = ["junit", "kotest-property", "kotest-assertions", "kotest-assertions-arrow", "coroutines-core", "coroutines-test"]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

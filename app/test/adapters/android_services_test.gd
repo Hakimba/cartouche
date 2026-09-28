@@ -38,3 +38,23 @@ func test_INV_E2_5_01_without_the_plugin_the_catalog_and_the_demo_library_are_th
 	var games: Array = demo["library"]["games"]
 	assert_int(answer.library.games.size()).is_equal(games.size())
 	assert_array(answer.library.shelves.map(func(shelf: AndroidServices.Shelf) -> String: return shelf.platform_id)).is_equal(ids)
+
+
+func test_the_library_answer_carries_the_scans_stored_for_its_games() -> void:
+	var answer := AndroidServices.LibraryAnswer.new({
+		"ok": true, "library": "{}", "art": JSON.stringify([{"game_id": "ps2/a", "path": "/art/a.jpg"}]),
+	})
+	assert_array(answer.art.map(func(art: AndroidServices.Art) -> Array: return [art.game_id, art.path])).is_equal([["ps2/a", "/art/a.jpg"]])
+	assert_array(AndroidServices.LibraryAnswer.new({"ok": true, "library": "{}"}).art).is_empty()
+
+
+func test_an_art_change_tells_the_progress_its_stall_and_the_scan_found() -> void:
+	var change := AndroidServices.ArtChange.new({"done": 3, "total": 55, "found": {"game_id": "ps2/a", "path": "/art/a.jpg"}})
+	assert_int(change.progress.done).is_equal(3)
+	assert_int(change.progress.total).is_equal(55)
+	assert_str(change.progress.stall).is_empty()
+	assert_bool(change.has_found).is_true()
+	assert_str(change.found.game_id).is_equal("ps2/a")
+	var stalled := AndroidServices.ArtChange.new({"done": 3, "total": 55, "stall": "offline"})
+	assert_str(stalled.progress.stall).is_equal("offline")
+	assert_bool(stalled.has_found).is_false()

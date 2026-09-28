@@ -66,12 +66,35 @@ func test_INV_E2_5_05_a_game_without_a_label_image_shows_its_title_in_ink_that_s
 				assert_float(absf(ink.get_luminance() - look.color.get_luminance())).is_greater_equal(0.43)
 
 
+func test_a_game_without_a_scan_is_drawn_as_a_blank_of_its_console_its_band_reading_the_console_s_mark() -> void:
+	var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(Fixtures.DVD))
+	add_child(model)
+	var look := ShelfRow.LabelLook.new()
+	look.platform_name = "Sony PlayStation 2"
+	model.draw_label("Konjiki no Gashbell!!", look)
+	var band: ColorRect = model.find_child("Band", true, false)
+	var platform: Label = model.find_child("Platform", true, false)
+	assert_bool(band.visible).is_false()
+	assert_str(platform.text).is_equal("Sony PlayStation 2")
+	look.band = Color(0.09, 0.09, 0.11)
+	look.band_text = "PlayStation 2"
+	model.draw_label("Konjiki no Gashbell!!", look)
+	assert_bool(band.visible).is_true()
+	assert_that(band.color).is_equal(look.band)
+	assert_str(platform.text).is_equal("PlayStation 2")
+	assert_that(platform.get_theme_color(&"font_color")).is_equal(Color.WHITE)
+	# Under the platform's name, down to the label's edge.
+	assert_float(band.position.y).is_less(platform.position.y)
+	var view: SubViewport = model.find_child("LabelView", true, false)
+	assert_float(band.position.y + band.size.y).is_equal_approx(view.size.y, 0.01)
+
+
 func test_INV_E2_5_05_a_game_with_a_label_image_shows_it_and_the_others_their_title() -> void:
 	var games := Fixtures.games(3)
 	var image := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGBA8))
 	var images: Dictionary[String, Texture2D] = {games[1].title: image}
 	var row: ShelfRow = auto_free(ShelfRow.new())
-	row.label_images = Fixtures.FakeLabels.new(images)
+	row.label_images = auto_free(Fixtures.FakeArt.new(images))
 	add_child(row)
 	row.show_shelf(games, 0, Fixtures.DVD, ShelfRow.LabelLook.new())
 	row.set_process(false)
@@ -91,6 +114,37 @@ func test_INV_E2_5_05_a_game_with_a_label_image_shows_it_and_the_others_their_ti
 				assert_str(title_drawn.text).is_equal(title)
 				assert_bool(material.get_shader_parameter(&"scanned")).is_false()
 	assert_int(seen).is_equal(1)
+
+
+func test_INV_E4_07_a_scan_that_arrives_replaces_the_title_of_its_game_in_view_and_nothing_else() -> void:
+	var games := Fixtures.games(3)
+	var art: Fixtures.FakeArt = auto_free(Fixtures.FakeArt.new())
+	var row: ShelfRow = auto_free(ShelfRow.new())
+	row.label_images = art
+	add_child(row)
+	row.show_shelf(games, 1, Fixtures.DVD, ShelfRow.LabelLook.new())
+	row.set_process(false)
+	for frame in 10:
+		row._process(Fixtures.FRAME_S)
+	var earlier: Dictionary[int, Array] = {}
+	for place: ShelfRow.Place in row.get_children():
+		if place.visible:
+			earlier[place.game] = [_label_material(place.shown).get_shader_parameter(&"label_texture"), place.transform]
+	var scan := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGBA8))
+	art.arrive(games[1], scan)
+	assert_array(earlier.keys()).contains_exactly_in_any_order([0, 1, 2])
+	for place: ShelfRow.Place in row.get_children():
+		if place.visible:
+			var material := _label_material(place.shown)
+			var shown: Texture2D = material.get_shader_parameter(&"label_texture")
+			assert_that(place.transform).is_equal(earlier[place.game][1])
+			if place.game == 1:
+				assert_object(shown).is_equal(scan)
+				assert_bool(material.get_shader_parameter(&"scanned")).is_true()
+			else:
+				assert_object(shown).is_equal(earlier[place.game][0])
+				assert_bool(material.get_shader_parameter(&"scanned")).is_false()
+	assert_str(row.selected_game().id).is_equal(games[1].id)
 
 
 ## The material of [param model]'s label.

@@ -3,11 +3,12 @@ class_name CarouselBench
 extends Node
 ## Measures the carousel in debug builds, driven like a user would: `scroll` holds right for
 ## [constant _DURATION_S], `switch` changes platform every [constant _SWITCH_EVERY_S], `turn` holds
-## the right stick, so that the selected game keeps turning, underside and clear parts shown. Then
+## the right stick, so that the selected game keeps turning, underside and clear parts shown,
+## `scrape` holds right as `scroll` does but from the start, while the disc scans download. Then
 ## traces one `bench` line of `key=value` frame statistics, read by `dev/bench.sh`. `launch`
 ## presses A once: [GameLaunch] traces its own `bench: launch:` line, with the insertion's frames
-## and the times to check and to start the game. Each starts once the app's start has settled,
-## which is measured on its own.
+## and the times to check and to start the game. Each but `scrape` starts once the app's start
+## has settled, which is measured on its own.
 
 const _SETTLE_S := 5.0
 const _DURATION_S := 30.0
@@ -27,11 +28,12 @@ func _init(scenario: String, row: ShelfRow) -> void:
 
 
 func _ready() -> void:
-	set_process(false)
-	await get_tree().create_timer(_SETTLE_S).timeout
-	set_process(true)
+	if _scenario != "scrape":
+		set_process(false)
+		await get_tree().create_timer(_SETTLE_S).timeout
+		set_process(true)
 	_row.selection_changed.connect(func(_game: AndroidServices.Game) -> void: _steps += 1)
-	if _scenario == "scroll":
+	if _scenario in ["scroll", "scrape"]:
 		_act(&"carousel_right", true)
 	elif _scenario == "turn":
 		_act(&"inspect_right", true)
@@ -50,7 +52,7 @@ func _process(delta: float) -> void:
 		_act(&"tab_next", true)
 		_act(&"tab_next", false)
 	if _elapsed_s >= _DURATION_S:
-		if _scenario == "scroll":
+		if _scenario in ["scroll", "scrape"]:
 			_act(&"carousel_right", false)
 		elif _scenario == "turn":
 			_act(&"inspect_right", false)

@@ -22,3 +22,15 @@ msgstr "Le fichier de ce jeu est introuvable : la carte SD ou le dossier est-il 
 
 msgid "The game could not be launched."
 msgstr "Le jeu n’a pas pu être lancé."
+
+msgid "Disc images · offline, resuming when the network is back"
+msgstr "Images des disques · hors ligne, reprise au retour du réseau"
+
+msgid "Disc images · server unavailable, trying again later"
+msgstr "Images des disques · serveur indisponible, nouvel essai plus tard"
+
+msgid "Disc images · no room left on the device"
+msgstr "Images des disques · plus de place sur la console"
+
+msgid "Disc images · {done} / {total}"
+msgstr "Images des disques · {done} / {total}"

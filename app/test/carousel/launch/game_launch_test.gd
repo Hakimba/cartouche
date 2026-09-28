@@ -193,7 +193,7 @@ func _assert_waited(outcome: Outcome, stages: Array[GameLaunch.Stage], waited_s:
 func _carousel() -> Carousel:
 	var carousel: Carousel = auto_free(CAROUSEL.instantiate())
 	var row: ShelfRow = carousel.get_node("%Row")
-	row.label_images = Fixtures.FakeLabels.new()
+	row.label_images = auto_free(Fixtures.FakeArt.new())
 	add_child(carousel)
 	for frame in 100:
 		if carousel._shown:

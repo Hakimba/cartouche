@@ -1,5 +1,9 @@
 {
-  "ps2": { "media": "dvd", "minimumGameBytes": 16000000 },
+  "ps2": {
+    "media": "dvd",
+    "minimumGameBytes": 16000000,
+    "scansBySerial": "https://psxdatacenter.com/psx2/images2/covers/{serial}/{serial}-D-ALL.jpg"
+  },
   "gc": { "media": "minidisc", "minimumGameBytes": 16000000 },
   "gba": { "media": "cartridge", "minimumGameBytes": 8192 }
 }

@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=15 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://carousel/launch/game_launch.gd" id="5"]
 [ext_resource type="Shader" path="res://carousel/launch/blackout.gdshader" id="6"]
 [ext_resource type="PackedScene" path="res://carousel/models/spindle.tscn" id="7"]
+[ext_resource type="Script" path="res://carousel/game_art.gd" id="8"]
 
 [sub_resource type="ShaderMaterial" id="backdrop_material"]
 shader = ExtResource("3")
@@ -125,6 +126,41 @@ layout_mode = 2
 size_flags_horizontal = 3
 horizontal_alignment = 2
 
+[node name="ArtProgress" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.93
+anchor_right = 0.5
+anchor_bottom = 0.93
+offset_left = -240.0
+offset_right = 240.0
+offset_bottom = 48.0
+mouse_filter = 2
+
+[node name="Content" type="VBoxContainer" parent="ArtProgress"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 8
+
+[node name="Bar" type="ProgressBar" parent="ArtProgress/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+theme_type_variation = &"ArtBar"
+show_percentage = false
+
+[node name="ArtText" type="Label" parent="ArtProgress/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Status"
+horizontal_alignment = 1
+
 [node name="Pill" type="PanelContainer" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
@@ -200,7 +236,11 @@ script = ExtResource("5")
 row = NodePath("../Row")
 spindle = NodePath("../Row/Spindle")
 blackout = NodePath("../Front/Blackout")
-controls = [NodePath("../TopBar"), NodePath("../Pill")]
+controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill")]
+
+[node name="Art" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("8")
 
 [node name="ClockTimer" type="Timer" parent="."]
 autostart = true
