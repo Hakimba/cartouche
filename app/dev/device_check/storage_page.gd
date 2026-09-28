@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends DeviceCheckPage
-## "All files access" and the folders whose access survives restarts.
+## "All files access", "display over other apps" (which the curtain hiding an emulator until its
+## game shows needs) and the folders whose access survives restarts.
 
 @onready var _access: Label = %Access
 @onready var _folders: ItemList = %Folders
@@ -8,8 +9,8 @@ extends DeviceCheckPage
 
 
 func refresh() -> void:
-	var granted := "granted" if Android.has_all_files_access() else "NOT granted"
-	_access.text = "All files access: " + granted
+	_access.text = "All files access: %s. Display over other apps: %s." % [
+		_granted(Android.has_all_files_access()), _granted(Android.curtain_allowed())]
 	_grant.grab_focus()
 	var listed := await Android.persisted_folders()
 	_folders.clear()
@@ -19,9 +20,20 @@ func refresh() -> void:
 
 
 func _on_grant_pressed() -> void:
-	var opened := await Android.request_all_files_access()
+	_log_opened(await Android.request_all_files_access())
+
+
+func _on_grant_overlay_pressed() -> void:
+	_log_opened(await Android.request_curtain_permission())
+
+
+func _log_opened(opened: AndroidServices.Result) -> void:
 	if not opened.ok:
 		logged.emit("Cannot open the setting (%s)" % opened.code)
+
+
+static func _granted(granted: bool) -> String:
+	return "granted" if granted else "NOT granted"
 
 
 func _on_add_folder_pressed() -> void:

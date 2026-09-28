@@ -8,7 +8,8 @@ extends Node
 ##
 ## Getters answer at once. Operations are coroutines (`await Android.list_folder(folder)`); without
 ## the plugin (editor, desktop) they fail with `code == &"unavailable"` and getters return empty
-## values, except the catalog and the demo library, read from [constant DESKTOP_DEMO].
+## values, except the catalog and the demo library, read from [constant DESKTOP_DEMO], and the
+## launch check, which lets every game's insertion play.
 
 ## Every operation's answer; callers await the one carrying their request id.
 signal _answered(payload: Dictionary)
@@ -19,6 +20,7 @@ const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
 ## One reference list per platform, named after its id (`ps2.tsv`).
 const _TITLE_LISTS := "res://data/redump"
 const _DATA_FOLDERS := "res://data/scan/data_folders.json"
+const _CURTAINS := "res://data/launch/curtains.json"
 ## The catalog and a demo library as the plugin sends them, for running without it: see
 ## `DesktopDemoTest.kt`, which keeps it up to date.
 const DESKTOP_DEMO := "res://dev/demo/desktop.json"
@@ -49,7 +51,8 @@ func _load_catalog() -> void:
 	var definitions := _files_in(_PLATFORM_DEFINITIONS, ".json")
 	var titles := _files_in(_TITLE_LISTS, ".tsv", true)
 	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
-	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders],
+	var curtains := FileAccess.get_file_as_string(_CURTAINS)
+	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders, curtains],
 		_desktop_demo("catalog"))
 	catalog = CatalogSummary.new(summary)
 
@@ -76,6 +79,13 @@ func has_all_files_access() -> bool:
 	return granted
 
 
+## Whether a curtain can hide an emulator until its game shows: Cartouche may display over other
+## apps.
+func curtain_allowed() -> bool:
+	var granted: bool = _query(&"curtainAllowed", [], false)
+	return granted
+
+
 func battery() -> Battery:
 	var state: Dictionary = _query(&"battery", [], {})
 	return Battery.new(state)
@@ -96,6 +106,11 @@ func launch_arguments() -> PackedStringArray:
 
 func request_all_files_access() -> Result:
 	return Result.new(await _request(&"requestAllFilesAccess"))
+
+
+## Opens the system screen letting Cartouche display over other apps, for the curtain.
+func request_curtain_permission() -> Result:
+	return Result.new(await _request(&"requestCurtainPermission"))
 
 
 ## Opens the system folder picker; answers once the user granted a folder or gave up.
@@ -164,7 +179,17 @@ func use_demo_library(games: int) -> LibraryAnswer:
 	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games]))
 
 
-## Launches disc [param disc] (an index into [member Game.discs]) of [param game].
+## Whether disc [param disc] of [param game] can launch (its emulator is installed, its file still
+## there), with the failure [method launch_game] would give; starts and stops nothing. Without the
+## plugin, every game can: the insertion plays, then the launch fails.
+func check_launch(game: Game, disc: int) -> Result:
+	if not is_available():
+		return Result.new({"ok": true})
+	return Result.new(await _request(&"checkLaunch", [{"game_id": game.id, "disc": disc}]))
+
+
+## Launches disc [param disc] (an index into [member Game.discs]) of [param game], hiding the
+## emulator under a black curtain until its game shows when [method curtain_allowed].
 func launch_game(game: Game, disc: int) -> Result:
 	return Result.new(await _request(&"launchGame", [{"game_id": game.id, "disc": disc}]))
 

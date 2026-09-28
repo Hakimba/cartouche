@@ -15,5 +15,31 @@
     "turn_degrees": 22,
     "sway_degrees": 7,
     "sway_period_s": 7
+  },
+  "insertions": {
+    "dvd": {
+      "face_s": 0.25, "grab_s": 0.3, "grab_distance": 0.45,
+      "seat_s": 0.28, "seat_depth": 0.5, "bounce": 0.03, "bounce_s": 0.08,
+      "tilt_degrees": 18, "spindle": true, "spin_up_s": 0.7, "turns_per_s": 15,
+      "black_after_s": 0.35, "black_s": 0.35,
+      "sounds": [
+        {"name": "ps2-clip", "delay_s": 0.0, "from_s": 0.17, "volume_db": 0},
+        {"name": "ps2-motor", "delay_s": 0.05, "from_s": 0.0, "volume_db": -6}
+      ]
+    },
+    "minidisc": {
+      "face_s": 0.25, "grab_s": 0.3, "grab_distance": 0.45,
+      "seat_s": 0.28, "seat_depth": 0.5, "bounce": 0.03, "bounce_s": 0.08,
+      "tilt_degrees": 18, "spindle": true, "spin_up_s": 0.7, "turns_per_s": 15,
+      "black_after_s": 0.35, "black_s": 0.35,
+      "sounds": []
+    },
+    "cartridge": {
+      "face_s": 0.25, "grab_s": 0.25, "grab_distance": 0.3,
+      "seat_s": 0.25, "seat_depth": 0.6, "bounce": 0.02, "bounce_s": 0.06,
+      "tilt_degrees": 0, "spindle": false,
+      "black_after_s": 0.15, "black_s": 0.35,
+      "sounds": []
+    }
   }
 }

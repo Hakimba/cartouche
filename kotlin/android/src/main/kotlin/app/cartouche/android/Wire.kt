@@ -67,6 +67,7 @@ internal enum class ErrorCode(val wire: String) {
     INVALID_TEMPLATE("invalid_template"),
     NOT_INSTALLED("not_installed"),
     NO_PLAYER("no_player"),
+    GAME_MISSING("game_missing"),
     UNKNOWN_PLATFORM("unknown_platform"),
     UNKNOWN_GAME("unknown_game"),
     NO_FOLDER("no_folder"),
@@ -119,6 +120,7 @@ internal fun LaunchFailure.toWire(): Dictionary = failure(
         is LaunchFailure.ActivityNotFound -> ErrorCode.ACTIVITY_NOT_FOUND
         is LaunchFailure.PermissionDenied -> ErrorCode.PERMISSION_DENIED
         is LaunchFailure.NoPlayer -> ErrorCode.NO_PLAYER
+        is LaunchFailure.GameMissing -> ErrorCode.GAME_MISSING
     },
     message,
 )

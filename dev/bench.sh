@@ -4,7 +4,10 @@
 # user's own library ("real") and made-up ones of N games (`--demo-games`). For each size: cold
 # starts (start to carousel shown, library read and sent, title indexing, first frames), then the
 # carousel held scrolling, changing platform and turning the selected game for 30 s each (frame
-# times), the app's memory and the save of the selection. Run it after `dev/build.sh --install`.
+# times), the app's memory and the save of the selection. With the user's own library, it also
+# launches the selected game once (insertion frames, times to check it and to start its emulator,
+# time for the emulator to show), then comes back and stops that emulator, just started: nothing
+# of the user's is running in it. Run it after `dev/build.sh --install`.
 #
 # Prints one line per measurement; with --record FILE, also appends each one to FILE as a JSON
 # record: {"date", "commit", "build", "device", "android", "scenario", "games", "metric",
@@ -59,6 +62,16 @@ wait_for() {
   done
 }
 
+# emit_bench SCENARIO SIZE KEY...: the KEYs of the scenario's `bench:` line.
+emit_bench() {
+  local line
+  line=$("$adb" logcat -d | grep -oE "bench: $1: .*" | head -1)
+  for key in "${@:3}"; do
+    emit "$1" "$2" "$key" "$(echo "$line" | grep -oE "$key=[0-9.]+" | cut -d= -f2)" \
+      "$(case "$key" in fps) echo fps ;; *_ms) echo ms ;; *) echo count ;; esac)" 1
+  done
+}
+
 # first NUMBER-PATTERN: the first number the log shows in a line matching the extended regex.
 first() { "$adb" logcat -d | grep -oE "$1" | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' | tail -1; }
 
@@ -86,12 +99,7 @@ for size in "${sizes[@]}"; do
   for scenario in scroll switch turn; do
     start "$args--bench=$scenario"
     wait_for "bench: $scenario:" 60
-    line=$("$adb" logcat -d | grep -oE "bench: $scenario: .*" | head -1)
-    for key in fps worst_ms p95_ms slow_frames steps; do
-      value=$(echo "$line" | grep -oE "$key=[0-9.]+" | cut -d= -f2)
-      unit=$(case "$key" in fps) echo fps ;; *_ms) echo ms ;; *) echo count ;; esac)
-      emit "$scenario" "$size" "$key" "$value" "$unit" 1
-    done
+    emit_bench "$scenario" "$size" fps worst_ms p95_ms slow_frames steps
     if [ "$scenario" = scroll ]; then
       emit memory "$size" memory_pss "$("$adb" shell dumpsys meminfo app.cartouche | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
       # Leaving the app (here for the system settings) saves the selection.
@@ -100,5 +108,19 @@ for size in "${sizes[@]}"; do
       emit selection "$size" selection_saved "$(first 'selection: saved .* in [0-9]+ ms')" ms 1
     fi
   done
+  if [ "$size" = real ]; then
+    start "--bench=launch"
+    wait_for "bench: launch:" 60
+    emit_bench launch "$size" worst_ms p95_ms slow_frames check_ms start_ms
+    emulator=$("$adb" logcat -d | grep -oE "launch: .* in [A-Za-z0-9_.]+$" | head -1 | awk '{ print $NF }')
+    sleep 5
+    # Android's own measure, such as "Displayed com.example/.Main: +1s187ms".
+    shown=$("$adb" logcat -d | grep -oE "Displayed $emulator/[^ ]+: \+[0-9s]+ms" | head -1 | grep -oE "[0-9s]+ms$" |
+      sed 's/ms$//' | awk -F's' '{ print NF == 2 ? $1 * 1000 + $2 : $1 + 0 }')
+    [ -z "$shown" ] || emit launch "$size" emulator_shown "$shown" ms 1
+    "$adb" shell am start -n app.cartouche/com.godot.game.GodotAppLauncher > /dev/null
+    sleep 2
+    [ -z "$emulator" ] || "$adb" shell am force-stop "$emulator"
+  fi
 done
 "$adb" shell am force-stop app.cartouche

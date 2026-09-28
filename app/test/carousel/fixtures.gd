@@ -101,6 +101,30 @@ static func cartridge(random: RandomNumberGenerator) -> CartridgeShape:
 	return shape
 
 
+## An insertion [param random] draws: each step from none to long, the drive upright or leaning
+## back, with or without a spindle.
+static func insertion(random: RandomNumberGenerator) -> Insertion:
+	var drawn := Insertion.new()
+	for step: StringName in [&"face_s", &"grab_s", &"seat_s", &"bounce_s", &"spin_up_s", &"black_after_s", &"black_s"]:
+		drawn.set(step, _or_zero(random, random.randf_range(0.01, 1.0)))
+	for distance: StringName in [&"grab_distance", &"seat_depth", &"bounce"]:
+		drawn.set(distance, _or_zero(random, random.randf_range(0.001, 1.0)))
+	drawn.tilt_degrees = _or_zero(random, random.randf_range(-40.0, 40.0))
+	drawn.turns_per_s = _or_zero(random, random.randf_range(0.1, 40.0))
+	drawn.spindle = random.randf() < 0.7
+	return drawn
+
+
+## How a game [param random] draws may stand when it is launched: turned any way, stretched as a
+## fast row stretches it, anywhere near the centre.
+static func stand(random: RandomNumberGenerator) -> Transform3D:
+	var turned := Basis.from_euler(Vector3(random.randf_range(-PI, PI), random.randf_range(-PI, PI), random.randf_range(-PI, PI)))
+	var stretch := random.randf_range(0.0, 0.1)
+	var scale := Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0) * random.randf_range(0.6, 1.0)
+	var origin := Vector3(random.randf_range(-0.5, 0.5), random.randf_range(-0.2, 0.2), random.randf_range(-0.5, 0.2))
+	return Transform3D(turned.scaled_local(scale), origin)
+
+
 ## Label images kept in memory, by title; none unless given.
 class FakeLabels extends DevLabels:
 	var _images: Dictionary[String, Texture2D]
@@ -113,6 +137,38 @@ class FakeLabels extends DevLabels:
 
 	func label(game: AndroidServices.Game) -> Texture2D:
 		return _images[game.title]
+
+
+## The Android services answering launches as the test says, counting them: a game can start
+## unless [member check_code] (or [member start_code]) holds the code of a failure. With
+## [member late], each answer waits for [signal replied]; with [member silent], it never comes.
+class FakeAndroid extends AndroidServices:
+	signal replied
+
+	var check_code := &""
+	var start_code := &""
+	var late := false
+	var silent: Array[StringName] = []
+	## Called as the game starts, before the answer.
+	var on_start := func() -> void: pass
+	var checks := 0
+	var starts := 0
+
+	func check_launch(_game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
+		checks += 1
+		return await _answer(&"check", check_code)
+
+	func launch_game(_game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
+		starts += 1
+		on_start.call()
+		return await _answer(&"start", start_code)
+
+	func _answer(request: StringName, code: StringName) -> AndroidServices.Result:
+		while late or request in silent:
+			await replied
+			if request not in silent:
+				break
+		return AndroidServices.Result.new({"ok": true} if code.is_empty() else {"ok": false, "code": code, "detail": "fake"})
 
 
 ## The centre of a box of [param size] that [param random] puts anywhere within [param room], a

@@ -114,6 +114,11 @@ internal class Folders(private val context: Context) {
             }
         }
 
+    /** Whether [document] is still there: providers answer a document that is gone, or on removed storage, with no row. */
+    fun exists(document: ContentUri): Either<StorageFailure, Boolean> = guard {
+        queryAll(Uri.parse(document.value), arrayOf(Document.COLUMN_DOCUMENT_ID)).isSome { cursor -> cursor.use { it.moveToFirst() } }
+    }
+
     private fun Raise<StorageFailure>.entries(
         tree: ContentUri,
         folder: Option<DocumentId>,

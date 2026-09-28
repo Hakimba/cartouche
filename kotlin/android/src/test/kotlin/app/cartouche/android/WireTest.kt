@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android
 
+import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.ScanReport
 import app.cartouche.android.storage.DocumentEntry
 import app.cartouche.android.storage.EntryKind
 import app.cartouche.android.storage.Folder
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.PackageName
 import app.cartouche.core.library.Disc
 import app.cartouche.core.library.FolderPath
 import app.cartouche.core.library.IgnoreReason
@@ -21,6 +23,7 @@ import app.cartouche.core.library.game
 import app.cartouche.core.library.listed
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.DefinitionSource
+import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.shelves.Selection
@@ -30,6 +33,7 @@ import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
 import arrow.core.nonEmptyListOf
+import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.Json
@@ -89,6 +93,22 @@ class WireTest {
         arrayOf("a").isGodotValue() shouldBe true
         listOf("a").toTypedArray<Any>().isGodotValue() shouldBe false
         arrayOf(dictionary()).isGodotValue() shouldBe false
+    }
+
+    @Test
+    fun `each launch failure reaches Godot with its own code, which the carousel tells apart`() {
+        val file = uri("content://p/tree/t/document/g")
+        val codes =
+            mapOf(
+                LaunchFailure.Rejected(LaunchError.UnknownPlayer(PlayerId("p"))) to "unknown_player",
+                LaunchFailure.Rejected(LaunchError.UnsupportedFile(PlayerId("p"), FileName("g.chd"))) to "unsupported_file",
+                LaunchFailure.NotInstalled(PackageName.parse("com.armsx2").shouldBeSome()) to "not_installed",
+                LaunchFailure.NoPlayer(PlatformId("ps2")) to "no_player",
+                LaunchFailure.GameMissing(file) to "game_missing",
+                LaunchFailure.ActivityNotFound("com.armsx2/.Main") to "activity_not_found",
+                LaunchFailure.PermissionDenied("denied") to "permission_denied",
+            )
+        codes.forEach { (failure, code) -> failure.toWire()["code"] shouldBe code }
     }
 
     @Test

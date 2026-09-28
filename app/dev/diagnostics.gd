@@ -74,6 +74,18 @@ func trace(area: String, detail: String) -> void:
 		print("Cartouche %s: %s" % [area, shown])
 
 
+## `key=value` statistics of frames lasting [param frames_ms] over [param seconds], as the
+## `bench` lines `dev/bench.sh` reads write them.
+func frame_statistics(frames_ms: PackedFloat32Array, seconds: float) -> String:
+	if frames_ms.is_empty() or seconds <= 0.0:
+		return "frames=0"
+	var sorted := frames_ms.duplicate()
+	sorted.sort()
+	var slow := sorted.size() - sorted.bsearch(SLOW_FRAME_MS, false)
+	return "frames=%d seconds=%.1f fps=%.1f worst_ms=%.1f p95_ms=%.1f slow_frames=%d" % [
+		sorted.size(), seconds, sorted.size() / seconds, sorted[-1], sorted[int(sorted.size() * 0.95)], slow]
+
+
 ## The value of `--[param option]=value` among the arguments the app was started with, in debug
 ## builds; empty otherwise. On Android they come from the launch intent (see
 ## [method AndroidServices.launch_arguments]).

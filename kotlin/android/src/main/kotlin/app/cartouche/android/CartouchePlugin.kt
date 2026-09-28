@@ -10,8 +10,10 @@ import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import app.cartouche.android.apps.InstalledApps
+import app.cartouche.android.launch.Curtain
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.launch.Launcher
+import app.cartouche.android.library.LaunchChoice
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.LibraryService
 import app.cartouche.android.storage.Folders
@@ -32,7 +34,9 @@ import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.TitleIndex
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.CatalogError
+import app.cartouche.core.platforms.CurtainTimes
 import app.cartouche.core.platforms.DefinitionSource
+import app.cartouche.core.platforms.Launch
 import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
@@ -81,7 +85,8 @@ import kotlin.time.TimeSource
 public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val folders by lazy { Folders(context) }
-    private val launcher by lazy { Launcher(context) }
+    private val launcher by lazy { Launcher(context, folders) }
+    private val curtain by lazy { Curtain(context.applicationContext, scope) }
     private val pendingPick = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
 
     /** Written on the render thread, read by operations too; immutable, so publishing it is enough. */
@@ -93,6 +98,8 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     @Volatile private var titleIndexes = ConcurrentHashMap<PlatformId, TitleIndex>()
 
     @Volatile private var dataFolders = DataFolders.NONE
+
+    @Volatile private var curtainTimes = CurtainTimes.NONE
 
     /** Runs every library call, one at a time (see [LibraryService]). */
     private val libraryThread = Dispatchers.IO.limitedParallelism(1)
@@ -107,19 +114,31 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     override fun getPluginSignals(): Set<SignalInfo> = setOf(SignalInfo(ANSWERED_SIGNAL, Dictionary::class.java))
 
-    override fun onMainResume(): Unit = installed.clear()
+    override fun onMainResume() {
+        installed.clear()
+        curtain.lower()
+    }
 
-    override fun onMainDestroy(): Unit = scope.cancel()
+    override fun onMainDestroy() {
+        curtain.lower()
+        scope.cancel()
+    }
 
     // Getters
 
     /**
      * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
-     * profiles file's text, the reference lists as `{platform id: text}` and the emulator data
-     * folder names (`data_folders.json`); returns the catalog summary.
+     * profiles file's text, the reference lists as `{platform id: text}`, the emulator data folder
+     * names (`data_folders.json`) and the curtain times (`curtains.json`); returns the catalog summary.
      */
     @UsedByGodot
-    public fun loadCatalog(definitions: Dictionary, profiles: String, titles: Dictionary, dataFolderNames: String): Dictionary {
+    public fun loadCatalog(
+        definitions: Dictionary,
+        profiles: String,
+        titles: Dictionary,
+        dataFolderNames: String,
+        curtains: String,
+    ): Dictionary {
         val (notText, sources) =
             definitions.keys.sorted().separateEither { name ->
                 definitions.text(name).map { DefinitionSource(name, it) }.toEither { CatalogError.InvalidJson(name, "not text") }
@@ -128,9 +147,11 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         titleIndexes = ConcurrentHashMap()
         val folderNames = DataFolders.parse(DefinitionSource("data_folders.json", dataFolderNames))
         dataFolders = folderNames.getOrElse { DataFolders.NONE }
+        val times = CurtainTimes.parse(DefinitionSource("curtains.json", curtains))
+        curtainTimes = times.getOrElse { CurtainTimes.NONE }
         catalog =
             Catalog.parse(sources, DefinitionSource("profiles.json", profiles)).let {
-                it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + it.rejected)
+                it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + times.swap().getOrNone().toList() + it.rejected)
             }
         // Indexing takes a second or so on a handheld: done now, the first scan does not wait for it.
         scope.launch { Either.catch { titleLists.keys.forEach(::titles) }.onLeft(::unexpected) }
@@ -151,6 +172,10 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     @UsedByGodot
     public fun hasAllFilesAccess(): Boolean = Environment.isExternalStorageManager()
+
+    /** Whether a curtain can hide an emulator until its game shows: the "display over other apps" permission. */
+    @UsedByGodot
+    public fun curtainAllowed(): Boolean = curtain.isAllowed
 
     /** `{"level_percent": int (absent when unknown), "charging": bool}` */
     @UsedByGodot
@@ -182,17 +207,16 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Opens the system screen granting "All files access". */
     @UsedByGodot
-    public fun requestAllFilesAccess(requestId: Int): Unit = withActivity(requestId) { act ->
-        onMain {
-            launcher
-                .start(act, Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${act.packageName}")))
-                .recover { failure ->
-                    // Some Android builds only offer the screen listing every app.
-                    ensure(failure is LaunchFailure.ActivityNotFound) { failure }
-                    launcher.start(act, Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)).bind()
-                }
-        }
-    }
+    public fun requestAllFilesAccess(requestId: Int): Unit = openSetting(
+        requestId,
+        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+        Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION,
+    )
+
+    /** Opens the system screen granting "display over other apps", which the curtain needs ([curtainAllowed]). */
+    @UsedByGodot
+    public fun requestCurtainPermission(requestId: Int): Unit =
+        openSetting(requestId, Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
 
     /** Opens the folder picker; answers with `{"folder"}` once the user picked one. */
     @UsedByGodot
@@ -314,21 +338,40 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         success("library" to wire(library.value))
     }
 
-    /** Launches the library game `{"game_id", "disc"?}` (a disc index; the last launched by default) with its platform's player. */
+    /**
+     * Checks that the library game `{"game_id", "disc"?}` can launch, as [launchGame] would, and
+     * answers with its failure if it cannot; starts and stops nothing.
+     */
+    @UsedByGodot
+    public fun checkLaunch(requestId: Int, request: Dictionary): Unit = answering(requestId, libraryThread) {
+        val (choice, launch) = libraryLaunch(request)
+        launcher.checkGame(launch, choice.file.uri).mapLeft { it.toWire() }.bind()
+        success()
+    }
+
+    /**
+     * Launches the library game `{"game_id", "disc"?}` (a disc index; the last launched by default)
+     * with its platform's player, under the curtain when it is allowed.
+     */
     @UsedByGodot
     public fun launchGame(requestId: Int, request: Dictionary): Unit = onActivity(requestId) { act ->
         answering(requestId, libraryThread) {
-            val id = request.text("game_id").map(::GameId).getOrElse { raise(invalid("launchGame needs a game_id")) }
-            val choice = inLibrary { launchChoice(id, request.integer("disc")) }
-            val platform = platform(choice.game.platform)
-            val player =
-                choice.setup.playerFor(platform, choice.file.name, ::isAvailable).getOrElse {
-                    raise(LaunchFailure.NoPlayer(platform.id).toWire())
-                }
-            trace("launch") { "${choice.file.name.value} with ${player.id.value} (chosen: ${choice.setup.player})" }
-            start(act, prepared(player.id, choice.file.asGameFile)).mapLeft { it.toWire() }.bind()
-            // The game is running: a failure to remember its disc must not report the launch as failed.
-            onLibrary { recordLaunch(id, choice.disc) }.onLeft { failure -> trace("library") { "last disc not saved: ${failure.message}" } }
+            val (choice, launch) = libraryLaunch(request)
+            trace("launch") { "${choice.file.name.value} in ${launch.spec.targetPackage.fold({ "the app Android picks" }) { it.value }}" }
+            val intent = launcher.prepareGame(launch, choice.file.uri).mapLeft { it.toWire() }.bind()
+            onMain {
+                curtain.over(
+                    curtainTimes.timeFor(launch.spec.targetPackage),
+                ) { launcher.start(act, intent) }
+            }.mapLeft { it.toWire() }.bind()
+            // Answered at once, for the black to last no longer than the start; a failure to
+            // remember the disc must not report the launch as failed.
+            scope.launch(libraryThread) {
+                Either
+                    .catch { library.value.recordLaunch(choice.game.id, choice.disc) }
+                    .onLeft(::unexpected)
+                    .onRight { saved -> saved.onLeft { trace("library") { "last disc not saved: ${it.message}" } } }
+            }
             success()
         }
     }
@@ -369,7 +412,32 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     private fun prepared(player: PlayerId, file: GameFile): Either<LaunchFailure, Intent> =
-        catalog.launch(player, file).mapLeft(LaunchFailure::Rejected).flatMap(launcher::prepareGame)
+        launchOf(player, file).flatMap { launcher.prepareGame(it, file.uri) }
+
+    private fun launchOf(player: PlayerId, file: GameFile): Either<LaunchFailure, Launch> =
+        catalog.launch(player, file).mapLeft(LaunchFailure::Rejected)
+
+    /** Opens the settings screen [forCartouche], or [forEveryApp] on the Android builds that only offer the screen listing every app. */
+    private fun openSetting(requestId: Int, forCartouche: String, forEveryApp: String): Unit = withActivity(requestId) { act ->
+        onMain {
+            launcher.start(act, Intent(forCartouche, Uri.parse("package:${act.packageName}"))).recover { failure ->
+                ensure(failure is LaunchFailure.ActivityNotFound) { failure }
+                launcher.start(act, Intent(forEveryApp)).bind()
+            }
+        }
+    }
+
+    /** What launching the library game `{"game_id", "disc"?}` takes: its choice and its launch with its platform's player. */
+    private suspend fun Raise<Dictionary>.libraryLaunch(request: Dictionary): Pair<LaunchChoice, Launch> {
+        val id = request.text("game_id").map(::GameId).getOrElse { raise(invalid("the request needs a game_id")) }
+        val choice = inLibrary { launchChoice(id, request.integer("disc")) }
+        val platform = platform(choice.game.platform)
+        val player =
+            choice.setup.playerFor(platform, choice.file.name, ::isAvailable).getOrElse {
+                raise(LaunchFailure.NoPlayer(platform.id).toWire())
+            }
+        return choice to launchOf(player.id, choice.file.asGameFile).mapLeft { it.toWire() }.bind()
+    }
 
     private fun Raise<Dictionary>.platform(id: PlatformId): Platform =
         catalog.platform(id).getOrElse { raise(failure(ErrorCode.UNKNOWN_PLATFORM, "No platform ${id.value}")) }

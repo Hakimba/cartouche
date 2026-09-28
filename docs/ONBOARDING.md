@@ -62,6 +62,15 @@ The same words are used in the code, the tests and this document.
   `CartridgeShape`); each **part** of the model (label, mirror, shell) is a mesh built from them.
 - **Pose**: how the selected game is shown, leaning back, turned and slowly swaying, so that the
   light moves over it. The right stick turns it further, as far as the user likes.
+- **Launch check**: asking whether a game can start (its player's emulator is installed, its file
+  still there) without starting or stopping anything, before its insertion plays.
+- **Insertion**: how a game goes into its console once A is pressed, one per media: a disc turns
+  to face the player, comes forward as if taken in hand, goes back onto the drive's **spindle**
+  (the motor, turntable, hub and balls a disc clips onto), which spins it up; then the screen goes
+  black from its centre.
+- **Curtain**: a black window over every app, raised as the emulator starts and lowered once the
+  emulator shows its game (a time per emulator) or the user is back, so that the emulator's own
+  screens never show between the insertion's black and the game.
 - **Demo library**: a made-up library of any size, in debug builds, for measuring at scale.
 - **Wire format**: what crosses the JNI bridge between the plugin and GDScript.
 
@@ -99,6 +108,10 @@ The same words are used in the code, the tests and this document.
   gives the same shelves), and restores the `Selection` on them; `SelectionFormat` stores the
   selection in its own small file, so remembering it costs the same whatever the size of the
   library.
+- **`platforms/CurtainTimes.kt`** reads how long the curtain stays over each emulator
+  (`data/launch/curtains.json`, milliseconds per package name, from 0 for none to 10 s): the time
+  its own screens (splash, game list) take to give way to the game, measured on a device by
+  recording the screen through a launch (`adb shell screenrecord`).
 - **`library/DemoLibrary.kt`** makes up libraries of any size, the same for the same arguments.
 - **`storage/DocumentPaths.kt`** maps document ids such as `1A2B-3C4D:ROMs/ps2` to paths such as
   `/storage/1A2B-3C4D/ROMs/ps2`.
@@ -118,9 +131,13 @@ The same words are used in the code, the tests and this document.
   the JSON of a library in milliseconds. Lists follow INV-E0-16.
 - **`launch/`** turns a resolved launch into a started activity:
   - `IntentMapper` builds the intent;
-  - `Launcher` prepares it in the background (checks installation, stops a lingering emulator on
-    Android ≤ 13), then starts it on the main thread. The emulator reads the game through the
-    intent's own read grant, which Android revokes once the emulator's activity is gone.
+  - `Launcher` checks a game in the background (its emulator installed, its file still there:
+    `checkGame`, which starts and stops nothing), then prepares it (the same checks, and stopping a
+    lingering emulator on Android ≤ 13) and starts it on the main thread, without Android's
+    transition between apps. The emulator reads the game through the intent's own read grant,
+    which Android revokes once the emulator's activity is gone;
+  - `Curtain` is the black window over the emulator; it needs the "display over other apps"
+    permission, granted from the device check.
 - **`storage/Folders.kt`** covers folders picked with the system picker: keeping read access (and
   nothing more), and listing a folder level from the documents provider for `FolderWalk`. Its
   tests run it against a fake `DocumentsProvider`. `LibraryStore` writes the library file
@@ -136,8 +153,12 @@ The same words are used in the code, the tests and this document.
   the app). `ShelfRow` moves the row and recycles a fixed pool of places, so its cost does not
   depend on the number of games; labels are drawn in each place's small `SubViewport`, one per
   frame. `CarouselLayout` holds the mechanics as pure functions.
+- **Launches**: `GameLaunch` (`carousel/launch/`) runs a launch from A to the carousel shown again;
+  `Insertion` holds the motion as pure functions of time, its timings, distances and sounds per
+  media in `appearance.json` (`insertions`), tuned without code; `carousel/models/spindle.tscn` is
+  the drive's spindle, `carousel/launch/blackout.gdshader` the black growing from the disc's centre.
 - **Models** are data: `data/carousel/appearance.json` names a scene per media, a label colour
-  per platform and the pose. A model is any scene with a `Label` mesh whose material uses
+  per platform, the pose and the insertions. A model is any scene with a `Label` mesh whose material uses
   `carousel/models/label.gdshader` (the carousel sets `label_texture`); replacing a model is
   changing that file. Every place makes its model of each media at start, as the first instance
   of a model takes 10 to 30 ms on a handheld.
@@ -161,8 +182,9 @@ The same words are used in the code, the tests and this document.
   timings, ignored files and skipped folders) and library problems the same way (`trace` in
   `Wire.kt`). Add trace points
   with every feature.
-- **`CarouselBench`** (`dev/`) drives the carousel like a user for `dev/bench.sh`: held scrolling
-  or platform changes for 30 s, then one line of frame statistics.
+- **`CarouselBench`** (`dev/`) drives the carousel like a user for `dev/bench.sh`: held scrolling,
+  platform changes or a turning game for 30 s, then one line of frame statistics; or one launch
+  (`--bench=launch`), which `GameLaunch` measures itself.
 - **The device check** opens from the carousel by holding Select for 2 s, in debug builds; back at
   its root returns to the carousel. It has a Library tab (folder, emulator, scan, games, ignored
   files, launch), and is built from one scene per tab over a shared `DeviceCheckPage` base, with
@@ -186,7 +208,11 @@ The same words are used in the code, the tests and this document.
   computer. The file is what the plugin would send; `DesktopDemoTest` (Kotlin) fails when it is out
   of date and writes the new one. In debug builds, images put in `user://dev-labels/`, named after
   a game's first serial (`SLES-52584.png`) or its title, are shown as its label (`DevLabels`, the
-  row's `label_images`, which tests replace); they are never part of the repository.
+  row's `label_images`, which tests replace); sounds put in `user://dev-sounds/`, named after an
+  insertion's cues (`ps2-clip.mp3`), are played as it runs (`DevSounds`). Neither is ever part of
+  the repository: the insertions play silently until freely licensed sounds are chosen.
+- **Without the plugin**, pressing A plays the insertion, then the launch fails: insertions are
+  tuned on a computer too.
 - **Debug arguments** (`--esa arguments` on the device, after `--` on a desktop):
   `--turntable=0.25` turns the selected game to show all its sides, `--shelf=gba` opens on a
   platform's shelf, `--demo-games=N` and `--bench=…` as in `dev/bench.sh`.

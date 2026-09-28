@@ -22,13 +22,31 @@ uniform float grain : hint_range(0.0, 1.0) = 0.15;
 uniform float grooves : hint_range(0.0, 1.0) = 0.0;
 // How many, from the centre to the edge.
 uniform float groove_count = 60.0;
+// The angle, in radians, a spinning disc turns while a frame shows: the print blurs round the
+// centre of the UV square.
+uniform float spin_blur = 0.0;
 
 float hash(vec2 at) {
 	return fract(sin(dot(at, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+const int BLUR_SAMPLES = 16;
+
+vec3 print_at(vec2 uv) {
+	if (spin_blur <= 0.0) {
+		return texture(label_texture, uv).rgb;
+	}
+	vec3 sum = vec3(0.0);
+	for (int i = 0; i < BLUR_SAMPLES; i++) {
+		float angle = (float(i) / float(BLUR_SAMPLES - 1) - 0.5) * spin_blur;
+		mat2 turn = mat2(vec2(cos(angle), sin(angle)), vec2(-sin(angle), cos(angle)));
+		sum += texture(label_texture, turn * (uv - 0.5) + 0.5).rgb;
+	}
+	return sum / float(BLUR_SAMPLES);
+}
+
 void fragment() {
-	vec3 colour = has_label ? texture(label_texture, UV).rgb : blank_color;
+	vec3 colour = has_label ? print_at(UV) : blank_color;
 	float light = dot(colour, vec3(0.299, 0.587, 0.114));
 	float saturation = max(colour.r, max(colour.g, colour.b)) - min(colour.r, min(colour.g, colour.b));
 	float metal = (has_label && scanned) ? silver * (1.0 - smoothstep(0.05, 0.14, saturation)) * smoothstep(0.35, 0.55, light) * (1.0 - smoothstep(0.88, 0.97, light)) : 0.0;

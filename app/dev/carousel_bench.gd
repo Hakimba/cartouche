@@ -4,8 +4,10 @@ extends Node
 ## Measures the carousel in debug builds, driven like a user would: `scroll` holds right for
 ## [constant _DURATION_S], `switch` changes platform every [constant _SWITCH_EVERY_S], `turn` holds
 ## the right stick, so that the selected game keeps turning, underside and clear parts shown. Then
-## traces one `bench` line of `key=value` frame statistics, read by `dev/bench.sh`. It starts once
-## the start has settled, which is measured on its own.
+## traces one `bench` line of `key=value` frame statistics, read by `dev/bench.sh`. `launch`
+## presses A once: [GameLaunch] traces its own `bench: launch:` line, with the insertion's frames
+## and the times to check and to start the game. Each starts once the app's start has settled,
+## which is measured on its own.
 
 const _SETTLE_S := 5.0
 const _DURATION_S := 30.0
@@ -33,6 +35,10 @@ func _ready() -> void:
 		_act(&"carousel_right", true)
 	elif _scenario == "turn":
 		_act(&"inspect_right", true)
+	elif _scenario == "launch":
+		_act(&"ui_accept", true)
+		_act(&"ui_accept", false)
+		queue_free()
 	Diagnostics.trace("bench", "%s started" % _scenario)
 
 
@@ -60,9 +66,5 @@ func _act(action: StringName, pressed: bool) -> void:
 
 
 func _report() -> void:
-	var sorted := _frames_ms.duplicate()
-	sorted.sort()
-	var slow := sorted.size() - sorted.bsearch(Diagnostics.SLOW_FRAME_MS, false)
-	Diagnostics.trace("bench", "%s: frames=%d seconds=%.1f fps=%.1f worst_ms=%.1f p95_ms=%.1f slow_frames=%d steps=%d" % [
-		_scenario, sorted.size(), _elapsed_s, sorted.size() / _elapsed_s, sorted[-1],
-		sorted[int(sorted.size() * 0.95)], slow, _steps])
+	var frames := Diagnostics.frame_statistics(_frames_ms, _elapsed_s)
+	Diagnostics.trace("bench", "%s: %s steps=%d" % [_scenario, frames, _steps])

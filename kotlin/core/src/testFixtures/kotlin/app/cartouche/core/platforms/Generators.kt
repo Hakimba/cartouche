@@ -2,10 +2,15 @@
 package app.cartouche.core.platforms
 
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.Codepoint
+import io.kotest.property.arbitrary.alphanumeric
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.boolean
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.long
+import io.kotest.property.arbitrary.map
+import io.kotest.property.arbitrary.string
 
 private val jsonValues: Arb<String> = Arb.element("\"x\"", "\"^.*$\"", "\"(\"", "1", "true", "null", "[]", "{}", "\"-n a.b/.C\"")
 
@@ -23,3 +28,9 @@ val definitionTexts: Arb<String> =
     Arb.bind(jsonValues, Arb.list(players, 0..4)) { value, players ->
         """{"platform": {"uniqueId": $value, "name": "P", "acceptedFilenameRegex": $value}, "playerList": [${players.joinToString()}]}"""
     }
+
+/** Package names such as `org.a1x`. */
+val packageNames: Arb<String> = Arb.string(1..8, Codepoint.alphanumeric()).map { "org.a$it" }
+
+/** Curtain times the curtain file accepts, in milliseconds, from none to the longest. */
+val curtainMillis: Arb<Long> = Arb.long(0L..CurtainTimes.LONGEST.inWholeMilliseconds)

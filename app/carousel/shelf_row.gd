@@ -45,6 +45,12 @@ var _places: Array[Place] = []
 var _placed: Dictionary[int, Place] = {}
 ## Places waiting for their label, drawn one per frame so that a fast move never stalls.
 var _unlabelled: Array[Place] = []
+## While the selected game is launched, how it stands instead of posed, and how its drive has turned
+## it (see [method stand_selected]).
+var _launched := false
+var _launch_stand := Transform3D.IDENTITY
+var _launch_spin := 0.0
+var _launch_blur := 0.0
 
 
 func _ready() -> void:
@@ -152,6 +158,36 @@ func inspect(stick: Vector2) -> void:
 	_stick = stick
 
 
+## Stops every move under way: a held direction, the stick. The selection stays where it is.
+func freeze() -> void:
+	_held = 0
+	_stick = Vector2.ZERO
+
+
+## Stands the selected game as [param stand] says (in the row's space) instead of posed, turned
+## [param spin] radians about its own axis with its label blurred over [param blur] radians, until
+## [method pose_selected].
+func stand_selected(stand: Transform3D, spin: float, blur: float) -> void:
+	_launched = true
+	_launch_stand = stand
+	_launch_spin = spin
+	_launch_blur = blur
+
+
+## Poses the selected game again, as it was before [method stand_selected].
+func pose_selected() -> void:
+	_launched = false
+	var place: Place = _placed.get(selected_index())
+	if place:
+		place.shown.spin(0.0, 0.0)
+
+
+## How the selected game stands now, in the row's space.
+func selected_stand() -> Transform3D:
+	var place: Place = _placed.get(selected_index())
+	return place.transform if place else Transform3D.IDENTITY
+
+
 func _step(direction: int) -> void:
 	if _games.size() < 2:
 		return
@@ -179,7 +215,11 @@ func _arrange() -> void:
 	var stretch := minf(absf(_speed) * _STRETCH, _MAX_STRETCH)
 	for place in _places:
 		place.visible = place.game >= 0
-		if place.visible:
+		if place.visible and _launched and place.game == selected_index():
+			place.transform = _launch_stand
+			place.shown.spin(_launch_spin, _launch_blur)
+			place.shown.fade(0.0)
+		elif place.visible:
 			var offset: float = shown[place.game]
 			var centred := clampf(1.0 - 2.0 * absf(offset), 0.0, 1.0)
 			var stand := CarouselLayout.place(offset)
@@ -313,6 +353,12 @@ class LabelledModel extends Node3D:
 		_material.set_shader_parameter(&"label_texture", label)
 		_material.set_shader_parameter(&"scanned", scanned)
 		_material.set_shader_parameter(&"has_label", true)
+
+	## Turns the model [param angle] radians about its own axis, its label blurred over
+	## [param blur] radians as when it spins fast.
+	func spin(angle: float, blur: float) -> void:
+		transform = Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO)
+		_material.set_shader_parameter(&"spin_blur", blur)
 
 	## Sets how transparent the model is, from 0 (opaque) to 1 (gone).
 	func fade(amount: float) -> void:

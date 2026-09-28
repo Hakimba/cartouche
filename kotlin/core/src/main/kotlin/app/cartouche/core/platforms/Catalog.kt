@@ -130,6 +130,9 @@ public sealed interface CatalogError {
 
     public data class MissingProfile(override val source: String, public val platform: PlatformId) : CatalogError
 
+    /** The value under [key] is not one the file allows. */
+    public data class InvalidValue(override val source: String, public val key: String, public val detail: String) : CatalogError
+
     /** English description, for logs. */
     public val message: String
         get() =
@@ -141,6 +144,7 @@ public sealed interface CatalogError {
                 is DuplicatePlatform -> "Platform ${platform.value} is already defined"
                 is DuplicatePlayer -> "Player ${player.value} is already defined"
                 is MissingProfile -> "Platform ${platform.value} has no Cartouche profile"
+                is InvalidValue -> "Invalid value for \"$key\": $detail"
             }
 }
 

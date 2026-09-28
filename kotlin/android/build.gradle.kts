@@ -35,6 +35,8 @@ base { archivesName = "cartouche-android" }
 tasks.withType<Test>().configureEach {
     systemProperty("cartouche.app", rootProject.file("../app").path)
     systemProperty("cartouche.build", layout.buildDirectory.get().asFile.path)
+    // `-Probolectric.enabledSdks=33` runs the Robolectric tests on one Android only, for quick runs.
+    providers.gradleProperty("robolectric.enabledSdks").orNull?.let { systemProperty("robolectric.enabledSdks", it) }
 }
 
 kotlin {

@@ -1,0 +1,6 @@
+{
+  "default_ms": 1500,
+  "emulators": {
+    "com.armsx2": 1500
+  }
+}

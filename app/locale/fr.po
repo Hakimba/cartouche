@@ -14,8 +14,11 @@ msgstr "Aucun jeu pour l’instant."
 msgid "Hold Select to open the device check, then choose a folder and scan it."
 msgstr "Maintenez Select pour ouvrir l’outil de test, puis choisissez un dossier et scannez-le."
 
-msgid "No emulator for this game is installed."
-msgstr "Aucun émulateur n’est installé pour ce jeu."
+msgid "No {platform} emulator is installed."
+msgstr "Aucun émulateur {platform} n’est installé."
+
+msgid "This game's file cannot be found: is its SD card or folder still there?"
+msgstr "Le fichier de ce jeu est introuvable : la carte SD ou le dossier est-il toujours là ?"
 
 msgid "The game could not be launched."
 msgstr "Le jeu n’a pas pu être lancé."

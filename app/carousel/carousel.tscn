@@ -1,15 +1,21 @@
-[gd_scene load_steps=10 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=14 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
 [ext_resource type="Shader" uid="uid://i8e1ijw1ftfn" path="res://carousel/background.gdshader" id="3"]
 [ext_resource type="Shader" path="res://carousel/studio_sky.gdshader" id="4"]
+[ext_resource type="Script" path="res://carousel/launch/game_launch.gd" id="5"]
+[ext_resource type="Shader" path="res://carousel/launch/blackout.gdshader" id="6"]
+[ext_resource type="PackedScene" path="res://carousel/models/spindle.tscn" id="7"]
 
 [sub_resource type="ShaderMaterial" id="backdrop_material"]
 shader = ExtResource("3")
 
 [sub_resource type="ShaderMaterial" id="studio_material"]
 shader = ExtResource("4")
+
+[sub_resource type="ShaderMaterial" id="blackout_material"]
+shader = ExtResource("6")
 
 [sub_resource type="Sky" id="studio"]
 sky_material = SubResource("studio_material")
@@ -62,6 +68,9 @@ light_specular = 0.0
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
 script = ExtResource("2")
+
+[node name="Spindle" parent="Row" instance=ExtResource("7")]
+visible = false
 
 [node name="TopBar" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -153,9 +162,9 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 1
 anchors_preset = -1
-anchor_top = 0.9
+anchor_top = 0.955
 anchor_right = 1.0
-anchor_bottom = 0.9
+anchor_bottom = 0.955
 grow_horizontal = 2
 grow_vertical = 2
 horizontal_alignment = 1
@@ -173,6 +182,26 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
+[node name="Front" type="CanvasLayer" parent="."]
+
+[node name="Blackout" type="ColorRect" parent="Front"]
+visible = false
+material = SubResource("blackout_material")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="GameLaunch" type="Node" parent="." node_paths=PackedStringArray("row", "spindle", "blackout", "controls")]
+unique_name_in_owner = true
+script = ExtResource("5")
+row = NodePath("../Row")
+spindle = NodePath("../Row/Spindle")
+blackout = NodePath("../Front/Blackout")
+controls = [NodePath("../TopBar"), NodePath("../Pill")]
+
 [node name="ClockTimer" type="Timer" parent="."]
 autostart = true
 
@@ -186,6 +215,7 @@ wait_time = 2.0
 one_shot = true
 
 [connection signal="selection_changed" from="Row" to="." method="_on_row_selection_changed"]
+[connection signal="failed" from="GameLaunch" to="." method="_on_game_launch_failed"]
 [connection signal="timeout" from="ClockTimer" to="." method="_on_clock_timeout"]
 [connection signal="timeout" from="MessageTimer" to="." method="_on_message_timer_timeout"]
 [connection signal="timeout" from="HoldSelect" to="." method="_on_hold_select_timeout"]

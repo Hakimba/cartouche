@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+class_name Carousel
 extends Control
 ## The main screen: one shelf of games per platform, the selected game in the middle. Left and
 ## right move along the shelf (held, faster and faster), L1 and R1 change platform, A launches the
-## selected game, the right stick turns it. Where the user was is remembered across restarts.
+## selected game into its console ([GameLaunch]), the right stick turns it. Where the user was is
+## remembered across restarts.
 ##
 ## In debug builds, holding Select opens the device check, and command-line arguments set up
-## measurements: `--demo-games=N` shows a made-up library of N games, `--bench=scroll`, `switch` or
-## `turn` runs [CarouselBench], `--turntable=T` turns the selected game T times a second to show
+## measurements: `--demo-games=N` shows a made-up library of N games, `--bench=scroll`, `switch`,
+## `turn` or `launch` runs [CarouselBench], `--turntable=T` turns the selected game T times a second to show
 ## all its sides, `--shelf=gba` opens on that platform's shelf. Without the Android plugin (the
 ## editor, a desktop run), the demo library is shown.
 
@@ -24,13 +26,13 @@ var _positions: Dictionary[String, int] = {}
 var _platforms: Dictionary[String, AndroidServices.Platform] = {}
 var _models: Dictionary[String, PackedScene] = {}
 var _colors: Dictionary[String, Color] = {}
+var _insertions: Dictionary[String, Insertion] = {}
 var _default_color: Color
 ## Whether the library shown is made up: its labels get made-up artwork.
 var _demo := false
 ## Set once the library is shown: until then there is nothing to move, launch or remember.
 var _shown := false
 var _switching := false
-var _launching := false
 var _direction := HeldDirection.new()
 var _clock_ticks := 0
 
@@ -45,6 +47,7 @@ var _clock_ticks := 0
 @onready var _message_timer: Timer = %MessageTimer
 @onready var _empty: Label = %Empty
 @onready var _hold_select: Timer = %HoldSelect
+@onready var _game_launch: GameLaunch = %GameLaunch
 
 
 func _ready() -> void:
@@ -66,6 +69,8 @@ func _ready() -> void:
 		Diagnostics.trace("carousel", "library not read (%s): %s" % [answer.code, answer.detail])
 	_show_library(answer.library)
 	_shown = true
+	# Once the carousel is on screen: reading sounds must not delay it.
+	get_tree().process_frame.connect(_game_launch.prepare.bind(_insertions.values()), CONNECT_ONE_SHOT)
 	if Diagnostics.enabled:
 		await get_tree().process_frame
 		Diagnostics.trace("carousel", "shown: %d games on %d shelves, %d ms after the scene started" % [
@@ -87,12 +92,14 @@ func _notification(what: int) -> void:
 
 
 func _process(_delta: float) -> void:
-	_row.inspect(Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down"))
+	if not _game_launch.is_busy():
+		_row.inspect(Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down"))
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var moved := _direction.update(event)
-	if event.is_echo() or not _shown:
+	# Nothing acts from A until the carousel shows again after the game.
+	if event.is_echo() or not _shown or _game_launch.is_busy():
 		return
 	if event.is_action_pressed(&"app_back") and Diagnostics.enabled:
 		_hold_select.start()
@@ -190,20 +197,11 @@ func _switch_shelf(direction: int) -> void:
 
 
 func _launch() -> void:
-	if _launching:
-		return
-	_launching = true
 	var game := _row.selected_game()
+	# A press begun before A must not act once it is let go.
+	_hold_select.stop()
 	_remember()
-	var result := await Android.launch_game(game, game.last_disc)
-	_launching = false
-	if not result.ok:
-		Diagnostics.trace("carousel", "launch failed (%s): %s" % [result.code, result.detail])
-		match result.code:
-			&"not_installed", &"no_player":
-				_show_message(tr("No emulator for this game is installed."))
-			_:
-				_show_message(tr("The game could not be launched."))
+	_game_launch.launch(game, game.last_disc, _insertions[_platforms[game.platform_id].media])
 
 
 ## Stores the selected game and its platform, for the next start.
@@ -234,6 +232,13 @@ func _load_appearance() -> void:
 		_colors[platform_id] = Color(color)
 	var default_color: String = appearance["default_color"]
 	_default_color = Color(default_color)
+	var insertions: Dictionary = appearance["insertions"]
+	for media: String in insertions:
+		var insertion: Dictionary = insertions[media]
+		var problems := Insertion.problems(insertion)
+		for key in problems:
+			push_error("%s: insertion of %s: %s: %s" % [_APPEARANCE, media, key, Insertion.Problem.keys()[problems[key]]])
+		_insertions[media] = Insertion.read(insertion)
 	var pose: Dictionary = appearance["pose"]
 	_row.pose.tilt = pose["tilt_degrees"]
 	_row.pose.turn = pose["turn_degrees"]
@@ -253,6 +258,18 @@ func _on_clock_timeout() -> void:
 		var battery := Android.battery()
 		_battery.text = ("%d %%" % battery.level_percent if battery.has_level else "") + (" ⚡" if battery.charging else "")
 	_clock_ticks += 1
+
+
+func _on_game_launch_failed(code: StringName) -> void:
+	Diagnostics.trace("carousel", "launch failed: %s" % code)
+	var platform := _platforms[_shelves[_shelf].platform_id].name
+	match code:
+		&"not_installed", &"no_player":
+			_show_message(tr("No {platform} emulator is installed.").format({"platform": platform}))
+		&"game_missing":
+			_show_message(tr("This game's file cannot be found: is its SD card or folder still there?"))
+		_:
+			_show_message(tr("The game could not be launched."))
 
 
 func _on_message_timer_timeout() -> void:

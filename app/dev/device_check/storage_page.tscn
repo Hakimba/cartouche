@@ -17,6 +17,10 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Grant all files access"
 
+[node name="GrantOverlay" type="Button" parent="Buttons"]
+layout_mode = 2
+text = "Allow display over other apps"
+
 [node name="AddFolder" type="Button" parent="Buttons"]
 layout_mode = 2
 text = "Add a folder…"
@@ -36,5 +40,6 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [connection signal="pressed" from="Buttons/Grant" to="." method="_on_grant_pressed"]
+[connection signal="pressed" from="Buttons/GrantOverlay" to="." method="_on_grant_overlay_pressed"]
 [connection signal="pressed" from="Buttons/AddFolder" to="." method="_on_add_folder_pressed"]
 [connection signal="pressed" from="Buttons/Refresh" to="." method="refresh"]

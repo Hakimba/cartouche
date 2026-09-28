@@ -9,7 +9,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.FileUriExposedException
 import app.cartouche.android.apps.InstalledApps
+import app.cartouche.android.storage.Folders
 import app.cartouche.android.trace
+import app.cartouche.core.ContentUri
 import app.cartouche.core.PackageName
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.platforms.Launch
@@ -35,6 +37,9 @@ internal sealed interface LaunchFailure {
     /** No installed player of [platform] opens the game. */
     data class NoPlayer(val platform: PlatformId) : LaunchFailure
 
+    /** The game file is gone, or its storage cannot be read. */
+    data class GameMissing(val file: ContentUri) : LaunchFailure
+
     val message: String
         get() =
             when (this) {
@@ -43,6 +48,7 @@ internal sealed interface LaunchFailure {
                 is ActivityNotFound -> "No activity for $target"
                 is PermissionDenied -> "Permission denied: $reason"
                 is NoPlayer -> "No installed emulator for ${platform.value} opens this game"
+                is GameMissing -> "The game file ${file.value} is missing or cannot be read"
             }
 }
 
@@ -53,14 +59,30 @@ internal sealed interface LaunchFailure {
  * Never grants a URI to a package directly: only the documents provider could revoke such a grant,
  * so it would last until reboot. The intent's own grant ([IntentMapper]) ends with the emulator.
  */
-internal class Launcher(private val context: Context) {
-    /** Checks the emulator is installed and stops a lingering instance, then returns the launch intent. */
-    fun prepareGame(launch: Launch): Either<LaunchFailure, Intent> = either {
+internal class Launcher(
+    private val context: Context,
+    private val folders: Folders,
+    /** Stops the background processes of an emulator: a port, for tests to see what a launch stops. */
+    private val stopInstance: (PackageName) -> Unit = { stopBackgroundInstance(context, it) },
+) {
+    /**
+     * The intent that starts [launch] of the game file [game], once its emulator is installed and
+     * the file is still there. Starts and stops nothing, so that a game can be checked before the
+     * launch animation plays. Android's own transition between apps is left out: the animation
+     * ends on black, and the emulator appears straight from it.
+     */
+    fun checkGame(launch: Launch, game: ContentUri): Either<LaunchFailure, Intent> = either {
         launch.spec.targetPackage.onSome { packageName ->
             ensure(InstalledApps.isInstalled(context.packageManager, packageName)) { LaunchFailure.NotInstalled(packageName) }
-            if (launch.runningInstance == RunningInstance.STOP) stopBackgroundInstance(packageName)
         }
-        IntentMapper.toIntent(launch.spec)
+        val present = folders.exists(game).getOrElse { failure -> false.also { trace("launch") { "game unreadable: ${failure.message}" } } }
+        ensure(present) { LaunchFailure.GameMissing(game) }
+        IntentMapper.toIntent(launch.spec).addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+    }
+
+    /** [checkGame], then stops a lingering instance of the emulator when its definition asks to. */
+    fun prepareGame(launch: Launch, game: ContentUri): Either<LaunchFailure, Intent> = checkGame(launch, game).onRight {
+        if (launch.runningInstance == RunningInstance.STOP) launch.spec.targetPackage.onSome(stopInstance)
     }
 
     fun appIntent(packageName: PackageName): Either<LaunchFailure, Intent> = either {
@@ -72,18 +94,6 @@ internal class Launcher(private val context: Context) {
     /** Opens the system folder picker; the choice arrives in the activity result for [requestCode]. */
     fun pickFolder(activity: Activity, requestCode: Int): Either<LaunchFailure, Unit> =
         Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).let { starting(it) { activity.startActivityForResult(it, requestCode) } }
-
-    /**
-     * Some emulators (RetroArch) keep running in the background and would resume the previous game
-     * instead of loading the new one. Stopping them only works up to Android 13: from Android 14,
-     * [ActivityManager.killBackgroundProcesses] can only stop the caller's own processes, so newer
-     * devices rely on the template's clear-task switches.
-     */
-    private fun stopBackgroundInstance(packageName: PackageName) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
-        trace("stop") { packageName.value }
-        context.getSystemService(ActivityManager::class.java).toOption().onSome { it.killBackgroundProcesses(packageName.value) }
-    }
 
     private inline fun starting(intent: Intent, crossinline start: () -> Unit): Either<LaunchFailure, Unit> = either {
         trace("start") { intent.toUri(Intent.URI_INTENT_SCHEME) }
@@ -100,4 +110,16 @@ internal class Launcher(private val context: Context) {
 
     private fun label(intent: Intent): String =
         intent.component.toOption().map { it.flattenToShortString() }.getOrElse { intent.action.orEmpty() }
+}
+
+/**
+ * Some emulators (RetroArch) keep running in the background and would resume the previous game
+ * instead of loading the new one. Stopping them only works up to Android 13: from Android 14,
+ * [ActivityManager.killBackgroundProcesses] can only stop the caller's own processes, so newer
+ * devices rely on the template's clear-task switches.
+ */
+private fun stopBackgroundInstance(context: Context, packageName: PackageName) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+    trace("stop") { packageName.value }
+    context.getSystemService(ActivityManager::class.java).toOption().onSome { it.killBackgroundProcesses(packageName.value) }
 }

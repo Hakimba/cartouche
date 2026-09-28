@@ -1,0 +1,81 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://carousel/models/spindle.gd" id="1"]
+
+[sub_resource type="StandardMaterial3D" id="rubber"]
+albedo_color = Color(0.07, 0.07, 0.08, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="plastic"]
+albedo_color = Color(0.1, 0.1, 0.11, 1)
+roughness = 0.35
+
+[sub_resource type="StandardMaterial3D" id="steel"]
+albedo_color = Color(0.75, 0.76, 0.78, 1)
+metallic = 1.0
+roughness = 0.2
+
+[sub_resource type="StandardMaterial3D" id="can"]
+albedo_color = Color(0.55, 0.56, 0.58, 1)
+metallic = 0.9
+roughness = 0.4
+
+[sub_resource type="CylinderMesh" id="motor_mesh"]
+material = SubResource("can")
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.06
+radial_segments = 48
+rings = 1
+
+[sub_resource type="CylinderMesh" id="turntable_mesh"]
+material = SubResource("rubber")
+top_radius = 0.13
+bottom_radius = 0.13
+height = 0.015
+radial_segments = 64
+rings = 1
+
+[sub_resource type="CylinderMesh" id="hub_mesh"]
+material = SubResource("plastic")
+top_radius = 0.062
+bottom_radius = 0.074
+height = 0.026
+radial_segments = 48
+rings = 1
+
+[sub_resource type="SphereMesh" id="ball_mesh"]
+material = SubResource("steel")
+radius = 0.009
+height = 0.018
+radial_segments = 12
+rings = 6
+
+[node name="Spindle" type="Node3D"]
+script = ExtResource("1")
+
+[node name="Motor" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -0.051)
+mesh = SubResource("motor_mesh")
+
+[node name="Rotor" type="Node3D" parent="."]
+
+[node name="Turntable" type="MeshInstance3D" parent="Rotor"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -0.0135)
+mesh = SubResource("turntable_mesh")
+
+[node name="Hub" type="MeshInstance3D" parent="Rotor"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0.007)
+mesh = SubResource("hub_mesh")
+
+[node name="Ball1" type="MeshInstance3D" parent="Rotor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.069, 0.009)
+mesh = SubResource("ball_mesh")
+
+[node name="Ball2" type="MeshInstance3D" parent="Rotor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.05976, -0.0345, 0.009)
+mesh = SubResource("ball_mesh")
+
+[node name="Ball3" type="MeshInstance3D" parent="Rotor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.05976, -0.0345, 0.009)
+mesh = SubResource("ball_mesh")

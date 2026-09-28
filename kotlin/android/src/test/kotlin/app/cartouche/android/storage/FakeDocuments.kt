@@ -14,18 +14,21 @@ import app.cartouche.core.uri
 import org.robolectric.Robolectric
 
 /**
- * A documents provider whose folders answer with [answer]: rows, no cursor (null) or an exception,
- * as third-party providers may. Installed with [installDocuments]; the Android types it
- * overrides are nullable, as the framework declares them.
+ * A documents provider whose folders answer with [answer] and documents with [document]: rows, no
+ * cursor (null) or an exception, as third-party providers may; a document that is gone throws
+ * [java.io.FileNotFoundException], which `DocumentsProvider` turns into no cursor, as Android's
+ * own providers do. Installed with [installDocuments]; the Android types it overrides are
+ * nullable, as the framework declares them.
  */
 internal class FakeDocuments : DocumentsProvider() {
     var answer: (folderId: String) -> Cursor? = { rows() }
+    var document: (documentId: String) -> Cursor? = { rows() }
 
     override fun onCreate(): Boolean = true
 
     override fun queryRoots(projection: Array<out String>?): Cursor = MatrixCursor(emptyArray())
 
-    override fun queryDocument(documentId: String?, projection: Array<out String>?): Cursor = rows()
+    override fun queryDocument(documentId: String, projection: Array<out String>?): Cursor? = document(documentId)
 
     override fun queryChildDocuments(parentDocumentId: String, projection: Array<out String>?, sortOrder: String?): Cursor? =
         answer(parentDocumentId)
@@ -43,8 +46,8 @@ internal val TREE: ContentUri = uri("content://$AUTHORITY/tree/root")
 
 internal val COLUMNS = arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE)
 
-/** Replaces the provider serving [AUTHORITY] with one answering [answer]. */
-internal fun installDocuments(answer: (folderId: String) -> Cursor?) {
+/** Replaces the provider serving [AUTHORITY] with one answering [document] and [answer]. */
+internal fun installDocuments(document: (documentId: String) -> Cursor? = { rows() }, answer: (folderId: String) -> Cursor?) {
     val info =
         ProviderInfo().apply {
             authority = AUTHORITY
@@ -53,7 +56,10 @@ internal fun installDocuments(answer: (folderId: String) -> Cursor?) {
             readPermission = Manifest.permission.MANAGE_DOCUMENTS
             writePermission = Manifest.permission.MANAGE_DOCUMENTS
         }
-    Robolectric.buildContentProvider(FakeDocuments::class.java).create(info).get().answer = answer
+    Robolectric.buildContentProvider(FakeDocuments::class.java).create(info).get().also {
+        it.answer = answer
+        it.document = document
+    }
 }
 
 /** One row per `(id, name, mime type, size)`; any of them may be null, as providers send them. */
