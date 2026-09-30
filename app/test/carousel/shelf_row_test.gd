@@ -151,7 +151,7 @@ func _assert_places(row: ShelfRow, count: int) -> void:
 		if place.visible:
 			shown.append(place.game)
 			assert_float(place.transform.origin.x).is_equal_approx(CarouselLayout.place(offsets[place.game]).origin.x, 0.0001)
-			if place.shown._material.get_shader_parameter(&"has_label"):
+			if place.shown._materials[0].get_shader_parameter(&"has_label"):
 				assert_str(place.shown._title.text).is_equal(row._games[place.game].title)
 	shown.sort()
 	var in_view := offsets.keys()
@@ -194,7 +194,7 @@ func test_INV_E2_5_07_the_stick_turns_the_selected_game_any_way_up_to_its_back()
 		var front := _centre(row).transform.basis
 		row.inspect(stick)
 		# Half a turn, at the stick's speed.
-		_frames(row, roundi(PI / ShelfRow._TURN_SPEED / Fixtures.FRAME_S), Fixtures.FRAME_S)
+		_frames(row, roundi(PI / StickTurn.SPEED / Fixtures.FRAME_S), Fixtures.FRAME_S)
 		row.inspect(Vector2.ZERO)
 		_frames(row, 120, Fixtures.FRAME_S)
 		var turned := _centre(row).transform.basis
@@ -253,7 +253,7 @@ func test_INV_E2_5_07_a_game_just_selected_turns_from_the_front_whatever_the_las
 	# Three frames of stick: a small turn, from where the row stands it now.
 	var standing := CarouselLayout.place(CarouselLayout.offsets(5, row._scroll)[row.selected_index()]).basis
 	var turned := _centre(row).transform.basis
-	assert_float(turned.z.angle_to(standing.z)).is_less(3.0 * Fixtures.FRAME_S * ShelfRow._TURN_SPEED + 0.01)
+	assert_float(turned.z.angle_to(standing.z)).is_less(3.0 * Fixtures.FRAME_S * StickTurn.SPEED + 0.01)
 
 
 ## A pose [param random] draws.

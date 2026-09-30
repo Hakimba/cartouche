@@ -4,6 +4,10 @@
     "minidisc": "res://carousel/models/minidisc.tscn",
     "cartridge": "res://carousel/models/cartridge.tscn"
   },
+  "consoles": {
+    "ps2": { "model": "res://carousel/consoles/ps2_slim.tscn", "steps": "res://data/launch/ps2_slim.json" }
+  },
+  "media_steps": "res://data/launch/media.json",
   "colors": {
     "ps2": "#c9ccd1",
     "gc": "#f2f2ee",

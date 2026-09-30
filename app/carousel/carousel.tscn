@@ -8,6 +8,10 @@
 [ext_resource type="Shader" path="res://carousel/launch/blackout.gdshader" id="6"]
 [ext_resource type="PackedScene" path="res://carousel/models/spindle.tscn" id="7"]
 [ext_resource type="Script" path="res://carousel/game_art.gd" id="8"]
+[ext_resource type="Script" path="res://carousel/consoles/console_row.gd" id="9"]
+[ext_resource type="Script" path="res://carousel/consoles/console_sequence.gd" id="10"]
+[ext_resource type="Script" path="res://carousel/consoles/console_layer.gd" id="11"]
+[ext_resource type="Shader" path="res://carousel/consoles/console_layer.gdshader" id="12"]
 
 [sub_resource type="ShaderMaterial" id="backdrop_material"]
 shader = ExtResource("3")
@@ -17,6 +21,9 @@ shader = ExtResource("4")
 
 [sub_resource type="ShaderMaterial" id="blackout_material"]
 shader = ExtResource("6")
+
+[sub_resource type="ShaderMaterial" id="console_view_material"]
+shader = ExtResource("12")
 
 [sub_resource type="Sky" id="studio"]
 sky_material = SubResource("studio_material")
@@ -53,11 +60,36 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="ConsoleView" type="TextureRect" parent="Backdrop" node_paths=PackedStringArray("watched", "view", "camera")]
+visible = false
+material = SubResource("console_view_material")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+script = ExtResource("11")
+watched = NodePath("../../Camera")
+view = NodePath("../../ConsoleViewport")
+camera = NodePath("../../ConsoleViewport/Camera")
+
+[node name="ConsoleViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(640, 480)
+render_target_update_mode = 0
+
+[node name="Camera" type="Camera3D" parent="ConsoleViewport"]
+cull_mask = 2
+fov = 32.0
+
 [node name="Environment" type="WorldEnvironment" parent="."]
 environment = SubResource("environment")
 
 [node name="Camera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 3.7)
+cull_mask = 1048573
 current = true
 fov = 32.0
 
@@ -72,6 +104,22 @@ script = ExtResource("2")
 
 [node name="Spindle" parent="Row" instance=ExtResource("7")]
 visible = false
+
+[node name="Consoles" type="Node3D" parent="."]
+unique_name_in_owner = true
+script = ExtResource("9")
+
+[node name="Player" type="AnimationPlayer" parent="."]
+callback_mode_process = 2
+
+[node name="Sequence" type="Node" parent="." node_paths=PackedStringArray("player", "row", "consoles", "layer")]
+unique_name_in_owner = true
+process_priority = -1
+script = ExtResource("10")
+player = NodePath("../Player")
+row = NodePath("../Row")
+consoles = NodePath("../Consoles")
+layer = NodePath("../Backdrop/ConsoleView")
 
 [node name="TopBar" type="MarginContainer" parent="."]
 layout_mode = 1
@@ -91,34 +139,10 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="TabBar" type="HBoxContainer" parent="TopBar/Items"]
+[node name="Platform" type="Label" parent="TopBar/Items"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 20
-
-[node name="Previous" type="Label" parent="TopBar/Items/TabBar"]
-layout_mode = 2
-theme_type_variation = &"Hint"
-text = "L1"
-
-[node name="Tabs" type="HBoxContainer" parent="TopBar/Items/TabBar"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 28
-
-[node name="Before" type="Label" parent="TopBar/Items/TabBar/Tabs"]
-layout_mode = 2
-
-[node name="Current" type="Label" parent="TopBar/Items/TabBar/Tabs"]
-layout_mode = 2
-
-[node name="After" type="Label" parent="TopBar/Items/TabBar/Tabs"]
-layout_mode = 2
-
-[node name="Next" type="Label" parent="TopBar/Items/TabBar"]
-layout_mode = 2
-theme_type_variation = &"Hint"
-text = "R1"
+theme_type_variation = &"CurrentTab"
 
 [node name="Battery" type="Label" parent="TopBar/Items"]
 unique_name_in_owner = true
@@ -230,11 +254,13 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="GameLaunch" type="Node" parent="." node_paths=PackedStringArray("row", "spindle", "blackout", "controls")]
+[node name="GameLaunch" type="Node" parent="." node_paths=PackedStringArray("row", "spindle", "sequence", "blackout", "controls")]
 unique_name_in_owner = true
+process_priority = -1
 script = ExtResource("5")
 row = NodePath("../Row")
 spindle = NodePath("../Row/Spindle")
+sequence = NodePath("../Sequence")
 blackout = NodePath("../Front/Blackout")
 controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill")]
 
@@ -255,6 +281,7 @@ wait_time = 2.0
 one_shot = true
 
 [connection signal="selection_changed" from="Row" to="." method="_on_row_selection_changed"]
+[connection signal="selection_changed" from="Consoles" to="." method="_on_consoles_selection_changed"]
 [connection signal="failed" from="GameLaunch" to="." method="_on_game_launch_failed"]
 [connection signal="timeout" from="ClockTimer" to="." method="_on_clock_timeout"]
 [connection signal="timeout" from="MessageTimer" to="." method="_on_message_timer_timeout"]

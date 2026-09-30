@@ -60,11 +60,24 @@ The same words are used in the code, the tests and this document.
   platform's label colour.
 - **Shape**: the dimensions, in millimetres, a model is built from (`DiscShape`,
   `CartridgeShape`); each **part** of the model (label, mirror, shell) is a mesh built from them.
-- **Pose**: how the selected game is shown, leaning back, turned and slowly swaying, so that the
-  light moves over it. The right stick turns it further, as far as the user likes.
+- **Pose**: how the selected game or console is shown, leaning back, turned and slowly swaying, so
+  that the light moves over it. The right stick turns it further, as far as the user likes.
+- **Consoles screen**: the first screen, one **console** per platform with games (its 3D model,
+  or its media until it has one), in a row laid out like the games'. **Going in** (A) and **going
+  out** (B) play the console's **launch animation** between it and the platform's **games screen**
+  (its shelf).
+- **Launch animation**: a console's moves from the consoles screen to a launched game, written as
+  **steps**: each a whole state of the scene (console, lid, disc, rows, blur, controls, black),
+  reached from the previous one in `dur` seconds along its `ease`, then held `hold` seconds. Its
+  **moments** name where it comes to the games screen, the launch, the disc seated, the black.
+  The steps file is the contract between the tuning tool and the app: `choice` (the step the game
+  is chosen at) and `steps`, each a group per part (`console`, `consoles`, `lid`, `disc`, `row`,
+  `look`, `ui`, `fx`), distances in centimetres, angles in degrees, the blur in pixels of the
+  screen; a missing value takes its default (`LaunchAnimation`).
 - **Launch check**: asking whether a game can start (its player's emulator is installed, its file
   still there) without starting or stopping anything, before its insertion plays.
-- **Insertion**: how a game goes into its console once A is pressed, one per media: a disc turns
+- **Insertion**: how a game goes into its console once A is pressed, for a platform whose console
+  has no launch animation, one per media: a disc turns
   to face the player, comes forward as if taken in hand, goes back onto the drive's **spindle**
   (the motor, turntable, hub and balls a disc clips onto), which spins it up; then the screen goes
   black from its centre.
@@ -171,17 +184,33 @@ The same words are used in the code, the tests and this document.
 - **`AndroidManifest.xml`** lists the permissions, each justified in a comment.
 
 ### Godot (`app/`)
-- **The carousel** (`carousel/`, the main scene) shows the shelves. `carousel.gd` handles input,
-  platforms, launches and remembering the selection (before leaving a shelf, launching, or leaving
-  the app). `ShelfRow` moves the row and recycles a fixed pool of places, so its cost does not
+- **The carousel** (`carousel/`, the main scene) shows the consoles screen and the games screen.
+  `carousel.gd` handles the screens, input, platforms, launches and remembering the selection
+  (before going out of a console, launching, or leaving the app); the right stick turns the
+  console or the game only on their screens (`StickTurn`). `ShelfRow` moves the row and recycles a fixed pool of places, so its cost does not
   depend on the number of games; titles are drawn in each place's small `SubViewport`, one per
   frame, until a game's art is read (`GameArt`: on a worker thread, one texture sent to the GPU a
   frame, the latest 24 kept); a game without a scan gets its shelf's blank (`LabelLook`, colours
   and band from `appearance.json`). `CarouselLayout` holds the mechanics as pure functions.
   Scraping's progress is a bar under the title: it moves to each count, greys with the reason while
-  the run waits, fades once full, hides for a launch's message, and fades with the controls at a
-  launch.
-- **Launches**: `GameLaunch` (`carousel/launch/`) runs a launch from A to the carousel shown again;
+  the run waits, fades once full, hides for a launch's message, and shows and fades with the pill
+  in a launch animation. `Appearance` reads `appearance.json` once, each launch animation made once.
+- **Consoles** (`carousel/consoles/`): `ConsoleRow` lays the consoles out as `ShelfRow` lays the
+  games (`CarouselLayout`, `Pose`), the selected one standing as the launch animation has it.
+  `LaunchAnimation` turns a console's steps (`data/launch/<console>.json`, named in
+  `appearance.json` with the console's scene; `media.json` for the platforms shown by their media)
+  into a Godot `Animation`, its tracks on the carousel's nodes, its moments as metadata;
+  `ConsoleSequence` has the `AnimationPlayer` sample it at the times it is given, puts the chosen
+  disc between the row and the spindle, and draws the consoles apart while they blur behind the
+  games (`ConsoleLayer`: a second view of the consoles alone, blurred by `console_layer.gdshader`).
+  The PS2 slim (`ps2_slim.tscn`) is a `ConsoleModel`: its `ConsoleShape` gives its body, lid,
+  well and ribs (`ConsoleGeometry`, on `ShapeGeometry`'s rounded blocks, shared with the
+  cartridge), its lid turns about its hinge, the drive's `Spindle` sits in its well. Their plain
+  parts use `carousel/models/solid.gdshader`, colours and finishes as its parameters, rather than
+  standard materials: every distinct material is a shader (and its fading copy) that the graphics
+  driver keeps in memory, several megabytes each on a handheld.
+- **Launches**: `GameLaunch` (`carousel/launch/`) runs a launch from A to the carousel shown again,
+  playing the console's launch animation, or else its media's insertion;
   `Insertion` holds the motion as pure functions of time, its timings, distances and sounds per
   media in `appearance.json` (`insertions`), tuned without code; `carousel/models/spindle.tscn` is
   the drive's spindle, `carousel/launch/blackout.gdshader` the black growing from the disc's centre.
@@ -240,8 +269,15 @@ The same words are used in the code, the tests and this document.
 - **Art data**: `dev/launchbox_art.py` makes a platform's extract from the LaunchBox Games
   Database dump (`Metadata.zip`, published daily); `dev/redump_titles.py` does the same for the
   reference lists. Images are never part of the repository: they are downloaded on the device.
-- **Without the plugin**, pressing A plays the insertion, then the launch fails: insertions are
-  tuned on a computer too.
+- **Without the plugin**, A goes into a console, then plays the launch, which then fails: launch
+  animations and insertions are tuned on a computer too. A launch animation's steps can be tuned
+  apart from the app and exported as they are; `dev/launch_steps.py` keeps what the app plays.
+- **Fading a model** goes through `ModelFade`: Godot's per-instance transparency does not show on
+  the mobile renderer, so a model is drawn with its own opaque materials while it is not faded, and
+  with transparent copies of them while it is (our shaders' fading variants, `*_fading.gdshader`,
+  by their `fade` instance uniform; standard materials by their albedo's alpha), their depth still
+  written so that a faded model hides what is behind it. A shader shared by both variants lives in
+  its `.gdshaderinc`.
 - **Debug arguments** (`--esa arguments` on the device, after `--` on a desktop):
   `--turntable=0.25` turns the selected game to show all its sides, `--shelf=gba` opens on a
   platform's shelf, `--art-refused` makes every art server refuse (to see the message and the
@@ -290,8 +326,8 @@ a property that filters its cases also checks that enough of them reach the code
 - **GDScript:** the official style guide, static typing everywhere, scenes rather than UI built in
   code, `%UniqueName` with typed `@onready`, and InputMap actions rather than raw buttons (the
   controller test page aside). `ui_accept` is redefined to add the joypad's south button, which
-  Godot's default leaves out. Every action also has a keyboard key (arrows, Page Up and Page
-  Down for L1 and R1, Enter, Escape): keyboards work, and `adb shell input keyevent` can drive the
+  Godot's default leaves out. Every action also has a keyboard key (arrows, Enter for A,
+  Backspace for B, Escape for Select): keyboards work, and `adb shell input keyevent` can drive the
   app. Text shown to users goes through `tr()`, translated in `locale/*.po`; the device check is a
   developer tool, so its text is English and not translated.
 - **Both:**

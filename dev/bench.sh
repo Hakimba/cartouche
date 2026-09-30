@@ -3,8 +3,9 @@
 # Measures a debug build on the device connected through adb, at several library sizes: the
 # user's own library ("real") and made-up ones of N games (`--demo-games`). For each size: cold
 # starts (start to carousel shown, library read and sent, title indexing, first frames), then the
-# carousel held scrolling, changing platform and turning the selected game for 30 s each (frame
-# times), the app's memory and the save of the selection. With the user's own library, it also
+# carousel held scrolling, going into a console and back out, stepping along the consoles and
+# turning the selected game for 30 s each (frame times), the app's memory and the save of the
+# selection. With the user's own library, it also
 # launches the selected game once (insertion frames, times to check it and to start its emulator,
 # time for the emulator to show), then comes back and stops that emulator, just started: nothing
 # of the user's is running in it. First, with the user's own library, the art downloaded so far is
@@ -122,7 +123,7 @@ for size in "${sizes[@]}"; do
     read_worst=$("$adb" logcat -d | grep -oE "art: .* read in [0-9.]+" | grep -oE "[0-9.]+$" | sort -n | tail -1 || true)
     [ -z "$read_worst" ] || emit art "$size" label_read_worst "$read_worst" ms "$run"
   done
-  for scenario in scroll switch turn; do
+  for scenario in scroll enter step turn; do
     start "$args--bench=$scenario"
     wait_for "bench: $scenario:" 60
     emit_bench "$scenario" "$size" fps worst_ms p95_ms slow_frames steps

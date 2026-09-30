@@ -22,7 +22,7 @@ func test_INV_E2_06_every_model_loads_with_a_label_the_carousel_draws_on() -> vo
 		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
 		add_child(model)
 		model.draw_label("Title", ShelfRow.LabelLook.new())
-		var uniforms := model._material.shader.get_shader_uniform_list().map(func(uniform: Dictionary) -> String: return uniform["name"])
+		var uniforms := model._materials[0].shader.get_shader_uniform_list().map(func(uniform: Dictionary) -> String: return uniform["name"])
 		assert_array(uniforms).override_failure_message("%s: its label cannot be drawn" % path).contains(["label_texture", "has_label"])
 
 
@@ -155,3 +155,54 @@ func _label_material(model: Node3D) -> ShaderMaterial:
 
 func _json(path: String) -> Dictionary:
 	return JSON.parse_string(FileAccess.get_file_as_string(path))
+
+
+func test_a_model_fades_through_transparent_copies_of_its_materials_and_is_opaque_again_once_not_faded() -> void:
+	var random := Fixtures.cases(60)
+	for scene: PackedScene in [preload("res://carousel/models/dvd.tscn"), preload("res://carousel/models/cartridge.tscn"),
+			preload("res://carousel/consoles/ps2_slim.tscn")]:
+		var model: Node3D = auto_free(scene.instantiate())
+		add_child(model)
+		var own: Dictionary[MeshInstance3D, Array] = {}
+		for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			var materials: Array[Material] = []
+			for surface in geometry.mesh.get_surface_count():
+				materials.append(geometry.get_active_material(surface))
+			own[geometry] = materials
+		var fade := ModelFade.new(model)
+		for i in 30:
+			var amounts: Array[float] = [0.0, 1.0, random.randf_range(0.01, 0.99)]
+			var amount := amounts[i % 3]
+			fade.apply(amount)
+			for geometry: MeshInstance3D in own:
+				assert_bool(geometry.visible).is_equal(amount < 0.999)
+				for surface in geometry.mesh.get_surface_count():
+					var drawn := geometry.get_active_material(surface)
+					var original: Material = own[geometry][surface]
+					if amount == 0.0:
+						assert_object(drawn).is_same(original)
+					elif drawn is BaseMaterial3D:
+						var standard: BaseMaterial3D = drawn
+						assert_float(standard.albedo_color.a).is_equal_approx(1.0 - amount, 0.0001)
+						assert_int(standard.transparency).is_equal(BaseMaterial3D.TRANSPARENCY_ALPHA)
+						assert_int(standard.depth_draw_mode).is_equal(BaseMaterial3D.DEPTH_DRAW_ALWAYS)
+					else:
+						var faded: float = geometry.get_instance_shader_parameter(&"fade")
+						assert_float(faded).is_equal_approx(amount, 0.0001)
+
+
+func test_a_faded_game_shows_the_label_drawn_on_it_as_it_would_opaque() -> void:
+	for scene: PackedScene in [preload("res://carousel/models/dvd.tscn"), preload("res://carousel/models/cartridge.tscn")]:
+		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
+		add_child(model)
+		var label: MeshInstance3D = model.find_child("Label", true, false)
+		var image := ImageTexture.create_from_image(Image.create(4, 4, false, Image.FORMAT_RGB8))
+		for amount: float in [0.5, 0.0, 0.3]:
+			model.fade(amount)
+			model.show_label(image, amount > 0.0)
+			var drawn: ShaderMaterial = label.get_active_material(0)
+			assert_bool(drawn.get_shader_parameter(&"has_label")).is_true()
+			assert_object(drawn.get_shader_parameter(&"label_texture")).is_same(image)
+			assert_bool(drawn.get_shader_parameter(&"scanned")).is_equal(amount > 0.0)
+			model.clear_label()
+			assert_bool(drawn.get_shader_parameter(&"has_label")).is_false()

@@ -2,9 +2,8 @@
 extends GdUnitTestSuite
 
 const Fixtures := preload("res://test/carousel/fixtures.gd")
-const CAROUSEL := preload("res://carousel/carousel.tscn")
 const FAILURES: Array[StringName] = [&"not_installed", &"no_player", &"game_missing", &"activity_not_found", &"unexpected"]
-const BUTTONS: Array[StringName] = [&"carousel_left", &"carousel_right", &"tab_previous", &"tab_next", &"ui_accept", &"app_back"]
+const BUTTONS: Array[StringName] = [&"carousel_left", &"carousel_right", &"screen_back", &"ui_accept", &"app_back"]
 ## INV-E3-04's bound on waiting, in seconds, and the longest frame the test draws.
 const WAIT_S := 5.0
 const LONGEST_FRAME_S := 1.0 / 20.0
@@ -33,19 +32,26 @@ enum Press { NOTHING, DIRECTION, STICK, SELECT }
 
 ## Counts the failures of the launch under test, beside the carousel's own receiver.
 var _counting := func(_code: StringName) -> void: pass
+## Frames of launches into the console, and the most the disc turned on its spindle there.
+var _console_frames := 0
+var _spun := 0.0
 
 
 func test_INV_E3_04_INV_E3_05_whatever_the_launch_comes_to_the_carousel_shows_again_as_it_was_and_nothing_acted_meanwhile() -> void:
-	var carousel := await _carousel()
-	var random := Fixtures.cases(80)
-	var outcomes: Dictionary[Outcome, int] = {}
-	for i in 80:
-		if is_failure():
-			return
-		var outcome: Outcome = random.randi_range(0, Outcome.size() - 1) as Outcome
-		outcomes[outcome] = outcomes.get(outcome, 0) + 1
-		_check_launch(carousel, outcome, random)
-	assert_int(outcomes.size()).is_equal(Outcome.size())
+	# A game put into its console, and one inserted by its medium.
+	for platform: String in ["ps2", "gba"]:
+		var carousel := await _carousel(platform)
+		var random := Fixtures.cases(80)
+		var outcomes: Dictionary[Outcome, int] = {}
+		for i in 80:
+			if is_failure():
+				return
+			var outcome: Outcome = random.randi_range(0, Outcome.size() - 1) as Outcome
+			outcomes[outcome] = outcomes.get(outcome, 0) + 1
+			_check_launch(carousel, outcome, random)
+		assert_int(outcomes.size()).is_equal(Outcome.size())
+	assert_int(_console_frames).is_greater(500)
+	assert_float(_spun).is_greater(TAU)
 
 
 func test_a_game_that_cannot_start_plays_nothing_while_it_is_checked_nor_after() -> void:
@@ -56,11 +62,11 @@ func test_a_game_that_cannot_start_plays_nothing_while_it_is_checked_nor_after()
 	android.late = true
 	launch.android = android
 	var codes := _codes(launch)
-	carousel._unhandled_input(_button(&"ui_accept", true))
+	carousel._unhandled_input(Fixtures.button(&"ui_accept", true))
 	for frame in 20:
 		if frame == 10:
 			android.replied.emit()
-		_frame(carousel, Fixtures.FRAME_S)
+		Fixtures.step_frame(carousel)
 		_assert_nothing_shown(carousel)
 	assert_bool(launch.is_busy()).is_false()
 	assert_int(android.starts).is_equal(0)
@@ -76,10 +82,10 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 	carousel._message.hide()
 	var press: Press = random.randi_range(0, Press.size() - 1) as Press
 	_press(carousel, press, random)
-	carousel._unhandled_input(_button(&"ui_accept", true))
+	carousel._unhandled_input(Fixtures.button(&"ui_accept", true))
 	var game := row.selected_game().id
 	var shelf: int = carousel._shelf
-	var turned := row._turned
+	var turned := row._turn.turned
 	var stood := row._placed[row.selected_index()].transform
 	var frames := 0
 	# The longest a waiting stage has lasted.
@@ -91,16 +97,25 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 			if launch._stage == GameLaunch.Stage.INSERTING:
 				# From where the game stood as the insertion started, before its first frame.
 				assert_bool(launch._start.is_equal_approx(stood)).is_true()
+				# Into the console for the platform that has a launch animation.
+				assert_bool(launch._into_console).is_equal(carousel._shelves[shelf].platform_id == "ps2")
 		_leave_or_come_back(launch, outcome, random)
 		if random.randf() < 0.3:
-			carousel._unhandled_input(_button(BUTTONS[random.randi_range(0, BUTTONS.size() - 1)], random.randf() < 0.5))
+			carousel._unhandled_input(Fixtures.button(BUTTONS[random.randi_range(0, BUTTONS.size() - 1)], random.randf() < 0.5))
 		assert_str(row.selected_game().id).is_equal(game)
 		assert_int(carousel._shelf).is_equal(shelf)
-		assert_bool(row._turned.is_equal_approx(turned)).is_true()
+		assert_bool(row._turn.turned.is_equal_approx(turned)).is_true()
 		assert_bool(carousel._hold_select.is_stopped()).is_true()
 		if launch._stage == GameLaunch.Stage.CHECKING:
 			_assert_nothing_shown(carousel)
-		if launch._stage == GameLaunch.Stage.INSERTING and launch._clock_s >= launch._insertion.seated_s() + launch._insertion.bounce_s:
+		if launch._stage == GameLaunch.Stage.INSERTING and launch._into_console:
+			if launch._clock_s >= launch.sequence.seated_s():
+				_assert_on_the_console_spindle(carousel)
+			# INV-E5-08: the whole screen black 2.4 s after the start at most.
+			assert_float(launch._clock_s).is_less_equal(2.4 + LONGEST_FRAME_S)
+			_assert_into_the_console(carousel)
+			_console_frames += 1
+		elif launch._stage == GameLaunch.Stage.INSERTING and launch._clock_s >= launch._insertion.seated_s() + launch._insertion.bounce_s:
 			_assert_on_the_spindle(launch, row)
 		var delta := random.randf_range(1.0 / 120.0, LONGEST_FRAME_S)
 		if launch._stage in WAITING:
@@ -110,12 +125,12 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 		if random.randf() < 0.3:
 			android.replied.emit()
 		stood = row._placed[row.selected_index()].transform
-		_frame(carousel, delta)
+		Fixtures.step_frame(carousel, delta)
 		frames += 1
 	if outcome in [Outcome.CHECK_ANSWERED_TOO_LATE, Outcome.START_REFUSED_TOO_LATE]:
 		android.silent.clear()
 		android.replied.emit()
-	_frame(carousel, Fixtures.FRAME_S)
+	Fixtures.step_frame(carousel)
 	var case: String = Outcome.keys()[outcome]
 	assert_bool(launch.is_busy()).override_failure_message("%s: still busy" % case).is_false()
 	assert_int(android.checks).is_equal(1)
@@ -133,13 +148,13 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 func _press(carousel: Carousel, press: Press, random: RandomNumberGenerator) -> void:
 	match press:
 		Press.DIRECTION:
-			carousel._unhandled_input(_button(BUTTONS[random.randi_range(0, 1)], true))
+			carousel._unhandled_input(Fixtures.button(BUTTONS[random.randi_range(0, 1)], true))
 		Press.STICK:
 			Input.action_press(&"inspect_right", random.randf_range(0.3, 1.0))
 		Press.SELECT:
-			carousel._unhandled_input(_button(&"app_back", true))
+			carousel._unhandled_input(Fixtures.button(&"app_back", true))
 	for frame in random.randi_range(0, 30):
-		_frame(carousel, Fixtures.FRAME_S)
+		Fixtures.step_frame(carousel)
 
 
 ## Everything pressed is let go for the next case, where it would act.
@@ -190,19 +205,13 @@ func _assert_waited(outcome: Outcome, stages: Array[GameLaunch.Stage], waited_s:
 			assert_float(waited_s).is_greater_equal(WAIT_S - LONGEST_FRAME_S)
 
 
-func _carousel() -> Carousel:
-	var carousel: Carousel = auto_free(CAROUSEL.instantiate())
-	var row: ShelfRow = carousel.get_node("%Row")
-	row.label_images = auto_free(Fixtures.FakeArt.new())
-	add_child(carousel)
-	for frame in 100:
-		if carousel._shown:
-			break
-		await await_idle_frame()
-	assert_bool(carousel._shown).is_true()
-	# The test moves time itself.
-	row.set_process(false)
-	carousel.set_process(false)
+## The carousel on the games screen of [param platform].
+func _carousel(platform := "gba") -> Carousel:
+	var carousel: Carousel = await Fixtures.shown_carousel(self)
+	while carousel._shelves[carousel._shelf].platform_id != platform:
+		Fixtures.press(carousel, &"carousel_right")
+	Fixtures.press(carousel, &"ui_accept")
+	Fixtures.step_until(carousel, Carousel.Screen.GAMES)
 	return carousel
 
 
@@ -244,24 +253,9 @@ func _codes(launch: GameLaunch) -> Array[StringName]:
 	return codes
 
 
-## One frame of [param delta] seconds for the carousel, its launch, then its row.
-func _frame(carousel: Carousel, delta: float) -> void:
-	carousel._process(delta)
-	if carousel._game_launch.is_processing():
-		carousel._game_launch._process(delta)
-	carousel._row._process(delta)
-
-
 func _leave_and_come_back(launch: GameLaunch) -> void:
 	launch.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
 	launch.notification(Node.NOTIFICATION_APPLICATION_RESUMED)
-
-
-func _button(action: StringName, pressed: bool) -> InputEventAction:
-	var event := InputEventAction.new()
-	event.action = action
-	event.pressed = pressed
-	return event
 
 
 ## While a game is checked, nothing of a launch shows.
@@ -273,6 +267,41 @@ func _assert_nothing_shown(carousel: Carousel) -> void:
 	for control: CanvasItem in launch.controls:
 		assert_float(control.modulate.a).is_equal(1.0)
 
+
+
+## Once seated, the game is on its console's spindle.
+func _assert_on_the_console_spindle(carousel: Carousel) -> void:
+	var row := carousel._row
+	var console: ConsoleModel = carousel._consoles.selected().model
+	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	var seat := row.global_transform.affine_inverse() * console.seat()
+	assert_bool(place.transform.origin.is_equal_approx(seat.origin)).is_true()
+	assert_float(place.transform.basis.z.normalized().dot(seat.basis.z.normalized())).is_equal_approx(1.0, 0.0001)
+
+
+## Put into the console: no spindle of its medium, the black growing from the console's spindle,
+## the disc turning with it once seated, the sounds after it.
+func _assert_into_the_console(carousel: Carousel) -> void:
+	var launch := carousel._game_launch
+	var sequence := launch.sequence
+	var console: ConsoleModel = carousel._consoles.selected().model
+	assert_bool(launch.spindle.visible).is_false()
+	if launch._clock_s > 0.0:
+		var centre: Vector2 = launch._black.get_shader_parameter(&"centre") * launch.blackout.size
+		var seat := carousel.get_viewport().get_camera_3d().unproject_position(console.seat().origin)
+		assert_vector(centre).is_equal_approx(seat, Vector2.ONE * 0.01)
+	var rotor := console.spindle._rotor.basis
+	var spin := carousel._row._launch_spin
+	if sequence.disc_away >= 1.0:
+		assert_bool(rotor.is_equal_approx(Basis(Vector3.BACK, spin))).is_true()
+		_spun = maxf(_spun, spin)
+	else:
+		assert_bool(rotor.is_equal_approx(Basis.IDENTITY)).is_true()
+	var cues := launch._insertion.sounds
+	if launch._clock_s < sequence.seated_s():
+		assert_int(launch._cues_played).is_equal(0)
+	elif not cues.is_empty() and launch._clock_s >= sequence.seated_s() + cues[0].delay_s:
+		assert_int(launch._cues_played).is_greater(0)
 
 
 ## Once seated and still, the game is on the spindle.
@@ -303,8 +332,11 @@ func _assert_as_before_the_launch(carousel: Carousel) -> void:
 	assert_bool(place.shown.transform.is_equal_approx(Transform3D.IDENTITY)).is_true()
 	assert_float(place.transform.origin.x).is_equal_approx(laid_out.origin.x, 0.0001)
 	assert_float(place.transform.origin.z).is_equal_approx(laid_out.origin.z, 0.0001)
-	assert_float(place.shown._geometry[0].transparency).is_equal_approx(CarouselLayout.fade(offset), 0.0001)
+	assert_float(place.shown._fade.amount).is_equal_approx(CarouselLayout.fade(offset), 0.0001)
 	for control: CanvasItem in carousel._game_launch.controls:
 		assert_float(control.modulate.a).is_equal(1.0)
 	assert_bool(carousel._game_launch.blackout.visible).is_false()
 	assert_bool(carousel._game_launch.spindle.visible).is_false()
+	assert_int(carousel._screen).is_equal(Carousel.Screen.GAMES)
+	var sequence := carousel._sequence
+	assert_float(sequence._at_s).is_equal_approx(sequence._moment(&"games"), 0.0001)

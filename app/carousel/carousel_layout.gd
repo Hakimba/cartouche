@@ -27,6 +27,11 @@ const SIDE_GAP := 0.9
 const SIDE_SCALE := 0.6
 ## How transparent the neighbours of the selected game are; farther places fade out.
 const SIDE_FADE := 0.35
+## The selected model floats up and down at this pace, in radians a second, this high at most (in
+## world units), and sways this much (in degrees) unless told otherwise.
+const _FLOAT_SPEED := 1.6
+const BOB_HEIGHT := 0.05
+const SWAY_DEGREES := 7.0
 
 
 ## The offset from the centre of each game shown at [param scroll], by game index, at most
@@ -65,6 +70,24 @@ static func fade(offset: float) -> float:
 	if distance <= 1.0:
 		return SIDE_FADE * distance
 	return lerpf(SIDE_FADE, 1.0, clampf(distance - REACH, 0.0, 1.0))
+
+
+## How much a model [param offset] places from the centre is the selected one: 1 at the centre,
+## 0 halfway to the next place and beyond.
+static func centred(offset: float) -> float:
+	return clampf(1.0 - 2.0 * absf(offset), 0.0, 1.0)
+
+
+## How transparent a model [param offset] places from the centre is, shown as much as its
+## [param presence] (from 0, gone, to 1, as [method fade] has it).
+static func faded(offset: float, presence: float) -> float:
+	return 1.0 - (1.0 - fade(offset)) * presence
+
+
+## How far the selected model floats up at [param clock_s], [param height] at most, as much as it is
+## [param posed] (from 0 to 1).
+static func float_height(clock_s: float, height: float, posed: float) -> float:
+	return sin(clock_s * _FLOAT_SPEED) * height * posed
 
 
 ## The scroll one frame of [param delta] seconds later, moving towards [param target] without

@@ -1,24 +1,29 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://carousel/models/spindle.gd" id="1"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
 
-[sub_resource type="StandardMaterial3D" id="rubber"]
-albedo_color = Color(0.07, 0.07, 0.08, 1)
-roughness = 0.85
+[sub_resource type="ShaderMaterial" id="rubber"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.07, 0.07, 0.08, 1)
+shader_parameter/roughness = 0.85
 
-[sub_resource type="StandardMaterial3D" id="plastic"]
-albedo_color = Color(0.1, 0.1, 0.11, 1)
-roughness = 0.35
+[sub_resource type="ShaderMaterial" id="plastic"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.1, 0.1, 0.11, 1)
+shader_parameter/roughness = 0.35
 
-[sub_resource type="StandardMaterial3D" id="steel"]
-albedo_color = Color(0.75, 0.76, 0.78, 1)
-metallic = 1.0
-roughness = 0.2
+[sub_resource type="ShaderMaterial" id="steel"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.75, 0.76, 0.78, 1)
+shader_parameter/metallic = 1.0
+shader_parameter/roughness = 0.2
 
-[sub_resource type="StandardMaterial3D" id="can"]
-albedo_color = Color(0.55, 0.56, 0.58, 1)
-metallic = 0.9
-roughness = 0.4
+[sub_resource type="ShaderMaterial" id="can"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.55, 0.56, 0.58, 1)
+shader_parameter/metallic = 0.9
+shader_parameter/roughness = 0.4
 
 [sub_resource type="CylinderMesh" id="motor_mesh"]
 material = SubResource("can")

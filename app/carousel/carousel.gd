@@ -1,52 +1,56 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name Carousel
 extends Control
-## The main screen: one shelf of games per platform, the selected game in the middle. Left and
-## right move along the shelf (held, faster and faster), L1 and R1 change platform, A launches the
-## selected game into its console ([GameLaunch]), the right stick turns it. Where the user was is
-## remembered across restarts. The games' disc scans arrive as the plugin finds them ([GameArt]),
-## a bar under the title telling how it goes.
+## The main screens. The consoles screen shows one console per platform with games ([ConsoleRow]);
+## A goes into the selected one, as its launch animation has it ([ConsoleSequence]), to the games
+## screen: the platform's shelf of games, the selected game in the middle. There, left and right
+## move along the shelf (held, faster and faster), A launches the selected game into its console
+## ([GameLaunch]), B goes back out to the consoles. The right stick turns the selected console on
+## the consoles screen, the selected game on the games screen, nothing in between. Where the user
+## was is remembered across restarts. The games' disc scans arrive as the plugin finds them
+## ([GameArt]), a bar under the title telling how it goes.
 ##
 ## In debug builds, holding Select opens the device check, and command-line arguments set up
-## measurements: `--demo-games=N` shows a made-up library of N games, `--bench=scroll`, `switch`,
+## measurements: `--demo-games=N` shows a made-up library of N games, `--bench=scroll`, `enter`,
 ## `turn` or `launch` runs [CarouselBench], `--turntable=T` turns the selected game T times a second to show
-## all its sides, `--shelf=gba` opens on that platform's shelf. Without the Android plugin (the
-## editor, a desktop run), the demo library is shown.
+## all its sides, `--shelf=gba` opens on that platform. Without the Android plugin (the editor, a
+## desktop run), the demo library is shown.
+
+## The screen changed; in between, the animation into or out of the console plays.
+signal screen_changed(screen: Screen)
+
+enum Screen { CONSOLES, ENTERING, GAMES, LEAVING }
 
 const _APPEARANCE := "res://data/carousel/appearance.json"
 const _DEVICE_CHECK := "res://dev/device_check/device_check.tscn"
 const _BATTERY_EVERY_S := 60
 const _MESSAGE_S := 4.0
-const _SWITCH_OUT_S := 0.12
-const _SWITCH_IN_S := 0.2
 ## The art bar moves to each new count in this time; once full, it stays a moment, then fades.
 const _ART_STEP_S := 0.3
 const _ART_FULL_S := 1.0
 const _ART_FADE_S := 0.4
+const _MOVING: Array[Screen] = [Screen.ENTERING, Screen.LEAVING]
 
 var _shelves: Array[AndroidServices.Shelf] = []
 var _shelf := 0
+var _screen := Screen.CONSOLES
 ## Index of the game each platform showed last in this session, by platform id.
 var _positions: Dictionary[String, int] = {}
 var _platforms: Dictionary[String, AndroidServices.Platform] = {}
-var _models: Dictionary[String, PackedScene] = {}
-var _colors: Dictionary[String, Color] = {}
-var _bands: Dictionary[String, Dictionary] = {}
-var _insertions: Dictionary[String, Insertion] = {}
-var _default_color: Color
+var _appearance: Appearance
 ## Whether the library shown is made up: its labels get made-up artwork.
 var _demo := false
 ## Set once the library is shown: until then there is nothing to move, launch or remember.
 var _shown := false
-var _switching := false
 var _direction := HeldDirection.new()
 var _clock_ticks := 0
 var _art_tween: Tween
 
 @onready var _row: ShelfRow = %Row
+@onready var _consoles: ConsoleRow = %Consoles
+@onready var _sequence: ConsoleSequence = %Sequence
 @onready var _clock: Label = %Clock
-@onready var _tabs: HBoxContainer = %Tabs
-@onready var _tab_bar: Control = %TabBar
+@onready var _platform_tab: Label = %Platform
 @onready var _battery: Label = %Battery
 ## Shown while a run looks for art; its content, apart, hides for a message and fades once done.
 @onready var _art_progress: Control = %ArtProgress
@@ -67,11 +71,16 @@ func _ready() -> void:
 	var started := Time.get_ticks_msec()
 	for platform in Android.catalog.platforms:
 		_platforms[platform.id] = platform
-	_load_appearance()
+	_appearance = Appearance.read(_APPEARANCE)
+	_row.pose = _appearance.pose
+	# The same pose, but for its sway, which each console's launch animation has.
+	_consoles.pose.tilt = _appearance.pose.tilt
+	_consoles.pose.turn = _appearance.pose.turn
+	_consoles.pose.sway_period_s = _appearance.pose.sway_period_s
 	_row.label_images = _art
 	# Before the library is asked for: its art is looked for as soon as it is sent.
 	Android.art_changed.connect(_on_art_changed)
-	_row.prepare(_models.values())
+	_row.prepare(_appearance.models.values())
 	_row.turntable = Diagnostics.argument("turntable").to_float()
 	_on_clock_timeout()
 	var demo_games := Diagnostics.argument("demo-games").to_int()
@@ -88,7 +97,8 @@ func _ready() -> void:
 	_show_library(answer.library)
 	_shown = true
 	# Once the carousel is on screen: reading sounds must not delay it.
-	get_tree().process_frame.connect(_game_launch.prepare.bind(_insertions.values()), CONNECT_ONE_SHOT)
+	get_tree().process_frame.connect(_game_launch.prepare.bind(_appearance.insertions.values()),
+		CONNECT_ONE_SHOT)
 	if Diagnostics.enabled:
 		await get_tree().process_frame
 		var shown_ms := Time.get_ticks_msec()
@@ -103,7 +113,7 @@ func _ready() -> void:
 		_trace_selected_label(shown_ms)
 		var bench := Diagnostics.argument("bench")
 		if bench:
-			add_child(CarouselBench.new(bench, _row))
+			add_child(CarouselBench.new(bench, self, _row))
 
 
 func _notification(what: int) -> void:
@@ -112,34 +122,47 @@ func _notification(what: int) -> void:
 
 
 func _process(_delta: float) -> void:
+	var stick := Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down")
+	_consoles.inspect(stick if _screen == Screen.CONSOLES else Vector2.ZERO)
 	if not _game_launch.is_busy():
-		_row.inspect(Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down"))
+		_row.inspect(stick if _screen == Screen.GAMES else Vector2.ZERO)
+	if _screen in _MOVING:
+		_show_title()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var moved := _direction.update(event)
-	# Nothing acts from A until the carousel shows again after the game.
-	if event.is_echo() or not _shown or _game_launch.is_busy():
+	# Nothing acts from A until the carousel shows again after the game, nor while the animation
+	# into or out of the console plays.
+	if event.is_echo() or not _shown or _game_launch.is_busy() or _screen in _MOVING:
 		return
 	if event.is_action_pressed(&"app_back") and Diagnostics.enabled:
 		_hold_select.start()
 	elif event.is_action_released(&"app_back"):
 		_hold_select.stop()
-	elif _switching or not _row.has_games():
+	elif not _row.has_games():
 		return
-	elif moved and _direction.held:
-		_row.hold(_direction.direction)
-	elif moved:
-		_row.release(_direction.direction)
-	elif event.is_action_pressed(&"tab_previous"):
-		_switch_shelf(-1)
-	elif event.is_action_pressed(&"tab_next"):
-		_switch_shelf(1)
-	elif event.is_action_pressed(&"ui_accept"):
+	elif _screen == Screen.CONSOLES and moved and _direction.held:
+		_consoles.step(_direction.direction)
+	elif _screen == Screen.CONSOLES and event.is_action_pressed(&"ui_accept"):
+		_enter()
+	elif _screen == Screen.GAMES and moved:
+		if _direction.held:
+			_row.hold(_direction.direction)
+		else:
+			_row.release(_direction.direction)
+	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_accept"):
 		_launch()
+	elif _screen == Screen.GAMES and event.is_action_pressed(&"screen_back"):
+		_leave()
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+
+## The screen shown, or the one the animation goes to.
+func screen() -> Screen:
+	return _screen
 
 
 ## Debug builds: how long after the carousel showed, at [param shown_ms], the selected game's label
@@ -195,72 +218,94 @@ func _show_library(library: AndroidServices.Library) -> void:
 	var has_games := not _shelves.is_empty()
 	_empty.visible = not has_games
 	_pill.visible = has_games
-	_tab_bar.visible = has_games
 	if not has_games:
 		_empty.text = tr("No games yet.")
 		if Diagnostics.enabled:
 			_empty.text += "\n" + tr("Hold Select to open the device check, then choose a folder and scan it.")
 		return
+	var items: Array[ConsoleRow.Item] = []
 	for shelf in _shelves:
 		_positions[shelf.platform_id] = shelf.selected
-	_show_shelf()
+		items.append(_console_item(shelf.platform_id))
+	_consoles.show_consoles(items, _shelf)
+	_show_platform()
 	if Diagnostics.enabled:
 		var game := _row.selected_game()
 		Diagnostics.trace("carousel", "restored %s on %s in %.1f ms" % [
 			game.title, game.platform_id, (Time.get_ticks_usec() - started) / 1000.0])
 
 
-func _show_shelf() -> void:
-	# Shelves are made of the catalog's platforms, and every media has a model (INV-E2-06).
+## The console of [param platform_id] as the consoles screen shows it: its model, or else its
+## medium, labelled with the platform's name.
+func _console_item(platform_id: String) -> ConsoleRow.Item:
+	var platform := _platforms[platform_id]
+	var rest := ConsoleRow.Rest.of(_appearance.animation_of(platform_id))
+	if platform_id in _appearance.consoles:
+		var console: ConsoleModel = _appearance.consoles[platform_id].instantiate()
+		return ConsoleRow.Item.new(console, rest)
+	var medium := ShelfRow.LabelledModel.new(_appearance.models[platform.media])
+	medium.draw_label(platform.name, _look(platform_id))
+	return ConsoleRow.Item.new(medium, rest)
+
+
+## The platform selected on the consoles screen: its shelf behind, ready for the games screen, and
+## its launch animation.
+func _show_platform() -> void:
 	var shelf := _shelves[_shelf]
 	var platform := _platforms[shelf.platform_id]
+	_row.show_shelf(shelf.games, _positions[shelf.platform_id], _appearance.models[platform.media],
+		_look(shelf.platform_id))
+	_sequence.use(_appearance.animation_of(shelf.platform_id))
+	_platform_tab.text = platform.name
+	_title.text = platform.name
+
+
+## How the labels of [param platform_id]'s games look.
+func _look(platform_id: String) -> ShelfRow.LabelLook:
 	var look := ShelfRow.LabelLook.new()
-	look.color = _colors.get(shelf.platform_id, _default_color)
-	look.platform_name = platform.name
+	look.color = _appearance.colors.get(platform_id, _appearance.default_color)
+	look.platform_name = _platforms[platform_id].name
 	look.demo_art = _demo
-	if shelf.platform_id in _bands:
-		var band: Dictionary = _bands[shelf.platform_id]
+	if platform_id in _appearance.bands:
+		var band: Dictionary = _appearance.bands[platform_id]
 		var color: String = band["color"]
 		look.band = Color(color)
 		look.band_text = band["text"]
-	_row.show_shelf(shelf.games, _positions[shelf.platform_id], _models[platform.media], look)
-	_show_tabs()
-	_on_row_selection_changed(_row.selected_game())
+	return look
 
 
-## The current platform between the ones L1 and R1 lead to: the bar fits however many there are.
-func _show_tabs() -> void:
-	var shown: Array[int] = []
-	for step in range(-1, 2):
-		var shelf := posmod(_shelf + step, _shelves.size())
-		if shelf not in shown:
-			shown.append(shelf)
-	for i in _tabs.get_child_count():
-		var tab: Label = _tabs.get_child(i)
-		tab.visible = i < shown.size()
-		if tab.visible:
-			tab.text = _platforms[_shelves[shown[i]].platform_id].name
-			tab.theme_type_variation = &"CurrentTab" if shown[i] == _shelf else &"OtherTab"
+func _enter() -> void:
+	# A press begun before A must not act once it is let go.
+	_hold_select.stop()
+	_go(Screen.ENTERING)
+	_consoles.face_front()
+	_sequence.enter()
+	await _sequence.finished
+	_show_title()
+	_go(Screen.GAMES)
 
 
-func _switch_shelf(direction: int) -> void:
-	if _shelves.size() < 2:
-		return
-	_switching = true
-	# The game left on this shelf, for the next start; the requests are answered in order.
+func _leave() -> void:
+	_hold_select.stop()
+	_go(Screen.LEAVING)
+	_row.freeze()
 	_remember()
-	var tween := create_tween().set_trans(Tween.TRANS_QUAD)
-	tween.tween_property(_row, ^"scale", Vector3.ONE * 0.01, _SWITCH_OUT_S).set_ease(Tween.EASE_IN)
-	await tween.finished
-	_shelf = posmod(_shelf + direction, _shelves.size())
-	_show_shelf()
-	if Diagnostics.enabled:
-		Diagnostics.trace("carousel", "platform %s" % _shelves[_shelf].platform_id)
-	tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(_row, ^"scale", Vector3.ONE, _SWITCH_IN_S)
-	await tween.finished
-	_switching = false
-	_remember()
+	_sequence.leave()
+	await _sequence.finished
+	_show_title()
+	_go(Screen.CONSOLES)
+
+
+## The pill names the selected game once its disc shows at least half, the console otherwise.
+func _show_title() -> void:
+	_title.text = (_row.selected_game().title if _row.selected_presence >= 0.5
+		else _platforms[_shelves[_shelf].platform_id].name)
+
+
+func _go(screen_to: Screen) -> void:
+	_screen = screen_to
+	Diagnostics.trace("carousel", "screen %s" % Screen.keys()[screen_to])
+	screen_changed.emit(screen_to)
 
 
 func _launch() -> void:
@@ -268,7 +313,8 @@ func _launch() -> void:
 	# A press begun before A must not act once it is let go.
 	_hold_select.stop()
 	_remember()
-	_game_launch.launch(game, game.last_disc, _insertions[_platforms[game.platform_id].media])
+	var insertion := _appearance.insertions[_platforms[game.platform_id].media]
+	_game_launch.launch(game, game.last_disc, insertion)
 
 
 ## Stores the selected game and its platform, for the next start.
@@ -289,36 +335,6 @@ func _show_message(text: String) -> void:
 	_message_timer.start(_MESSAGE_S)
 
 
-func _load_appearance() -> void:
-	var appearance: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(_APPEARANCE))
-	var models: Dictionary = appearance["models"]
-	for media: String in models:
-		var path: String = models[media]
-		_models[media] = load(path)
-	var bands: Dictionary = appearance["bands"]
-	_bands.assign(bands)
-	var colors: Dictionary = appearance["colors"]
-	for platform_id: String in colors:
-		var color: String = colors[platform_id]
-		_colors[platform_id] = Color(color)
-	var default_color: String = appearance["default_color"]
-	_default_color = Color(default_color)
-	var insertions: Dictionary = appearance["insertions"]
-	for media: String in insertions:
-		var insertion: Dictionary = insertions[media]
-		var problems := Insertion.problems(insertion)
-		for key in problems:
-			push_error("%s: insertion of %s: %s: %s" % [_APPEARANCE, media, key, Insertion.Problem.keys()[problems[key]]])
-		_insertions[media] = Insertion.read(insertion)
-	var pose: Dictionary = appearance["pose"]
-	_row.pose.tilt = pose["tilt_degrees"]
-	_row.pose.turn = pose["turn_degrees"]
-	_row.pose.sway = pose["sway_degrees"]
-	var period: float = pose["sway_period_s"]
-	# A sway never takes no time.
-	_row.pose.sway_period_s = maxf(period, 0.5)
-
-
 func _on_art_changed(change: AndroidServices.ArtChange) -> void:
 	if change.has_found:
 		_art.add(change.found)
@@ -327,7 +343,15 @@ func _on_art_changed(change: AndroidServices.ArtChange) -> void:
 
 
 func _on_row_selection_changed(game: AndroidServices.Game) -> void:
-	_title.text = game.title
+	if _screen == Screen.GAMES:
+		_title.text = game.title
+
+
+func _on_consoles_selection_changed(index: int) -> void:
+	_shelf = index
+	_show_platform()
+	Diagnostics.trace("carousel", "platform %s" % _shelves[_shelf].platform_id)
+	_remember()
 
 
 func _on_clock_timeout() -> void:

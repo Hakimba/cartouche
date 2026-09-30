@@ -12,6 +12,8 @@ uniform vec3 edge_tint : source_color = vec3(0.22, 0.23, 0.25);
 uniform float opacity : hint_range(0.0, 1.0) = 0.6;
 uniform float edge_opacity : hint_range(0.0, 1.0) = 0.92;
 uniform float roughness : hint_range(0.0, 1.0) = 0.08;
+// How faded the model is, from 0 (opaque) to 1 (gone), set per model (see ModelFade).
+instance uniform float fade = 0.0;
 
 varying float edge;
 
@@ -21,9 +23,9 @@ void vertex() {
 
 void fragment() {
 	float grazing = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
-	ALPHA = mix(mix(opacity, 0.85, grazing), edge_opacity, edge);
+	ALPHA = mix(mix(opacity, 0.85, grazing), edge_opacity, edge) * (1.0 - fade);
 	// Premultiplied: the reflections added by the lights stay whole where the plastic is clear.
 	ALBEDO = mix(tint, edge_tint, edge) * ALPHA;
 	ROUGHNESS = roughness;
-	SPECULAR = 0.6;
+	SPECULAR = 0.6 * (1.0 - fade);
 }

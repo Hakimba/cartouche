@@ -10,10 +10,6 @@ signal selection_changed(game: AndroidServices.Game)
 
 ## Every game [method CarouselLayout.offsets] can show at once.
 const _PLACES := 2 * CarouselLayout.REACH + 3
-## How fast the right stick turns the selected game, pushed all the way, in radians a second.
-const _TURN_SPEED := 2.6
-const _BOB_HEIGHT := 0.05
-const _BOB_SPEED := 1.6
 ## How much a fast-moving row stretches its games.
 const _STRETCH := 0.012
 const _MAX_STRETCH := 0.1
@@ -27,6 +23,12 @@ var label_images: GameArt:
 		label_images = art
 		art.loaded.connect(refresh_label)
 var pose := Pose.new()
+## How much of its pose and float the selected game has, from 0 (none) to 1.
+var pose_amount := 1.0
+## How present the games beside the selected one are, and the selected one itself, from 0 (gone) to
+## 1 (as the layout fades them).
+var neighbours := 1.0
+var selected_presence := 1.0
 
 var _games: Array[AndroidServices.Game] = []
 var _look := LabelLook.new()
@@ -40,11 +42,7 @@ var _held_steps := 0
 var _next_repeat_s := 0.0
 var _clock_s := 0.0
 var _stick := Vector2.ZERO
-## How the right stick has turned a game, the one selected when it was pushed, and how that game is
-## shown turned, catching up; it turns back when another is selected, as it leaves.
-var _turned := Basis.IDENTITY
-var _shown_turn := Basis.IDENTITY
-var _turned_game := -1
+var _turn := StickTurn.new()
 var _places: Array[Place] = []
 var _placed: Dictionary[int, Place] = {}
 ## Places waiting for their label, drawn one per frame so that a fast move never stalls.
@@ -77,16 +75,8 @@ func _process(delta: float) -> void:
 	var before := _scroll
 	_scroll = CarouselLayout.scrolled(_scroll, _position, delta)
 	_speed = (_scroll - before) / delta if delta > 0.0 else 0.0
-	if not _stick.is_zero_approx():
-		if _turned_game != selected_index():
-			_shown_turn = Basis.IDENTITY
-			_turned_game = selected_index()
-		var push := _stick * _TURN_SPEED * delta
-		_turned = (Basis.from_euler(Vector3(push.y, push.x, 0.0)) * _turned).orthonormalized()
-	_shown_turn = _shown_turn.slerp(_turned, 1.0 - exp(-10.0 * delta))
-	# Then exactly there: a game let go stays still.
-	if _shown_turn.get_rotation_quaternion().angle_to(_turned.get_rotation_quaternion()) < 0.001:
-		_shown_turn = _turned
+	if not _games.is_empty():
+		_turn.follow(_stick, selected_index(), delta)
 	_arrange()
 	if not _unlabelled.is_empty():
 		var place: Place = _unlabelled.pop_front()
@@ -112,9 +102,7 @@ func show_shelf(games: Array[AndroidServices.Game], selected: int, model: Packed
 	_look = look
 	_position = selected
 	_scroll = selected
-	_turned = Basis.IDENTITY
-	_shown_turn = Basis.IDENTITY
-	_turned_game = -1
+	_turn = StickTurn.new()
 	_held = 0
 	set_process(true)
 	_placed.clear()
@@ -153,9 +141,8 @@ func release(direction: int) -> void:
 		_held = 0
 
 
-## Turns the selected game while [param stick] (each axis from -1 to 1) is pushed, any way and as
-## far as it goes, up to its back; it stays turned when the stick is let go, and turns back to the
-## front when another game is selected.
+## Turns the selected game while [param stick] (each axis from -1 to 1) is pushed (see
+## [StickTurn]).
 func inspect(stick: Vector2) -> void:
 	_stick = stick
 
@@ -211,7 +198,7 @@ func _step(direction: int) -> void:
 	if _games.size() < 2:
 		return
 	_position = CarouselLayout.stepped(_position, direction, _games.size())
-	_turned = Basis.IDENTITY
+	_turn.release()
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "step %d to %d (held for %d steps)" % [direction, selected_index(), _held_steps])
 	selection_changed.emit(selected_game())
@@ -240,15 +227,17 @@ func _arrange() -> void:
 			place.shown.fade(0.0)
 		elif place.visible:
 			var offset: float = shown[place.game]
-			var centred := clampf(1.0 - 2.0 * absf(offset), 0.0, 1.0)
+			var centred := CarouselLayout.centred(offset)
+			var posed_part := centred * pose_amount
 			var stand := CarouselLayout.place(offset)
-			stand.origin.y += sin(_clock_s * _BOB_SPEED) * _BOB_HEIGHT * centred
+			stand.origin.y += CarouselLayout.float_height(_clock_s, CarouselLayout.BOB_HEIGHT, posed_part)
 			var spun := Basis(Vector3.UP, TAU * turntable * _clock_s * centred)
-			var turn := spun * (_shown_turn if place.game == _turned_game else Basis.IDENTITY)
+			var turn := spun * _turn.of(place.game)
 			var stretched := Basis.from_scale(Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0))
-			var posed := stand.basis * pose.at(_clock_s, centred) * turn * stretched
+			var posed := stand.basis * pose.at(_clock_s, posed_part) * turn * stretched
 			place.transform = Transform3D(posed, stand.origin)
-			place.shown.fade(CarouselLayout.fade(offset))
+			var presence := selected_presence if place.game == selected_index() else neighbours
+			place.shown.fade(CarouselLayout.faded(offset, presence))
 
 
 func _free_place() -> Place:
@@ -319,8 +308,9 @@ class LabelledModel extends Node3D:
 	## How far above the platform's name the band starts, as a fraction of the label.
 	const _BAND_ABOVE := 0.02
 
-	var _geometry: Array[GeometryInstance3D] = []
-	var _material: ShaderMaterial
+	var _fade: ModelFade
+	## The label's material, and the copy it fades through: both drawn the same label.
+	var _materials: Array[ShaderMaterial] = []
 	var _view: SubViewport = _LABEL_VIEW.instantiate()
 	var _background: ColorRect = _view.get_node("Background")
 	var _title: Label = _view.get_node("Title")
@@ -332,10 +322,11 @@ class LabelledModel extends Node3D:
 		var instance: Node3D = model.instantiate()
 		add_child(instance)
 		add_child(_view)
-		_geometry.assign(instance.find_children("*", "GeometryInstance3D", true, false))
 		var label: MeshInstance3D = instance.get_node("Label")
-		_material = label.get_surface_override_material(0).duplicate()
-		label.set_surface_override_material(0, _material)
+		var material: ShaderMaterial = label.get_surface_override_material(0).duplicate()
+		label.set_surface_override_material(0, material)
+		_fade = ModelFade.new(instance)
+		_materials.assign([material, _fade.copy_of(material)])
 		var face := label.get_aabb().size
 		_view.size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH * face.y / face.x))
 		# Where the title and the platform go is the shape's: round a disc's hub, for one.
@@ -359,7 +350,7 @@ class LabelledModel extends Node3D:
 		_demo_art.shader = _DEMO_ART
 
 	func clear_label() -> void:
-		_material.set_shader_parameter(&"has_label", false)
+		_label(&"has_label", false)
 
 	func draw_label(title: String, look: LabelLook) -> void:
 		_background.color = look.color
@@ -383,17 +374,20 @@ class LabelledModel extends Node3D:
 
 	## Shows [param label] as the model's label, an image of a real one when [param scanned].
 	func show_label(label: Texture2D, scanned: bool) -> void:
-		_material.set_shader_parameter(&"label_texture", label)
-		_material.set_shader_parameter(&"scanned", scanned)
-		_material.set_shader_parameter(&"has_label", true)
+		_label(&"label_texture", label)
+		_label(&"scanned", scanned)
+		_label(&"has_label", true)
 
 	## Turns the model [param angle] radians about its own axis, its label blurred over
 	## [param blur] radians as when it spins fast.
 	func spin(angle: float, blur: float) -> void:
 		transform = Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO)
-		_material.set_shader_parameter(&"spin_blur", blur)
+		_label(&"spin_blur", blur)
 
-	## Sets how transparent the model is, from 0 (opaque) to 1 (gone).
+	## Fades the model [param amount], from 0 (opaque) to 1 (gone).
 	func fade(amount: float) -> void:
-		for geometry in _geometry:
-			geometry.transparency = amount
+		_fade.apply(amount)
+
+	func _label(parameter: StringName, value: Variant) -> void:
+		for material in _materials:
+			material.set_shader_parameter(parameter, value)

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name GameLaunch
 extends Node
-## Launches the selected game: checks that it can start, plays its medium's [Insertion] with its
-## sounds, starts it once the screen is black, and shows the carousel again, as it was, when the
-## user comes back. Nothing is played for a game that cannot start. While [method is_busy], the
-## carousel ignores every input.
+## Launches the selected game: checks that it can start, puts it into its console (the console's
+## [ConsoleSequence]) or plays its medium's [Insertion], with its sounds, starts it once the screen
+## is black, and shows the carousel again, as it was, when the user comes back. Nothing is played
+## for a game that cannot start. While [method is_busy], the carousel ignores every input.
 ##
 ## Everything moves with the time [method _process] is given, so tests can step through a launch.
 ## Android pauses the app as the emulator shows and resumes it as the user comes back, before or
@@ -37,6 +37,7 @@ const SHOW_S := 0.2
 
 @export var row: ShelfRow
 @export var spindle: Spindle
+@export var sequence: ConsoleSequence
 @export var blackout: ColorRect
 ## What fades out as the game turns: the title pill, the top bar.
 @export var controls: Array[CanvasItem] = []
@@ -51,6 +52,8 @@ var _stage_s := 0.0
 ## Increases with every launch and every launch given up, so that a late answer is ignored.
 var _launch_id := 0
 var _insertion := Insertion.new()
+## Whether the game goes into its console ([member sequence]) rather than by its insertion.
+var _into_console := false
 var _start := Transform3D.IDENTITY
 var _clock_s := 0.0
 var _cues_played := 0
@@ -91,7 +94,7 @@ func _process(delta: float) -> void:
 			if Diagnostics.enabled:
 				_frames_ms.append(delta * 1000.0)
 			_insert(delta)
-			if _clock_s >= _insertion.duration_s():
+			if _clock_s >= (sequence.launch_duration() if _into_console else _insertion.duration_s()):
 				_inserted.emit()
 		Stage.STARTING, Stage.STARTING_BACK, Stage.AWAY:
 			_insert(delta)
@@ -122,8 +125,9 @@ func prepare(insertions: Array[Insertion]) -> void:
 				_players[cue] = player
 
 
-## Launches disc [param disc] of [param game], the selected game, with [param insertion]; does
-## nothing while [method is_busy].
+## Launches disc [param disc] of [param game], the selected game, into its console when the
+## sequence has a launch (see [method ConsoleSequence.can_launch]), else with [param insertion],
+## whose sounds play either way; does nothing while [method is_busy].
 func launch(game: AndroidServices.Game, disc: int, insertion: Insertion) -> void:
 	if is_busy():
 		return
@@ -141,12 +145,13 @@ func launch(game: AndroidServices.Game, disc: int, insertion: Insertion) -> void
 		_give_up(check.code)
 		return
 	_insertion = insertion
+	_into_console = sequence.can_launch()
 	_start = row.selected_stand()
 	_clock_s = 0.0
 	_cues_played = 0
 	_frames_ms.clear()
 	spindle.transform = insertion.spindle_stand()
-	spindle.visible = insertion.spindle
+	spindle.visible = insertion.spindle and not _into_console
 	_black.set_shader_parameter(&"opacity", 1.0)
 	_black.set_shader_parameter(&"radius", 0.0)
 	blackout.visible = true
@@ -186,27 +191,37 @@ func _give_up(code: StringName) -> void:
 	failed.emit(code)
 
 
-## Applies the insertion at the current time, [param delta] after the previous frame: the game, its
+## Applies the launch at the current time, [param delta] after the previous frame: the game, its
 ## spindle, the black, the controls, the sounds.
 func _insert(delta: float) -> void:
 	var t := _clock_s
-	var stand := _insertion.stand_at(t, _start)
-	var spin := _insertion.spin_at(t)
-	# The label blurs over the turn it makes while a frame shows.
-	row.stand_selected(stand, spin, minf(TAU, _insertion.spin_speed_at(t) * delta))
-	spindle.turn(spin)
-	spindle.fade(1.0 - _insertion.spindle_at(t))
-	for control in controls:
-		control.modulate.a = _insertion.controls_at(t)
+	var black := 0.0
+	var origin := Vector3.ZERO
+	if _into_console:
+		sequence.launch_at(t, delta)
+		black = sequence.black
+		origin = sequence.black_origin()
+	else:
+		var stand := _insertion.stand_at(t, _start)
+		var spin := _insertion.spin_at(t)
+		# The label blurs over the turn it makes while a frame shows.
+		row.stand_selected(stand, spin, minf(TAU, _insertion.spin_speed_at(t) * delta))
+		spindle.turn(spin)
+		spindle.fade(1.0 - _insertion.spindle_at(t))
+		for control in controls:
+			control.modulate.a = _insertion.controls_at(t)
+		black = _insertion.black_at(t)
+		origin = row.to_global(stand.origin)
 	var size := blackout.size
-	var centre := get_viewport().get_camera_3d().unproject_position(row.to_global(stand.origin))
+	var centre := get_viewport().get_camera_3d().unproject_position(origin)
 	# The distance to the farthest corner of the screen.
 	var farthest := Vector2(maxf(centre.x, size.x - centre.x), maxf(centre.y, size.y - centre.y)).length()
 	_black.set_shader_parameter(&"centre", centre / size)
 	_black.set_shader_parameter(&"size", size)
-	_black.set_shader_parameter(&"radius", _insertion.black_at(t) * farthest)
+	_black.set_shader_parameter(&"radius", black * farthest)
 	var cues := _insertion.sounds
-	while _cues_played < cues.size() and t >= _insertion.seated_s() + cues[_cues_played].delay_s:
+	var seated_s := sequence.seated_s() if _into_console else _insertion.seated_s()
+	while _cues_played < cues.size() and t >= seated_s + cues[_cues_played].delay_s:
 		var player: AudioStreamPlayer = _players.get(cues[_cues_played])
 		if player:
 			player.play(cues[_cues_played].from_s)
@@ -216,6 +231,8 @@ func _insert(delta: float) -> void:
 ## The carousel as it was before the launch, shown again as the black fades.
 func _show_carousel() -> void:
 	_launch_id += 1
+	if _into_console:
+		sequence.show_games()
 	row.pose_selected()
 	spindle.visible = false
 	for control in controls:

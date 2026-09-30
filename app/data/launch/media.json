@@ -1,0 +1,101 @@
+{
+ "choice": 1,
+ "steps": [
+  {
+   "dur": 0,
+   "ease": "inOut",
+   "hold": 0,
+   "lid": {
+    "angle": 0
+   },
+   "disc": {
+    "visible": 0,
+    "inRow": 1
+   },
+   "row": {
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0,
+    "scale": 1,
+    "pose": 1
+   },
+   "consoles": {
+    "show": 1
+   },
+   "look": {
+    "blur": 0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "bar": 1,
+    "tabs": 0,
+    "pill": 1
+   },
+   "fx": {
+    "black": 0
+   },
+   "console": {
+    "px": 0,
+    "py": 1.8,
+    "pz": 0,
+    "rx": 0,
+    "ry": 0,
+    "rz": 0,
+    "scale": 1,
+    "pose": 1,
+    "sway": 7,
+    "bob": 0.5
+   }
+  },
+  {
+   "dur": 0.3,
+   "ease": "out",
+   "hold": 0,
+   "lid": {
+    "angle": 0
+   },
+   "disc": {
+    "visible": 1,
+    "inRow": 1
+   },
+   "row": {
+    "show": 1,
+    "x": 0,
+    "y": 0,
+    "z": 0,
+    "scale": 1,
+    "pose": 1
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0,
+    "opacity": 0,
+    "sat": 1
+   },
+   "ui": {
+    "bar": 1,
+    "tabs": 1,
+    "pill": 1
+   },
+   "fx": {
+    "black": 0
+   },
+   "console": {
+    "px": 0,
+    "py": 1.8,
+    "pz": 0,
+    "rx": 0,
+    "ry": 0,
+    "rz": 0,
+    "scale": 1,
+    "pose": 1,
+    "sway": 7,
+    "bob": 0.5
+   }
+  }
+ ]
+}

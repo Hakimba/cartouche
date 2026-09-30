@@ -35,8 +35,8 @@ func test_INV_E2_5_02_a_disc_is_closed_its_faces_turned_outwards() -> void:
 	var random := Fixtures.cases(25)
 	for i in SHAPES:
 		var meshes := _meshes(Fixtures.disc(random), random.randi_range(8, 64))
-		assert_array(_open_edges(meshes)).is_empty()
-		for volume in _volumes(meshes):
+		assert_array(Fixtures.open_edges(meshes)).is_empty()
+		for volume in Fixtures.volumes(meshes):
 			assert_float(volume).is_greater(0.0)
 
 
@@ -49,7 +49,7 @@ func test_INV_E2_5_02_a_disc_fills_its_size_and_nothing_covers_its_hole() -> voi
 		var heights := PackedFloat32Array()
 		# The hole's edge is a polygon in the circle: no face comes further in than its sides.
 		var nearest := shape.hole * cos(PI / segments)
-		for triangle in _triangles(_meshes(shape, segments)):
+		for triangle in Fixtures.all_triangles(_meshes(shape, segments)):
 			var centre := (triangle[0] + triangle[1] + triangle[2]) / 3.0 / MM
 			assert_float(Vector2(centre.x, centre.y).length()).is_greater_equal(nearest - EPSILON)
 			for corner in triangle:
@@ -71,7 +71,7 @@ func test_INV_E2_5_02_the_label_covers_the_top_from_its_inner_to_its_outer_radiu
 			var arrays := DiscGeometry.arrays(shape, part, segments)
 			var side := 1.0 if part == &"label" else -1.0
 			var radii := PackedFloat32Array()
-			for point in _points(arrays):
+			for point in Fixtures.points(arrays):
 				radii.append(Vector2(point.x, point.y).length() / MM)
 				assert_float(point.z / MM).is_equal_approx(side * shape.thickness / 2.0, EPSILON)
 			for normal: Vector3 in arrays[Mesh.ARRAY_NORMAL]:
@@ -88,7 +88,7 @@ func test_INV_E2_5_02_a_label_image_covers_the_disc_face_its_top_upwards() -> vo
 		var shape := Fixtures.disc(random)
 		var arrays := DiscGeometry.arrays(shape, &"label", random.randi_range(8, 64))
 		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
-		var points := _points(arrays)
+		var points := Fixtures.points(arrays)
 		for v in points.size():
 			# The image's square is the disc's: its top-left corner at the top left of the disc.
 			var point := points[v] / MM
@@ -103,7 +103,7 @@ func test_INV_E2_5_02_only_the_mirror_between_the_data_radii_is_marked_recorded(
 		var arrays := DiscGeometry.arrays(shape, &"mirror", random.randi_range(8, 64))
 		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
 		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-		var vertices := _points(arrays)
+		var vertices := Fixtures.points(arrays)
 		for t in range(0, indices.size(), 3):
 			var radii := PackedFloat32Array()
 			for k in 3:
@@ -122,12 +122,12 @@ func test_INV_E2_5_03_a_cartridge_is_closed_except_under_the_plate_its_faces_tur
 		var meshes := _meshes(shape, random.randi_range(16, 128))
 		var plate := shape.plate_box().grow(EPSILON)
 		var upper_front := shape.depth / 2.0 + shape.ledge
-		for edge in _open_edges(meshes):
+		for edge in Fixtures.open_edges(meshes):
 			for end in edge:
 				var point := end / MM
 				assert_bool(plate.has_point(Vector2(point.x, point.y)) and absf(point.z - upper_front) < EPSILON) \
 					.override_failure_message("an open edge away from the plate: %s" % [edge]).is_true()
-		for volume in _volumes(meshes):
+		for volume in Fixtures.volumes(meshes):
 			assert_float(volume).is_greater(0.0)
 
 
@@ -136,7 +136,7 @@ func test_INV_E2_5_03_a_cartridge_fills_its_size_its_label_upright_at_the_bottom
 	for i in SHAPES:
 		var shape := Fixtures.cartridge(random)
 		var detail := random.randi_range(16, 128)
-		var points := _points(shape.mesh_arrays(&"shell", detail))
+		var points := Fixtures.points(shape.mesh_arrays(&"shell", detail))
 		var box := AABB(points[0], Vector3.ZERO)
 		for point in points:
 			box = box.expand(point)
@@ -148,7 +148,7 @@ func test_INV_E2_5_03_a_cartridge_fills_its_size_its_label_upright_at_the_bottom
 		var label := shape.mesh_arrays(&"label", detail)
 		var uvs: PackedVector2Array = label[Mesh.ARRAY_TEX_UV]
 		var label_box := shape.label_box()
-		var corners := _points(label)
+		var corners := Fixtures.points(label)
 		for v in corners.size():
 			var point := corners[v] / MM
 			assert_bool(label_box.grow(EPSILON).has_point(Vector2(point.x, point.y))).is_true()
@@ -221,8 +221,12 @@ func test_INV_E2_5_04_impossible_dimensions_are_refused_by_the_rule_they_break_a
 func test_INV_E2_5_04_a_model_builds_faces_for_each_of_its_parts_and_nothing_else() -> void:
 	var random := Fixtures.cases(41)
 	for i in SHAPES:
-		for shape: ModelShape in [Fixtures.disc(random), Fixtures.cartridge(random)]:
+		var console := Fixtures.console(random)
+		for shape: ModelShape in [Fixtures.disc(random), Fixtures.cartridge(random), console]:
 			for part in shape.parts():
+				# A console may have no ribs.
+				if shape == console and part == &"ribs" and console.rib_count == 0:
+					continue
 				var indices: PackedInt32Array = shape.mesh_arrays(part, 32)[Mesh.ARRAY_INDEX]
 				assert_int(indices.size()).is_greater(0)
 			assert_array(shape.mesh_arrays(&"lable", 32)).is_empty()
@@ -231,9 +235,12 @@ func test_INV_E2_5_04_a_model_builds_faces_for_each_of_its_parts_and_nothing_els
 func test_every_vertex_has_a_tangent_square_to_its_normal_as_normal_maps_need() -> void:
 	var random := Fixtures.cases(42)
 	for i in 50:
-		for shape: ModelShape in [Fixtures.disc(random), Fixtures.cartridge(random)]:
+		for shape: ModelShape in [Fixtures.disc(random), Fixtures.cartridge(random), Fixtures.console(random)]:
 			for part in shape.parts():
 				var arrays := shape.mesh_arrays(part, 32)
+				var indices: PackedInt32Array = [] if arrays.is_empty() else arrays[Mesh.ARRAY_INDEX]
+				if indices.is_empty():
+					continue
 				var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 				var tangents: PackedFloat32Array = arrays[Mesh.ARRAY_TANGENT]
 				for v in normals.size():
@@ -248,67 +255,3 @@ static func _meshes(shape: ModelShape, detail: int) -> Array[Array]:
 	for part in shape.parts():
 		found.append(shape.mesh_arrays(part, detail))
 	return found
-
-
-static func _triangles(meshes: Array[Array]) -> Array[PackedVector3Array]:
-	var found: Array[PackedVector3Array] = []
-	for arrays in meshes:
-		found.append_array(Fixtures.triangles(arrays))
-	return found
-
-
-static func _points(arrays: Array) -> PackedVector3Array:
-	return arrays[Mesh.ARRAY_VERTEX]
-
-
-## The edges of [param meshes]' faces, as their two ends, that no face goes back along: none on a
-## closed surface whose faces are all turned the same way. Points are joined to the micrometre.
-static func _open_edges(meshes: Array[Array]) -> Array[PackedVector3Array]:
-	var counts: Dictionary[String, int] = {}
-	var ends: Dictionary[String, PackedVector3Array] = {}
-	for triangle in _triangles(meshes):
-		for k in 3:
-			var from := _micrometres(triangle[k])
-			var to := _micrometres(triangle[(k + 1) % 3])
-			if from == to:
-				continue
-			counts[from + ">" + to] = counts.get(from + ">" + to, 0) + 1
-			counts[to + ">" + from] = counts.get(to + ">" + from, 0) - 1
-			ends[from + ">" + to] = PackedVector3Array([triangle[k], triangle[(k + 1) % 3]])
-	var found: Array[PackedVector3Array] = []
-	for edge in counts:
-		if counts[edge] > 0:
-			found.append(ends[edge])
-	return found
-
-
-## The volume each separate piece of [param meshes] encloses (pieces share no point): positive
-## when its faces are turned outwards.
-static func _volumes(meshes: Array[Array]) -> PackedFloat32Array:
-	var triangles := _triangles(meshes)
-	# Each point's piece, pieces merged as faces join them.
-	var piece: Dictionary[String, String] = {}
-	var root := func(at: String) -> String:
-		while piece[at] != at:
-			at = piece[at]
-		return at
-	for triangle in triangles:
-		var keys: Array[String] = []
-		for corner in triangle:
-			var key := _micrometres(corner)
-			if key not in piece:
-				piece[key] = key
-			keys.append(key)
-		for key: String in keys.slice(1):
-			piece[root.call(key)] = root.call(keys[0])
-	var sums: Dictionary[String, float] = {}
-	for triangle in triangles:
-		var at: String = root.call(_micrometres(triangle[0]))
-		# Godot's front faces are clockwise seen from the side they face.
-		sums[at] = sums.get(at, 0.0) - triangle[0].dot(triangle[1].cross(triangle[2])) / 6.0
-	return PackedFloat32Array(sums.values())
-
-
-static func _micrometres(point: Vector3) -> String:
-	var at := Vector3i((point / MM * 1000.0).round())
-	return "%d %d %d" % [at.x, at.y, at.z]
