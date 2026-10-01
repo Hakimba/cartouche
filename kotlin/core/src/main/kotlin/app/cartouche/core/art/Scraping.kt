@@ -32,8 +32,8 @@ public enum class Stall {
 /**
  * A scraping run: the games waiting to be looked for, those under way, and how many are done. Each
  * waiting request is handed out once by [take]; it only waits again when it stalls, behind the
- * others, so that a game whose image a server keeps refusing never holds the others back. A stall
- * hands nothing out until [resumed].
+ * others, so that a game whose image a server keeps refusing never holds the others back, unless the
+ * run no longer asks for it (its platform removed meanwhile). A stall hands nothing out until [resumed].
  */
 @ConsistentCopyVisibility
 public data class Scraping private constructor(
@@ -43,6 +43,8 @@ public data class Scraping private constructor(
     public val stall: Option<Stall>,
     /** Stalls since the last request that finished, for [retryDelay]. */
     private val stalls: Int,
+    /** The games under way that the last [with] no longer asks for: they do not wait again. */
+    private val leaving: Set<GameId>,
 ) {
     public val total: Int get() = done + waiting.size + underWay.size
 
@@ -58,16 +60,23 @@ public data class Scraping private constructor(
         .map { it to copy(waiting = waiting.drop(1), underWay = underWay + it) }
 
     /** [game]'s request is over: its art found, or none in any source. */
-    public fun finished(game: GameId): Scraping = ifUnderWay(game) { _, others -> copy(underWay = others, done = done + 1, stalls = 0) }
+    public fun finished(game: GameId): Scraping =
+        ifUnderWay(game) { _, others -> copy(underWay = others, done = done + 1, stalls = 0, leaving = leaving - game) }
 
     /** [game]'s request stalled for [why]: it waits again, last. */
     public fun stalled(game: GameId, why: Stall): Scraping = ifUnderWay(game) { request, others ->
-        copy(waiting = waiting + request, underWay = others, stall = Some(why), stalls = if (stall.isNone()) stalls + 1 else stalls)
+        copy(
+            waiting = waiting + again(game, request),
+            underWay = others,
+            stall = Some(why),
+            stalls = if (stall.isNone()) stalls + 1 else stalls,
+            leaving = leaving - game,
+        )
     }
 
     /** [game]'s request was set aside before its end, as when the app stops: it waits again, first. */
     public fun returned(game: GameId): Scraping =
-        ifUnderWay(game) { request, others -> copy(waiting = request + waiting, underWay = others) }
+        ifUnderWay(game) { request, others -> copy(waiting = again(game, request) + waiting, underWay = others, leaving = leaving - game) }
 
     public fun resumed(): Scraping = copy(stall = None)
 
@@ -77,15 +86,22 @@ public data class Scraping private constructor(
      */
     public fun with(requests: List<ArtRequest>): Scraping {
         val run = if (isOver) copy(done = 0, stall = None, stalls = 0) else this
-        return run.copy(waiting = requests.distinctBy { it.game }.filter { request -> underWay.none { it.game == request.game } })
+        val asked = requests.mapTo(HashSet()) { it.game }
+        return run.copy(
+            waiting = requests.distinctBy { it.game }.filter { request -> underWay.none { it.game == request.game } },
+            leaving = underWay.map { it.game }.filterTo(HashSet()) { it !in asked },
+        )
     }
+
+    /** [request] of [game], to wait again: none when the run no longer asks for it. */
+    private fun again(game: GameId, request: List<ArtRequest>): List<ArtRequest> = if (game in leaving) emptyList() else request
 
     /** [change] of [game]'s request under way and the others; unchanged when it is not under way. */
     private fun ifUnderWay(game: GameId, change: (List<ArtRequest>, List<ArtRequest>) -> Scraping): Scraping =
         underWay.partition { it.game == game }.let { (request, others) -> if (request.isEmpty()) this else change(request, others) }
 
     public companion object {
-        public val NONE: Scraping = Scraping(emptyList(), emptyList(), 0, None, 0)
+        public val NONE: Scraping = Scraping(emptyList(), emptyList(), 0, None, 0, emptySet())
 
         private val FIRST_RETRY = 30.seconds
         private val LONGEST_RETRY = 15.minutes

@@ -121,21 +121,78 @@ internal class LibraryService(private val store: LibraryStore, private val selec
     /** Remembers game [id] as selected, and its platform as shown; the file is written only when that changes. */
     fun select(id: GameId): Either<LibraryFailure, Selection> = either {
         val game = library().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id)) }
-        val selection = selection().with(game)
+        remember(selection().with(game)).bind()
+    }
+
+    /** Stores [setup] for [platform]; the access to a folder no platform uses any more is given up. */
+    fun setUp(platform: PlatformId, setup: PlatformSetup): Either<LibraryFailure, Library> =
+        save(library().withSetup(platform, setup)).onRight(::keepFoldersOf)
+
+    /**
+     * Removes [platform]: its choices, games and what its scans set aside, what the selection
+     * remembers of it, and the access to its folder unless another platform uses it. The files in
+     * the folder are not touched.
+     */
+    fun remove(platform: PlatformId): Either<LibraryFailure, Library> = either {
+        // The selection first: one left remembering a platform that stayed only starts it from its first game.
+        remember(selection().without(platform)).bind()
+        save(library().without(platform)).bind().also(::keepFoldersOf)
+    }
+
+    /**
+     * The games whose art is kept: those of the library; none when it could not be read, as its
+     * games are not known then.
+     */
+    fun gamesWithArt(): Option<Set<GameId>> {
+        // Read first: whether it could be is known once it is.
+        val games = library().games
+        return if (loadProblem.isSome()) None else Some(games.mapTo(HashSet()) { it.id })
+    }
+
+    /** Saves [selection] if it changed. */
+    private fun remember(selection: Selection): Either<LibraryFailure, Selection> = either {
         if (selection != selection()) {
             val started = TimeSource.Monotonic.markNow()
             selections.save(selection).mapLeft(LibraryFailure::Storage).bind()
             selected = Some(selection)
-            trace("selection") { "saved ${id.value} in ${started.elapsedNow().inWholeMilliseconds} ms" }
+            trace("selection") { "saved in ${started.elapsedNow().inWholeMilliseconds} ms" }
         }
         selection
     }
 
-    fun setUp(platform: PlatformId, setup: PlatformSetup): Either<LibraryFailure, Library> = save(library().withSetup(platform, setup))
+    /**
+     * Keeps the access to the folders of [library]'s platforms only; a failure only leaves some
+     * access kept. Not while the library could not be read: the folders of the one set aside are
+     * not known.
+     */
+    private fun keepFoldersOf(library: Library) {
+        if (loadProblem.isSome()) return
+        folders
+            .keepOnly(library.setups.values.flatMapTo(HashSet()) { it.folder.toList() })
+            .onRight { released -> if (released > 0) trace("library") { "access to $released folders given up" } }
+            .onLeft { trace("library") { "folder access not given up: ${it.message}" } }
+    }
 
     /** Lists [platform]'s folder and replaces its games with what the scan finds. */
     fun scan(platform: Platform, titles: TitleIndex, dataFolders: DataFolders): Either<LibraryFailure, Pair<Library, ScanReport>> = either {
-        val setup = library().setup(platform.id)
+        val (scan, report) = found(platform, library().setup(platform.id), titles, dataFolders).bind()
+        save(library().withScan(platform.id, scan)).bind() to report
+    }
+
+    /** How many games a scan of [platform] with [setup] would find; nothing is saved. */
+    fun preview(
+        platform: Platform,
+        setup: PlatformSetup,
+        titles: TitleIndex,
+        dataFolders: DataFolders,
+    ): Either<LibraryFailure, ScanReport> = found(platform, setup, titles, dataFolders).map { it.second }
+
+    private fun found(
+        platform: Platform,
+        setup: PlatformSetup,
+        titles: TitleIndex,
+        dataFolders: DataFolders,
+    ): Either<LibraryFailure, Pair<Scan, ScanReport>> = either {
         val folder = setup.folder.getOrElse { raise(LibraryFailure.NoFolder(platform.id)) }
         val started = TimeSource.Monotonic.markNow()
         val contents =
@@ -166,7 +223,7 @@ internal class LibraryService(private val store: LibraryStore, private val selec
             ) { "ignored $reason: ${files.size}, such as ${files.take(IgnoredCount.EXAMPLES).joinToString { it.file.name.value }}" }
         }
         scan.skippedFolders.forEach { trace("scan") { "skipped folder ${it.path.value}: ${it.reason}" } }
-        save(library().withScan(platform.id, scan)).bind() to report
+        scan to report
     }
 
     /** What launching game [id] takes: [disc] (an index) if given, else the disc launched last, and its platform's choices. */

@@ -224,12 +224,16 @@ static func shown_carousel(suite: GdUnitTestSuite) -> Carousel:
 	var carousel: Carousel = suite.auto_free(CAROUSEL.instantiate())
 	var row: ShelfRow = carousel.get_node("%Row")
 	row.label_images = suite.auto_free(FakeArt.new())
+	var screens: ScreenFlow = carousel.get_node("%Screens")
+	screens.welcome_waits = false
 	suite.add_child(carousel)
 	for i in 100:
 		if carousel._shown:
 			break
 		await suite.await_idle_frame()
 	suite.assert_bool(carousel._shown).is_true()
+	# The carousel's arrival at its end.
+	carousel._arrival.custom_step(10.0)
 	row.set_process(false)
 	carousel.set_process(false)
 	carousel._consoles.set_process(false)

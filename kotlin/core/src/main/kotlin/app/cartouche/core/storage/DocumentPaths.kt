@@ -17,6 +17,12 @@ import arrow.core.raise.option
     }
 }
 
+/** The storage volume a folder is on, as the user knows it. */
+public enum class Volume { INTERNAL, CARD }
+
+/** Where a folder is, as the user reads it: its volume, then the folders down to it (none for the volume itself). */
+public data class FolderPlace(public val volume: Volume, public val folders: List<String>)
+
 /**
  * Maps documents of Android's external storage provider to filesystem paths.
  *
@@ -39,6 +45,19 @@ public object DocumentPaths {
         val home = volume == HOME_ROOT
         val root = volumeRoots.getOrNone(if (home) VolumeId.PRIMARY else VolumeId(volume)).bind().value + if (home) "/Documents" else ""
         FilePath(if (relative.isEmpty()) root else "$root/$relative")
+    }
+
+    /** Where [documentId] of the external storage provider is; none for any other provider. */
+    public fun placeOf(authority: String, documentId: DocumentId): Option<FolderPlace> = option {
+        ensure(authority == EXTERNAL_STORAGE_AUTHORITY)
+        val volume = documentId.value.substringBefore(':', missingDelimiterValue = "")
+        ensure(volume.isNotEmpty())
+        val relative = documentId.value.substringAfter(':').split('/').filter(String::isNotEmpty)
+        when (volume) {
+            VolumeId.PRIMARY.value -> FolderPlace(Volume.INTERNAL, relative)
+            HOME_ROOT -> FolderPlace(Volume.INTERNAL, listOf("Documents") + relative)
+            else -> FolderPlace(Volume.CARD, relative)
+        }
     }
 
     /** Last segment of a document id, used when the provider reports no display name. */

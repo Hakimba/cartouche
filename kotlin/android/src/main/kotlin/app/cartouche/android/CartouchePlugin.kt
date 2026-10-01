@@ -27,6 +27,7 @@ import app.cartouche.android.library.LibraryService
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.storage.SelectionStore
+import app.cartouche.android.storage.SettingsStore
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
@@ -53,6 +54,7 @@ import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
 import app.cartouche.core.platforms.PlayerId
+import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
 import arrow.core.Option
@@ -86,6 +88,7 @@ import org.godotengine.godot.plugin.UsedByGodot
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.TimeSource
+import app.cartouche.core.settings.Settings as AppSettings
 
 /**
  * Cartouche's Android services, reached from GDScript as `Engine.get_singleton("CartoucheAndroid")`
@@ -141,6 +144,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Only used on [libraryThread], which [useDemoLibrary] replaces it on. */
     private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
+
+    /** Only used on [libraryThread]. */
+    private val settingsStore by lazy { SettingsStore(File(context.filesDir, "settings.json")) }
 
     /** Whether each package is installed, forgotten on resume since apps may be installed meanwhile. */
     private val installed = ConcurrentHashMap<PackageName, Boolean>()
@@ -210,12 +216,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun candidates(fileName: String): Array<Any> =
         catalog.candidates(FileName(fileName)).filter { isAvailable(it.player) }.toWireArray { it.toWire() }
 
-    /** The installed players of [platformId], in definition order: `[{"player_id", "player_name"}]`. */
+    /** The installed players of [platformId], in definition order: `[{"player_id", "player_name", "emulator_name", "extensions"?}]`. */
     @UsedByGodot
     public fun installedPlayers(platformId: String): Array<Any> = catalog
         .platform(PlatformId(platformId))
         .fold({ emptyList() }) { it.players.filter(::isAvailable) }
-        .toWireArray { dictionary("player_id" to it.id.value, "player_name" to it.name) }
+        .toWireArray { player ->
+            dictionary("player_id" to player.id.value, "player_name" to player.name, "emulator_name" to player.emulatorName)
+                .putSome("extensions", player.accepts.extensions.map { it.toTypedArray() })
+        }
 
     @UsedByGodot
     public fun hasAllFilesAccess(): Boolean = Environment.isExternalStorageManager()
@@ -346,18 +355,36 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     public fun setUpPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = answering(requestId, libraryThread) {
         val platform = platform(PlatformId(platformId))
-
-        fun <T> code(key: String, values: List<T>, wire: (T) -> String): T = setup
-            .text(key)
-            .flatMap { text ->
-                values.firstOrNone { wire(it) == text }
-            }.getOrElse { raise(invalid("$key is missing or unknown")) }
-        val folder = setup.text("folder_uri").map { ContentUri.parse(it).getOrElse { raise(invalid("folder_uri is not a content URI")) } }
-        val discs = code("disc_grouping", DiscGrouping.entries) { it.wire }
-        val depth = code("folder_depth", FolderDepth.entries) { it.wire }
-        val choices = PlatformSetup(folder, setup.text("player_id").map(::PlayerId), discs, depth)
+        val choices = setupOf(setup)
         inLibrary { setUp(platform.id, choices) }
         success("library" to wire(library.value))
+    }
+
+    /**
+     * Scans the folder of the choices [setup] (as [setUpPlatform] takes them) for [platformId] without
+     * saving anything; answers with `{"report"}`, whose `games` the scan after saving them finds too.
+     */
+    @UsedByGodot
+    public fun previewPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = answering(requestId, libraryThread) {
+        val platform = platform(PlatformId(platformId))
+        val choices = setupOf(setup)
+        success("report" to inLibrary { preview(platform, choices, titles(platform.id), dataFolders) }.toWire())
+    }
+
+    /** Answers with the settings, `{"first_launch", "button_style"?}`. */
+    @UsedByGodot
+    public fun settings(requestId: Int): Unit = answering(requestId, libraryThread) {
+        val settings = storedSettings()
+        success().apply { putAll(settings.toWire(settings.isFirstLaunch(library.value.library()))) }
+    }
+
+    /** Stores the button style the user chose, [style] as [settings] names it. */
+    @UsedByGodot
+    public fun saveButtonStyle(requestId: Int, style: String): Unit = answering(requestId, libraryThread) {
+        val chosen = code("button_style", Some(style), ButtonStyle.entries, ButtonStyle::wire)
+        settingsStore.save(storedSettings().copy(buttonStyle = Some(chosen))).mapLeft { it.toWire() }.bind()
+        trace("settings") { "button style: $style" }
+        success()
     }
 
     /** Scans [platformId]'s folder; answers with `{"library", "report"}`. */
@@ -367,6 +394,17 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val titles = titles(platform.id)
         val report = inLibrary { scan(platform, titles, dataFolders) }.second
         success("library" to wire(library.value), "report" to report.toWire()).also { lookForArt() }
+    }
+
+    /**
+     * Removes [platformId] from the library (see [LibraryService.remove]), then the art of its
+     * games; answers with `{"library"}`.
+     */
+    @UsedByGodot
+    public fun removePlatform(requestId: Int, platformId: String): Unit = answering(requestId, libraryThread) {
+        inLibrary { remove(PlatformId(platformId)) }
+        trace("library") { "$platformId removed" }
+        success("library" to wire(library.value)).also { lookForArt() }
     }
 
     /** Remembers [gameId] as the selected game of its platform, and that platform as the one shown. */
@@ -453,12 +491,19 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     // Plumbing
 
     /**
-     * Looks for the art of the library's games that have none, in library order, on [libraryThread]
-     * after the calls already there: an answer never waits for it, and its failure fails no answer.
+     * Deletes the art of games no longer in the library, then looks for the art of its games that
+     * have none, in library order, on [libraryThread] after the calls already there: an answer never
+     * waits for it, and its failure fails no answer.
      */
     private fun lookForArt() {
         scope.launch(libraryThread) {
             if (demo) return@launch
+            library.value.gamesWithArt().onSome { kept ->
+                artStore
+                    .keepOnly(kept)
+                    .onRight { deleted -> if (deleted > 0) trace("art") { "$deleted images of games no longer in the library deleted" } }
+                    .onLeft { trace("art") { "images of games no longer in the library not deleted: ${it.message}" } }
+            }
             val requests =
                 library.value.library().games.flatMap { game ->
                     sources(game.platform).requestFor(game).toList()
@@ -531,6 +576,27 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
                 raise(LaunchFailure.NoPlayer(platform.id).toWire())
             }
         return choice to launchOf(player.id, choice.file.asGameFile).mapLeft { it.toWire() }.bind()
+    }
+
+    /** The choices `{"folder_uri"?, "player_id"?, "disc_grouping", "folder_depth"}` sent for a platform. */
+    private fun Raise<Dictionary>.setupOf(setup: Dictionary): PlatformSetup {
+        val folder = setup.text("folder_uri").map { ContentUri.parse(it).getOrElse { raise(invalid("folder_uri is not a content URI")) } }
+        return PlatformSetup(
+            folder,
+            setup.text("player_id").map(::PlayerId),
+            code("disc_grouping", setup.text("disc_grouping"), DiscGrouping.entries, DiscGrouping::wire),
+            code("folder_depth", setup.text("folder_depth"), FolderDepth.entries, FolderDepth::wire),
+        )
+    }
+
+    /** The value of [values] named [text] on the wire, sent as [key]; an invalid request when there is none. */
+    private fun <T> Raise<Dictionary>.code(key: String, text: Option<String>, values: List<T>, wire: (T) -> String): T =
+        text.flatMap { name -> values.firstOrNone { wire(it) == name } }.getOrElse { raise(invalid("$key is missing or unknown")) }
+
+    /** The stored settings; unreadable ones only mean starting without any, as on a first launch. */
+    private fun storedSettings(): AppSettings = settingsStore.load().getOrElse { problem ->
+        trace("settings") { "not read, starting without: ${problem.detail}" }
+        AppSettings()
     }
 
     private fun Raise<Dictionary>.platform(id: PlatformId): Platform =

@@ -2,12 +2,15 @@
 class_name Appearance
 extends RefCounted
 ## How the carousel shows its platforms, as `data/carousel/appearance.json` has it: a model per
-## media, a console per platform that has one (its scene and its launch animation's steps), the
-## steps of the platforms shown by their medium, label colours and bands, the pose, and each media's
-## insertion. Read once, its launch animations made once each.
+## media, a console per platform that has one (its scene, its launch animation's steps, the name and
+## model shown above it), the steps of the platforms shown by their medium, label colours and bands,
+## the pose, and each media's insertion. Read once, its launch animations made once each.
 
 var models: Dictionary[String, PackedScene] = {}
 var consoles: Dictionary[String, PackedScene] = {}
+## The short name and the model of each console, as shown above it: "PlayStation 2", "Slim".
+var console_names: Dictionary[String, String] = {}
+var console_models: Dictionary[String, String] = {}
 var colors: Dictionary[String, Color] = {}
 var default_color: Color
 var bands: Dictionary[String, Dictionary] = {}
@@ -32,6 +35,8 @@ static func read(path: String) -> Appearance:
 		var model: String = console["model"]
 		var steps: String = console["steps"]
 		appearance.consoles[platform_id] = load(model)
+		appearance.console_names[platform_id] = console["name"]
+		appearance.console_models[platform_id] = console["model_name"]
 		appearance._animations[platform_id] = LaunchAnimation.read(steps)
 	var media_steps: String = data["media_steps"]
 	appearance._media_animation = LaunchAnimation.read(media_steps)

@@ -11,6 +11,7 @@ extends Node3D
 
 signal selection_changed(index: int)
 
+
 ## Where the selected console stands, turned (radians, about X then Y then Z) and sized.
 var console_position := Vector3.ZERO
 var console_rotation := Vector3.ZERO
@@ -20,6 +21,10 @@ var pose_amount := 1.0
 var sway_degrees := CarouselLayout.SWAY_DEGREES
 var bob_height := CarouselLayout.BOB_HEIGHT
 var others_opacity := 1.0
+## How far the row has come in on screen, from 0 (a point) to 1 (beyond, as it overshoots): every
+## console grows out of its own centre with it, opaque all along (a fading model would draw with
+## other shaders, compiled on the spot).
+var arrival := 1.0
 ## How far the selected console's lid is open, when it has one.
 var lid_degrees := 0.0
 var pose := ShelfRow.Pose.new()
@@ -47,6 +52,8 @@ func _process(delta: float) -> void:
 ## Shows [param items] in platform order from [param from].
 func show_consoles(items: Array[Item], from: int) -> void:
 	for item in _items:
+		# Out at once: its geometry must not be found below with the new consoles'.
+		remove_child(item.model)
 		item.model.queue_free()
 	_items = items
 	for item in _items:
@@ -115,7 +122,7 @@ func arrange() -> void:
 		pose.sway = sway_degrees if chosen else rest.sway_degrees
 		var bob := CarouselLayout.float_height(_clock_s, bob_height if chosen else rest.bob_height, centred)
 		var turned := _three_euler(console_rotation if chosen else rest.console_rotation)
-		var size := console_scale if chosen else rest.console_scale
+		var size := (console_scale if chosen else rest.console_scale) * maxf(arrival, 0.001)
 		var posed := place.basis * pose.at(_clock_s, centred) * _turn.of(i)
 		var stand := posed * turned.scaled(Vector3.ONE * size)
 		item.model.transform = Transform3D(stand, at_position + place.origin + Vector3.UP * bob)

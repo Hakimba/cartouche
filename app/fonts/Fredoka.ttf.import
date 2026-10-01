@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://c8656vpk8yx63"
-path="res://.godot/imported/AtkinsonHyperlegible-Bold.ttf-5f207ef77263b1c88724e7d91019652c.fontdata"
+uid="uid://b5ev3mt35r06g"
+path="res://.godot/imported/Fredoka.ttf-298377900bfb6872c6093eeb33bab54d.fontdata"
 
 [deps]
 
-source_file="res://fonts/AtkinsonHyperlegible-Bold.ttf"
-dest_files=["res://.godot/imported/AtkinsonHyperlegible-Bold.ttf-5f207ef77263b1c88724e7d91019652c.fontdata"]
+source_file="res://fonts/Fredoka.ttf"
+dest_files=["res://.godot/imported/Fredoka.ttf-298377900bfb6872c6093eeb33bab54d.fontdata"]
 
 [params]
 

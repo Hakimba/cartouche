@@ -19,6 +19,9 @@ public data class AbsentArt(private val games: Map<GameId, ArtVersion> = emptyMa
     /** Remembers that no source of [request] has art for its game. */
     public fun with(request: ArtRequest): AbsentArt = request.version.fold({ this }) { copy(games = games + (request.game to it)) }
 
+    /** Only what is remembered of [kept]. */
+    public fun keeping(kept: Set<GameId>): AbsentArt = copy(games = games.filterKeys { it in kept })
+
     public companion object {
         /** Stored as JSON; an unreadable text is none, which only means looking for those games again. */
         public fun decode(text: String): Option<AbsentArt> = Option.catch { Json.decodeFromString(serializer(), text) }

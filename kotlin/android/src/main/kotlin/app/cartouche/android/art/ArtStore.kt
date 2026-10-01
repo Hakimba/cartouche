@@ -55,6 +55,21 @@ internal class ArtStore(private val folder: File) {
         return AtomicFile(art.file).write(image).map { art.also { stored[stem] = it } }
     }
 
+    /**
+     * Deletes the images and the absence of the games not in [kept] (a platform removed, games gone
+     * from their folder); answers how many images went. An image stored meanwhile by a download
+     * under way goes at the next call.
+     */
+    @Synchronized
+    fun keepOnly(kept: Set<GameId>): Either<StorageFailure, Int> {
+        val stems = kept.mapTo(HashSet(), ::hash)
+        val gone = stored.keys.filter { it !in stems }
+        // A file that cannot be deleted is listed again at the next start, and goes then.
+        gone.forEach { stem -> stored.remove(stem).toOption().onSome { it.file.delete() } }
+        val absentKept = absent().keeping(kept)
+        return (if (absentKept == absent()) Unit.right() else writeAbsent(absentKept)).map { gone.size }
+    }
+
     /** The games no source has art for, read on first use, then kept in step with their file. */
     private var absent: Option<AbsentArt> = None
 
@@ -66,9 +81,11 @@ internal class ArtStore(private val folder: File) {
     @Synchronized
     fun markAbsent(request: ArtRequest): Either<StorageFailure, Unit> {
         folder.mkdirs()
-        val now = absent().with(request)
-        return absentFile.write(AbsentArt.encode(now)).map { absent = Some(now) }
+        return writeAbsent(absent().with(request))
     }
+
+    private fun writeAbsent(now: AbsentArt): Either<StorageFailure, Unit> =
+        absentFile.write(AbsentArt.encode(now)).map { absent = Some(now) }
 
     /** An unreadable file only means looking for those games again. */
     private fun absent(): AbsentArt = absent.getOrElse {

@@ -1,0 +1,61 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://screens/no_console.gd" id="1"]
+[ext_resource type="Script" path="res://screens/glyph_button.gd" id="2"]
+[ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
+
+[node name="NoConsole" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -450.0
+offset_top = 300.0
+offset_right = 450.0
+offset_bottom = 370.0
+grow_horizontal = 2
+theme_type_variation = &"ScreenTitle"
+theme_override_font_sizes/font_size = 50
+text = "No console yet"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Add" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 474.0
+offset_bottom = 538.0
+grow_horizontal = 2
+text = "Add a console"
+script = ExtResource("2")
+shows_glyph = true
+
+[node name="SettingsHint" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -40.0
+offset_right = 40.0
+offset_bottom = -40.0
+grow_vertical = 0
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+button = &"y"
+text = "Settings"
+
+[connection signal="pressed" from="Add" to="." method="_on_add_pressed"]

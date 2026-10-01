@@ -45,4 +45,14 @@ class AbsentArtTest {
         }
         AbsentArt.decode("{broken").shouldBeNone()
     }
+
+    @Test
+    fun `INV-E6-03 only the games kept stay absent, as they were`() = runBlocking<Unit> {
+        val names = Arb.list(Arb.element("a", "b", "c", "d"), 0..4)
+        checkAll(names, names, Arb.element("a", "b", "c", "d")) { absentOnes, kept, game ->
+            val absent = absentOnes.fold(AbsentArt()) { all, name -> all.with(request(name, Some("2026-09-28"))) }
+            val asked = request(game, Some("2026-09-28"))
+            absent.keeping(kept.map { GameId("ps2/$it") }.toSet()).covers(asked) shouldBe (game in kept && absent.covers(asked))
+        }
+    }
 }

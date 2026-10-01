@@ -204,4 +204,15 @@ class FoldersTest {
     private companion object {
         fun WalkFailure<StorageFailure>.unlisted(): StorageFailure = shouldBeInstanceOf<WalkFailure.Unlisted<StorageFailure>>().error
     }
+
+    @Test
+    fun `INV-E6-03 the access to the folders no platform uses is given up, the others kept`() {
+        fun tree(name: String) = Uri.parse("content://com.android.externalstorage.documents/tree/1A2B-3C4D%3AROMs%2F$name")
+        val trees = listOf("ps2", "gba", "gc").map(::tree)
+        val folders = Folders(context)
+        val kept = trees.map { folders.keepAccess(it).shouldBeRight().uri }
+        folders.keepOnly(setOf(kept[1])).shouldBeRight() shouldBe 2
+        context.contentResolver.persistedUriPermissions.map { it.uri } shouldBe listOf(trees[1])
+        folders.keepOnly(setOf(kept[1])).shouldBeRight() shouldBe 0
+    }
 }

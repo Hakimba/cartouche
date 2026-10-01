@@ -52,6 +52,17 @@ func add(art: AndroidServices.Art) -> void:
 	_unreadable.erase(art.game_id)
 
 
+## Forgets the art of the games not in [param games] (a platform removed or rescanned).
+func keep_only(games: Array[AndroidServices.Game]) -> void:
+	var kept := {}
+	for game in games:
+		kept[game.id] = true
+	for known: Dictionary in [_art, _textures, _read, _unreadable]:
+		for game_id: String in known.keys():
+			if game_id not in kept:
+				known.erase(game_id)
+
+
 ## Whether [param game] has a stored image.
 func has_art(game: AndroidServices.Game) -> bool:
 	return game.id in _art

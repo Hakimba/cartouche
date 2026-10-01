@@ -5,6 +5,7 @@ import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.library.GameId
+import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -93,5 +94,24 @@ class ArtStoreTest {
         store.isAbsent(request(GameId("ps2/d"), Some("2026-09-28"))) shouldBe false
         File(folder, "absent.json").writeText("{broken")
         ArtStore(folder).isAbsent(request(game, Some("2026-09-28"))) shouldBe false
+    }
+
+    @Test
+    fun `INV-E6-03 only the images and absences of the games kept stay, at once and after a restart`() {
+        fun request(game: GameId) = ArtRequest(game, "A", nonEmptyListOf(ArtUrl("https://a/a.png")), Some(ArtVersion("2026-09-28")))
+        val kept = GameId("ps2/kept")
+        val gone = listOf(game, GameId("gba/gone"))
+        val store = ArtStore(folder)
+        val files = (gone + kept).map { store.save(it, image).shouldBeRight().file }
+        (gone + kept).forEach { store.markAbsent(request(it)).shouldBeRight() }
+        store.keepOnly(setOf(kept, GameId("ps2/no image"))) shouldBe Either.Right(2)
+        files.map { it.exists() } shouldBe listOf(false, false, true)
+        listOf(store, ArtStore(folder)).forEach { again ->
+            again.stored(kept).shouldBeSome()
+            gone.forEach { again.stored(it).shouldBeNone() }
+            again.isAbsent(request(kept)) shouldBe true
+            gone.forEach { again.isAbsent(request(it)) shouldBe false }
+        }
+        store.keepOnly(setOf(kept)) shouldBe Either.Right(0)
     }
 }

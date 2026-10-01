@@ -5,7 +5,10 @@
     "cartridge": "res://carousel/models/cartridge.tscn"
   },
   "consoles": {
-    "ps2": { "model": "res://carousel/consoles/ps2_slim.tscn", "steps": "res://data/launch/ps2_slim.json" }
+    "ps2": {
+      "model": "res://carousel/consoles/ps2_slim.tscn", "steps": "res://data/launch/ps2_slim.json",
+      "name": "PlayStation 2", "model_name": "Slim"
+    }
   },
   "media_steps": "res://data/launch/media.json",
   "colors": {

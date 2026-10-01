@@ -23,6 +23,7 @@ import arrow.core.raise.ensureNotNull
 import arrow.core.raise.withError
 import arrow.core.separateEither
 import arrow.core.serialization.OptionSerializer
+import arrow.core.toOption
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -49,7 +50,21 @@ public class FileNamePattern private constructor(public val source: String, priv
 
     override fun toString(): String = source
 
+    /**
+     * The file extensions the pattern accepts, when it reads like the definitions' usual
+     * `….(?:iso|chd|bin)$` and accepts any name with them; none for any other pattern.
+     */
+    public val extensions: Option<List<String>>
+        get() =
+            EXTENSIONS
+                .find(source)
+                .toOption()
+                .map { found -> found.groupValues[1].split('|') }
+                .filter { extensions -> extensions.all { matches(FileName("Game.$it")) } }
+
     public companion object {
+        private val EXTENSIONS = Regex("""\\?\.\(\?:([A-Za-z0-9]+(?:\|[A-Za-z0-9]+)*)\)\$$""")
+
         public fun of(source: String): Option<FileNamePattern> =
             Either.catch { FileNamePattern(source, Regex(source, RegexOption.IGNORE_CASE)) }.getOrNone()
     }
@@ -62,7 +77,11 @@ public data class Player(
     public val template: Template,
     public val runningInstance: RunningInstance,
     public val accepts: FileNamePattern,
-)
+) {
+    /** The name without the platform the definitions put first: `ps2 - ARMSX2 (Nightly)` is `ARMSX2 (Nightly)`. */
+    public val emulatorName: String
+        get() = name.substringAfter(" - ")
+}
 
 public data class Platform(
     public val id: PlatformId,

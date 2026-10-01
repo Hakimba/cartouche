@@ -30,7 +30,10 @@ import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.MediaType
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
+import app.cartouche.core.settings.ButtonStyle
+import app.cartouche.core.settings.Settings
 import app.cartouche.core.shelves.Shelves
+import app.cartouche.core.storage.Volume
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
@@ -136,7 +139,17 @@ internal fun StorageFailure.toWire(): Dictionary = failure(
     message,
 )
 
-internal fun Folder.toWire(): Dictionary = dictionary("uri" to uri.value, "name" to name).putSome("path", path.map { it.value })
+/** `{"uri", "name", "path"?, "place"?: {"volume": "internal" or "card", "folders": [name]}}`. */
+internal fun Folder.toWire(): Dictionary = dictionary("uri" to uri.value, "name" to name)
+    .putSome("path", path.map { it.value })
+    .putSome("place", place.map { dictionary("volume" to it.volume.wire, "folders" to it.folders.toTypedArray()) })
+
+private val Volume.wire: String
+    get() =
+        when (this) {
+            Volume.INTERNAL -> "internal"
+            Volume.CARD -> "card"
+        }
 
 internal fun DocumentEntry.toWire(): Dictionary = dictionary(
     "name" to name.value,
@@ -260,6 +273,18 @@ internal val FolderDepth.wire: String
             FolderDepth.TOP_LEVEL -> "top_level"
             FolderDepth.SUBFOLDERS -> "subfolders"
         }
+
+internal val ButtonStyle.wire: String
+    get() =
+        when (this) {
+            ButtonStyle.XBOX -> "xbox"
+            ButtonStyle.NINTENDO -> "nintendo"
+            ButtonStyle.PLAYSTATION -> "playstation"
+        }
+
+/** `{"first_launch", "button_style"?}`: the style is absent until one is chosen. */
+internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary("first_launch" to firstLaunch)
+    .putSome("button_style", buttonStyle.map { it.wire })
 
 internal val MediaType.wire: String
     get() =

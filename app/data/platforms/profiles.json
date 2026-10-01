@@ -4,6 +4,24 @@
     "minimumGameBytes": 16000000,
     "scansBySerial": "https://psxdatacenter.com/psx2/images2/covers/{serial}/{serial}-D-ALL.jpg"
   },
-  "gc": { "media": "minidisc", "minimumGameBytes": 16000000 },
-  "gba": { "media": "cartridge", "minimumGameBytes": 8192 }
+  "gc": {"media": "minidisc", "minimumGameBytes": 16000000},
+  "gba": {"media": "cartridge", "minimumGameBytes": 8192},
+  "nes": {"media": "cartridge", "minimumGameBytes": 8192},
+  "snes": {"media": "cartridge", "minimumGameBytes": 65536},
+  "n64": {"media": "cartridge", "minimumGameBytes": 262144},
+  "gb": {"media": "cartridge", "minimumGameBytes": 16384},
+  "gbc": {"media": "cartridge", "minimumGameBytes": 16384},
+  "nds": {"media": "cartridge", "minimumGameBytes": 131072},
+  "3ds": {"media": "cartridge", "minimumGameBytes": 1048576},
+  "genesis": {"media": "cartridge", "minimumGameBytes": 65536},
+  "master": {"media": "cartridge", "minimumGameBytes": 8192},
+  "gamegear": {"media": "cartridge", "minimumGameBytes": 8192},
+  "tg16": {"media": "cartridge", "minimumGameBytes": 8192},
+  "atari2600": {"media": "cartridge", "minimumGameBytes": 1024},
+  "psx": {"media": "dvd", "minimumGameBytes": 0},
+  "psp": {"media": "dvd", "minimumGameBytes": 1048576},
+  "wii": {"media": "dvd", "minimumGameBytes": 16000000},
+  "saturn": {"media": "dvd", "minimumGameBytes": 0},
+  "dreamcast": {"media": "dvd", "minimumGameBytes": 0},
+  "segacd": {"media": "dvd", "minimumGameBytes": 0}
 }

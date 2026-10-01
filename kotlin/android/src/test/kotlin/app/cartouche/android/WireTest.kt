@@ -33,9 +33,12 @@ import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
+import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.storage.DocumentId
+import app.cartouche.core.storage.FolderPlace
+import app.cartouche.core.storage.Volume
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
@@ -51,6 +54,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.godotengine.godot.Dictionary
 import org.junit.Test
 import java.io.File
+import app.cartouche.core.settings.Settings as AppSettings
 
 class WireTest {
     private val found = FoundArt(GameId("ps2/a"), StoredArt(File("/data/art/a.jpg")))
@@ -101,10 +105,24 @@ class WireTest {
             failure(ErrorCode.CANCELLED, "x"),
             Scraping.NONE.toWire().putSome("found", Some(found.toWire())),
             success("library" to library.toWireJson(None), "art" to listOf(found).artWireJson()),
+            AppSettings(Some(ButtonStyle.NINTENDO)).toWire(false),
+            success("folder" to placed.toWire()),
         ).forEach { it.isGodotValue() shouldBe true }
         arrayOf("a").isGodotValue() shouldBe true
         listOf("a").toTypedArray<Any>().isGodotValue() shouldBe false
         arrayOf(dictionary()).isGodotValue() shouldBe false
+    }
+
+    private val placed = Folder(uri("content://p/tree/t"), "ps2", None, Some(FolderPlace(Volume.CARD, listOf("ROMs", "ps2"))))
+
+    @Test
+    fun `the settings and a folder's place reach Godot with the keys the GDScript adapter reads`() {
+        AppSettings().toWire(true) shouldBe dictionary("first_launch" to true)
+        AppSettings(Some(ButtonStyle.PLAYSTATION)).toWire(false) shouldBe
+            dictionary("first_launch" to false, "button_style" to "playstation")
+        val place = placed.toWire()["place"] as Dictionary
+        place["volume"] shouldBe "card"
+        (place["folders"] as Array<*>).toList() shouldBe listOf("ROMs", "ps2")
     }
 
     @Test

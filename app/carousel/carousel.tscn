@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=17 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -12,6 +12,10 @@
 [ext_resource type="Script" path="res://carousel/consoles/console_sequence.gd" id="10"]
 [ext_resource type="Script" path="res://carousel/consoles/console_layer.gd" id="11"]
 [ext_resource type="Shader" path="res://carousel/consoles/console_layer.gdshader" id="12"]
+[ext_resource type="PackedScene" path="res://screens/screens.tscn" id="13"]
+[ext_resource type="Script" path="res://screens/button_glyph.gd" id="14"]
+[ext_resource type="Script" path="res://screens/button_hint.gd" id="20"]
+[ext_resource type="Script" path="res://screens/add_ball.gd" id="21"]
 
 [sub_resource type="ShaderMaterial" id="backdrop_material"]
 shader = ExtResource("3")
@@ -121,34 +125,69 @@ row = NodePath("../Row")
 consoles = NodePath("../Consoles")
 layer = NodePath("../Backdrop/ConsoleView")
 
-[node name="TopBar" type="MarginContainer" parent="."]
+[node name="ConsoleTitle" type="Control" parent="."]
+unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 10
+anchors_preset = 15
 anchor_right = 1.0
-offset_bottom = 72.0
+anchor_bottom = 1.0
 grow_horizontal = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 32
+grow_vertical = 2
+mouse_filter = 2
 
-[node name="Items" type="HBoxContainer" parent="TopBar"]
-layout_mode = 2
+[node name="Names" type="VBoxContainer" parent="ConsoleTitle"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -400.0
+offset_top = 130.0
+offset_right = 400.0
+offset_bottom = 238.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
 
-[node name="Clock" type="Label" parent="TopBar/Items"]
+[node name="ConsoleName" type="Label" parent="ConsoleTitle/Names"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 3
+theme_type_variation = &"ConsoleName"
+horizontal_alignment = 1
 
-[node name="Platform" type="Label" parent="TopBar/Items"]
+[node name="ConsoleModel" type="Label" parent="ConsoleTitle/Names"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_type_variation = &"CurrentTab"
+theme_type_variation = &"ConsoleModel"
+horizontal_alignment = 1
 
-[node name="Battery" type="Label" parent="TopBar/Items"]
+[node name="AddBall" type="Control" parent="ConsoleTitle"]
 unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-horizontal_alignment = 2
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 30.0
+offset_right = 180.0
+offset_bottom = 94.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("21")
+
+[node name="SettingsHint" type="PanelContainer" parent="ConsoleTitle"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -40.0
+offset_right = 40.0
+offset_bottom = -40.0
+grow_vertical = 0
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"y"
+text = "Settings"
 
 [node name="ArtProgress" type="Control" parent="."]
 unique_name_in_owner = true
@@ -201,16 +240,11 @@ theme_type_variation = &"Pill"
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Glyph" type="PanelContainer" parent="Pill/Items"]
+[node name="Glyph" type="Control" parent="Pill/Items"]
+custom_minimum_size = Vector2(38, 38)
 layout_mode = 2
 size_flags_vertical = 4
-theme_type_variation = &"Glyph"
-
-[node name="Letter" type="Label" parent="Pill/Items/Glyph"]
-layout_mode = 2
-theme_type_variation = &"GlyphText"
-text = "A"
-horizontal_alignment = 1
+script = ExtResource("14")
 
 [node name="Title" type="Label" parent="Pill/Items"]
 unique_name_in_owner = true
@@ -229,18 +263,38 @@ grow_horizontal = 2
 grow_vertical = 2
 horizontal_alignment = 1
 
-[node name="Empty" type="Label" parent="."]
+[node name="Screens" parent="." instance=ExtResource("13")]
 unique_name_in_owner = true
-visible = false
 layout_mode = 1
-anchors_preset = 15
+
+[node name="TopBar" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
+offset_bottom = 72.0
 grow_horizontal = 2
-grow_vertical = 2
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 32
+
+[node name="Items" type="HBoxContainer" parent="TopBar"]
+layout_mode = 2
+
+[node name="Clock" type="Label" parent="TopBar/Items"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Chip"
+
+[node name="Space" type="Control" parent="TopBar/Items"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Battery" type="Label" parent="TopBar/Items"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"Chip"
 
 [node name="Front" type="CanvasLayer" parent="."]
 
@@ -262,7 +316,7 @@ row = NodePath("../Row")
 spindle = NodePath("../Row/Spindle")
 sequence = NodePath("../Sequence")
 blackout = NodePath("../Front/Blackout")
-controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill")]
+controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill"), NodePath("../ConsoleTitle")]
 
 [node name="Art" type="Node" parent="."]
 unique_name_in_owner = true
@@ -286,3 +340,8 @@ one_shot = true
 [connection signal="timeout" from="ClockTimer" to="." method="_on_clock_timeout"]
 [connection signal="timeout" from="MessageTimer" to="." method="_on_message_timer_timeout"]
 [connection signal="timeout" from="HoldSelect" to="." method="_on_hold_select_timeout"]
+[connection signal="library_changed" from="Screens" to="." method="_on_screens_library_changed"]
+[connection signal="console_added" from="Screens" to="." method="_on_screens_console_added"]
+[connection signal="covering" from="Screens" to="." method="_on_screens_covering"]
+[connection signal="library_edited" from="Screens" to="." method="_on_screens_library_edited"]
+[connection signal="welcome_closed" from="Screens" to="." method="_on_screens_welcome_closed"]

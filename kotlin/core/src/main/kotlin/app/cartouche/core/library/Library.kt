@@ -268,6 +268,15 @@ public data class Library(
         )
     }
 
+    /** The library without [platform]: its choices, its games and what its scans set aside. The others are untouched. */
+    public fun without(platform: PlatformId): Library = copy(
+        setups = setups - platform,
+        games = games.filter { it.platform != platform },
+        notGames = notGames - platform,
+        ignoredCounts = ignoredCounts - platform,
+        skippedFolders = skippedFolders - platform,
+    )
+
     /** Records [disc] (an index into the game's discs, kept within them) as the one launched last. */
     public fun withLastDisc(id: GameId, disc: Int): Library =
         copy(games = games.map { if (it.id == id) it.copy(lastDisc = disc.coerceIn(it.discs.indices)) else it })

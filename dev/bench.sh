@@ -50,10 +50,12 @@ emit() {
 }
 
 # start ARGUMENTS: a cold start, the launch arguments joined by commas.
+# start [ARGUMENTS]: Cartouche started anew with the comma-separated ARGUMENTS, past its welcome
+# screen (which waits for a press).
 start() {
   "$adb" shell am force-stop app.cartouche
   "$adb" logcat -c
-  "$adb" shell am start -n app.cartouche/com.godot.game.GodotAppLauncher ${1:+--esa arguments "$1"} > /dev/null
+  "$adb" shell am start -n app.cartouche/com.godot.game.GodotAppLauncher --esa arguments "--welcome=skip${1:+,$1}" > /dev/null
 }
 
 # wait_for PATTERN SECONDS: until the log has a line matching PATTERN.

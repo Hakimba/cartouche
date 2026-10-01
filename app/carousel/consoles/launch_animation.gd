@@ -29,7 +29,7 @@ const TRACKS: Array[String] = [
 	"Sequence:disc_away", "Sequence:disc_lift", "Sequence:disc_offset", "Sequence:disc_tilt",
 	"Sequence:disc_turns_per_s", "Sequence:blur", "Sequence:layer_opacity", "Sequence:saturation",
 	"Sequence:black",
-	"TopBar:modulate:a", "TopBar/Items/Platform:modulate:a", "Pill:modulate:a",
+	"TopBar:modulate:a", "Pill:modulate:a",
 	"ArtProgress:modulate:a",
 ]
 ## The shortest a step takes: an animation merges keys closer than a few hundred-thousandths of a
@@ -193,8 +193,6 @@ static func _value(track: String, step: Dictionary) -> Variant:
 			return _number(_group(step, "fx"), "black", 0.0)
 		"TopBar:modulate:a":
 			return _number(shown, "bar", 1.0)
-		"TopBar/Items/Platform:modulate:a":
-			return _number(shown, "tabs", 1.0)
 		# The art bar shows under the pill, and with it.
 		"Pill:modulate:a", "ArtProgress:modulate:a":
 			return _number(shown, "pill", 1.0)

@@ -1,0 +1,132 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://screens/add_console.gd" id="1"]
+[ext_resource type="PackedScene" path="res://screens/field_button.tscn" id="2"]
+[ext_resource type="Script" path="res://screens/glyph_button.gd" id="3"]
+[ext_resource type="PackedScene" path="res://screens/choice_list.tscn" id="4"]
+
+[node name="AddConsole" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.094, 0.102, 0.125, 0.42)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_right = 450.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"FormPanel"
+
+[node name="Items" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="Panel/Items"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"PanelTitle"
+text = "Add a console"
+horizontal_alignment = 1
+
+[node name="Type" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 2
+label = "Type"
+
+[node name="Emulator" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 2
+label = "Emulator"
+
+[node name="Folder" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 2
+label = "Games folder"
+
+[node name="Note" type="Label" parent="Panel/Items"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+theme_type_variation = &"PanelNote"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subfolders" type="CheckButton" parent="Panel/Items"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+theme_type_variation = &"Toggle"
+button_pressed = true
+text = "Subfolders"
+
+[node name="Discs" type="CheckButton" parent="Panel/Items"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+focus_neighbor_bottom = NodePath("../Buttons/Cancel")
+theme_type_variation = &"Toggle"
+button_pressed = true
+text = "Group the discs of a game"
+
+[node name="Gap" type="Control" parent="Panel/Items"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+focus_mode = 0
+mouse_filter = 2
+
+[node name="Buttons" type="HBoxContainer" parent="Panel/Items"]
+layout_mode = 2
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="Cancel" type="Button" parent="Panel/Items/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+focus_neighbor_left = NodePath(".")
+focus_neighbor_right = NodePath("../Add")
+text = "Cancel"
+script = ExtResource("3")
+
+[node name="Add" type="Button" parent="Panel/Items/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+focus_neighbor_left = NodePath("../Cancel")
+focus_neighbor_right = NodePath(".")
+disabled = true
+text = "Add"
+script = ExtResource("3")
+
+[node name="Choice" parent="." instance=ExtResource("4")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[connection signal="pressed" from="Panel/Items/Type" to="." method="_on_type_pressed"]
+[connection signal="pressed" from="Panel/Items/Emulator" to="." method="_on_emulator_pressed"]
+[connection signal="pressed" from="Panel/Items/Folder" to="." method="_on_folder_pressed"]
+[connection signal="toggled" from="Panel/Items/Subfolders" to="." method="_on_option_toggled"]
+[connection signal="toggled" from="Panel/Items/Discs" to="." method="_on_option_toggled"]
+[connection signal="pressed" from="Panel/Items/Buttons/Cancel" to="." method="_on_cancel_pressed"]
+[connection signal="pressed" from="Panel/Items/Buttons/Add" to="." method="_on_add_pressed"]

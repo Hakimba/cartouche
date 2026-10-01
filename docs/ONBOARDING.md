@@ -93,6 +93,19 @@ The same words are used in the code, the tests and this document.
   out **requests** (a game and where to look, best first); a **stall** (offline, a server refusing,
   no room to store) stops it until the network is back or a delay passes. Games no source has are
   remembered as **absent** until the extract changes.
+- **Screens**: what shows in front of the carousel, over its background: the **welcome** at each
+  start, a title screen that waits for a button while the app loads; on the **first launch** (no
+  controller set up and no platform), the **button style** (how buttons are drawn: Nintendo,
+  Xbox or PlayStation) and the **curtain permission**; while no console has games, **no console**
+  and the **form** adding one, whose **count** (the compatible games of the chosen folder) is a
+  scan that saves nothing; then the **discovery** of the console added. Y opens the **settings**
+  over the consoles screen: the **platforms** set up, each opened in the same form to **edit** it
+  (saved and scanned again) or **remove** it after a confirmation, and the button style. Above the
+  console, a **"+" ball**: holding up turns it into "Add a platform" (its strokes spreading into the
+  button's outline), and A adds one more console, the consoles screen coming back on it.
+- **Settings**: the app's own choices, apart from the library: the button style.
+- **Removing a platform**: its choices, games, selection, art and folder access go (INV-E6-03);
+  the game files stay.
 - **Demo library**: a made-up library of any size, in debug builds, for measuring at scale.
 - **Wire format**: what crosses the JNI bridge between the plugin and GDScript.
 
@@ -143,7 +156,9 @@ The same words are used in the code, the tests and this document.
   no source has, with the version of the sources they were looked for in.
 - **`library/DemoLibrary.kt`** makes up libraries of any size, the same for the same arguments.
 - **`storage/DocumentPaths.kt`** maps document ids such as `1A2B-3C4D:ROMs/ps2` to paths such as
-  `/storage/1A2B-3C4D/ROMs/ps2`.
+  `/storage/1A2B-3C4D/ROMs/ps2`, and to a **place** the user reads (the SD card, then `ROMs`, `ps2`).
+- **`settings/`** holds the app's `Settings` (the button style), whether the first launch is still
+  to do, and their stored format.
 - **`Values.kt`** holds the newtypes shared across modules: `PackageName`, `ContentUri` (built
   with `ContentUri.parse`, so it is always a `content://` URI), `FilePath`, `FileName`.
 
@@ -170,20 +185,34 @@ The same words are used in the code, the tests and this document.
 - **`storage/Folders.kt`** covers folders picked with the system picker: keeping read access (and
   nothing more), and listing a folder level from the documents provider for `FolderWalk`. Its
   tests run it against a fake `DocumentsProvider`. `LibraryStore` writes the library file
-  atomically and sets an unreadable one aside; `SelectionStore` does the same for the selection,
-  whose unreadable file is only replaced.
-- **`library/LibraryService.kt`** runs scans, choices, selections and library launches on one
-  thread, in the order they arrive.
+  atomically and sets an unreadable one aside; `SelectionStore` and `SettingsStore` do the same
+  for the selection and the settings, whose unreadable files are only replaced.
+- **`library/LibraryService.kt`** runs scans, counts (`preview`: the scan's own walk and sorting,
+  nothing saved), choices, removals, selections and library launches on one thread, in the order
+  they arrive. Setting a platform up or removing one gives up the access to folders no platform
+  uses any more.
 - **`art/`** runs scraping: `Scraper` hands a run's requests to four workers, which download
   through the `Fetch` port (`HttpFetch` in the app, `FakeFetch` in tests), cut the scan to a
   square label (`ArtImages`: to its disc, 1,024 pixels at most, JPEG)
   and store it (`ArtStore`: one file per game, named after a hash of its id, written atomically).
   It stops while the app is paused (a game is played), resumes on the network callback or after a
   growing delay, and tells Godot through the `art_changed` signal. It starts after the library is
-  read and after each scan, never for a demo library.
+  read, after each scan and after a removal, never for a demo library; each time, the images of
+  games no longer in the library are deleted first (`ArtStore.keepOnly`).
 - **`AndroidManifest.xml`** lists the permissions, each justified in a comment.
 
 ### Godot (`app/`)
+- **The screens** (`screens/`): `ScreenFlow`, in the carousel's scene, shows one screen at a time
+  in front of it and returns once the carousel can be used; each screen is a scene of its own that
+  says when it is done. The settings (`SettingsMenu`, `PlatformList`, `ConfirmRemoval`) reuse the
+  form adding a console (`AddConsole`) to edit one. `Controls` holds the button style that
+  `ButtonGlyph`, `ButtonHint` and `ButtonMark` draw. The theme
+  (`carousel/carousel_theme.tres`) holds the buttons, fields, toggles and focus ring of every
+  screen; the font is Fredoka throughout (`fonts/`, two weights of its variable font).
+- **Controller buttons** (`adapters/android/android_buttons.gd`): on Android, A confirms and B goes
+  back as Android names them, following the device's own setting when it has one. Godot's bundled
+  controller database maps some devices by position instead (A is then the bottom button), so
+  `AndroidButtons` drops each controller's mapping at start and on connection.
 - **The carousel** (`carousel/`, the main scene) shows the consoles screen and the games screen.
   `carousel.gd` handles the screens, input, platforms, launches and remembering the selection
   (before going out of a console, launching, or leaving the app); the right stick turns the

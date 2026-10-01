@@ -41,6 +41,8 @@ func _ready() -> void:
 		_plugin = Engine.get_singleton(_SINGLETON)
 		_plugin.connect(&"answered", _answered.emit)
 		_plugin.connect(&"art_changed", func(payload: Dictionary) -> void: art_changed.emit(ArtChange.new(payload)))
+	if OS.has_feature("android"):
+		AndroidButtons.follow_android()
 	_load_catalog()
 
 
@@ -167,9 +169,33 @@ func set_up_platform(platform_id: String, setup: PlatformSetup) -> LibraryAnswer
 	return LibraryAnswer.new(await _request(&"setUpPlatform", [platform_id, setup.to_wire()]))
 
 
+## How many games a scan of [param platform_id] with [param setup] would find, without saving
+## anything; its scan after [method set_up_platform] finds the same.
+func preview_platform(platform_id: String, setup: PlatformSetup) -> PreviewAnswer:
+	return PreviewAnswer.new(await _request(&"previewPlatform", [platform_id, setup.to_wire()]))
+
+
+## The app's settings. Without the plugin: no first launch, no button style chosen.
+func settings() -> SettingsAnswer:
+	if not is_available():
+		return SettingsAnswer.new({"ok": true, "first_launch": false})
+	return SettingsAnswer.new(await _request(&"settings"))
+
+
+## Stores the button style the user chose, [param style] as [SettingsAnswer] names it.
+func save_button_style(style: StringName) -> Result:
+	return Result.new(await _request(&"saveButtonStyle", [style]))
+
+
 ## Scans the folder of [param platform_id] and replaces its games.
 func scan_platform(platform_id: String) -> ScanAnswer:
 	return ScanAnswer.new(await _request(&"scanPlatform", [platform_id]))
+
+
+## Removes [param platform_id] from the library: its choices, games and art, and the access to its
+## folder unless another platform uses it. The game files stay.
+func remove_platform(platform_id: String) -> LibraryAnswer:
+	return LibraryAnswer.new(await _request(&"removePlatform", [platform_id]))
 
 
 ## Remembers [param game] as the selected game of its platform, and that platform as the one shown.
@@ -289,7 +315,20 @@ class Document:
 
 ## A folder granted through the system picker.
 class Folder extends Document:
-	pass
+	## Whether the folder is on the device's storage, where [member volume] and [member folders]
+	## say where, as the user reads it.
+	var has_place: bool
+	## `internal` or `card`.
+	var volume: StringName
+	## The folders from the volume down to this one; none for the volume itself.
+	var folders: PackedStringArray
+
+	func _init(item: Dictionary) -> void:
+		super(item)
+		has_place = item.has("place")
+		var place: Dictionary = item.get("place", {})
+		volume = place.get("volume", &"")
+		folders = place.get("folders", PackedStringArray())
 
 
 ## A folder listing entry.
@@ -347,10 +386,16 @@ class Platform:
 class Player:
 	var id: String
 	var name: String
+	## The name without the platform the definitions put first, as the user knows the emulator.
+	var emulator_name: String
+	## The file extensions the player opens, when its definition says them plainly; empty otherwise.
+	var extensions: PackedStringArray
 
 	func _init(item: Dictionary) -> void:
 		id = item["player_id"]
 		name = item["player_name"]
+		emulator_name = item.get("emulator_name", name)
+		extensions = item.get("extensions", PackedStringArray())
 
 
 class CatalogSummary:
@@ -550,6 +595,10 @@ class Library:
 	func setup_of(platform_id: String) -> PlatformSetup:
 		return _setups.get(platform_id, PlatformSetup.new())
 
+	## The platforms set up, games or not.
+	func set_up_platforms() -> PackedStringArray:
+		return PackedStringArray(_setups.keys())
+
 	func games_of(platform_id: String) -> Array[Game]:
 		return games.filter(func(game: Game) -> bool: return game.platform_id == platform_id)
 
@@ -613,6 +662,29 @@ class ScanReport:
 		ignored = item.get("ignored", 0)
 		skipped_folders = item.get("skipped_folders", 0)
 		milliseconds = item.get("milliseconds", 0)
+
+
+class PreviewAnswer extends Result:
+	var report: ScanReport
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		var item: Dictionary = payload.get("report", {})
+		report = ScanReport.new(item)
+
+
+class SettingsAnswer extends Result:
+	## Whether the first launch is still to do: no button style chosen and no platform.
+	var first_launch: bool
+	var has_button_style: bool
+	## `xbox`, `nintendo` or `playstation`: how the buttons are drawn.
+	var button_style: StringName
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		first_launch = payload.get("first_launch", false)
+		has_button_style = payload.has("button_style")
+		button_style = payload.get("button_style", &"")
 
 
 class ScanAnswer extends LibraryAnswer:

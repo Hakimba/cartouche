@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
 
-const CAROUSEL := preload("res://carousel/carousel.tscn")
+const Fixtures := preload("res://test/carousel/fixtures.gd")
 
 
 func test_the_art_bar_follows_a_run_greys_while_it_waits_and_fades_once_it_is_over() -> void:
-	var carousel: Carousel = auto_free(CAROUSEL.instantiate())
-	add_child(carousel)
+	var carousel := await Fixtures.shown_carousel(self)
 	var progress: Control = carousel.get_node("%ArtProgress")
 	var bar: ProgressBar = carousel.get_node("%Bar")
 	var text: Label = carousel.get_node("%ArtText")

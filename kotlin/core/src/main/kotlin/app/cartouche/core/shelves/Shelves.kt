@@ -33,6 +33,9 @@ public data class SelectedGame(public val id: GameId, public val title: String) 
 public data class Selection(public val platform: Option<PlatformId> = None, public val games: Map<PlatformId, SelectedGame> = emptyMap()) {
     /** [game] selected, and its platform shown. */
     public fun with(game: Game): Selection = copy(platform = Some(game.platform), games = games + (game.platform to SelectedGame.of(game)))
+
+    /** Nothing remembered of [platform]: its game, and that it was shown. */
+    public fun without(platform: PlatformId): Selection = Selection(this.platform.filter { it != platform }, games - platform)
 }
 
 /** The games of one platform, in title order, and the index of the one shown first. */

@@ -219,8 +219,6 @@ static func _expected(track: String, step: Dictionary) -> Variant:
 			return _read(step, "fx", "black")
 		"TopBar:modulate:a":
 			return _read(step, "ui", "bar")
-		"TopBar/Items/Platform:modulate:a":
-			return _read(step, "ui", "tabs")
 		"Pill:modulate:a", "ArtProgress:modulate:a":
 			return _read(step, "ui", "pill")
 	push_error("no expected value for %s" % track)

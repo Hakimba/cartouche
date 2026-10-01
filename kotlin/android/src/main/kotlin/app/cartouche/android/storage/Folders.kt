@@ -27,6 +27,7 @@ import app.cartouche.core.library.ListedFile
 import app.cartouche.core.library.WalkFailure
 import app.cartouche.core.storage.DocumentId
 import app.cartouche.core.storage.DocumentPaths
+import app.cartouche.core.storage.FolderPlace
 import app.cartouche.core.storage.VolumeId
 import arrow.core.Either
 import arrow.core.None
@@ -43,8 +44,11 @@ import arrow.core.raise.ensureNotNull
 import arrow.core.raise.option
 import arrow.core.toOption
 
-/** A folder the user granted through the system picker; [path] is none when it has no filesystem path. */
-internal data class Folder(val uri: ContentUri, val name: String, val path: Option<FilePath>)
+/**
+ * A folder the user granted through the system picker; [path] is none when it has no filesystem path,
+ * [place] when its provider is not the device's storage.
+ */
+internal data class Folder(val uri: ContentUri, val name: String, val path: Option<FilePath>, val place: Option<FolderPlace> = None)
 
 internal data class DocumentEntry(
     val name: FileName,
@@ -96,6 +100,14 @@ internal class Folders(private val context: Context) {
         context.contentResolver.persistedUriPermissions
             .filter { it.isReadPermission && DocumentsContract.isTreeUri(it.uri) }
             .map { describe(it.uri, roots) }
+    }
+
+    /** Gives up the access kept to the folders not in [used] (a platform removed or moved, a pick given up); answers how many. */
+    fun keepOnly(used: Set<ContentUri>): Either<StorageFailure, Int> = guard {
+        context.contentResolver.persistedUriPermissions
+            .filter { it.isReadPermission && DocumentsContract.isTreeUri(it.uri) && contentUri(it.uri) !in used }
+            .onEach { context.contentResolver.releasePersistableUriPermission(it.uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            .size
     }
 
     /** Lists one level of [tree]: its root, or the sub-folder [documentId]. Nothing is filtered out. */
@@ -165,7 +177,8 @@ internal class Folders(private val context: Context) {
             queryAll(DocumentsContract.buildDocumentUriUsingTree(treeUri, rootId.value), arrayOf(Document.COLUMN_DISPLAY_NAME))
                 .flatMap { cursor -> cursor.use { if (it.moveToFirst()) it.getString(0).toOption() else None } }
                 .getOrElse { DocumentPaths.fallbackName(rootId) }
-        return Folder(contentUri(treeUri), name, DocumentPaths.pathOf(treeUri.authority.orEmpty(), rootId, roots))
+        val authority = treeUri.authority.orEmpty()
+        return Folder(contentUri(treeUri), name, DocumentPaths.pathOf(authority, rootId, roots), DocumentPaths.placeOf(authority, rootId))
     }
 
     private fun Raise<StorageFailure>.contentUri(uri: Uri): ContentUri =

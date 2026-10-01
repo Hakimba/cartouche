@@ -37,11 +37,39 @@ class CatalogTest {
     }
 
     @Test
+    fun `the extensions read from a player's pattern are exactly ones it accepts, and every shipped player has them`() {
+        shippedCatalog.platforms.flatMap { it.players }.forEach { player ->
+            val extensions = player.accepts.extensions.shouldBeSome()
+            extensions.forEach { player.accepts.matches(FileName("Game.$it")) shouldBe true }
+            player.accepts.matches(FileName("Game.notadisc")) shouldBe false
+        }
+        FileNamePattern.of("^(.*)\\.(?:iso|CHD)$").shouldBeSome().extensions shouldBe Some(listOf("iso", "CHD"))
+        // Patterns that say other things, or only seem to list extensions.
+        listOf("^(?!\\.).*$", "^foo\\.(?:iso)$", "^(.*)\\.(?:iso|)$", "(?:iso|bin)", "^(.*)\\.(?:iso)x$").forEach {
+            FileNamePattern.of(it).shouldBeSome().extensions shouldBe None
+        }
+    }
+
+    @Test
+    fun `a player's emulator name leaves out the platform the definitions put first`() {
+        val names = shippedCatalog.platform(PlatformId("ps2")).shouldBeSome().players.map { it.emulatorName }
+        names shouldContain "ARMSX2 (Refresh/GitHub)"
+        names shouldContain "RetroArch 64 - play"
+        shippedCatalog.platform(PlatformId("ps2")).shouldBeSome().players.first().copy(name = "Solo").emulatorName shouldBe "Solo"
+    }
+
+    @Test
     fun `a PS2 disc image is offered to ARMSX2`() {
         val candidates = shippedCatalog.candidates(FileName("Burnout 3 - Takedown (Europe) (En,Es,Nl,Sv).chd"))
-        candidates.map { it.platform.id }.distinct() shouldBe listOf(PlatformId("ps2"))
-        candidates.map { it.player.template.targetPackage.map { p -> p.value } } shouldContain Some("com.armsx2")
-        shippedCatalog.candidates(FileName("GAME.CHD")).map { it.platform.id }.distinct() shouldBe listOf(PlatformId("ps2"))
+        // A .chd may hold a disc of several platforms: the PS2 is one of them.
+        candidates.map { it.platform.id } shouldContain PlatformId("ps2")
+        candidates.filter { it.platform.id == PlatformId("ps2") }.map {
+            it.player.template.targetPackage.map { p ->
+                p.value
+            }
+        } shouldContain
+            Some("com.armsx2")
+        shippedCatalog.candidates(FileName("GAME.CHD")).map { it.platform.id } shouldContain PlatformId("ps2")
     }
 
     @Test
