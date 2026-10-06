@@ -22,14 +22,15 @@ class RemovalTest {
     /** A library and its selection, with choices, files set aside and counts for every platform. */
     private val libraries =
         Arb.bind(selectedLibraries, setups) { (library, selection), setup ->
-            platforms.fold(library) { built, platform ->
-                built.withSetup(platform, setup).copy(
-                    notGames = built.notGames + (platform to listOf(listed("bios ${platform.value}.bin"))),
-                    ignoredCounts =
-                        built.ignoredCounts + (platform to mapOf(CountedReason.HIDDEN to IgnoredCount(1, listOf(FileName(".x"))))),
-                    skippedFolders = built.skippedFolders + (platform to listOf(SkippedFolder(FolderPath(".x"), SkipReason.HIDDEN))),
-                )
-            } to selection
+            platforms
+                .fold(library) { built, platform ->
+                    built.withSetup(platform, setup).copy(
+                        notGames = built.notGames + (platform to listOf(listed("bios ${platform.value}.bin"))),
+                        ignoredCounts =
+                            built.ignoredCounts + (platform to mapOf(CountedReason.HIDDEN to IgnoredCount(1, listOf(FileName(".x"))))),
+                        skippedFolders = built.skippedFolders + (platform to listOf(SkippedFolder(FolderPath(".x"), SkipReason.HIDDEN))),
+                    )
+                }.withConsoleOrder(platforms.reversed()) to selection
         }
 
     @Test
@@ -50,6 +51,7 @@ class RemovalTest {
                 fun others(of: Library) = listOf(of.setups, of.notGames, of.ignoredCounts, of.skippedFolders).map { it - platform }
                 others(removed) shouldBe others(library)
                 removed.games shouldBe library.games.filter { it.platform != platform }
+                removed.consoleOrder shouldBe library.consoleOrder - platform
                 forgotten.games shouldBe selection.games - platform
                 forgotten.platform shouldBe selection.platform.filter { it != platform }
             }

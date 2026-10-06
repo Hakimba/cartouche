@@ -26,9 +26,18 @@ import arrow.core.separateEither
 import arrow.core.serialization.NonEmptyListSerializer
 import arrow.core.serialization.OptionSerializer
 import arrow.core.toNonEmptyListOrNone
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 @Serializable @JvmInline
 public value class GameId(public val value: String)
@@ -42,6 +51,66 @@ public data class ListedFile(
     public val sizeBytes: Option<Long>,
 ) {
     public val asGameFile: GameFile get() = GameFile(name, uri, path)
+}
+
+/** A region an image of a game was printed for, as the art sources name it (`Japan`); empty when they name none. */
+@Serializable @JvmInline
+public value class LabelRegion(public val name: String)
+
+/**
+ * A name the user gave a game, shown in place of its title: one line, its spaces single, trimmed,
+ * never blank, at most [LONGEST] characters. Only what is shown changes: identification and art keep
+ * looking for its title, and the shelves keep it in its title's place.
+ */
+@Serializable(with = DisplayNameSerializer::class)
+@JvmInline
+public value class DisplayName private constructor(public val text: String) {
+    public companion object {
+        public const val LONGEST: Int = 80
+
+        // Every kind of space, line break and invisible control: a name is one line.
+        private val SPACES = Regex("[\\s\\p{Z}\\p{Cc}]+")
+
+        /** [text] as a game's name, as its type says; none when it is blank, the game showing its title again. */
+        public fun of(text: String): Option<DisplayName> {
+            val single = text.replace(SPACES, " ").trim()
+            // Characters, not UTF-16 units: a name is never cut inside one.
+            val end = single.offsetByCodePoints(0, minOf(LONGEST, single.codePointCount(0, single.length)))
+            val cut = single.substring(0, end).trimEnd()
+            return if (cut.isEmpty()) None else Some(DisplayName(cut))
+        }
+    }
+}
+
+/** Stored names are checked when read back, like any other: decoding fails on anything [DisplayName.of] would not give. */
+private object DisplayNameSerializer : KSerializer<DisplayName> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("app.cartouche.DisplayName", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: DisplayName): Unit = encoder.encodeString(value.text)
+
+    // The serialization library reports invalid input by exception; decoders catch it at their boundary.
+    override fun deserialize(decoder: Decoder): DisplayName = decoder.decodeString().let { text ->
+        DisplayName.of(text).filter { it.text == text }.getOrElse { throw SerializationException("Not a display name: $text") }
+    }
+}
+
+/** Which image a game's label shows. */
+@Serializable
+public sealed interface LabelChoice {
+    /** The image of the region closest to the game's own, as its art is looked for. */
+    @Serializable
+    @SerialName("automatic")
+    public data object Automatic : LabelChoice
+
+    /** The image the art sources have for [region], chosen by the user. */
+    @Serializable
+    @SerialName("region")
+    public data class Region(public val region: LabelRegion) : LabelChoice
+
+    /** A picture of the user's own, framed by them ([app.cartouche.core.art.LabelFraming]); the app keeps the framed copy. */
+    @Serializable
+    @SerialName("own")
+    public data object Own : LabelChoice
 }
 
 /** One disc of a game; [number] is none when the file names no disc. */
@@ -65,9 +134,20 @@ public data class Game(
     public val discs: NonEmptyList<Disc>,
     /** The disc launched last, as an index into [discs]; launches start from it. */
     public val lastDisc: Int = 0,
+    /** Left out of the stored library while automatic, as most games' are. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val label: LabelChoice = LabelChoice.Automatic,
+    /** The name the user gave it, if any; left out of the stored library otherwise. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val displayName: Option<DisplayName> = None,
 ) {
     /** Whether the reference list knows the game: as an exact disc, or by the serials of its release. */
     public val identified: Boolean get() = redumpName.isSome() || serials.isNotEmpty()
+
+    /** What the game is called on screen: the name the user gave it, else its title. */
+    public val shownTitle: String get() = displayName.fold({ title }) { it.text }
 }
 
 @Serializable
@@ -230,6 +310,14 @@ public data class Library(
     public val notGames: Map<PlatformId, List<ListedFile>> = emptyMap(),
     public val ignoredCounts: Map<PlatformId, Map<CountedReason, IgnoredCount>> = emptyMap(),
     public val skippedFolders: Map<PlatformId, List<SkippedFolder>> = emptyMap(),
+    /** The names the user gave consoles, shown in place of their own; left out of the stored library while there is none. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val consoleNames: Map<PlatformId, DisplayName> = emptyMap(),
+    /** The order the user put consoles in; left out of the stored library while they put none anywhere. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val consoleOrder: List<PlatformId> = emptyList(),
 ) {
     public fun setup(platform: PlatformId): PlatformSetup = setups.getOrElse(platform) { PlatformSetup() }
 
@@ -242,7 +330,9 @@ public data class Library(
         val previous = games.filter { it.platform == platform }.associateBy { it.id }
         val scanned =
             scan.games.map { game ->
-                previous.getOrNone(game.id).fold({ game }) { game.copy(lastDisc = it.lastDisc.coerceIn(game.discs.indices)) }
+                previous.getOrNone(game.id).fold({ game }) { kept ->
+                    game.copy(lastDisc = kept.lastDisc.coerceIn(game.discs.indices), label = kept.label, displayName = kept.displayName)
+                }
             }
         return copy(
             games = games.filter { it.platform != platform } + scanned,
@@ -275,9 +365,30 @@ public data class Library(
         notGames = notGames - platform,
         ignoredCounts = ignoredCounts - platform,
         skippedFolders = skippedFolders - platform,
+        consoleNames = consoleNames - platform,
+        consoleOrder = consoleOrder - platform,
     )
 
+    /** [platform]'s console shown as [name], or under its own name, [own], again when none or when [name] is it. */
+    public fun withConsoleName(platform: PlatformId, name: Option<DisplayName>, own: String): Library =
+        copy(consoleNames = name.filter { it.text != own }.fold({ consoleNames - platform }) { consoleNames + (platform to it) })
+
+    /** Consoles shown in [order] from now on; those put somewhere before and not in it follow, in their order. */
+    public fun withConsoleOrder(order: List<PlatformId>): Library = copy(consoleOrder = (order + consoleOrder).distinct())
+
+    /** [platforms] in the order the user put their consoles in: those put somewhere first, then the others as given. */
+    public fun inConsoleOrder(platforms: List<PlatformId>): List<PlatformId> =
+        (consoleOrder.filter { it in platforms } + platforms).distinct()
+
     /** Records [disc] (an index into the game's discs, kept within them) as the one launched last. */
-    public fun withLastDisc(id: GameId, disc: Int): Library =
-        copy(games = games.map { if (it.id == id) it.copy(lastDisc = disc.coerceIn(it.discs.indices)) else it })
+    public fun withLastDisc(id: GameId, disc: Int): Library = withGame(id) { it.copy(lastDisc = disc.coerceIn(it.discs.indices)) }
+
+    /** Records which image game [id]'s label shows; the other games are untouched. */
+    public fun withLabel(id: GameId, label: LabelChoice): Library = withGame(id) { it.copy(label = label) }
+
+    /** Game [id] shown as [name], or as its title again when none or when [name] is its title. */
+    public fun withDisplayName(id: GameId, name: Option<DisplayName>): Library =
+        withGame(id) { game -> game.copy(displayName = name.filter { it.text != game.title }) }
+
+    private fun withGame(id: GameId, change: (Game) -> Game): Library = copy(games = games.map { if (it.id == id) change(it) else it })
 }

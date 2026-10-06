@@ -7,10 +7,12 @@ import app.cartouche.android.storage.SelectionStore
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.android.trace
 import app.cartouche.core.library.DataFolders
+import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderPath
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.IgnoredCount
+import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.ListedFile
 import app.cartouche.core.library.PlatformSetup
@@ -27,6 +29,7 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.getOrElse
+import arrow.core.getOrNone
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import kotlin.time.TimeSource
@@ -38,6 +41,8 @@ internal sealed interface LibraryFailure {
 
     data class NoDisc(val game: GameId, val disc: Int) : LibraryFailure
 
+    data class UnknownPlatform(val platform: PlatformId) : LibraryFailure
+
     data class Storage(val failure: StorageFailure) : LibraryFailure
 
     data class TooManyEntries(val walk: WalkFailure.TooManyEntries) : LibraryFailure
@@ -48,6 +53,7 @@ internal sealed interface LibraryFailure {
                 is NoFolder -> "No folder is set for ${platform.value}"
                 is UnknownGame -> "No game ${id.value} in the library"
                 is NoDisc -> "${game.value} has no disc $disc"
+                is UnknownPlatform -> "No console ${platform.value} in the library"
                 is Storage -> failure.message
                 is TooManyEntries -> {
                     fun name(folder: Option<FolderPath>) = folder.fold({ "the folder itself" }) { it.value }
@@ -235,6 +241,30 @@ internal class LibraryService(private val store: LibraryStore, private val selec
     }
 
     fun recordLaunch(id: GameId, disc: Int): Either<LibraryFailure, Library> = save(library().withLastDisc(id, disc))
+
+    /** Records which image game [id]'s label shows. */
+    fun chooseLabel(id: GameId, label: LabelChoice): Either<LibraryFailure, Library> = either {
+        ensure(library().game(id).isSome()) { LibraryFailure.UnknownGame(id) }
+        save(library().withLabel(id, label)).bind()
+    }
+
+    /** Shows game [id] as [name] from now on, or as its title again when none; answers the game renamed. */
+    fun rename(id: GameId, name: Option<DisplayName>): Either<LibraryFailure, Game> = either {
+        ensure(library().game(id).isSome()) { LibraryFailure.UnknownGame(id) }
+        save(library().withDisplayName(id, name)).bind().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id)) }
+    }
+
+    /** Shows [platform]'s console as [name] from now on, or under its own name, [own], again when none or when [name] is it; answers the name kept. */
+    fun renameConsole(platform: PlatformId, name: Option<DisplayName>, own: String): Either<LibraryFailure, Option<DisplayName>> = either {
+        ensure(platform in library().setups) { LibraryFailure.UnknownPlatform(platform) }
+        save(library().withConsoleName(platform, name, own)).bind().consoleNames.getOrNone(platform)
+    }
+
+    /** Shows the consoles in [order] from now on (see [Library.withConsoleOrder]); every one must be in the library. */
+    fun orderConsoles(order: List<PlatformId>): Either<LibraryFailure, Library> = either {
+        order.forEach { ensure(it in library().setups) { LibraryFailure.UnknownPlatform(it) } }
+        save(library().withConsoleOrder(order)).bind()
+    }
 
     private fun save(library: Library): Either<LibraryFailure, Library> = either {
         ensure(writable) { LibraryFailure.Storage(StorageFailure.Unavailable("the unreadable library file could not be set aside")) }

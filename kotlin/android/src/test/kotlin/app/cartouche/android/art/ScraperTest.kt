@@ -271,4 +271,20 @@ class ScraperTest {
         harness.last.stall shouldBe Some(Stall.STORAGE)
         store.isAbsent(request.single()) shouldBe false
     }
+
+    @Test
+    fun `an image chosen by the user while its game's download runs stays`() {
+        val store = ArtStore(folder)
+        val chosen = byteArrayOf(7, 7, 7)
+        val fetch = FakeFetch(mapOf(url(0, 0) to image))
+        fetch.during = { store.save(GameId("ps2/0"), chosen).shouldBeRight() }
+        val found = mutableListOf<FoundArt>()
+        val scope = TestScope(StandardTestDispatcher())
+        val scraper = Scraper(store, fetch, scope) { _, art -> found += art.toList() }
+        scraper.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
+        scope.runCurrent()
+        val kept = store.stored(GameId("ps2/0")).shouldBeSome()
+        kept.file.readBytes() shouldBe chosen
+        found shouldBe listOf(FoundArt(GameId("ps2/0"), kept))
+    }
 }

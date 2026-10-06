@@ -161,3 +161,168 @@ msgstr "Ses réglages et l’accès à son dossier seront retirés de Cartouche.
 
 msgid "Add a platform"
 msgstr "Ajouter une plateforme"
+
+msgid "Properties"
+msgstr "Propriétés"
+
+msgid "Label image"
+msgstr "Image du label"
+
+msgid "Change"
+msgstr "Changer"
+
+msgid "Choose"
+msgstr "Choisir"
+
+msgid "Choose the label's image"
+msgstr "Choisis l’image du label"
+
+msgid "My own image"
+msgstr "Image à moi"
+
+msgid "This image could not be kept."
+msgstr "Cette image n’a pas pu être gardée."
+
+msgid "No region"
+msgstr "Sans région"
+
+msgid "North America"
+msgstr "Amérique du Nord"
+
+msgid "South America"
+msgstr "Amérique du Sud"
+
+msgid "Latin America"
+msgstr "Amérique latine"
+
+msgid "Europe"
+msgstr "Europe"
+
+msgid "Japan"
+msgstr "Japon"
+
+msgid "World"
+msgstr "Monde"
+
+msgid "Asia"
+msgstr "Asie"
+
+msgid "Oceania"
+msgstr "Océanie"
+
+msgid "Australia"
+msgstr "Australie"
+
+msgid "New Zealand"
+msgstr "Nouvelle-Zélande"
+
+msgid "United Kingdom"
+msgstr "Royaume-Uni"
+
+msgid "Germany"
+msgstr "Allemagne"
+
+msgid "France"
+msgstr "France"
+
+msgid "Spain"
+msgstr "Espagne"
+
+msgid "Italy"
+msgstr "Italie"
+
+msgid "Netherlands"
+msgstr "Pays-Bas"
+
+msgid "Russia"
+msgstr "Russie"
+
+msgid "Scandinavia"
+msgstr "Scandinavie"
+
+msgid "Sweden"
+msgstr "Suède"
+
+msgid "Finland"
+msgstr "Finlande"
+
+msgid "Korea"
+msgstr "Corée"
+
+msgid "China"
+msgstr "Chine"
+
+msgid "Brazil"
+msgstr "Brésil"
+
+msgid "Canada"
+msgstr "Canada"
+
+msgid "No other image of this game is known"
+msgstr "Aucune autre image connue pour ce jeu"
+
+msgid "Game name"
+msgstr "Nom du jeu"
+
+msgid "Adjust the image on the label"
+msgstr "Ajuste l’image sur le label"
+
+msgid "Move"
+msgstr "Déplacer"
+
+msgid "Zoom out"
+msgstr "Éloigner"
+
+msgid "Zoom in"
+msgstr "Rapprocher"
+
+msgid "Place"
+msgstr "Poser"
+
+msgid "Shift"
+msgstr "Maj"
+
+msgid "Space"
+msgstr "Espace"
+
+msgid "Erase"
+msgstr "Effacer"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Type a key"
+msgstr "Taper"
+
+msgid "This name could not be kept."
+msgstr "Ce nom n’a pas pu être gardé."
+
+msgid "Console name"
+msgstr "Nom de la console"
+
+msgid "Arrange"
+msgstr "Ranger"
+
+msgid "Change place"
+msgstr "Changer de place"
+
+msgid "Take"
+msgstr "Prendre"
+
+msgid "Done"
+msgstr "Terminé"
+
+msgid "Put down"
+msgstr "Poser"
+
+msgid "in its place"
+msgstr "à sa place"
+
+msgid "between {before} and {after}"
+msgstr "entre {before} et {after}"
+
+msgid "next to {other}"
+msgstr "à côté de {other}"
+
+msgid "This order could not be kept."
+msgstr "Cet ordre n’a pas pu être gardé."

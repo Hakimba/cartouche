@@ -283,6 +283,7 @@ class FakeArt extends GameArt:
 	var _images: Dictionary[String, Texture2D]
 
 	func _init(images: Dictionary[String, Texture2D] = {}) -> void:
+		super()
 		_images = images
 
 	## [param game]'s scan arrives, as the plugin finds it.

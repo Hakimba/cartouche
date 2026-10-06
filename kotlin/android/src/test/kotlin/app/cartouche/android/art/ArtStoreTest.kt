@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.art
 
+import app.cartouche.android.storage.StorageFailure
 import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.ArtVersion
@@ -15,6 +16,7 @@ import io.kotest.assertions.arrow.core.shouldBeNone
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -113,5 +115,50 @@ class ArtStoreTest {
             gone.forEach { again.isAbsent(request(it)) shouldBe false }
         }
         store.keepOnly(setOf(kept)) shouldBe Either.Right(0)
+    }
+
+    @Test
+    fun `an image of a region is found again, apart from the games' images, and only the latest ones are kept`() {
+        val store = ArtStore(folder)
+        val urls = (0..ArtStore.VARIANTS_KEPT + 4).map { ArtUrl("https://art/$it.png") }
+        urls.forEachIndexed { i, url ->
+            store.saveVariant(url, byteArrayOf(i.toByte())).shouldBeRight()
+            // One second apart, older first, as a person looks at one game after another.
+            store.variant(url).shouldBeSome().file.setLastModified(1_000L * (i + 1))
+        }
+        val (gone, kept) = urls.partition { urls.indexOf(it) < urls.size - ArtStore.VARIANTS_KEPT }
+        gone.forEach { store.variant(it).shouldBeNone() }
+        kept.forEach { url -> store.variant(url).shouldBeSome().file.readBytes() shouldBe byteArrayOf(urls.indexOf(url).toByte()) }
+        ArtStore(folder).variant(kept.last()).shouldBeSome()
+        store.stored(game).shouldBeNone()
+    }
+
+    @Test
+    fun `deleting the images of games gone leaves the images of regions`() {
+        val store = ArtStore(folder)
+        val url = ArtUrl("https://art/eu.png")
+        store.saveVariant(url, image).shouldBeRight()
+        store.keepOnly(emptySet()).shouldBeRight(0)
+        store.variant(url).shouldBeSome()
+    }
+
+    @Test
+    fun `an image of a region taken for a game's label is copied whole, and one that is gone fails`() {
+        val store = ArtStore(folder)
+        val url = ArtUrl("https://art/jp.png")
+        store.saveVariant(url, image).shouldBeRight()
+        store.adopt(game, url).shouldBeRight().file.readBytes() shouldBe image
+        ArtStore(folder).stored(game).shouldBeSome().file.readBytes() shouldBe image
+        store.adopt(game, ArtUrl("https://art/gone.png")).shouldBeLeft().shouldBeInstanceOf<StorageFailure.Unavailable>()
+        store.stored(game).shouldBeSome().file.readBytes() shouldBe image
+    }
+
+    @Test
+    fun `a game's image stored meanwhile is kept by a save that only fills a missing one`() {
+        val store = ArtStore(folder)
+        val chosen = store.save(game, image).shouldBeRight()
+        store.saveIfAbsent(game, byteArrayOf(9)).shouldBeRight() shouldBe chosen
+        chosen.file.readBytes() shouldBe image
+        store.saveIfAbsent(GameId("ps2/other"), byteArrayOf(9)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
     }
 }

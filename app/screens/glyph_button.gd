@@ -2,12 +2,14 @@
 class_name GlyphButton
 extends Button
 ## A button of the screens, as wide as its text: grows a little while focused, and may show the
-## mark of the button that confirms on its left ([member shows_glyph]), its text moved over.
+## mark of the button that presses it on its left ([member shows_glyph]), its text moved over.
 
 ## Room the mark takes on the left: its margin, its width and the gap to the text.
 const _GLYPH_ROOM := 22.0 + 30.0 + 12.0
 
 @export var shows_glyph := false
+## The button that presses it, as [method Controls.mark] names it.
+@export var button := &"a"
 
 var _focus_scale := FocusScale.new()
 
@@ -20,6 +22,7 @@ func _ready() -> void:
 			box.content_margin_left = _GLYPH_ROOM
 			add_theme_stylebox_override(state, box)
 		var glyph := ButtonGlyph.new()
+		glyph.button = button
 		glyph.anchor_top = 0.5
 		glyph.anchor_bottom = 0.5
 		glyph.offset_left = 22.0

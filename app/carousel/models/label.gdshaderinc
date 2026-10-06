@@ -8,6 +8,9 @@
 // Included by label.gdshader, and by label_fading.gdshader with FADING defined.
 
 uniform sampler2D label_texture : source_color, filter_linear_mipmap_anisotropic;
+// The part of the texture the label shows, as fractions of it: its position, then its size. A
+// picture being framed shows its square this way, without being cut.
+uniform vec4 label_window = vec4(0.0, 0.0, 1.0, 1.0);
 uniform bool has_label = false;
 // Whether the label is an image of a real one, rather than drawn from the game's title.
 uniform bool scanned = false;
@@ -36,15 +39,20 @@ float hash(vec2 at) {
 
 const int BLUR_SAMPLES = 16;
 
+// The texture's colour at [uv] of the label, through [label_window].
+vec3 printed(vec2 uv) {
+	return texture(label_texture, label_window.xy + uv * label_window.zw).rgb;
+}
+
 vec3 print_at(vec2 uv) {
 	if (spin_blur <= 0.0) {
-		return texture(label_texture, uv).rgb;
+		return printed(uv);
 	}
 	vec3 sum = vec3(0.0);
 	for (int i = 0; i < BLUR_SAMPLES; i++) {
 		float angle = (float(i) / float(BLUR_SAMPLES - 1) - 0.5) * spin_blur;
 		mat2 turn = mat2(vec2(cos(angle), sin(angle)), vec2(-sin(angle), cos(angle)));
-		sum += texture(label_texture, turn * (uv - 0.5) + 0.5).rgb;
+		sum += printed(turn * (uv - 0.5) + 0.5);
 	}
 	return sum / float(BLUR_SAMPLES);
 }

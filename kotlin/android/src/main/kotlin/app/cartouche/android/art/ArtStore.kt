@@ -7,11 +7,13 @@ import app.cartouche.android.storage.read
 import app.cartouche.android.storage.write
 import app.cartouche.core.art.AbsentArt
 import app.cartouche.core.art.ArtRequest
+import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.library.GameId
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
+import arrow.core.flatMap
 import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.right
@@ -45,15 +47,56 @@ internal class ArtStore(private val folder: File) {
         )
     }
 
-    fun stored(game: GameId): Option<StoredArt> = stored.getOrNone(hash(game))
+    fun stored(game: GameId): Option<StoredArt> = stored.getOrNone(sha1(game.value))
 
     /** Stores [image] as [game]'s disc scan. */
+    @Synchronized
     fun save(game: GameId, image: ByteArray): Either<StorageFailure, StoredArt> {
         folder.mkdirs()
-        val stem = hash(game)
+        val stem = sha1(game.value)
         val art = StoredArt(File(folder, "$stem.jpg"))
         return AtomicFile(art.file).write(image).map { art.also { stored[stem] = it } }
     }
+
+    /** Stores [image] as [game]'s disc scan unless it has one, chosen by the user meanwhile; answers the one it has then. */
+    @Synchronized
+    fun saveIfAbsent(game: GameId, image: ByteArray): Either<StorageFailure, StoredArt> =
+        stored(game).fold({ save(game, image) }) { it.right() }
+
+    /** Stores the scan of [url] kept by [saveVariant] as [game]'s disc scan; fails when it is gone or cannot be read. */
+    @Synchronized
+    fun adopt(game: GameId, url: ArtUrl): Either<StorageFailure, StoredArt> = Either
+        .catch { variantFile(url).readBytes() }
+        .mapLeft { StorageFailure.Unavailable("the image of ${url.value} cannot be read: $it") }
+        .flatMap { save(game, it) }
+
+    /** The scan of [url] kept by [saveVariant], while it is among the latest ones. */
+    fun variant(url: ArtUrl): Option<StoredArt> = Some(variantFile(url)).filter(File::isFile).map(::StoredArt)
+
+    /**
+     * Keeps [image], the scan at [url], to be shown and chosen among a game's other images; only
+     * the [VARIANTS_KEPT] latest ones are kept, the others deleted.
+     */
+    @Synchronized
+    fun saveVariant(url: ArtUrl, image: ByteArray): Either<StorageFailure, StoredArt> {
+        variants.mkdirs()
+        val art = StoredArt(variantFile(url))
+        return AtomicFile(art.file).write(image).map {
+            // The newest kept, this one first; a file that cannot be deleted only stays until the next save.
+            variants
+                .listFiles()
+                .orEmpty()
+                .filter { NAME.matches(it.name) && it != art.file }
+                .sortedByDescending(File::lastModified)
+                .drop(VARIANTS_KEPT - 1)
+                .forEach(File::delete)
+            art
+        }
+    }
+
+    private val variants = File(folder, "variants")
+
+    private fun variantFile(url: ArtUrl): File = File(variants, "${sha1(url.value)}.jpg")
 
     /**
      * Deletes the images and the absence of the games not in [kept] (a platform removed, games gone
@@ -62,7 +105,7 @@ internal class ArtStore(private val folder: File) {
      */
     @Synchronized
     fun keepOnly(kept: Set<GameId>): Either<StorageFailure, Int> {
-        val stems = kept.mapTo(HashSet(), ::hash)
+        val stems = kept.mapTo(HashSet()) { sha1(it.value) }
         val gone = stored.keys.filter { it !in stems }
         // A file that cannot be deleted is listed again at the next start, and goes then.
         gone.forEach { stem -> stored.remove(stem).toOption().onSome { it.file.delete() } }
@@ -96,10 +139,13 @@ internal class ArtStore(private val folder: File) {
             .also { absent = Some(it) }
     }
 
-    private companion object {
-        val NAME = Regex("""([0-9a-f]{40})\.jpg""")
+    companion object {
+        private val NAME = Regex("""([0-9a-f]{40})\.jpg""")
 
-        fun hash(game: GameId): String =
-            MessageDigest.getInstance("SHA-1").digest(game.value.encodeToByteArray()).joinToString("") { "%02x".format(it) }
+        /** Enough for a few screens of a game's images, a few megabytes. */
+        const val VARIANTS_KEPT = 48
+
+        private fun sha1(text: String): String =
+            MessageDigest.getInstance("SHA-1").digest(text.encodeToByteArray()).joinToString("") { "%02x".format(it) }
     }
 }

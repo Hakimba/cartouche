@@ -51,5 +51,6 @@ internal object Regions {
         }
     }
 
-    private fun same(region: String): String = SAME.getOrElse(region) { region }
+    /** The name [region] goes by here, whichever source named it (`USA` is `North America`). */
+    fun same(region: String): String = SAME.getOrElse(region) { region }
 }

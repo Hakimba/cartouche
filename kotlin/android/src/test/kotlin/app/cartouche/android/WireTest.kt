@@ -2,7 +2,9 @@
 package app.cartouche.android
 
 import app.cartouche.android.art.FoundArt
+import app.cartouche.android.art.OwnPicture
 import app.cartouche.android.art.StoredArt
+import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.ScanReport
 import app.cartouche.android.storage.DocumentEntry
@@ -16,11 +18,15 @@ import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.library.Disc
+import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderPath
+import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.IgnoreReason
 import app.cartouche.core.library.IgnoredCount
 import app.cartouche.core.library.IgnoredFile
+import app.cartouche.core.library.LabelChoice
+import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.Scan
@@ -88,7 +94,7 @@ class WireTest {
                     ),
                     listOf(SkippedFolder(FolderPath(".Trash"), SkipReason.HIDDEN)),
                 ),
-            )
+            ).withConsoleName(PlatformId("ps2"), DisplayName.of("Ma PS2"), "PlayStation 2")
 
     @Test
     fun `INV-E0-16 everything sent to Godot is a value its bridge converts`() {
@@ -217,7 +223,48 @@ class WireTest {
                 "ps2": {"unsupported": {"count": 1, "examples": ["a.json"]}, "hidden": {"count": 1, "examples": ["._G.chd"]}}
             },
             "skipped_folders": {"ps2": [{"path": ".Trash", "reason": "hidden"}]},
+            "console_names": {"ps2": "Ma PS2"},
             "shelves": {"shelves": [{"platform": "ps2", "games": [0], "selected": 0}], "selected": 0}
         }"""
+    }
+
+    @Test
+    fun `a renamed game reaches Godot under its name, with its title beside it`() {
+        fun sent(game: Game) = Json
+            .parseToJsonElement(Library(games = listOf(game)).toWireJson(None))
+            .jsonObject
+            .getValue("games")
+            .jsonArray
+            .single()
+            .jsonObject
+        val okage = game("Okage")
+        sent(okage).getValue("title").jsonPrimitive.content shouldBe "Okage"
+        sent(okage).containsKey("original_title") shouldBe false
+        val renamed = sent(okage.copy(displayName = DisplayName.of("Okage: Shadow King")))
+        renamed.getValue("title").jsonPrimitive.content shouldBe "Okage: Shadow King"
+        renamed.getValue("original_title").jsonPrimitive.content shouldBe "Okage"
+    }
+
+    @Test
+    fun `a game's chosen region reaches Godot under its own key, and an automatic label sends none`() {
+        fun sent(label: LabelChoice) = Json
+            .parseToJsonElement(Library(games = listOf(game("Okage").copy(label = label))).toWireJson(None))
+            .jsonObject
+            .getValue("games")
+            .jsonArray
+            .single()
+            .jsonObject
+        sent(LabelChoice.Region(LabelRegion("Japan"))).getValue("label_region").jsonPrimitive.content shouldBe "Japan"
+        sent(LabelChoice.Region(LabelRegion(""))).getValue("label_region").jsonPrimitive.content shouldBe ""
+        sent(LabelChoice.Automatic).containsKey("label_region") shouldBe false
+        sent(LabelChoice.Own).getValue("label_own").jsonPrimitive.content shouldBe "true"
+        sent(LabelChoice.Own).containsKey("label_region") shouldBe false
+        VariantFailure.entries.map { it.wire }.distinct().size shouldBe VariantFailure.entries.size
+    }
+
+    @Test
+    fun `a picture being framed is sent with its path and size`() {
+        OwnPicture(File("/own/picked.jpg"), 640, 480).toWire() shouldBe
+            dictionary("path" to "/own/picked.jpg", "width" to 640, "height" to 480)
     }
 }

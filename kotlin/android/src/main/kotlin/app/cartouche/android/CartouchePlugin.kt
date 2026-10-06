@@ -3,6 +3,7 @@ package app.cartouche.android
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.ImageDecoder
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.Uri
@@ -17,7 +18,12 @@ import app.cartouche.android.art.Fetch
 import app.cartouche.android.art.FetchFailure
 import app.cartouche.android.art.FoundArt
 import app.cartouche.android.art.HttpFetch
+import app.cartouche.android.art.LabelChoices
+import app.cartouche.android.art.OwnPictures
 import app.cartouche.android.art.Scraper
+import app.cartouche.android.art.StoredArt
+import app.cartouche.android.art.VariantDownloads
+import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.Curtain
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.launch.Launcher
@@ -34,13 +40,17 @@ import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
 import app.cartouche.core.art.ArtIndex
 import app.cartouche.core.art.ArtSources
+import app.cartouche.core.art.ArtVariant
+import app.cartouche.core.art.LabelFraming
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.SerialScans
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DemoLibrary
 import app.cartouche.core.library.DiscGrouping
+import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderDepth
+import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LibraryFormat
 import app.cartouche.core.library.PlatformSetup
@@ -107,8 +117,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private val launcher by lazy { Launcher(context, folders) }
     private val curtain by lazy { Curtain(context.applicationContext, scope) }
     private val pendingPick = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
+    private val pendingPicture = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
+    private val ownPictures by lazy { OwnPictures(File(context.cacheDir, "own-label")) }
     private val artStore by lazy { ArtStore(File(context.filesDir, "art")) }
-    private val scraper by lazy { Scraper(artStore, artFetch(), scope, ::artChanged) }
+    private val fetch by lazy { artFetch() }
+    private val scraper by lazy { Scraper(artStore, fetch, scope, ::artChanged) }
+
+    private val variantDownloads by lazy {
+        VariantDownloads(artStore, fetch, scope, Dispatchers.IO.limitedParallelism(VARIANT_DOWNLOADS), ::variantDownloaded)
+    }
     private val network =
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) = scraper.networkBack()
@@ -153,8 +170,11 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     override fun getPluginName(): String = BuildConfig.GODOT_PLUGIN_NAME
 
-    override fun getPluginSignals(): Set<SignalInfo> =
-        setOf(SignalInfo(ANSWERED_SIGNAL, Dictionary::class.java), SignalInfo(ART_SIGNAL, Dictionary::class.java))
+    override fun getPluginSignals(): Set<SignalInfo> = setOf(
+        SignalInfo(ANSWERED_SIGNAL, Dictionary::class.java),
+        SignalInfo(ART_SIGNAL, Dictionary::class.java),
+        SignalInfo(VARIANT_SIGNAL, Dictionary::class.java),
+    )
 
     override fun onMainResume() {
         installed.clear()
@@ -276,21 +296,29 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Opens the folder picker; answers with `{"folder"}` once the user picked one. */
     @UsedByGodot
-    public fun pickFolder(requestId: Int): Unit = onActivity(requestId) { act ->
-        scope.launch(Dispatchers.Main) {
-            pendingPick.start(requestId, failure(ErrorCode.CANCELLED, "Replaced by a new pick")) {
-                Either.catch { launcher.pickFolder(act, REQUEST_PICK_FOLDER) }.fold({ Some(unexpected(it)) }) { opened ->
-                    opened.swap().getOrNone().map { it.toWire() }
+    public fun pickFolder(requestId: Int): Unit = picking(requestId, pendingPick) { launcher.pickFolder(it, REQUEST_PICK_FOLDER) }
+
+    /** Opens a system picker with [open], on the main thread, as [pending]'s pick of [requestId]. */
+    private fun picking(requestId: Int, pending: PendingPick<Dictionary>, open: (Activity) -> Either<LaunchFailure, Unit>): Unit =
+        onActivity(requestId) { act ->
+            scope.launch(Dispatchers.Main) {
+                pending.start(requestId, failure(ErrorCode.CANCELLED, "Replaced by a new pick")) {
+                    Either.catch { open(act) }.fold({ Some(unexpected(it)) }) { opened -> opened.swap().getOrNone().map { it.toWire() } }
                 }
             }
         }
-    }
 
     override fun onMainActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         trace("activity result") { "request $requestCode, result $resultCode, data ${data.toOption().flatMap { it.data.toOption() }}" }
-        if (requestCode != REQUEST_PICK_FOLDER) return
-        val requestId = pendingPick.end()
         val picked = data.toOption().flatMap { it.data.toOption() }.filter { resultCode == Activity.RESULT_OK }
+        when (requestCode) {
+            REQUEST_PICK_FOLDER -> folderPicked(picked)
+            REQUEST_PICK_PICTURE -> picturePicked(picked)
+        }
+    }
+
+    private fun folderPicked(picked: Option<Uri>) {
+        val requestId = pendingPick.end()
         scope.launch {
             // A result reaching a restarted process belongs to no request; the folder is still kept.
             val result =
@@ -301,6 +329,54 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
                     )
                 }
             requestId.onSome { answer(it) { result } }
+        }
+    }
+
+    /**
+     * Opens the system's picker on images, for a picture of the user's own to put on a label; once
+     * one is picked, the app keeps an upright copy of it to be framed and answers with
+     * `{"picture": {"path", "width", "height"}}`.
+     */
+    @UsedByGodot
+    public fun pickLabelPicture(requestId: Int): Unit =
+        picking(requestId, pendingPicture) { launcher.pickPicture(it, REQUEST_PICK_PICTURE) }
+
+    // A result reaching a restarted process belongs to no request: nothing is copied.
+    private fun picturePicked(picked: Option<Uri>) = pendingPicture.end().onSome { requestId ->
+        scope.launch {
+            val started = System.nanoTime()
+            answer(requestId) {
+                picked.fold(
+                    { failure(ErrorCode.CANCELLED, "Picker closed without a picture") },
+                    { uri ->
+                        ownPictures.keep(ImageDecoder.createSource(context.contentResolver, uri)).fold({ it.toWire() }, {
+                            success(
+                                "picture" to it.toWire(),
+                            )
+                        })
+                    },
+                )
+            }
+            trace("art") { "picture picked and copied in ${(System.nanoTime() - started) / 1_000_000} ms" }
+        }
+    }
+
+    /**
+     * Shows the picture of the user's own picked last ([pickLabelPicture]) on [gameId]'s label from
+     * now on, framed [zoom] times closer than the largest square that fits and centred at [x], [y]
+     * (see [LabelFraming]), and remembers the choice (see [LabelChoices]); answers with
+     * `{"art": {"game_id", "path"}}`. The picture is cut in the background, the library only waiting
+     * for the choice to be recorded.
+     */
+    @UsedByGodot
+    public fun keepOwnLabel(requestId: Int, gameId: String, zoom: Double, x: Double, y: Double): Unit = answering(requestId) {
+        val started = System.nanoTime()
+        val image = ownPictures.framed(LabelFraming(zoom, x, y)).mapLeft { it.toWire() }.bind()
+        withContext(libraryThread) {
+            val game = game(GameId(gameId))
+            val art = LabelChoices(library.value, artStore).keepOwn(game, image).mapLeft { it.toWire() }.bind()
+            trace("art") { "${game.title}: own label kept in ${(System.nanoTime() - started) / 1_000_000} ms" }
+            success("art" to FoundArt(game.id, art).toWire())
         }
     }
 
@@ -435,6 +511,76 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     /**
+     * The images the art sources have for [gameId]'s label, one per region, closest to the game's own
+     * first: answers with `{"variants": [{"region", "path"?}]}`, `path` for those already downloaded;
+     * then downloads the others, each telling the `label_variant_downloaded` signal `{"game_id",
+     * "region", "path"}`, or `{"game_id", "region", "failure"}` (`offline`, `refused`, `not_found`,
+     * `unreadable`, `storage`).
+     */
+    @UsedByGodot
+    public fun labelVariants(requestId: Int, gameId: String): Unit = answering(requestId, libraryThread) {
+        val game = game(GameId(gameId))
+        val stored = sources(game.platform).variantsOf(game).map { it to artStore.variant(it.url) }
+        val missing = stored.filter { it.second.isNone() }.map { it.first }
+        trace("art") { "${game.title}: ${stored.size} images, ${missing.size} to download" }
+        variantDownloads.download(game.id, missing)
+        success(
+            "variants" to
+                stored.toWireArray { (variant, art) ->
+                    dictionary("region" to variant.region.name).putSome("path", art.map { it.file.path })
+                },
+        )
+    }
+
+    /**
+     * Shows the image of [region] (as [labelVariants] names it, downloaded) on [gameId]'s label from
+     * now on, and remembers the choice (see [LabelChoices]); answers with `{"art": {"game_id",
+     * "path"}}`.
+     */
+    @UsedByGodot
+    public fun chooseLabel(requestId: Int, gameId: String, region: String): Unit = answering(requestId, libraryThread) {
+        val game = game(GameId(gameId))
+        val variant =
+            sources(game.platform).variantsOf(game).firstOrNone { it.region.name == region }.getOrElse {
+                raise(failure(ErrorCode.NO_IMAGE, "No image of ${game.title} for region '$region'"))
+            }
+        val art = LabelChoices(library.value, artStore).choose(game, variant).mapLeft { it.toWire() }.bind()
+        trace("art") { "${game.title}: label of region '$region' chosen" }
+        success("art" to FoundArt(game.id, art).toWire())
+    }
+
+    /**
+     * Shows [gameId] as [name] from now on (trimmed and cut, see [DisplayName]), or as its title
+     * again when [name] is blank; answers with `{"title", "original_title"?}`, what the game is now
+     * called and, once renamed, its title.
+     */
+    @UsedByGodot
+    public fun renameGame(requestId: Int, gameId: String, name: String): Unit = answering(requestId, libraryThread) {
+        val game = library.value.rename(GameId(gameId), DisplayName.of(name)).mapLeft { it.toWire() }.bind()
+        trace("library") { "${game.title}: shown as '${game.shownTitle}'" }
+        success("title" to game.shownTitle).putSome("original_title", game.displayName.map { game.title })
+    }
+
+    /**
+     * Shows [platformId]'s console as [name] from now on (see [DisplayName]), or under its own name,
+     * [own], again when [name] is blank or is it; answers with `{"name"?}`, the name kept.
+     */
+    @UsedByGodot
+    public fun renameConsole(requestId: Int, platformId: String, name: String, own: String): Unit = answering(requestId, libraryThread) {
+        val kept = library.value.renameConsole(PlatformId(platformId), DisplayName.of(name), own).mapLeft { it.toWire() }.bind()
+        trace("library") { "console $platformId shown as '${kept.fold({ own }) { it.text }}'" }
+        success().putSome("name", kept.map { it.text })
+    }
+
+    /** Shows the consoles of [platformIds] in that order from now on, on the consoles screen and after a restart. */
+    @UsedByGodot
+    public fun orderConsoles(requestId: Int, platformIds: Array<String>): Unit = answering(requestId, libraryThread) {
+        library.value.orderConsoles(platformIds.map(::PlatformId)).mapLeft { it.toWire() }.bind()
+        trace("library") { "consoles ordered: ${platformIds.joinToString()}" }
+        success()
+    }
+
+    /**
      * Checks that the library game `{"game_id", "disc"?}` can launch, as [launchGame] would, and
      * answers with its failure if it cannot; starts and stops nothing.
      */
@@ -511,6 +657,13 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             scraper.lookFor(requests)
             if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
         }
+    }
+
+    private fun variantDownloaded(game: GameId, variant: ArtVariant, kept: Either<VariantFailure, StoredArt>) {
+        trace("art") { "${variant.region.name} image of ${game.value}: ${kept.fold({ it.wire }) { "downloaded" }}" }
+        val told = dictionary("game_id" to game.value, "region" to variant.region.name)
+        kept.fold({ told.put("failure", it.wire) }) { told.put("path", it.file.path) }
+        emitSignal(VARIANT_SIGNAL, told)
     }
 
     private fun artChanged(run: Scraping, found: Option<FoundArt>): Unit =
@@ -599,6 +752,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         AppSettings()
     }
 
+    private fun Raise<Dictionary>.game(id: GameId): Game =
+        library.value.library().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id).toWire()) }
+
     private fun Raise<Dictionary>.platform(id: PlatformId): Platform =
         catalog.platform(id).getOrElse { raise(failure(ErrorCode.UNKNOWN_PLATFORM, "No platform ${id.value}")) }
 
@@ -665,8 +821,14 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         // among the plugins bundled with the app.
         const val REQUEST_PICK_FOLDER = 0xCA27
 
+        const val REQUEST_PICK_PICTURE = 0xCA28
+
         const val LIBRARY_FILE = "library.json"
 
         const val ART_SIGNAL = "art_changed"
+
+        const val VARIANT_SIGNAL = "label_variant_downloaded"
+
+        const val VARIANT_DOWNLOADS = 3
     }
 }

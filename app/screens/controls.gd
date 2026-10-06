@@ -7,16 +7,18 @@ extends RefCounted
 
 ## Each style's name.
 const NAMES: Dictionary[StringName, String] = {&"xbox": "Xbox", &"nintendo": "Nintendo", &"playstation": "PlayStation"}
-const _SHAPES: Dictionary[StringName, String] = {&"a": "✕", &"b": "○", &"y": "△"}
+const _SHAPES: Dictionary[StringName, String] = {&"a": "✕", &"b": "○", &"x": "□", &"y": "△"}
 
 ## `xbox`, `nintendo` or `playstation`.
 static var style := &"xbox"
 
 
-## The mark of [param button] (`a`, `b` or `y`, as Android names it), as [member style]
-## draws it.
+## The mark of [param button] (`a`, `b`, `x` or `y`, as Android names it), as [member style]
+## draws it; the other buttons (`l1`, `r1`) are marked by their name, and `stick` is the left stick.
 static func mark(button: StringName) -> String:
-	return _SHAPES[button] if style == &"playstation" else String(button).to_upper()
+	if button == &"stick":
+		return "◎"
+	return _SHAPES[button] if style == &"playstation" and button in _SHAPES else String(button).to_upper()
 
 
 ## The style's name: Xbox, Nintendo or PlayStation.

@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name GameArt
 extends Node
-## The games' disc scans the plugin stored (see `Scraper.kt`), as textures. An image is read and
-## its mipmaps made on a worker thread, as it takes tens of milliseconds; at most one texture a frame
-## is then sent to the GPU, so that labels arriving never stall the carousel. The latest textures
-## are kept, the oldest dropped; an image that cannot be read is not read again.
+## The games' disc scans the plugin stored (see `Scraper.kt`), as textures, read by an
+## [ImageReader] so that labels arriving never stall the carousel. The latest textures are kept,
+## the oldest dropped; an image that cannot be read is not read again.
 
 ## [method request]ed art of [param game_id] is ready: [method has_texture] is now true.
 signal loaded(game_id: String)
@@ -15,41 +14,26 @@ const _KEPT := 24
 var _art: Dictionary[String, AndroidServices.Art] = {}
 ## Textures made, by game id, the latest last.
 var _textures: Dictionary[String, Texture2D] = {}
-## Worker tasks reading an image, by game id.
-var _reading: Dictionary[String, int] = {}
-## Images read, by game id, waiting for their texture.
-var _read: Dictionary[String, Image] = {}
 var _unreadable: Dictionary[String, bool] = {}
+var _reader := ImageReader.new()
 
 
-func _ready() -> void:
-	set_process(false)
-
-
-# Runs only while images wait for their texture.
-func _process(_delta: float) -> void:
-	var game_id: String = _read.keys()[0]
-	var image := _read[game_id]
-	_read.erase(game_id)
-	set_process(not _read.is_empty())
-	if _textures.size() >= _KEPT:
-		_textures.erase(_textures.keys()[0])
-	_textures[game_id] = ImageTexture.create_from_image(image)
-	loaded.emit(game_id)
-
-
-func _exit_tree() -> void:
-	for task: int in _reading.values():
-		WorkerThreadPool.wait_for_task_completion(task)
+# The reader is its child from the start: art not in the tree yet is freed with it.
+func _init() -> void:
+	add_child(_reader)
+	_reader.read.connect(_on_read)
 
 
 ## Adds [param art], stored for a game, replacing what it had: an image of what it had, read or
-## being read, is dropped.
-func add(art: AndroidServices.Art) -> void:
+## being read, is dropped. With [param image], the image already read: [signal loaded] tells it is
+## ready at once.
+func add(art: AndroidServices.Art, image: Texture2D = null) -> void:
 	_art[art.game_id] = art
 	_textures.erase(art.game_id)
-	_read.erase(art.game_id)
+	_reader.cancel(art.game_id)
 	_unreadable.erase(art.game_id)
+	if image:
+		_keep(art.game_id, image)
 
 
 ## Forgets the art of the games not in [param games] (a platform removed or rescanned).
@@ -57,10 +41,11 @@ func keep_only(games: Array[AndroidServices.Game]) -> void:
 	var kept := {}
 	for game in games:
 		kept[game.id] = true
-	for known: Dictionary in [_art, _textures, _read, _unreadable]:
+	for known: Dictionary in [_art, _textures, _unreadable]:
 		for game_id: String in known.keys():
 			if game_id not in kept:
 				known.erase(game_id)
+				_reader.cancel(game_id)
 
 
 ## Whether [param game] has a stored image.
@@ -81,31 +66,20 @@ func texture(game: AndroidServices.Game) -> Texture2D:
 ## could not be read; [signal loaded] tells when it is ready.
 func request(game: AndroidServices.Game) -> void:
 	var id := game.id
-	if not has_art(game) or id in _textures or id in _reading or id in _read or id in _unreadable:
+	if not has_art(game) or id in _textures or _reader.is_reading(id) or id in _unreadable:
 		return
-	_reading[id] = WorkerThreadPool.add_task(_read_image.bind(id, _art[id].path, game.title))
+	_reader.request(id, _art[id].path, game.title)
 
 
-## Runs on a worker thread; hands the image, or none, to the main thread.
-func _read_image(game_id: String, path: String, title: String) -> void:
-	var started := Time.get_ticks_usec()
-	var image := Image.load_from_file(path)
-	if image and not image.is_empty():
-		image.generate_mipmaps()
-		Diagnostics.trace("art", "%s read in %.1f ms" % [title, (Time.get_ticks_usec() - started) / 1000.0])
-	else:
-		image = null
-		Diagnostics.trace("art", "%s: %s could not be read" % [title, path])
-	_on_read.call_deferred(game_id, path, image)
-
-
-func _on_read(game_id: String, path: String, image: Image) -> void:
-	WorkerThreadPool.wait_for_task_completion(_reading[game_id])
-	_reading.erase(game_id)
-	if path != _art[game_id].path:
-		return
-	if image:
-		_read[game_id] = image
-		set_process(true)
-	else:
+func _on_read(game_id: String, read: Texture2D) -> void:
+	if not read:
 		_unreadable[game_id] = true
+		return
+	_keep(game_id, read)
+
+
+func _keep(game_id: String, kept: Texture2D) -> void:
+	if _textures.size() >= _KEPT:
+		_textures.erase(_textures.keys()[0])
+	_textures[game_id] = kept
+	loaded.emit(game_id)

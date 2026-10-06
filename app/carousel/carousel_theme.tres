@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=26 format=3 uid="uid://voyem7672a04"]
+[gd_resource type="Theme" load_steps=32 format=3 uid="uid://voyem7672a04"]
 
 [ext_resource type="FontVariation" path="res://fonts/fredoka_medium.tres" id="1"]
 [ext_resource type="FontVariation" path="res://fonts/fredoka_semibold.tres" id="2"]
@@ -200,6 +200,72 @@ shadow_color = Color(0, 0, 0, 0.12)
 shadow_size = 5
 shadow_offset = Vector2(0, 1)
 
+[sub_resource type="StyleBoxEmpty" id="name_plain"]
+content_margin_left = 22.0
+content_margin_right = 22.0
+
+[sub_resource type="StyleBoxFlat" id="name_focus"]
+draw_center = false
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.13, 0.14, 0.17, 1)
+corner_radius_top_left = 29
+corner_radius_top_right = 29
+corner_radius_bottom_right = 29
+corner_radius_bottom_left = 29
+expand_margin_left = 7.0
+expand_margin_top = 7.0
+expand_margin_right = 7.0
+expand_margin_bottom = 7.0
+
+[sub_resource type="StyleBoxFlat" id="card"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 1, 1, 0.95)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+shadow_color = Color(0, 0, 0, 0.12)
+shadow_size = 8
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxFlat" id="card_focus"]
+draw_center = false
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.13, 0.14, 0.17, 1)
+corner_radius_top_left = 29
+corner_radius_top_right = 29
+corner_radius_bottom_right = 29
+corner_radius_bottom_left = 29
+expand_margin_left = 7.0
+expand_margin_top = 7.0
+expand_margin_right = 7.0
+expand_margin_bottom = 7.0
+
+[sub_resource type="StyleBoxEmpty" id="card_text"]
+
+[sub_resource type="StyleBoxFlat" id="key"]
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(1, 1, 1, 0.95)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+shadow_color = Color(0, 0, 0, 0.12)
+shadow_size = 8
+shadow_offset = Vector2(0, 2)
+
 [resource]
 default_font = ExtResource("1")
 default_font_size = 26
@@ -274,6 +340,12 @@ ConsoleModel/base_type = &"Label"
 ConsoleModel/colors/font_color = Color(0.36, 0.38, 0.43, 1)
 ConsoleModel/constants/outline_size = 10
 ConsoleModel/font_sizes/font_size = 26
+RingName/base_type = &"ConsoleName"
+RingName/constants/outline_size = 12
+RingName/font_sizes/font_size = 34
+RingPlace/base_type = &"ConsoleModel"
+RingPlace/constants/outline_size = 9
+RingPlace/font_sizes/font_size = 24
 Pill/base_type = &"PanelContainer"
 Pill/styles/panel = SubResource("pill")
 Glyph/base_type = &"PanelContainer"
@@ -317,3 +389,38 @@ HintText/fonts/font = ExtResource("2")
 RowValue/base_type = &"Label"
 RowValue/colors/font_color = Color(0.41, 0.43, 0.48, 1)
 RowValue/font_sizes/font_size = 24
+NameButton/base_type = &"Button"
+NameButton/colors/font_outline_color = Color(1, 1, 1, 1)
+NameButton/constants/outline_size = 16
+NameButton/font_sizes/font_size = 44
+NameButton/fonts/font = ExtResource("2")
+NameButton/styles/disabled = SubResource("name_plain")
+NameButton/styles/focus = SubResource("name_focus")
+NameButton/styles/hover = SubResource("name_plain")
+NameButton/styles/normal = SubResource("name_plain")
+NameButton/styles/pressed = SubResource("name_plain")
+Card/base_type = &"Button"
+Card/styles/disabled = SubResource("card")
+Card/styles/focus = SubResource("card_focus")
+Card/styles/hover = SubResource("card")
+Card/styles/normal = SubResource("card")
+Card/styles/pressed = SubResource("card")
+CardText/base_type = &"Label"
+CardText/font_sizes/font_size = 22
+CardText/fonts/font = ExtResource("2")
+CardText/styles/normal = SubResource("card_text")
+Prompt/base_type = &"Label"
+Prompt/constants/outline_size = 12
+Prompt/font_sizes/font_size = 26
+Prompt/fonts/font = ExtResource("1")
+Key/base_type = &"Card"
+Key/font_sizes/font_size = 28
+Key/styles/disabled = SubResource("key")
+Key/styles/hover = SubResource("key")
+Key/styles/normal = SubResource("key")
+Key/styles/pressed = SubResource("key")
+NameField/base_type = &"PanelContainer"
+NameField/styles/panel = SubResource("card")
+NameFieldText/base_type = &"Label"
+NameFieldText/font_sizes/font_size = 36
+NameFieldText/fonts/font = ExtResource("2")

@@ -1,0 +1,229 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://carousel/properties/disc_properties.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/properties/label_zone.gd" id="2"]
+[ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
+[ext_resource type="Script" path="res://carousel/properties/focus_callout.gd" id="4"]
+[ext_resource type="PackedScene" path="res://carousel/properties/name_editor.tscn" id="5"]
+
+[node name="DiscProperties" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Zone" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 0
+offset_left = 330.0
+offset_top = 152.0
+offset_right = 950.0
+offset_bottom = 772.0
+focus_neighbor_left = NodePath(".")
+focus_neighbor_top = NodePath(".")
+focus_neighbor_right = NodePath(".")
+focus_neighbor_bottom = NodePath("../Properties/Name")
+mouse_filter = 1
+script = ExtResource("2")
+
+[node name="Properties" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Name" type="Button" parent="Properties"]
+unique_name_in_owner = true
+auto_translate_mode = 2
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 790.0
+offset_bottom = 854.0
+grow_horizontal = 2
+focus_neighbor_left = NodePath(".")
+focus_neighbor_top = NodePath("../../Zone")
+focus_neighbor_right = NodePath(".")
+focus_neighbor_bottom = NodePath(".")
+theme_type_variation = &"NameButton"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Hints" type="HBoxContainer" parent="Properties"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 890.0
+offset_right = 400.0
+offset_bottom = 934.0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Change" type="PanelContainer" parent="Properties/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+text = "Change"
+
+[node name="Back" type="PanelContainer" parent="Properties/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+button = &"b"
+text = "Back"
+
+[node name="Callout" type="Control" parent="Properties"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4")
+
+[node name="Caption" type="Label" parent="Properties/Callout"]
+layout_mode = 0
+auto_translate_mode = 2
+theme_type_variation = &"Chip"
+
+[node name="Labels" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Prompt" type="Label" parent="Labels"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 594.0
+offset_bottom = 634.0
+grow_horizontal = 2
+theme_type_variation = &"Prompt"
+text = "Choose the label's image"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Cards" type="HBoxContainer" parent="Labels"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 650.0
+offset_bottom = 870.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 30
+alignment = 1
+
+[node name="Hints" type="HBoxContainer" parent="Labels"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 890.0
+offset_right = 400.0
+offset_bottom = 934.0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Choose" type="PanelContainer" parent="Labels/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+text = "Choose"
+
+[node name="Back" type="PanelContainer" parent="Labels/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+button = &"b"
+text = "Back"
+
+[node name="Framing" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Prompt" type="Label" parent="Framing"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 92.0
+offset_bottom = 136.0
+grow_horizontal = 2
+theme_type_variation = &"Prompt"
+text = "Adjust the image on the label"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Hints" type="HBoxContainer" parent="Framing"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 890.0
+offset_right = 900.0
+offset_bottom = 934.0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Move" type="PanelContainer" parent="Framing/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+button = &"stick"
+text = "Move"
+
+[node name="Further" type="PanelContainer" parent="Framing/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+button = &"l1"
+text = "Zoom out"
+
+[node name="Closer" type="PanelContainer" parent="Framing/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+button = &"r1"
+text = "Zoom in"
+
+[node name="Place" type="PanelContainer" parent="Framing/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+text = "Place"
+
+[node name="Cancel" type="PanelContainer" parent="Framing/Hints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("3")
+button = &"b"
+text = "Cancel"
+
+[node name="Naming" parent="." instance=ExtResource("5")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1

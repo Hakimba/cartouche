@@ -140,8 +140,12 @@ func test_INV_E5_06_the_carousel_opens_on_the_consoles_screen_with_the_remembere
 		assert_bool(carousel._sequence.is_processing()).is_false()
 		assert_int(carousel._consoles._turn.index).is_equal(-1)
 		assert_float(carousel._consoles._scroll).is_equal(float(selected))
-		var platform := carousel._platforms[carousel._shelves[selected].platform_id]
-		assert_str(carousel._title.text).is_equal(platform.name)
+		# The console opened is named over it, as the appearance names it.
+		var platform_id := carousel._shelves[selected].platform_id
+		assert_str(carousel._console_name.text).is_equal(
+			carousel._appearance.console_names.get(platform_id, carousel._platforms[platform_id].name))
+	# The consoles each library replaced are freed at the end of the frame.
+	await await_idle_frame()
 
 
 func test_INV_E5_04_the_selected_console_stands_as_its_animation_has_it_the_others_as_they_rest() -> void:
@@ -285,23 +289,26 @@ func test_the_consoles_are_drawn_in_one_view_the_blurred_one_once_behind_the_gam
 	assert_int(blurred).is_greater(0)
 
 
-func test_the_pill_names_the_game_while_its_disc_shows_and_the_console_otherwise() -> void:
+func test_the_pill_names_the_game_over_the_games_and_never_shows_over_the_consoles() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	for index in carousel._consoles._items.size():
 		_select(carousel, index)
-		var console: String = carousel._platforms[carousel._shelves[index].platform_id].name
-		assert_str(carousel._title.text).is_equal(console)
+		assert_float(carousel._pill.modulate.a).is_equal(0.0)
 		for action: StringName in [&"ui_accept", &"screen_back"]:
 			Fixtures.press(carousel, action)
 			for frame in 600:
 				Fixtures.step_frame(carousel)
-				var game := carousel._row.selected_game().title
-				assert_str(carousel._title.text).is_equal(game if carousel._row.selected_presence >= 0.5
-					else console)
+				# Never over the consoles, nor naming them.
+				if carousel._row.selected_presence < 0.5:
+					assert_float(carousel._pill.modulate.a).is_less(0.5)
 				if carousel._screen not in MOVING:
 					break
-			assert_str(carousel._title.text).is_equal(
-				carousel._row.selected_game().title if action == &"ui_accept" else console)
+			if action == &"ui_accept":
+				assert_str(carousel._title.text).is_equal(carousel._row.selected_game().title)
+				assert_float(carousel._pill.modulate.a).is_equal(1.0)
+				assert_float(carousel._console_title.modulate.a).is_equal(0.0)
+			else:
+				assert_float(carousel._pill.modulate.a).is_equal(0.0)
 
 
 func test_the_consoles_stop_at_the_ends_of_the_row_and_a_single_one_stays() -> void:
@@ -422,5 +429,6 @@ func _assert_alone(carousel: Carousel) -> void:
 
 ## Every console drawn in [param layers] only.
 func _assert_drawn_in(carousel: Carousel, layers: int) -> void:
-	for geometry in carousel._consoles._geometry:
-		assert_int(geometry.layers).is_equal(layers)
+	for item in carousel._consoles._items:
+		for geometry in item.geometry:
+			assert_int(geometry.layers).is_equal(layers)

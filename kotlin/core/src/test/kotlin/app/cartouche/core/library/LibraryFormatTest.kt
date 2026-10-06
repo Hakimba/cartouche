@@ -92,4 +92,59 @@ class LibraryFormatTest {
             LibraryFormat.decode(LibraryFormat.encode(library)).shouldBeRight() shouldBe StoredLibrary(library, LibraryFormat.VERSION)
         }
     }
+
+    @Test
+    fun `a library stored before label choices reads with automatic labels, and automatic labels are not stored`() {
+        val okage = game("Okage")
+        val stored = LibraryFormat.encode(Library(games = listOf(okage)))
+        stored.contains("\"label\"") shouldBe false
+        LibraryFormat.decode(stored).shouldBeRight().library.games.map { it.label } shouldBe listOf(LabelChoice.Automatic)
+        val chosen = Library(games = listOf(okage.copy(label = LabelChoice.Region(LabelRegion("Japan")))))
+        val written = stored.replace("\"lastDisc\":0", "\"lastDisc\":0,\"label\":{\"type\":\"region\",\"region\":\"Japan\"}")
+        LibraryFormat.decode(written).shouldBeRight().library shouldBe chosen
+    }
+
+    @Test
+    fun `a game's name is stored as its text, and only when it has one`() {
+        val okage = game("Okage")
+        val stored = LibraryFormat.encode(Library(games = listOf(okage)))
+        stored.contains("displayName") shouldBe false
+        val named = okage.copy(displayName = DisplayName.of(" Okage, a shadow king "))
+        LibraryFormat.encode(Library(games = listOf(named))) shouldBe
+            stored.replace("\"lastDisc\":0", "\"lastDisc\":0,\"displayName\":\"Okage, a shadow king\"")
+    }
+
+    @Test
+    fun `a label of the user's own is stored by its kind alone`() {
+        val okage = game("Okage")
+        val stored = LibraryFormat.encode(Library(games = listOf(okage)))
+        val written = stored.replace("\"lastDisc\":0", "\"lastDisc\":0,\"label\":{\"type\":\"own\"}")
+        LibraryFormat.encode(Library(games = listOf(okage.copy(label = LabelChoice.Own)))) shouldBe written
+    }
+
+    @Test
+    fun `a stored name that is not one a user can give is refused`() {
+        val stored = LibraryFormat.encode(Library(games = listOf(game("Okage"))))
+        for (bad in listOf("", "  Okage", "two\\nlines", "a  b", "x".repeat(81))) {
+            LibraryFormat.decode(stored.replace("\"lastDisc\":0", "\"lastDisc\":0,\"displayName\":\"$bad\"")).isLeft() shouldBe true
+        }
+    }
+
+    @Test
+    fun `console names are stored only once there is one`() {
+        val library = Library(games = listOf(game("Okage")))
+        LibraryFormat.encode(library).contains("consoleNames") shouldBe false
+        LibraryFormat
+            .encode(
+                library.withConsoleName(PlatformId("ps2"), DisplayName.of("Ma PS2"), "PlayStation 2"),
+            ).contains("consoleNames") shouldBe
+            true
+    }
+
+    @Test
+    fun `the consoles' order is stored only once the user put one somewhere`() {
+        val library = Library(games = listOf(game("Okage")))
+        LibraryFormat.encode(library).contains("consoleOrder") shouldBe false
+        LibraryFormat.encode(library.withConsoleOrder(listOf(PlatformId("gc")))).contains("consoleOrder") shouldBe true
+    }
 }

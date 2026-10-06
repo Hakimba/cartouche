@@ -4,6 +4,9 @@ package app.cartouche.android
 import android.util.Log
 import app.cartouche.android.apps.LaunchableApp
 import app.cartouche.android.art.FoundArt
+import app.cartouche.android.art.LabelFailure
+import app.cartouche.android.art.OwnPicture
+import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.ScanReport
@@ -20,6 +23,7 @@ import app.cartouche.core.library.FolderDepth
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.IgnoredCount
+import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.SkipReason
@@ -81,6 +85,8 @@ internal enum class ErrorCode(val wire: String) {
     PERMISSION_DENIED("permission_denied"),
     FOLDER_UNAVAILABLE("folder_unavailable"),
     TOO_MANY_FILES("too_many_files"),
+    NO_IMAGE("no_image"),
+    UNREADABLE_IMAGE("unreadable_image"),
     UNEXPECTED("unexpected"),
 }
 
@@ -111,6 +117,9 @@ internal fun Dictionary.integer(key: String): Option<Int> = this[key].toOption()
         else -> None
     }
 }
+
+/** `{"path", "width", "height"}`. */
+internal fun OwnPicture.toWire(): Dictionary = dictionary("path" to file.path, "width" to width, "height" to height)
 
 internal fun Either<LaunchFailure, Unit>.toWire(): Dictionary = fold({ it.toWire() }, { success() })
 
@@ -165,6 +174,7 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
     is LibraryFailure.NoFolder -> failure(ErrorCode.NO_FOLDER, message)
     is LibraryFailure.UnknownGame -> failure(ErrorCode.UNKNOWN_GAME, message)
     is LibraryFailure.NoDisc -> failure(ErrorCode.INVALID_REQUEST, message)
+    is LibraryFailure.UnknownPlatform -> failure(ErrorCode.UNKNOWN_PLATFORM, message)
     is LibraryFailure.TooManyEntries -> failure(ErrorCode.TOO_MANY_FILES, message)
 }
 
@@ -183,6 +193,7 @@ internal fun Library.toWireJson(shelves: Option<Shelves>): String = buildJsonObj
     put("not_games", notGames.toJson(PlatformId::value) { files -> files.toJson { JsonPrimitive(it.name.value) } })
     put("ignored_counts", ignoredCounts.toJson(PlatformId::value) { counts -> counts.toJson({ it.wire }) { it.toJson() } })
     put("skipped_folders", skippedFolders.toJson(PlatformId::value) { folders -> folders.toJson { it.toJson() } })
+    put("console_names", consoleNames.toJson(PlatformId::value) { JsonPrimitive(it.text) })
     shelves.onSome { put("shelves", it.toJson(games.withIndex().associate { (at, game) -> game.id to at })) }
 }.toString()
 
@@ -203,7 +214,8 @@ private fun PlatformSetup.toJson(): JsonObject = buildJsonObject {
 private fun Game.toJson(): JsonObject = buildJsonObject {
     put("id", id.value)
     put("platform_id", platform.value)
-    put("title", title)
+    put("title", shownTitle)
+    putSome("original_title", displayName.map { title })
     put("regions", regions.toJson(::JsonPrimitive))
     put("languages", languages.toJson(::JsonPrimitive))
     put("serials", serials.toJson(::JsonPrimitive))
@@ -212,6 +224,11 @@ private fun Game.toJson(): JsonObject = buildJsonObject {
     put("identified", identified)
     putSome("version", version)
     putSome("redump_name", redumpName)
+    when (val chosen = label) {
+        LabelChoice.Automatic -> Unit
+        is LabelChoice.Region -> put("label_region", chosen.region.name)
+        LabelChoice.Own -> put("label_own", true)
+    }
 }
 
 private fun Disc.toJson(): JsonObject = buildJsonObject {
@@ -310,6 +327,24 @@ internal fun List<FoundArt>.artWireJson(): String = toJson { found ->
         put("path", found.art.file.path)
     }
 }.toString()
+
+internal fun LabelFailure.toWire(): Dictionary = when (this) {
+    LabelFailure.NotDownloaded -> failure(ErrorCode.NO_IMAGE, "The image is not downloaded")
+    LabelFailure.NotPicked -> failure(ErrorCode.NO_IMAGE, "No picture is being framed")
+    is LabelFailure.Unreadable -> failure(ErrorCode.UNREADABLE_IMAGE, "The picture cannot be read: $reason")
+    is LabelFailure.Library -> failure.toWire()
+    is LabelFailure.Storage -> failure.toWire()
+}
+
+internal val VariantFailure.wire: String
+    get() =
+        when (this) {
+            VariantFailure.OFFLINE -> "offline"
+            VariantFailure.REFUSED -> "refused"
+            VariantFailure.NOT_FOUND -> "not_found"
+            VariantFailure.UNREADABLE -> "unreadable"
+            VariantFailure.STORAGE -> "storage"
+        }
 
 internal val Stall.wire: String
     get() =

@@ -156,7 +156,8 @@ internal class Scraper(
                 }
             }) { image ->
                 ArtImages.label(image).map { label ->
-                    store.save(request.game, label).fold({ Outcome.Stalled(Stall.STORAGE) }) { art ->
+                    // An image chosen by the user meanwhile stays.
+                    store.saveIfAbsent(request.game, label).fold({ Outcome.Stalled(Stall.STORAGE) }) { art ->
                         trace("art") {
                             "${request.title}: scan of ${image.size / 1024} kB, stored in ${label.size / 1024} kB, in ${started.elapsedNow().inWholeMilliseconds} ms"
                         }

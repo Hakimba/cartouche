@@ -4,17 +4,21 @@ package app.cartouche.core.shelves
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.Library
+import app.cartouche.core.library.LibraryFormat
 import app.cartouche.core.library.game
 import app.cartouche.core.platforms.PlatformId
 import arrow.core.Some
+import arrow.core.firstOrNone
 import arrow.core.getOrNone
 import io.kotest.assertions.arrow.core.shouldBeNone
+import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.long
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
@@ -99,6 +103,57 @@ class ShelvesTest {
         found shouldBeGreaterThan 100
         followed shouldBeGreaterThan 100
         wrapped shouldBeGreaterThan 10
+    }
+
+    @Test
+    fun `INV-E7-08 the consoles show in the order the user put them in, the others after them in catalog order`() = runBlocking<Unit> {
+        var reordered = 0
+        var partly = 0
+        var moved = 0
+        // A stored order may also name a console the catalog no longer has: it never shows.
+        val other = PlatformId("other")
+        checkAll(selectedLibraries, Arb.long(), Arb.int(0..4), Arb.int(0..4)) { (library, selection), seed, count, again ->
+            val random = Random(seed)
+            val catalog = shelfPlatforms.shuffled(random)
+            val placed = (catalog + other).shuffled(random).take(count)
+            val ordered = library.withConsoleOrder(placed)
+
+            fun shown(of: Library) = Shelves.of(of, catalog, selection).map { found -> found.shelves.map { it.platform } }
+
+            fun withGames(platforms: List<PlatformId>) = platforms.filter { platform -> library.games.any { it.platform == platform } }
+            Shelves.of(ordered, catalog, selection).onSome { found ->
+                val platforms = found.shelves.map { it.platform }
+                platforms shouldBe withGames(placed - other) + withGames(catalog - placed.toSet())
+                if (platforms != withGames(catalog)) reordered++
+                if (count in 1..2) partly++
+                // The remembered platform is still the one shown first, wherever it is.
+                selection.platform.filter { remembered -> platforms.contains(remembered) }.onSome {
+                    platforms[found.selected] shouldBe it
+                    if (found.selected != withGames(catalog).indexOf(it)) moved++
+                }
+            }
+            LibraryFormat.decode(LibraryFormat.encode(ordered)).shouldBeRight().library shouldBe ordered
+            // Put in another order later, those left out keep their place after the new ones.
+            val later = (catalog + other).shuffled(random).take(again)
+            shown(ordered.withConsoleOrder(later)).onSome { platforms ->
+                platforms shouldBe withGames(later - other) + withGames(placed - later.toSet() - other) +
+                    withGames(catalog - (placed + later).toSet())
+            }
+            // A console removed leaves the others in their order.
+            placed.firstOrNone().onSome { first ->
+                shown(ordered.without(first)) shouldBe shown(ordered).map { it - first }.filter { it.isNotEmpty() }
+            }
+        }
+        reordered shouldBeGreaterThan 100
+        partly shouldBeGreaterThan 100
+        moved shouldBeGreaterThan 50
+    }
+
+    @Test
+    fun `INV-E7-08 a console stored twice in the order shows once`() {
+        val gc = PlatformId("gc")
+        val library = Library(games = listOf(game("Okage", "ps2"), game("Pikmin", "gc")), consoleOrder = listOf(gc, ps2, gc))
+        Shelves.of(library, shelfPlatforms, Selection()).shouldBeSome().shelves.map { it.platform } shouldBe listOf(gc, ps2)
     }
 
     @Test

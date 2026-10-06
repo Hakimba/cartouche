@@ -193,9 +193,12 @@ static func _value(track: String, step: Dictionary) -> Variant:
 			return _number(_group(step, "fx"), "black", 0.0)
 		"TopBar:modulate:a":
 			return _number(shown, "bar", 1.0)
-		# The art bar shows under the pill, and with it.
-		"Pill:modulate:a", "ArtProgress:modulate:a":
+		"Pill:modulate:a":
 			return _number(shown, "pill", 1.0)
+		# The art bar shows under the pill, and with it, unless the step says otherwise: over the
+		# consoles, where the pill does not show.
+		"ArtProgress:modulate:a":
+			return _number(shown, "art", _number(shown, "pill", 1.0))
 	push_error("LaunchAnimation: no value for %s" % track)
 	return 0.0
 

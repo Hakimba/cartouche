@@ -11,10 +11,11 @@ const GROUP := &"button_glyphs"
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(30, 30)
+	# A button named by a word (Start) is a capsule as long as the word.
+	custom_minimum_size = Vector2(76 if Controls.mark(button).length() > 2 else 30, 30)
 	add_to_group(GROUP)
 
 
 func _draw() -> void:
 	var radius := minf(size.x, size.y) / 2.0
-	ButtonMark.draw(self, Controls.mark(button), size / 2.0, radius, radius * 1.3)
+	ButtonMark.draw(self, Controls.mark(button), size / 2.0, radius, radius * 1.3, size.x / 2.0 - radius)

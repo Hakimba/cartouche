@@ -58,3 +58,28 @@ func test_an_art_change_tells_the_progress_its_stall_and_the_scan_found() -> voi
 	var stalled := AndroidServices.ArtChange.new({"done": 3, "total": 55, "stall": "offline"})
 	assert_str(stalled.progress.stall).is_equal("offline")
 	assert_bool(stalled.has_found).is_false()
+
+
+func test_a_picture_picked_is_read_with_its_path_and_size_and_a_label_of_one_s_own_as_such() -> void:
+	# The shapes of `OwnPicture.toWire` and of a game in Wire.kt.
+	var picture := AndroidServices.LabelPicture.new({"ok": true, "picture": {"path": "/own/picked.jpg", "width": 640, "height": 480}})
+	assert_str(picture.path).is_equal("/own/picked.jpg")
+	assert_vector(picture.size).is_equal(Vector2i(640, 480))
+	var game := {"id": "ps2/A", "platform_id": "ps2", "title": "A", "identified": false, "discs": [{"name": "A"}], "last_disc": 0}
+	assert_bool(AndroidServices.Game.new(game).label_own).is_false()
+	game["label_own"] = true
+	assert_bool(AndroidServices.Game.new(game).label_own).is_true()
+	game["original_title"] = "A of its own"
+	assert_str(AndroidServices.Game.new(game).own_title()).is_equal("A of its own")
+	game.erase("original_title")
+	assert_str(AndroidServices.Game.new(game).own_title()).is_equal("A")
+
+
+func test_a_console_renamed_is_read_with_its_name_and_one_given_its_own_back_without() -> void:
+	# The shape `CartouchePlugin.renameConsole` answers with.
+	var named := AndroidServices.ConsoleRenamed.new({"ok": true, "name": "Ma PS2"})
+	assert_bool(named.has_name and named.name == "Ma PS2").is_true()
+	assert_bool(AndroidServices.ConsoleRenamed.new({"ok": true}).has_name).is_false()
+	var library := AndroidServices.Library.new({"console_names": {"ps2": "Ma PS2"}})
+	assert_str(library.console_names.get("ps2", "")).is_equal("Ma PS2")
+

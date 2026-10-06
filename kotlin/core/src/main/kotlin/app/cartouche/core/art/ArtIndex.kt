@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
+import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.TitleKey
 import arrow.core.None
 import arrow.core.Option
@@ -23,20 +24,33 @@ public class ArtIndex private constructor(
     /** How many games the extract knows. */
     public val size: Int,
 ) {
-    private class Image(val region: String, val file: String)
+    private class Image(val region: String, file: String) {
+        val url: ArtUrl = ArtUrl(IMAGES + file)
+    }
 
     /**
      * The disc scans of the game titled [title], closest to [regions] first (see [Regions]). The title is the game's name, or else one of its alternate names, whatever
      * their case, accents, punctuation and spaces; a title that names several games names none, as
      * it could be any of them.
      */
-    public fun scansOf(title: String, regions: List<String>): List<ArtUrl> {
-        val key = key(title)
-        val entry = byName.getOrElse(key) { byAlternateName.getOrElse(key) { emptyList() } }
-        return entry.singleOrNone().fold({ emptyList() }) { discs ->
-            discs.sortedBy { Regions.rank(regions, it.region) }.map { ArtUrl(IMAGES + it.file) }
-        }
-    }
+    public fun scansOf(title: String, regions: List<String>): List<ArtUrl> =
+        discsOf(title).sortedBy { Regions.rank(regions, it.region) }.map { it.url }
+
+    /**
+     * The disc scan of each region the extract has for the game titled [title] (found as by
+     * [scansOf]), closest to [regions] first: one per region, the first the extract lists for it,
+     * whichever name a source gives the region (`USA` and `North America` are one).
+     */
+    public fun variantsOf(title: String, regions: List<String>): List<ArtVariant> = discsOf(title)
+        .map { ArtVariant(LabelRegion(Regions.same(it.region)), it.url) }
+        .distinctBy { it.region }
+        .sortedBy { Regions.rank(regions, it.region.name) }
+
+    /** The scans of the one game titled [title], in the extract's order; none when no game or several are. */
+    private fun discsOf(title: String): List<Image> = key(title)
+        .let { key -> byName.getOrElse(key) { byAlternateName.getOrElse(key) { emptyList() } } }
+        .singleOrNone()
+        .getOrElse { emptyList() }
 
     public companion object {
         public val EMPTY: ArtIndex = ArtIndex(None, emptyMap(), emptyMap(), 0)

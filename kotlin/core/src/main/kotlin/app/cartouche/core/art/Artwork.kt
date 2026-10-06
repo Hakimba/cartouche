@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
+import app.cartouche.core.library.LabelRegion
 import kotlinx.serialization.Serializable
 
 /** Where a source serves a scan of a game's medium, its printed face: an `https://` URL. */
@@ -12,3 +13,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable @JvmInline
 public value class ArtVersion(public val date: String)
+
+/** The disc scan a source has for one [region] of a game. */
+public data class ArtVariant(public val region: LabelRegion, public val url: ArtUrl)

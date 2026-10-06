@@ -42,7 +42,7 @@ internal object ArtImages {
                     val top = (side - height) / 2
                     drawBitmap(bitmap, part, Rect(left, top, left + width, top + height), Paint(Paint.FILTER_BITMAP_FLAG))
                 }
-                ByteArrayOutputStream().also { square.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }.toByteArray()
+                jpeg(square)
             } finally {
                 square.recycle()
             }
@@ -50,6 +50,10 @@ internal object ArtImages {
             bitmap.recycle()
         }
     }
+
+    /** [bitmap] as a JPEG, as labels are stored. */
+    fun jpeg(bitmap: Bitmap): ByteArray =
+        ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }.toByteArray()
 
     /**
      * [image] decoded, halved as often as its longer side stays at least twice [LARGEST]: a decoded

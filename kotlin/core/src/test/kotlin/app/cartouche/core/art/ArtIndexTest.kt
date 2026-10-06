@@ -94,12 +94,43 @@ class ArtIndexTest {
             checkAll(Arb.list(regionNames, 1..6), Arb.list(regionNames, 0..2)) { discs, regions ->
                 val lines = discs.mapIndexed { i, region -> "$region=d$i.png" }
                 val scans = files(ArtIndex.parse(extract(listOf(ExtractGame("Okage", emptySet(), lines)))).scansOf("Okage", regions))
-                val own = scans.map { scan -> same(discs[number(scan)]) in regions.map(::same) }
+                val own = scans.map { scan -> sameRegion(discs[number(scan)]) in regions.map(::sameRegion) }
                 own shouldBe own.sortedDescending()
                 scans.map(::number).zipWithNext().forEach { (first, second) ->
                     if (Regions.rank(regions, discs[first]) == Regions.rank(regions, discs[second])) (first < second) shouldBe true
                 }
             }
+        }
+
+    @Test
+    fun `a game's images by region are one per region, its own first, each region under one name`() {
+        val zone =
+            ExtractGame(
+                "Zone of the Enders",
+                emptySet(),
+                listOf("North America=na.png", "Europe=eu.png", "USA=us.png", "Japan=jp.png", "Europe=eu2.png"),
+            )
+        val variants = ArtIndex.parse(extract(listOf(zone))).variantsOf("Zone of the Enders", listOf("Europe"))
+        variants.map { it.region.name to it.url.value.removePrefix(images) } shouldContainExactly
+            listOf("Europe" to "eu.png", "North America" to "na.png", "Japan" to "jp.png")
+    }
+
+    @Test
+    fun `INV-E7-03 a game's images by region are the first scan of each region its title finds, the closest region's first`() =
+        runBlocking<Unit> {
+            var several = 0
+            checkAll(extracts, artTitles, Arb.list(regionNames, 0..2)) { games, title, regions ->
+                val variants = ArtIndex.parse(extract(games)).variantsOf(title, regions)
+                val firsts =
+                    named(games, title).fold({ emptyMap() }) { game ->
+                        game.discs.reversed().associate { sameRegion(it.substringBefore('=')) to it.substringAfter('=') }
+                    }
+                variants.map { it.region }.distinct().size shouldBe variants.size
+                variants.associate { it.region.name to files(listOf(it.url)).single() } shouldBe firsts
+                variants.map { Regions.rank(regions, it.region.name) }.let { it shouldBe it.sorted() }
+                if (variants.size > 1) several++
+            }
+            several shouldBeGreaterThan 50
         }
 
     @Test
@@ -152,10 +183,6 @@ class ArtIndexTest {
         index.size shouldBe text.lines().count { it.isNotBlank() && !it.startsWith("#") }
         index.size shouldBeGreaterThan 4000
     }
-
-    /** A region under the one name Redump and LaunchBox share for it. */
-    private fun same(region: String) =
-        mapOf("USA" to "North America", "United States" to "North America", "UK" to "United Kingdom").getOrElse(region) { region }
 
     /** What an extract's reader must find for [title]: the one game named so, else the one whose alternate name it is. */
     private fun named(games: List<ExtractGame>, title: String): Option<ExtractGame> = candidates(games, title).singleOrNone()

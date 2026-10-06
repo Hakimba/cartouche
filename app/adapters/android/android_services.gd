@@ -13,6 +13,9 @@ extends Node
 
 ## Looking for the games' art went on: [param change] tells how, and the art just found, if any.
 signal art_changed(change: ArtChange)
+## One of the images [method label_variants] listed, not downloaded then, was downloaded or could
+## not be.
+signal label_variant_downloaded(variant: LabelVariant)
 ## Every operation's answer; callers await the one carrying their request id.
 signal _answered(payload: Dictionary)
 
@@ -41,6 +44,8 @@ func _ready() -> void:
 		_plugin = Engine.get_singleton(_SINGLETON)
 		_plugin.connect(&"answered", _answered.emit)
 		_plugin.connect(&"art_changed", func(payload: Dictionary) -> void: art_changed.emit(ArtChange.new(payload)))
+		_plugin.connect(&"label_variant_downloaded", func(payload: Dictionary) -> void:
+			label_variant_downloaded.emit(LabelVariant.new(payload)))
 	if OS.has_feature("android"):
 		AndroidButtons.follow_android()
 	_load_catalog()
@@ -210,6 +215,48 @@ func use_demo_library(games: int) -> LibraryAnswer:
 	if not is_available():
 		return LibraryAnswer.new({"ok": true, "library": JSON.stringify(_desktop_demo("library"))})
 	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games]))
+
+
+## The images the art sources have for [param game]'s label, one per region, closest to the
+## game's own first; those not downloaded yet then arrive through [signal label_variant_downloaded].
+## Without the plugin, none.
+func label_variants(game: Game) -> LabelVariants:
+	return LabelVariants.new(await _request(&"labelVariants", [game.id]))
+
+
+## Shows the image of [param region] (downloaded, as [method label_variants] names it) on
+## [param game]'s label from now on.
+func choose_label(game: Game, region: String) -> ArtAnswer:
+	return ArtAnswer.new(await _request(&"chooseLabel", [game.id, region]))
+
+
+## Shows [param game] as [param shown] from now on (trimmed, cut at 80 characters), or as its own
+## title again when [param shown] is blank.
+func rename_game(game: Game, shown: String) -> Renamed:
+	return Renamed.new(await _request(&"renameGame", [game.id, shown]))
+
+
+## Shows [param platform_id]'s console as [param shown] from now on (trimmed, cut at 80 characters),
+## or under its own name, [param own], again when [param shown] is blank or is it.
+func rename_console(platform_id: String, shown: String, own: String) -> ConsoleRenamed:
+	return ConsoleRenamed.new(await _request(&"renameConsole", [platform_id, shown, own]))
+
+
+## Shows the consoles of [param platform_ids] in that order from now on, after a restart too.
+func order_consoles(platform_ids: PackedStringArray) -> Result:
+	return Result.new(await _request(&"orderConsoles", [platform_ids]))
+
+
+## Opens the system's picker on images, for a picture of the user's own to put on a label; the app
+## keeps a copy of the one picked, to be framed. Cancelled when the user leaves the picker.
+func pick_label_picture() -> LabelPicture:
+	return LabelPicture.new(await _request(&"pickLabelPicture"))
+
+
+## Shows the picture picked last on [param game]'s label from now on, [param zoom] times closer than
+## the largest square that fits and centred at [param centre] (see [LabelFraming]).
+func keep_own_label(game: Game, zoom: float, centre: Vector2) -> ArtAnswer:
+	return ArtAnswer.new(await _request(&"keepOwnLabel", [game.id, zoom, centre.x, centre.y]))
 
 
 ## Whether disc [param disc] of [param game] can launch (its emulator is installed, its file still
@@ -505,6 +552,18 @@ class Game:
 	var discs: Array[Disc] = []
 	## Index into [member discs] of the disc launched last.
 	var last_disc: int
+	## Whether the user chose the region of the image its label shows, [member label_region].
+	var has_label_region: bool
+	var label_region: String
+	## Whether its label shows a picture of the user's own.
+	var label_own: bool
+	## The title it had before the user renamed it, [member title] being the name they gave it.
+	var has_original_title: bool
+	var original_title: String
+
+	## The title it has of its own, whatever name the user gave it.
+	func own_title() -> String:
+		return original_title if has_original_title else title
 
 	func _init(item: Dictionary) -> void:
 		id = item["id"]
@@ -521,6 +580,11 @@ class Game:
 		for disc: Dictionary in item["discs"]:
 			discs.append(Disc.new(disc))
 		last_disc = item["last_disc"]
+		has_label_region = item.has("label_region")
+		label_region = item.get("label_region", "")
+		label_own = item.get("label_own", false)
+		has_original_title = item.has("original_title")
+		original_title = item.get("original_title", "")
 
 
 ## A sub-folder a scan did not look into.
@@ -573,8 +637,12 @@ class Library:
 	var _not_games: Dictionary[String, Array] = {}
 	var _ignored_counts: Dictionary[String, Dictionary] = {}
 	var _skipped: Dictionary[String, Array] = {}
+	## The names the user gave consoles, by platform id.
+	var console_names: Dictionary[String, String] = {}
 
 	func _init(item: Dictionary) -> void:
+		var names: Dictionary = item.get("console_names", {})
+		console_names.assign(names)
 		var setups: Dictionary = item.get("setups", {})
 		for platform_id: String in setups:
 			var setup: Dictionary = setups[platform_id]
@@ -734,3 +802,80 @@ class ArtChange:
 			var item: Dictionary = payload["found"]
 			found = Art.new(item)
 
+
+## One image a game's label can show: the art sources' for [member region] (as they name it, empty
+## when they name none), at [member path] once downloaded.
+class LabelVariant:
+	## Set when it arrives through [signal AndroidServices.label_variant_downloaded].
+	var game_id: String
+	var region: String
+	var has_path: bool
+	var path: String
+	## Why it could not be downloaded: `offline`, `refused`, `not_found`, `unreadable` or `storage`;
+	## empty when it was, or is still to be.
+	var failure: StringName
+
+	func _init(item: Dictionary) -> void:
+		game_id = item.get("game_id", "")
+		region = item["region"]
+		has_path = item.has("path")
+		path = item.get("path", "")
+		failure = item.get("failure", &"")
+
+
+class LabelVariants extends Result:
+	var variants: Array[LabelVariant] = []
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		for item: Dictionary in payload.get("variants", []):
+			variants.append(LabelVariant.new(item))
+
+
+## What a game is called once renamed: [member title], and its own title when the user gave it a name.
+class Renamed extends Result:
+	var title: String
+	var has_original_title: bool
+	var original_title: String
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		title = payload.get("title", "")
+		has_original_title = payload.has("original_title")
+		original_title = payload.get("original_title", "")
+
+
+## The name a console was given, when it was given one ([member has_name]).
+class ConsoleRenamed extends Result:
+	var has_name: bool
+	var name: String
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		has_name = payload.has("name")
+		name = payload.get("name", "")
+
+
+## A picture of the user's own being framed: the app's copy at [member path], [member size] pixels.
+class LabelPicture extends Result:
+	var path: String
+	var size: Vector2i
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		if ok:
+			var item: Dictionary = payload["picture"]
+			path = item["path"]
+			var width: int = item["width"]
+			var height: int = item["height"]
+			size = Vector2i(width, height)
+
+
+class ArtAnswer extends Result:
+	var art: Art
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		if ok:
+			var item: Dictionary = payload["art"]
+			art = Art.new(item)

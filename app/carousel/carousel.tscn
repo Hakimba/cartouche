@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=23 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -16,6 +16,11 @@
 [ext_resource type="Script" path="res://screens/button_glyph.gd" id="14"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="20"]
 [ext_resource type="Script" path="res://screens/add_ball.gd" id="21"]
+[ext_resource type="Script" path="res://carousel/properties/operating_light.gd" id="22"]
+[ext_resource type="Shader" path="res://carousel/properties/operating_light.gdshader" id="23"]
+[ext_resource type="PackedScene" path="res://carousel/properties/disc_properties.tscn" id="24"]
+[ext_resource type="PackedScene" path="res://carousel/properties/console_properties.tscn" id="25"]
+[ext_resource type="PackedScene" path="res://carousel/consoles/console_order.tscn" id="26"]
 
 [sub_resource type="ShaderMaterial" id="backdrop_material"]
 shader = ExtResource("3")
@@ -28,6 +33,9 @@ shader = ExtResource("6")
 
 [sub_resource type="ShaderMaterial" id="console_view_material"]
 shader = ExtResource("12")
+
+[sub_resource type="ShaderMaterial" id="light_material"]
+shader = ExtResource("23")
 
 [sub_resource type="Sky" id="studio"]
 sky_material = SubResource("studio_material")
@@ -79,6 +87,18 @@ watched = NodePath("../../Camera")
 view = NodePath("../../ConsoleViewport")
 camera = NodePath("../../ConsoleViewport/Camera")
 
+[node name="Light" type="ColorRect" parent="Backdrop"]
+unique_name_in_owner = true
+visible = false
+material = SubResource("light_material")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("22")
+
 [node name="ConsoleViewport" type="SubViewport" parent="."]
 transparent_bg = true
 size = Vector2i(640, 480)
@@ -93,12 +113,13 @@ environment = SubResource("environment")
 
 [node name="Camera" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 3.7)
-cull_mask = 1048573
+cull_mask = 1048569
 current = true
 fov = 32.0
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.985, -0.087, 0.15, 0, 0.866, 0.5, -0.174, -0.492, 0.853, 0, 0, 0)
+layers = 5
 light_specular = 0.0
 
 [node name="Row" type="Node3D" parent="."]
@@ -174,32 +195,52 @@ grow_horizontal = 2
 mouse_filter = 2
 script = ExtResource("21")
 
-[node name="SettingsHint" type="PanelContainer" parent="ConsoleTitle"]
+[node name="ConsoleHints" type="HBoxContainer" parent="ConsoleTitle"]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 40.0
-offset_top = -40.0
-offset_right = 40.0
-offset_bottom = -40.0
+offset_top = -82.0
+offset_right = 640.0
+offset_bottom = -38.0
 grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Settings" type="PanelContainer" parent="ConsoleTitle/ConsoleHints"]
+layout_mode = 2
 theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"y"
 text = "Settings"
+
+[node name="Properties" type="PanelContainer" parent="ConsoleTitle/ConsoleHints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"x"
+text = "Properties"
+
+[node name="Arrange" type="PanelContainer" parent="ConsoleTitle/ConsoleHints"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"↓"
+text = "Arrange"
 
 [node name="ArtProgress" type="Control" parent="."]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.5
+anchor_left = 0.784
 anchor_top = 0.93
-anchor_right = 0.5
+anchor_right = 0.784
 anchor_bottom = 0.93
-offset_left = -240.0
-offset_right = 240.0
+offset_left = -230.0
+offset_right = 230.0
 offset_bottom = 48.0
 mouse_filter = 2
 
@@ -251,17 +292,57 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"Title"
 
+[node name="GamesHints" type="HBoxContainer" parent="."]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0)
+layout_mode = 0
+offset_left = 40.0
+offset_top = 878.0
+offset_right = 600.0
+offset_bottom = 922.0
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Settings" type="PanelContainer" parent="GamesHints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"y"
+text = "Settings"
+
+[node name="Properties" type="PanelContainer" parent="GamesHints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"x"
+text = "Properties"
+
+[node name="Properties" parent="." instance=ExtResource("24")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="ConsoleProperties" parent="." instance=ExtResource("25")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="ConsoleOrder" parent="." instance=ExtResource("26")]
+unique_name_in_owner = true
+layout_mode = 1
+
 [node name="Message" type="Label" parent="."]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
 anchors_preset = -1
+anchor_left = 0.6
 anchor_top = 0.955
 anchor_right = 1.0
 anchor_bottom = 0.955
+offset_right = -40.0
 grow_horizontal = 2
-grow_vertical = 2
+grow_vertical = 0
 horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="Screens" parent="." instance=ExtResource("13")]
 unique_name_in_owner = true

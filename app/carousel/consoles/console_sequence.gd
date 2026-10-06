@@ -125,6 +125,12 @@ func black_origin() -> Vector3:
 	return row.global_position
 
 
+## Shows the consoles behind the games [param amount] as present as the animation has them, from 0
+## (gone) to 1, as when a game's properties hide them; only while still on the games screen.
+func fade_behind(amount: float) -> void:
+	layer.look(_behind and layer_opacity * amount > 0.001, blur, layer_opacity * amount, saturation)
+
+
 func _play(from_s: float, to_s: float, settle_s: float) -> void:
 	_seek(from_s)
 	_to_s = to_s

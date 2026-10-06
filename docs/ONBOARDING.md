@@ -89,20 +89,42 @@ The same words are used in the code, the tests and this document.
   disc with a dark band) with its title. The **art extract** (`app/data/art/<platform>.tsv`) lists,
   per game of the LaunchBox Games Database, its disc scans by region; a platform's **serial source**
   (`scansBySerial` in its profile, psxdatacenter for the PS2) names scans after a disc's serial.
+- **Label choice**: which image a game's label shows: **automatic** (the closest region's, as
+  scraping finds it), a **region** the user chose among the game's **images by region** (the first
+  scan of each region its extract has, closest first), or a **picture of their own**, picked with
+  the system's picker and **framed** on the label (`LabelFraming`: a zoom and a centre, standing for a
+  square of the picture), which no scraping replaces.
+- **Display name**: a name the user gave a game or a console (`DisplayName`, typed on the
+  properties' gamepad keyboard), shown in place of its own; identification and art keep using a
+  game's title, and its shelf its title's order.
+- **Tap, long press, drag, swipe**: what a finger does: `Finger` reads a tap (a short press that
+  barely moves), a long press (one held still) and a drag (one that moved past the slop); the
+  carousel reads a drag on the consoles screen, or beside the game in the middle, as a swipe,
+  which moves exactly one, however long or fast.
+- **Console order**: the order the user put the consoles in on the **ring** (down on the consoles
+  screen, or "Change place" in a console's properties), which the consoles screen follows
+  (`Library.consoleOrder`); consoles never put anywhere follow in catalog order.
+- **Properties**: a game's screen opened with X from the games screen: its disc **staged** (out of
+  the row, in the middle, still and facing the camera) under the **operating light** (the room
+  darkened round it, a pool of light on it), its **zones** (its label, its name) picked
+  with up and down; A on the label opens its images by region, the disc showing each at once, and
+  the card of the user's own picture, which opens the system's picker and then the **framing**; A on
+  the name opens a keyboard played with the stick (`GamepadKeyboard`).
 - **Scraping**: looking for the art of the games that have none, in the background. A **run** hands
   out **requests** (a game and where to look, best first); a **stall** (offline, a server refusing,
   no room to store) stops it until the network is back or a delay passes. Games no source has are
   remembered as **absent** until the extract changes.
 - **Screens**: what shows in front of the carousel, over its background: the **welcome** at each
   start, a title screen that waits for a button while the app loads; on the **first launch** (no
-  controller set up and no platform), the **button style** (how buttons are drawn: Nintendo,
-  Xbox or PlayStation) and the **curtain permission**; while no console has games, **no console**
-  and the **form** adding one, whose **count** (the compatible games of the chosen folder) is a
-  scan that saves nothing; then the **discovery** of the console added. Y opens the **settings**
-  over the consoles screen: the **platforms** set up, each opened in the same form to **edit** it
-  (saved and scanned again) or **remove** it after a confirmation, and the button style. Above the
-  console, a **"+" ball**: holding up turns it into "Add a platform" (its strokes spreading into the
-  button's outline), and A adds one more console, the consoles screen coming back on it.
+  controller set up and no platform), the **button style** (how buttons are drawn: Nintendo, Xbox or
+  PlayStation) and the **curtain permission**; while no console has games, **no console** and the
+  **form** adding one, whose **count** (the compatible games of the chosen folder) is a scan that
+  saves nothing; then the **discovery** of the console added. Y opens the **settings** over the
+  consoles screen or the games screen: the **platforms** set up, each opened in the same form to
+  **edit** it (saved and scanned again) or **remove** it after a confirmation, and the button style.
+  Above the console, a **"+" ball**: holding up turns it into "Add a platform" (its strokes
+  spreading into the button's outline), and A adds one more console, the consoles screen coming back
+  on it.
 - **Settings**: the app's own choices, apart from the library: the button style.
 - **Removing a platform**: its choices, games, selection, art and folder access go (INV-E6-03);
   the game files stay.
@@ -151,7 +173,8 @@ The same words are used in the code, the tests and this document.
   game by title (case, accents, punctuation and spaces aside; a title naming several games finds
   none), `Regions` orders scans by how close their region is to the game's (NTSC-U, PAL, NTSC-J
   groups), `SerialScans` names a serial source's scans, `ArtSources.requestFor` makes a game's
-  request (the extract's scans, then the serial source's). `Scraping` is a run's state (waiting,
+  request (the scan of the region chosen for its label, the extract's, then the serial source's)
+  and lists its images by region (`variantsOf`). `Scraping` is a run's state (waiting,
   under way, done, stall, retry delay), changed only by its operations; `AbsentArt` stores the games
   no source has, with the version of the sources they were looked for in.
 - **`library/DemoLibrary.kt`** makes up libraries of any size, the same for the same arguments.
@@ -198,7 +221,15 @@ The same words are used in the code, the tests and this document.
   It stops while the app is paused (a game is played), resumes on the network callback or after a
   growing delay, and tells Godot through the `art_changed` signal. It starts after the library is
   read, after each scan and after a removal, never for a demo library; each time, the images of
-  games no longer in the library are deleted first (`ArtStore.keepOnly`).
+  games no longer in the library are deleted first (`ArtStore.keepOnly`). A game's images by region
+  are downloaded when its properties show them (`VariantDownloads`, three at a time, each once
+  while under way, told through the `label_variant_downloaded` signal) and kept apart
+  (`ArtStore.saveVariant`, the latest 48); choosing one (`chooseLabel`) records the choice, then
+  copies the image as the game's (`ArtStore.adopt`), giving the choice up if it cannot. An image
+  chosen while the game's art is being looked for stays (`ArtStore.saveIfAbsent`). A picture of the
+  user's own (`OwnPictures`) is picked with the system's document picker (`pickLabelPicture`),
+  copied upright and at most 2,048 pixels long while it is framed, then cut to its framed square at
+  1,024 pixels and kept as the game's image (`keepOwnLabel`, through `LabelChoices`).
 - **`AndroidManifest.xml`** lists the permissions, each justified in a comment.
 
 ### Godot (`app/`)
@@ -216,12 +247,21 @@ The same words are used in the code, the tests and this document.
 - **The carousel** (`carousel/`, the main scene) shows the consoles screen and the games screen.
   `carousel.gd` handles the screens, input, platforms, launches and remembering the selection
   (before going out of a console, launching, or leaving the app); the right stick turns the
-  console or the game only on their screens (`StickTurn`). `ShelfRow` moves the row and recycles a fixed pool of places, so its cost does not
+  console or the game only on their screens (`StickTurn`). By touch, `Finger` reads the first
+  finger as a tap, a long press or a drag (the design's thresholds, times passed in, so it is
+  tested alone); the carousel takes the touches over its screens (`_gui_input`): a tap or a long
+  press on the console or game in the middle, a swipe (anywhere on the consoles screen, beside the
+  game on the games screen) moves exactly one console or game (`Carousel._drag`, past 80 pixels,
+  whatever its length or speed), a drag on the game, or over the properties, turns it
+  (`StickTurn.touch`, back to the front once let go). Buttons, cards and keys answer taps as
+  clicks (Godot emulates the mouse from touch); the label zone and the framing read their own
+  finger; the ring reads its own in `_input`, before the controls over it. The system's back
+  (`NOTIFICATION_WM_GO_BACK_REQUEST`) is sent as B. `ShelfRow` moves the row and recycles a fixed pool of places, so its cost does not
   depend on the number of games; titles are drawn in each place's small `SubViewport`, one per
   frame, until a game's art is read (`GameArt`: on a worker thread, one texture sent to the GPU a
   frame, the latest 24 kept); a game without a scan gets its shelf's blank (`LabelLook`, colours
   and band from `appearance.json`). `CarouselLayout` holds the mechanics as pure functions.
-  Scraping's progress is a bar under the title: it moves to each count, greys with the reason while
+  Scraping's progress is a bar at the bottom right, beside the hints, where a message shows too: it moves to each count, greys with the reason while
   the run waits, fades once full, hides for a launch's message, and shows and fades with the pill
   in a launch animation. `Appearance` reads `appearance.json` once, each launch animation made once.
 - **Consoles** (`carousel/consoles/`): `ConsoleRow` lays the consoles out as `ShelfRow` lays the
@@ -238,6 +278,29 @@ The same words are used in the code, the tests and this document.
   parts use `carousel/models/solid.gdshader`, colours and finishes as its parameters, rather than
   standard materials: every distinct material is a shader (and its fading copy) that the graphics
   driver keeps in memory, several megabytes each on a handheld.
+- **Console order** (`carousel/consoles/`): `ConsoleOrder` puts the consoles in order on a ring:
+  `ConsoleRow.wheel` takes them from the row to it, each sliding to its slot; `ConsoleWheel` is the
+  ring's rule (no end, the console held trading places as it goes, B giving the old order back),
+  pure and tested alone. The ring's dashed track is drawn on a layer of the backdrop (a
+  `CanvasLayer` at or under the environment's `background_canvas_max_layer`), which the 3D view
+  draws behind it: the consoles stand in front of the track. `ConsoleSticker` draws the console held as a sticker: alone in a view of
+  its own (render layer `ConsoleLayer.STICKER`, which the carousel's camera leaves out; the sun
+  lights that layer too), drawn again only when it moves, then outlined and shadowed by
+  `sticker.gdshader` only round it.
+- **Properties** (`carousel/properties/`): `PropertiesScreen` holds what a game's and a console's
+  properties share (the staging under the light, the three-part moves, the name's fitting);
+  `NameEditor` is the name's field and keyboard (`GamepadKeyboard`), used by both.
+  `ConsoleProperties` stages the selected console (`ConsoleRow.stage`), its name with a callout on
+  its right, and "Change place" (or Y), which leaves for `ConsoleOrder`. `DiscProperties` stages the selected disc
+  (`ShelfRow.stage` and `staged`, the neighbours and the consoles behind fading), shows its zones
+  (`LabelZone`, a black ring drawn as it has the focus, `FocusCallout` naming it with an arrow) and
+  its images by region (`LabelCard`, `label_thumbnail.gdshader`) and frames a picture of the user's
+  own (`LabelFraming`, the same rule as the core's `LabelFraming`, shown through the label shader's
+  `label_window` without cutting the picture); each move from one screen to the
+  next plays in three parts (`Move`: what leaves, the 3D moving from one `Staging` to the next, what
+  comes), no press counting meanwhile. Images are read by an `ImageReader` (a worker thread, one
+  texture a frame), as `GameArt` reads the games' art. `OperatingLight` (`operating_light.gdshader`)
+  draws the light between the backdrop and the 3D.
 - **Launches**: `GameLaunch` (`carousel/launch/`) runs a launch from A to the carousel shown again,
   playing the console's launch animation, or else its media's insertion;
   `Insertion` holds the motion as pure functions of time, its timings, distances and sounds per

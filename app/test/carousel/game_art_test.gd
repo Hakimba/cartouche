@@ -30,7 +30,7 @@ func _stored(game: AndroidServices.Game, size := 64, file := game.title) -> Andr
 ## Runs frames until every image asked for is read and made a texture, for 5 s at most.
 func _settled() -> void:
 	var until := Time.get_ticks_msec() + 5000
-	while (not _art._reading.is_empty() or not _art._read.is_empty()) and Time.get_ticks_msec() < until:
+	while not _art._reader.is_idle() and Time.get_ticks_msec() < until:
 		await get_tree().process_frame
 
 
@@ -76,7 +76,7 @@ func test_an_unreadable_image_gives_no_texture_and_the_carousel_goes_on() -> voi
 	assert_bool(_art.has_texture(game)).is_false()
 	# Not read again as its place comes back into view.
 	_art.request(game)
-	assert_bool(_art._reading.is_empty()).is_true()
+	assert_bool(_art._reader.is_idle()).is_true()
 
 
 func test_labels_arriving_together_reach_the_gpu_one_a_frame_and_only_the_latest_are_kept() -> void:
@@ -94,3 +94,18 @@ func test_labels_arriving_together_reach_the_gpu_one_a_frame_and_only_the_latest
 		made = now
 	assert_int(made).is_equal(games.size())
 	assert_int(games.filter(_art.has_texture).size()).is_equal(24)
+
+
+func test_art_added_with_its_image_is_ready_at_once_and_an_older_read_of_the_same_file_is_dropped() -> void:
+	var game := Fixtures.games(1)[0]
+	var old := _stored(game, 16, "same")
+	_art.add(old)
+	_art.request(game)
+	var chosen := ImageTexture.create_from_image(Image.create(64, 64, false, Image.FORMAT_RGB8))
+	var loaded: Array[String] = []
+	_art.loaded.connect(loaded.append)
+	_art.add(AndroidServices.Art.new({"game_id": game.id, "path": old.path}), chosen)
+	assert_array(loaded).contains_exactly([game.id])
+	assert_object(_art.texture(game)).is_same(chosen)
+	await _settled()
+	assert_object(_art.texture(game)).is_same(chosen)

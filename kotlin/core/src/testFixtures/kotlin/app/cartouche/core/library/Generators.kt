@@ -13,6 +13,7 @@ import io.kotest.property.arbitrary.alphanumeric
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.boolean
 import io.kotest.property.arbitrary.choice
+import io.kotest.property.arbitrary.constant
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.filter
@@ -69,3 +70,21 @@ private fun level(depth: Int): Arb<List<Node>> {
     val node = if (depth == 0) file else Arb.choice(file, Arb.bind(nodeNames, level(depth - 1), Node::Folder))
     return Arb.list(node, 0..4)
 }
+
+/** What a user may type as a game's name: blank, padded, accented, Japanese, far too long. */
+val typedNames: Arb<String> =
+    Arb.choice(
+        Arb.element("", "   ", "Okage", "  Kingdom Hearts II  ", "Ōkami", "ファイナルファンタジーXII", "x".repeat(200), "a\tb"),
+        // Spaces and breaks of every kind, and characters outside the basic plane, round the length limit.
+        Arb.element("a\u00A0\u00A0b", "a\u3000b", "a\u2028b", "a\r\nb", "\uD83C\uDFAE".repeat(85), "x".repeat(79) + "\uD83C\uDFAE"),
+        Arb.string(0..100, Codepoint.katakana()),
+        Arb.string(0..100),
+    )
+
+/** Label choices: automatic, a region as the art sources name it (known or not, and none), or a picture of the user's own. */
+val labelChoices: Arb<LabelChoice> =
+    Arb.choice(
+        Arb.constant(LabelChoice.Automatic),
+        Arb.constant(LabelChoice.Own),
+        Arb.element("Japan", "Europe", "North America", "", "Atlantis").map { LabelChoice.Region(LabelRegion(it)) },
+    )

@@ -95,6 +95,15 @@ internal class Launcher(
     fun pickFolder(activity: Activity, requestCode: Int): Either<LaunchFailure, Unit> =
         Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).let { starting(it) { activity.startActivityForResult(it, requestCode) } }
 
+    /**
+     * Opens the system document picker on images (the gallery, the device's folders, its other
+     * sources); the choice arrives in the activity result for [requestCode].
+     */
+    fun pickPicture(activity: Activity, requestCode: Int): Either<LaunchFailure, Unit> = Intent(Intent.ACTION_OPEN_DOCUMENT)
+        .addCategory(Intent.CATEGORY_OPENABLE)
+        .setType("image/*")
+        .let { starting(it) { activity.startActivityForResult(it, requestCode) } }
+
     private inline fun starting(intent: Intent, crossinline start: () -> Unit): Either<LaunchFailure, Unit> = either {
         trace("start") { intent.toUri(Intent.URI_INTENT_SCHEME) }
         catch({ start() }) { e: RuntimeException ->

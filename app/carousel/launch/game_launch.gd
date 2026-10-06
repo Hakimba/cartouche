@@ -60,6 +60,8 @@ var _cues_played := 0
 var _players: Dictionary[Insertion.Cue, AudioStreamPlayer] = {}
 ## Frame times of the insertion, traced once it is done, in debug builds.
 var _frames_ms := PackedFloat32Array()
+## How present each control was as the launch began: they fade from it, and show so again after.
+var _presence: Dictionary[CanvasItem, float] = {}
 
 @onready var _black: ShaderMaterial = blackout.material
 
@@ -134,6 +136,8 @@ func launch(game: AndroidServices.Game, disc: int, insertion: Insertion) -> void
 	_launch_id += 1
 	var launch_id := _launch_id
 	row.freeze()
+	for control in controls:
+		_presence[control] = control.modulate.a
 	_enter(Stage.CHECKING)
 	var pressed := Time.get_ticks_msec()
 	var check := await android.check_launch(game, disc)
@@ -209,7 +213,7 @@ func _insert(delta: float) -> void:
 		spindle.turn(spin)
 		spindle.fade(1.0 - _insertion.spindle_at(t))
 		for control in controls:
-			control.modulate.a = _insertion.controls_at(t)
+			control.modulate.a = _insertion.controls_at(t) * _presence[control]
 		black = _insertion.black_at(t)
 		origin = row.to_global(stand.origin)
 	var size := blackout.size
@@ -236,7 +240,7 @@ func _show_carousel() -> void:
 	row.pose_selected()
 	spindle.visible = false
 	for control in controls:
-		control.modulate.a = 1.0
+		control.modulate.a = _presence.get(control, control.modulate.a)
 	for player: AudioStreamPlayer in _players.values():
 		player.stop()
 	_black.set_shader_parameter(&"radius", blackout.size.length() * 2.0)

@@ -15,9 +15,12 @@ import app.cartouche.android.storage.setAside
 import app.cartouche.core.library.CountedReason
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DiscGrouping
+import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderDepth
 import app.cartouche.core.library.FolderWalk
 import app.cartouche.core.library.GameId
+import app.cartouche.core.library.LabelChoice
+import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.LibraryFormat
 import app.cartouche.core.library.PlatformSetup
@@ -31,6 +34,7 @@ import app.cartouche.core.platforms.playerJson
 import app.cartouche.core.shelves.Selection
 import arrow.core.None
 import arrow.core.Some
+import arrow.core.getOrNone
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeNone
 import io.kotest.assertions.arrow.core.shouldBeRight
@@ -323,5 +327,63 @@ class LibraryServiceTest {
         service.gamesWithArt().shouldBeNone()
         service.setUp(platform.id, PlatformSetup(Some(TREE))).shouldBeRight()
         kept() shouldBe listOf(tree("gba"))
+    }
+
+    @Test
+    fun `INV-E7-01 a label chosen is there after a restart, and choosing one for a game the library does not have fails`() {
+        val service = scanned("Okage", "Ico")
+        val okage = service.library().games.single { it.title == "Okage" }.id
+        val japan = LabelChoice.Region(LabelRegion("Japan"))
+        service.chooseLabel(okage, japan).shouldBeRight()
+        service().library().game(okage).shouldBeSome().label shouldBe japan
+        service().library().games.single { it.title == "Ico" }.label shouldBe LabelChoice.Automatic
+        val missing = GameId("test/none")
+        service.chooseLabel(missing, japan).shouldBeLeft(LibraryFailure.UnknownGame(missing))
+    }
+
+    @Test
+    fun `INV-E7-06 a name given is there after a restart, a blank one gives the title back, an unknown game is not renamed`() {
+        val service = scanned("Okage", "Ico")
+        val okage = service.library().games.single { it.title == "Okage" }.id
+        service.rename(okage, DisplayName.of("Okage: Shadow King")).shouldBeRight().shownTitle shouldBe "Okage: Shadow King"
+        service().library().game(okage).shouldBeSome().shownTitle shouldBe "Okage: Shadow King"
+        service().library().game(okage).shouldBeSome().title shouldBe "Okage"
+        service.rename(okage, DisplayName.of("  ")).shouldBeRight()
+        service().library().game(okage).shouldBeSome().shownTitle shouldBe "Okage"
+        service.rename(okage, DisplayName.of("Okage")).shouldBeRight().displayName shouldBe None
+        val missing = GameId("test/none")
+        service.rename(missing, DisplayName.of("X")).shouldBeLeft(LibraryFailure.UnknownGame(missing))
+    }
+
+    @Test
+    fun `INV-E7-07 a console's name is there after a restart, a blank one or its own gives its own back, an unknown one is refused`() {
+        val service = scanned("Okage")
+        service.renameConsole(platform.id, DisplayName.of("Ma PS2"), "PlayStation 2").shouldBeRight() shouldBe DisplayName.of("Ma PS2")
+        service().library().consoleNames.getOrNone(platform.id) shouldBe DisplayName.of("Ma PS2")
+        service.renameConsole(platform.id, DisplayName.of(" "), "PlayStation 2").shouldBeRight()
+        service().library().consoleNames.containsKey(platform.id) shouldBe false
+        service.renameConsole(platform.id, DisplayName.of("Ma PS2"), "PlayStation 2").shouldBeRight()
+        service.renameConsole(platform.id, DisplayName.of("PlayStation 2"), "PlayStation 2").shouldBeRight()
+        service().library().consoleNames.containsKey(platform.id) shouldBe false
+        // Removing the console forgets its name, after a restart too.
+        service.renameConsole(platform.id, DisplayName.of("Ma PS2"), "PlayStation 2").shouldBeRight()
+        service.remove(platform.id).shouldBeRight()
+        service().library().consoleNames.isEmpty() shouldBe true
+        val unknown = PlatformId("nes")
+        service.renameConsole(unknown, DisplayName.of("Mine"), "NES").shouldBeLeft(LibraryFailure.UnknownPlatform(unknown))
+    }
+
+    @Test
+    fun `INV-E7-08 the consoles' order is there after a restart, and a console removed leaves it, an unknown one refused`() {
+        val service = scanned("Okage")
+        val other = PlatformId("gba")
+        service.setUp(other, PlatformSetup(Some(TREE))).shouldBeRight()
+        service.orderConsoles(listOf(other, platform.id)).shouldBeRight()
+        service().library().consoleOrder shouldBe listOf(other, platform.id)
+        val unknown = PlatformId("nes")
+        service.orderConsoles(listOf(platform.id, unknown)).shouldBeLeft(LibraryFailure.UnknownPlatform(unknown))
+        service().library().consoleOrder shouldBe listOf(other, platform.id)
+        service.remove(other).shouldBeRight()
+        service().library().consoleOrder shouldBe listOf(platform.id)
     }
 }

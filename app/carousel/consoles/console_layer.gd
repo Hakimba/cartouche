@@ -10,6 +10,9 @@ extends TextureRect
 ## view's camera sees them (the carousel's leaves layer 2 out).
 const FRONT := 1
 const BEHIND := 1 << 1
+## The render layer of the console peeled off the ring, which only the sticker's view draws
+## ([ConsoleSticker]).
+const STICKER := 1 << 2
 ## The view is drawn at this fraction of the window's size: the blur hides the difference.
 const _RESOLUTION := 0.5
 

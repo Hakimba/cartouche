@@ -25,6 +25,8 @@ val regionNames: Arb<String> =
         "Brazil",
         "Japan",
         "Korea",
+        "The Netherlands",
+        "Netherlands",
         "Asia",
         "China",
         "World",
@@ -56,6 +58,11 @@ val artTitles: Arb<String> =
         "!!!",
         "",
     )
+
+/** A region under the one name Redump and LaunchBox share for it, as the tests know it. */
+fun sameRegion(region: String): String =
+    mapOf("USA" to "North America", "United States" to "North America", "UK" to "United Kingdom", "The Netherlands" to "Netherlands")
+        .getOrElse(region) { region }
 
 /** One game of an extract: its name, alternate names, and disc scans as `region=file` pairs. */
 data class ExtractGame(val name: String, val alternates: Set<String>, val discs: List<String>) {

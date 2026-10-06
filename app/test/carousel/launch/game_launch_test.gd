@@ -62,12 +62,13 @@ func test_a_game_that_cannot_start_plays_nothing_while_it_is_checked_nor_after()
 	android.late = true
 	launch.android = android
 	var codes := _codes(launch)
+	var as_it_was := _presence(launch)
 	carousel._unhandled_input(Fixtures.button(&"ui_accept", true))
 	for frame in 20:
 		if frame == 10:
 			android.replied.emit()
 		Fixtures.step_frame(carousel)
-		_assert_nothing_shown(carousel)
+		_assert_nothing_shown(carousel, as_it_was)
 	assert_bool(launch.is_busy()).is_false()
 	assert_int(android.starts).is_equal(0)
 	assert_array(codes).is_equal([&"game_missing"])
@@ -82,6 +83,7 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 	carousel._message.hide()
 	var press: Press = random.randi_range(0, Press.size() - 1) as Press
 	_press(carousel, press, random)
+	var as_it_was := _presence(launch)
 	carousel._unhandled_input(Fixtures.button(&"ui_accept", true))
 	var game := row.selected_game().id
 	var shelf: int = carousel._shelf
@@ -95,7 +97,7 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 		if launch._stage not in stages:
 			stages.append(launch._stage)
 			if launch._stage == GameLaunch.Stage.INSERTING:
-				# From where the game stood as the insertion started, before its first frame.
+				# From where the game stood as the insertion started, as_it_was its first frame.
 				assert_bool(launch._start.is_equal_approx(stood)).is_true()
 				# Into the console for the platform that has a launch animation.
 				assert_bool(launch._into_console).is_equal(carousel._shelves[shelf].platform_id == "ps2")
@@ -107,7 +109,7 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 		assert_bool(row._turn.turned.is_equal_approx(turned)).is_true()
 		assert_bool(carousel._hold_select.is_stopped()).is_true()
 		if launch._stage == GameLaunch.Stage.CHECKING:
-			_assert_nothing_shown(carousel)
+			_assert_nothing_shown(carousel, as_it_was)
 		if launch._stage == GameLaunch.Stage.INSERTING and launch._into_console:
 			if launch._clock_s >= launch.sequence.seated_s():
 				_assert_on_the_console_spindle(carousel)
@@ -140,7 +142,7 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 	assert_array(codes).override_failure_message("%s: %s" % [case, codes]).is_equal(_failures(outcome, android))
 	assert_bool(carousel._message.visible).is_equal(not codes.is_empty())
 	_assert_waited(outcome, stages, waited_s)
-	_assert_as_before_the_launch(carousel)
+	_assert_as_before_the_launch(carousel, as_it_was)
 	_let_go(carousel)
 
 
@@ -171,7 +173,7 @@ func _leave_or_come_back(launch: GameLaunch, outcome: Outcome, random: RandomNum
 		_leave_and_come_back(launch)
 	if outcome == Outcome.AWAY_AND_BACK and launch._stage == GameLaunch.Stage.AWAY and random.randf() < 0.05:
 		_leave_and_come_back(launch)
-	# Some time away, the screen still black, before coming back.
+	# Some time away, the screen still black, as_it_was coming back.
 	if outcome == Outcome.LEFT_BEFORE_THE_ANSWER and launch._stage == GameLaunch.Stage.AWAY_LEFT and random.randf() < 0.1:
 		launch.notification(Node.NOTIFICATION_APPLICATION_RESUMED)
 
@@ -258,14 +260,22 @@ func _leave_and_come_back(launch: GameLaunch) -> void:
 	launch.notification(Node.NOTIFICATION_APPLICATION_RESUMED)
 
 
-## While a game is checked, nothing of a launch shows.
-func _assert_nothing_shown(carousel: Carousel) -> void:
+## How present each control of [param launch] is now.
+func _presence(launch: GameLaunch) -> Dictionary[CanvasItem, float]:
+	var presence: Dictionary[CanvasItem, float] = {}
+	for control in launch.controls:
+		presence[control] = control.modulate.a
+	return presence
+
+
+## While a game is checked, nothing of a launch shows: the controls are as [param as_it_was].
+func _assert_nothing_shown(carousel: Carousel, as_it_was: Dictionary[CanvasItem, float]) -> void:
 	var launch := carousel._game_launch
 	assert_bool(launch.blackout.visible).is_false()
 	assert_bool(launch.spindle.visible).is_false()
 	assert_bool(carousel._row._launched).is_false()
 	for control: CanvasItem in launch.controls:
-		assert_float(control.modulate.a).is_equal(1.0)
+		assert_float(control.modulate.a).is_equal(as_it_was[control])
 
 
 
@@ -321,9 +331,9 @@ func _assert_black(launch: GameLaunch) -> void:
 		assert_float(radius).is_greater_equal(corner.distance_to(centre) - 0.001)
 
 
-## The selected game where the row places it again (it may still be finishing a move begun before
-## A), unturned and faded as laid out; the controls shown; no spindle, no black.
-func _assert_as_before_the_launch(carousel: Carousel) -> void:
+## The selected game where the row places it again (it may still be finishing a move begun as_it_was
+## A), unturned and faded as laid out; the controls as [param as_it_was]; no spindle, no black.
+func _assert_as_before_the_launch(carousel: Carousel, as_it_was: Dictionary[CanvasItem, float]) -> void:
 	var row := carousel._row
 	assert_bool(row._launched).is_false()
 	var place: ShelfRow.Place = row._placed[row.selected_index()]
@@ -334,7 +344,7 @@ func _assert_as_before_the_launch(carousel: Carousel) -> void:
 	assert_float(place.transform.origin.z).is_equal_approx(laid_out.origin.z, 0.0001)
 	assert_float(place.shown._fade.amount).is_equal_approx(CarouselLayout.fade(offset), 0.0001)
 	for control: CanvasItem in carousel._game_launch.controls:
-		assert_float(control.modulate.a).is_equal(1.0)
+		assert_float(control.modulate.a).is_equal(as_it_was[control])
 	assert_bool(carousel._game_launch.blackout.visible).is_false()
 	assert_bool(carousel._game_launch.spindle.visible).is_false()
 	assert_int(carousel._screen).is_equal(Carousel.Screen.GAMES)

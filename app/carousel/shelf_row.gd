@@ -8,6 +8,8 @@ extends Node3D
 ## The game at the centre changed.
 signal selection_changed(game: AndroidServices.Game)
 
+## A label texture shown whole (see [method preview_label]).
+const WHOLE := Rect2(0.0, 0.0, 1.0, 1.0)
 ## Every game [method CarouselLayout.offsets] can show at once.
 const _PLACES := 2 * CarouselLayout.REACH + 3
 ## How much a fast-moving row stretches its games.
@@ -29,6 +31,11 @@ var pose_amount := 1.0
 ## 1 (as the layout fades them).
 var neighbours := 1.0
 var selected_presence := 1.0
+## How far the selected game has left the row to stand as [member staged] has it, from 0 to 1.
+## Staged, it is still: the stick turns it, and it turns back to the front once let go.
+var stage := 0.0
+## Where the selected game stands once staged, in the row's space.
+var staged := Transform3D.IDENTITY
 
 var _games: Array[AndroidServices.Game] = []
 var _look := LabelLook.new()
@@ -53,6 +60,9 @@ var _launched := false
 var _launch_stand := Transform3D.IDENTITY
 var _launch_spin := 0.0
 var _launch_blur := 0.0
+## Whether the selected game shows another label than its own (see [method preview_label]): its own
+## image arriving meanwhile waits.
+var _previewing := false
 
 
 func _ready() -> void:
@@ -69,13 +79,15 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_clock_s += delta
 	if _held != 0 and _clock_s >= _next_repeat_s:
-		_step(_held)
+		step(_held)
 		_held_steps += 1
 		_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(_held_steps)
 	var before := _scroll
 	_scroll = CarouselLayout.scrolled(_scroll, _position, delta)
 	_speed = (_scroll - before) / delta if delta > 0.0 else 0.0
 	if not _games.is_empty():
+		if stage > 0.0 and _stick.is_zero_approx():
+			_turn.release()
 		_turn.follow(_stick, selected_index(), delta)
 	_arrange()
 	if not _unlabelled.is_empty():
@@ -129,7 +141,7 @@ func selected_index() -> int:
 ## Steps once towards [param direction] (-1 or 1), then again and again, faster, until
 ## [method release].
 func hold(direction: int) -> void:
-	_step(direction)
+	step(direction)
 	_held = direction
 	_held_steps = 0
 	_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(0)
@@ -145,6 +157,16 @@ func release(direction: int) -> void:
 ## [StickTurn]).
 func inspect(stick: Vector2) -> void:
 	_stick = stick
+
+
+## Turns the selected game with a finger dragged [param pixels] over it; it comes back to the
+## front once [method let_go] (see [StickTurn]).
+func touch_turn(pixels: Vector2) -> void:
+	_turn.touch(pixels)
+
+
+func let_go() -> void:
+	_turn.let_go()
 
 
 ## Stops every move under way: a held direction, the stick. The selection stays where it is.
@@ -177,10 +199,29 @@ func selected_stand() -> Transform3D:
 	return place.transform if place else Transform3D.IDENTITY
 
 
+## Shows [param label], an image of a real label, on the selected game instead of its own, until
+## [method show_own_label]; only its [param window] when given, as fractions of it.
+func preview_label(label: Texture2D, window := WHOLE) -> void:
+	var place: Place = _placed.get(selected_index())
+	if place:
+		_previewing = true
+		place.shown.show_label(label, true, window)
+
+
+## The selected game shows its own label again, after [method preview_label].
+func show_own_label() -> void:
+	_previewing = false
+	var place: Place = _placed.get(selected_index())
+	if place and not _show_image(place, selected_game()):
+		place.shown.draw_label(selected_game().title, _look)
+
+
 ## Shows [param game_id]'s image on its place, once read, if the game is in view: it replaces the
 ## title drawn there.
 func refresh_label(game_id: String) -> void:
 	for place: Place in _placed.values():
+		if _previewing and place.game == selected_index():
+			continue
 		if _games[place.game].id == game_id and place not in _unlabelled:
 			_show_image(place, _games[place.game])
 
@@ -194,7 +235,8 @@ func _show_image(place: Place, game: AndroidServices.Game) -> bool:
 	return false
 
 
-func _step(direction: int) -> void:
+## One step towards [param direction] (-1 or 1); a direction held stays held.
+func step(direction: int) -> void:
 	if _games.size() < 2:
 		return
 	_position = CarouselLayout.stepped(_position, direction, _games.size())
@@ -236,6 +278,9 @@ func _arrange() -> void:
 			var stretched := Basis.from_scale(Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0))
 			var posed := stand.basis * pose.at(_clock_s, posed_part) * turn * stretched
 			place.transform = Transform3D(posed, stand.origin)
+			if stage > 0.0 and place.game == selected_index():
+				var on_stage := Transform3D(staged.basis * turn, staged.origin)
+				place.transform = place.transform.interpolate_with(on_stage, stage)
 			var presence := selected_presence if place.game == selected_index() else neighbours
 			place.shown.fade(CarouselLayout.faded(offset, presence))
 
@@ -372,9 +417,11 @@ class LabelledModel extends Node3D:
 		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 		show_label(_view.get_texture(), false)
 
-	## Shows [param label] as the model's label, an image of a real one when [param scanned].
-	func show_label(label: Texture2D, scanned: bool) -> void:
+	## Shows [param label] as the model's label, an image of a real one when [param scanned]; only
+	## its [param window] when given, as fractions of it.
+	func show_label(label: Texture2D, scanned: bool, window := WHOLE) -> void:
 		_label(&"label_texture", label)
+		_label(&"label_window", Vector4(window.position.x, window.position.y, window.size.x, window.size.y))
 		_label(&"scanned", scanned)
 		_label(&"has_label", true)
 

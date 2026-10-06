@@ -41,20 +41,21 @@ public data class Selection(public val platform: Option<PlatformId> = None, publ
 /** The games of one platform, in title order, and the index of the one shown first. */
 public data class Shelf(public val platform: PlatformId, public val games: NonEmptyList<Game>, public val selected: Int)
 
-/** One shelf per platform that has games, in catalog order, and the index of the shelf shown first. */
+/** One shelf per platform that has games, in the order the user put the consoles in, and the index of the shelf shown first. */
 public data class Shelves(public val shelves: NonEmptyList<Shelf>, public val selected: Int) {
     public companion object {
         /**
-         * The shelves of [library] for [platforms] (in the catalog's order), where [selection] left
-         * the user: on each shelf the remembered game, else the one that followed it in title
-         * order, else the first; the remembered platform, else the first. None when no platform
-         * has games. Pure and total.
+         * The shelves of [library] for [platforms], in the order the user put the consoles in, the
+         * others in the order of [platforms] (the catalog's; see [Library.inConsoleOrder]), where
+         * [selection] left the user: on each shelf the remembered game, else the one that followed
+         * it in title order, else the first; the remembered platform, else the first. None when no
+         * platform has games. Pure and total.
          */
         public fun of(library: Library, platforms: List<PlatformId>, selection: Selection): Option<Shelves> {
             val order = titleOrder()
             val byPlatform = library.games.groupBy { it.platform }
             val shelves =
-                platforms.flatMap { platform ->
+                library.inConsoleOrder(platforms).flatMap { platform ->
                     val games = byPlatform.getOrElse(platform) { emptyList() }.sortedWith(compareBy(order, SelectedGame::of))
                     games
                         .toNonEmptyListOrNone()
