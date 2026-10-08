@@ -256,7 +256,11 @@ The same words are used in the code, the tests and this document.
   `ButtonGlyph`, `ButtonHint` and `ButtonMark` draw; the edges' smoothing is the root viewport's
   `msaa_3d`, set at start from the settings and by `EdgeSmoothingScreen`. The theme
   (`carousel/carousel_theme.tres`) holds the buttons, fields, toggles and focus ring of every
-  screen; the font is Fredoka throughout (`fonts/`, two weights of its variable font).
+  screen; the font is Fredoka throughout (`fonts/`, two weights of its variable font). The app's
+  icon is `icon.svg` (the name in Fredoka SemiBold with the titles' white outline, on the
+  carousel's dotted backdrop); `icons/` holds the launcher layers rendered from it, which
+  `export_presets.cfg` names: the full icon, the adaptive background and foreground (the tile
+  scaled so the launcher's visible two thirds show all of it), and the monochrome letters.
 - **Controller buttons** (`adapters/android/android_buttons.gd`): on Android, A confirms and B goes
   back as Android names them, following the device's own setting when it has one. Godot's bundled
   controller database maps some devices by position instead (A is then the bottom button), so
