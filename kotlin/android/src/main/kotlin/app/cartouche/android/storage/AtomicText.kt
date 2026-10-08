@@ -6,6 +6,7 @@ import arrow.core.Either
 import arrow.core.flatMap
 import arrow.core.raise.catch
 import arrow.core.raise.either
+import arrow.core.right
 import java.io.File
 import java.io.IOException
 
@@ -25,13 +26,8 @@ internal fun AtomicFile.write(bytes: ByteArray): Either<StorageFailure, Unit> = 
 }
 
 /** What the file holds, [decode]d; [empty] when nothing was ever written. */
-internal fun <E, T> AtomicFile.read(empty: T, unreadable: (String) -> E, decode: (String) -> Either<E, T>): Either<E, T> = if (!isWritten) {
-    Either.Right(
-        empty,
-    )
-} else {
-    Either.catch { readFully().decodeToString() }.mapLeft { unreadable(it.toString()) }.flatMap(decode)
-}
+internal fun <E, T> AtomicFile.read(empty: T, unreadable: (String) -> E, decode: (String) -> Either<E, T>): Either<E, T> =
+    if (isWritten) Either.catch { readFully().decodeToString() }.mapLeft { unreadable(it.toString()) }.flatMap(decode) else empty.right()
 
 /** Whether a write ever completed; [AtomicFile.exists] needs Android 12. A backup is left by a write interrupted on Android 11. */
 private val AtomicFile.isWritten: Boolean get() = baseFile.exists() || File(baseFile.path + ".bak").exists()

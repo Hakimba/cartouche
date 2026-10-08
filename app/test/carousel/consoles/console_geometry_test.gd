@@ -47,6 +47,23 @@ func test_INV_E5_07_closed_the_lid_fills_its_opening_but_its_gap_and_the_disc_si
 		assert_float(hinge.z).is_equal_approx(-shape.lid_box().end.y, EPSILON)
 
 
+func test_the_lid_given_each_frame_is_moved_only_when_it_turns() -> void:
+	var console: ConsoleModel = auto_free(PS2.instantiate())
+	add_child(console)
+	var lid := Fixtures.TransformProbe.new()
+	console.get_node("%Lid").add_child(lid)
+	console.lid_degrees = 30.0
+	await await_idle_frame()
+	lid.heard = 0
+	for frame in 5:
+		console.lid_degrees = 30.0
+		await await_idle_frame()
+	assert_int(lid.heard).is_equal(0)
+	console.lid_degrees = 31.0
+	await await_idle_frame()
+	assert_int(lid.heard).is_equal(1)
+
+
 func test_INV_E5_07_the_ps2_s_lid_opens_upwards_about_its_back_edge_over_the_well_its_disc_sits_in() -> void:
 	var console: ConsoleModel = auto_free(PS2.instantiate())
 	add_child(console)
@@ -128,7 +145,6 @@ func test_INV_E5_07_the_lid_s_opening_goes_through_the_top_down_to_the_well() ->
 			for spot in through:
 				assert_bool(Geometry2D.point_is_inside_triangle(spot, plan[0], plan[1], plan[2])) \
 					.override_failure_message("the upper block covers the opening at %s" % spot).is_false()
-
 
 
 ## The box, in plan (X right, Y back), of [param arrays]' points, moved by [param by] first.

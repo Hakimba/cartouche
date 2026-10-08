@@ -41,6 +41,8 @@ func test_INV_E2_04_a_held_direction_repeats_faster_and_faster_down_to_48_ms_and
 	var random := Fixtures.cases(7)
 	for i in 50:
 		var row := _row(50, 0)
+		# Whatever the idle motions' pace, which never slows a held direction.
+		row.pace = random.randf()
 		var clock := [0.0]
 		var steps: Array[float] = []
 		row.selection_changed.connect(func(_game: AndroidServices.Game) -> void: steps.append(clock[0]))
@@ -142,6 +144,16 @@ func _frames(row: ShelfRow, frames: int, frame_s: float) -> void:
 		row._process(frame_s)
 
 
+## [param row]'s places show, stand and fade as [param twin]'s; a place not shown is not drawn.
+func _assert_twins(row: ShelfRow, twin: ShelfRow) -> void:
+	for place: ShelfRow.Place in row.get_children():
+		var other: ShelfRow.Place = twin.get_child(place.get_index())
+		assert_bool(place.visible).is_equal(other.visible)
+		if place.visible:
+			assert_bool(place.transform == other.transform).is_true()
+			assert_float(place.shown._fade.amount).is_equal(other.shown._fade.amount)
+
+
 ## The visible places show each game in view once, where the layout puts it, with its own label
 ## once drawn.
 func _assert_places(row: ShelfRow, count: int) -> void:
@@ -157,6 +169,116 @@ func _assert_places(row: ShelfRow, count: int) -> void:
 	var in_view := offsets.keys()
 	in_view.sort()
 	assert_array(shown).is_equal(in_view)
+
+
+func test_gone_the_games_stand_still_wholly_faded_and_come_back_where_a_row_never_gone_stands() -> void:
+	var random := Fixtures.cases(61)
+	for i in 30:
+		var count := random.randi_range(1, 12)
+		var gone := _row(count, 0)
+		var shown := _row(count, 0)
+		var frames := random.randi_range(1, 120)
+		_frames(gone, frames, Fixtures.FRAME_S)
+		_frames(shown, frames, Fixtures.FRAME_S)
+		gone.selected_presence = 0.0
+		gone.neighbours = 0.0
+		_frames(gone, 1, Fixtures.FRAME_S)
+		_frames(shown, 1, Fixtures.FRAME_S)
+		var stood: Array[Transform3D] = []
+		for place: ShelfRow.Place in gone.get_children():
+			stood.append(place.transform)
+		var away := random.randi_range(1, 200)
+		_frames(gone, away, Fixtures.FRAME_S)
+		_frames(shown, away, Fixtures.FRAME_S)
+		for place: ShelfRow.Place in gone.get_children():
+			assert_bool(place.transform == stood[place.get_index()]).is_true()
+			if place.visible:
+				assert_float(place.shown._fade.amount).is_equal(1.0)
+		gone.selected_presence = 1.0
+		gone.neighbours = 1.0
+		_frames(gone, 1, Fixtures.FRAME_S)
+		_frames(shown, 1, Fixtures.FRAME_S)
+		_assert_twins(gone, shown)
+		if is_failure():
+			return
+
+
+func test_gone_the_row_still_takes_its_shelves_and_steps_and_comes_back_on_them_as_a_row_never_gone() -> void:
+	var random := Fixtures.cases(63)
+	for i in 20:
+		var count := random.randi_range(1, 12)
+		var gone := _row(count, 0)
+		var shown := _row(count, 0)
+		gone.selected_presence = 0.0
+		gone.neighbours = 0.0
+		# Gone, as on the consoles screen, where each console chosen shows its shelf.
+		var games := Fixtures.games(random.randi_range(1, 12))
+		var selected := random.randi_range(0, games.size() - 1)
+		var direction := Fixtures.direction(random)
+		var frames := random.randi_range(1, 30)
+		for row: ShelfRow in [gone, shown]:
+			_frames(row, 2, Fixtures.FRAME_S)
+			row.show_shelf(games, selected, Fixtures.DVD, ShelfRow.LabelLook.new())
+			row.step(direction)
+			_frames(row, frames, Fixtures.FRAME_S)
+		for place: ShelfRow.Place in gone.get_children():
+			var twin: ShelfRow.Place = shown.get_child(place.get_index())
+			assert_int(place.game).is_equal(twin.game)
+			assert_bool(place.visible).is_equal(twin.visible)
+			assert_str(place.shown._title.text).is_equal(twin.shown._title.text)
+		gone.selected_presence = 1.0
+		gone.neighbours = 1.0
+		_frames(gone, 1, Fixtures.FRAME_S)
+		_frames(shown, 1, Fixtures.FRAME_S)
+		_assert_twins(gone, shown)
+		if is_failure():
+			return
+
+
+func test_with_anything_of_it_showing_the_row_stands_each_frame_where_a_row_never_gone_stands() -> void:
+	var random := Fixtures.cases(62)
+	for i in 30:
+		var count := random.randi_range(1, 12)
+		var partly := _row(count, 0)
+		var whole := _row(count, 0)
+		# Any one of these left is enough for the row to be seen, however little.
+		var left := random.randi_range(0, 3)
+		var little: float = [0.0001, 0.01, 0.5][random.randi_range(0, 2)]
+		partly.selected_presence = little if left == 0 else 0.0
+		partly.neighbours = little if left == 1 else 0.0
+		partly.stage = little if left == 2 else 0.0
+		whole.stage = partly.stage
+		if left == 3:
+			# Launched, the disc out of the row stands where the launch has it.
+			for row: ShelfRow in [partly, whole]:
+				row.stand_selected(Transform3D(Basis(), Vector3(0.0, 1.0, 2.0)), 1.0, 0.1)
+		for frame in random.randi_range(1, 60):
+			_frames(partly, 1, Fixtures.FRAME_S)
+			_frames(whole, 1, Fixtures.FRAME_S)
+			for place: ShelfRow.Place in partly.get_children():
+				var twin: ShelfRow.Place = whole.get_child(place.get_index())
+				assert_bool(place.transform == twin.transform).is_true()
+		if is_failure():
+			return
+
+
+func test_a_game_standing_still_is_not_placed_again_and_its_parts_hear_nothing() -> void:
+	var row := _row(5, 2)
+	_frames(row, 2, Fixtures.FRAME_S)
+	await await_idle_frame()
+	# A neighbour stands still; the selected game floats, as a guard that probes do hear.
+	var still: Fixtures.TransformProbe = auto_free(Fixtures.TransformProbe.new())
+	var floating: Fixtures.TransformProbe = auto_free(Fixtures.TransformProbe.new())
+	(row._placed[1] as ShelfRow.Place).add_child(still)
+	(row._placed[2] as ShelfRow.Place).add_child(floating)
+	await await_idle_frame()
+	still.heard = 0
+	floating.heard = 0
+	for frame in 10:
+		_frames(row, 1, Fixtures.FRAME_S)
+		await await_idle_frame()
+	assert_int(still.heard).is_equal(0)
+	assert_int(floating.heard).is_equal(10)
 
 
 func test_INV_E2_5_06_the_pose_is_the_selected_game_s_alone_within_its_angles() -> void:
@@ -184,8 +306,28 @@ func test_INV_E2_5_06_on_a_stopped_row_the_selected_game_is_posed_and_the_others
 			if place.visible:
 				var laid_out := CarouselLayout.place(offsets[place.game]).basis
 				if place.game == row.selected_index():
-					laid_out *= row.pose.at(row._clock_s, 1.0)
+					laid_out *= row.pose.at(row._pose_s, 1.0)
 				assert_bool(place.transform.basis.is_equal_approx(laid_out)).is_true()
+
+
+func test_at_rest_the_selected_game_stops_floating_and_swaying_and_goes_on_from_there() -> void:
+	var random := Fixtures.cases(81)
+	var row := _row(9, 4, _pose(random))
+	_frames(row, 30, Fixtures.FRAME_S)
+	var centre := _centre(row)
+	row.pace = 0.0
+	var stood := centre.transform
+	_frames(row, 120, Fixtures.FRAME_S)
+	assert_bool(centre.transform == stood).is_true()
+	# Slowed, it goes on from where it stopped, as far as its pace takes it: as a row that never
+	# stopped would stand half a frame later.
+	row.pace = 0.5
+	_frames(row, 1, Fixtures.FRAME_S)
+	assert_bool(centre.transform == stood).is_false()
+	var twin := _row(9, 4, row.pose)
+	_frames(twin, 30, Fixtures.FRAME_S)
+	twin._process(Fixtures.FRAME_S / 2.0)
+	assert_bool(centre.transform.is_equal_approx(_centre(twin).transform)).is_true()
 
 
 func test_INV_E2_5_07_the_stick_turns_the_selected_game_any_way_up_to_its_back() -> void:

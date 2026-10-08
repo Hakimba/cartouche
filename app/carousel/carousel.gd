@@ -18,19 +18,24 @@ extends Control
 ## fast, a drag on it turns it, and nothing launches but A. A drag over the properties turns what
 ## they stage; what was turned comes back to the front once let go. The system's back gesture is B.
 ##
+## Left alone, the app rests ([Resting]): drawn 30 times a second, then still until something
+## changes; not while labels download. On the games screen the consoles behind are not drawn: they
+## fade out once there, back in for a launch or to go out.
+##
 ## In front of it, [ScreenFlow] shows the welcome at each start while the library loads, the first
 ## launch's screens, and the screens adding a console while none has games; Y on the consoles
-## screen or the games screen opens the settings over it. On the consoles screen, holding up turns the "+" ball above
-## the console into a button ([AddBall]), until up is let go: A then adds one more console, the
-## consoles coming in again on it; down (or "Change place" in a console's properties) opens the
-## ring putting the consoles in order ([ConsoleOrder]). The carousel waits for the screens in front
-## to close.
+## screen or the games screen opens the settings over it. On the consoles screen, holding up turns
+## the "+" ball above the console into a button ([AddBall]), until up is let go: A then adds one
+## more console, the consoles coming in again on it; down (or "Change place" in a console's
+## properties) opens the ring putting the consoles in order ([ConsoleOrder]). The carousel waits for
+## the screens in front to close.
 ##
 ## In debug builds, holding Select opens the device check, and command-line arguments set up
-## measurements: `--welcome=skip` goes past the welcome without a press, `--demo-games=N` shows a made-up library of N games, `--bench=scroll`, `enter`,
-## `turn` or `launch` runs [CarouselBench], `--turntable=T` turns the selected game T times a second to show
-## all its sides, `--shelf=gba` opens on that platform. Without the Android plugin (the editor, a
-## desktop run), the demo library is shown.
+## measurements: `--welcome=skip` goes past the welcome without a press, `--demo-games=N` shows a
+## made-up library of N games, `--bench=scroll`, `enter`, `turn` or `launch` runs [CarouselBench],
+## `--turntable=T` turns the selected game T times a second to show all its sides, `--shelf=gba`
+## opens on that platform, `--shots=DIR` saves pictures at set frames ([FrameShots]). Without the
+## Android plugin (the editor, a desktop run), the demo library is shown.
 
 ## The screen changed; in between, the animation into or out of the console plays.
 signal screen_changed(screen: Screen)
@@ -39,13 +44,16 @@ enum Screen { CONSOLES, ENTERING, GAMES, LEAVING, PROPERTIES, CONSOLE_PROPERTIES
 
 const _APPEARANCE := "res://data/carousel/appearance.json"
 const _DEVICE_CHECK := "res://dev/device_check/device_check.tscn"
-const _BATTERY_EVERY_S := 60
 const _MESSAGE_S := 4.0
 ## The art bar moves to each new count in this time; once full, it stays a moment, then fades.
 const _ART_STEP_S := 0.3
 const _ART_FULL_S := 1.0
 const _ART_FADE_S := 0.4
 const _MOVING: Array[Screen] = [Screen.ENTERING, Screen.LEAVING]
+## The screens with the selected console in the middle, which the right stick turns; and with the
+## selected game.
+const _CONSOLE_SCREENS: Array[Screen] = [Screen.CONSOLES, Screen.CONSOLE_PROPERTIES]
+const _GAME_SCREENS: Array[Screen] = [Screen.GAMES, Screen.PROPERTIES]
 ## The console's name above it fades out as the animation into it starts, back in once out.
 const _TITLE_FADE_S := 0.2
 ## The carousel comes in once the screens in front of it are gone: the consoles grow out of
@@ -65,6 +73,8 @@ const _CONSOLE_Y := 420.0
 ## sideways from where it came down, it moves one console or game.
 const _ON_SELECTED_PX := 270.0
 const _SWIPE_PX := 80.0
+## The consoles behind the games fade out or back in in this time.
+const _BEHIND_FADE_S := 0.3
 
 var android: AndroidServices = Android
 ## Milliseconds since the start, as fingers are read: the engine's clock, a fake one in tests.
@@ -87,12 +97,10 @@ var _appearance: Appearance
 var _demo := false
 ## Set once the library is shown: until then there is nothing to move, launch or remember.
 var _shown := false
-## Whether the consoles wait to come in, at the start or once the last was removed: the screens in
-## front hide them until then.
-var _arriving := true
 var _direction := HeldDirection.new()
-var _clock_ticks := 0
 var _art_tween: Tween
+## Whether labels download, neither waiting nor over: the app does not rest meanwhile.
+var _downloading := false
 var _arrival: Tween
 ## The console's name fading: one at a time, the latest wins.
 var _title_fade: Tween
@@ -111,7 +119,8 @@ var _swiped := false
 @onready var _console_model: Label = %ConsoleModel
 @onready var _add_ball: AddBall = %AddBall
 @onready var _camera: Camera3D = $Camera
-@onready var _battery: Label = %Battery
+@onready var _battery: BatteryChip = %Battery
+@onready var _resting: Resting = %Resting
 ## Shown while a run looks for art; its content, apart, hides for a message and fades once done.
 @onready var _art_progress: Control = %ArtProgress
 @onready var _art_content: Control = %Content
@@ -136,16 +145,28 @@ var _swiped := false
 func _ready() -> void:
 	var started := Time.get_ticks_msec()
 	_screens.android = android
+	_screens.covering.connect(_show_front.bind(true))
 	_game_launch.android = android
 	_share_clock()
+	_resting.moving = func() -> bool:
+		return _downloading or _game_launch.is_busy() or _screen in _MOVING or _screens.is_playing()
 	if Diagnostics.argument("welcome") == "skip":
 		_screens.welcome_waits = false
 	# The welcome shows first, without the bar.
 	_top_bar.hide()
 	_show_front(true)
+	# Asked first, its art looked for as soon as it is sent: the plugin reads the library while the
+	# scene sets itself up.
+	android.art_changed.connect(_on_art_changed)
+	var demo_games := Diagnostics.argument("demo-games").to_int()
+	_demo = demo_games > 0 or not android.is_available()
+	var asked_library := AndroidServices.Asked.new(
+		android.use_demo_library.bind(demo_games) if _demo else android.library)
+	var asked_settings := AndroidServices.Asked.new(android.settings)
 	for platform in android.catalog.platforms:
 		_platforms[platform.id] = platform
 	_appearance = Appearance.read(_APPEARANCE)
+	var read_ms := Time.get_ticks_msec()
 	# At the consoles' depth, the screen's height spans 2·d·tan(fov / 2).
 	var depth := _camera.global_position.z - _consoles.global_position.z
 	var shown := get_viewport_rect().size
@@ -164,7 +185,6 @@ func _ready() -> void:
 		properties.light = %Light
 		properties.rename_failed.connect(_show_message.bind(tr("This name could not be kept.")))
 	_properties.row = _row
-	_properties.sequence = _sequence
 	_properties.art = _art
 	_properties.behind.assign([_pill, _games_hints])
 	_properties.closed.connect(_go.bind(Screen.GAMES))
@@ -186,28 +206,26 @@ func _ready() -> void:
 	# The ring's centre in the middle of the screen, at the row's depth (it stands further back).
 	_consoles.ring_centre = _consoles.to_local(Vector3(_camera.global_position.x, _camera.global_position.y,
 		_consoles.global_position.z))
-	# Before the library is asked for: its art is looked for as soon as it is sent.
-	android.art_changed.connect(_on_art_changed)
-	_row.prepare(_appearance.models.values())
 	_row.turntable = Diagnostics.argument("turntable").to_float()
 	_on_clock_timeout()
-	var demo_games := Diagnostics.argument("demo-games").to_int()
-	var answer: AndroidServices.LibraryAnswer
-	_demo = demo_games > 0 or not android.is_available()
-	if _demo:
-		answer = await android.use_demo_library(demo_games)
-	else:
-		answer = await android.library()
+	_battery.show_battery(android.battery())
+	android.battery_changed.connect(_battery.show_battery)
+	var awaited_ms := Time.get_ticks_msec()
+	var answer: AndroidServices.LibraryAnswer = await asked_library.taken()
 	if not answer.ok:
 		Diagnostics.trace("carousel", "library not read (%s): %s" % [answer.code, answer.detail])
-	var settings := await android.settings()
+	var settings: AndroidServices.SettingsAnswer = await asked_settings.taken()
+	var answered_ms := Time.get_ticks_msec()
 	if settings.has_button_style:
 		Controls.style = settings.button_style
+	get_viewport().msaa_3d = EdgeSmoothingScreen.MSAA[settings.edge_smoothing]
 	for art in answer.art:
 		_art.add(art)
 	_show_library(answer.library)
+	var library_shown_ms := Time.get_ticks_msec()
 	_screens.library = answer.library
 	await _screens.run(settings)
+	var screens_ms := Time.get_ticks_msec()
 	_come_in()
 	_shown = true
 	# Once the carousel is on screen: reading sounds must not delay it.
@@ -218,6 +236,9 @@ func _ready() -> void:
 		var shown_ms := Time.get_ticks_msec()
 		Diagnostics.trace("carousel", "shown: %d games on %d shelves, %d ms after the scene started" % [
 			answer.library.games.size(), _shelves.size(), shown_ms - started])
+		Diagnostics.trace("carousel", ("start: scene from %d ms, appearance read in %d ms, set up by %d ms, "
+			+ "answers by %d ms, library shown by %d ms, screens passed by %d ms") % [started, read_ms - started,
+			awaited_ms - started, answered_ms - started, library_shown_ms - started, screens_ms - started])
 		var frames := PackedStringArray()
 		for frame in 3:
 			var frame_started := Time.get_ticks_usec()
@@ -228,6 +249,9 @@ func _ready() -> void:
 		var bench := Diagnostics.argument("bench")
 		if bench:
 			add_child(CarouselBench.new(bench, self, _row))
+		var shots := Diagnostics.argument("shots")
+		if shots:
+			add_child(FrameShots.new(shots))
 
 
 func _notification(what: int) -> void:
@@ -241,26 +265,20 @@ func _notification(what: int) -> void:
 		_press_back.call_deferred()
 
 
-## The system's back, a gesture or a button, is B on every screen: pressed, then let go a frame
-## later, as a real press is.
-func _press_back() -> void:
-	for pressed: bool in [true, false]:
-		var back := InputEventAction.new()
-		back.action = &"screen_back"
-		back.pressed = pressed
-		Input.parse_input_event(back)
-		if pressed:
-			await get_tree().process_frame
-
-
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	var gone := _screen in _GAME_SCREENS and not _game_launch.is_inserting()
+	# While a launch is checked, and as the black fades after the game, they stay away.
+	var behind := 0.0 if gone and _game_launch.is_busy() \
+		else move_toward(_sequence.behind_amount, 0.0 if gone else 1.0, delta / _BEHIND_FADE_S)
+	if behind != _sequence.behind_amount:
+		_sequence.behind_amount = behind
 	var now: int = clock.call()
 	if _finger_on_selected and _touchable() and _finger.held(now):
 		_long_press()
 	var stick := Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down")
-	_consoles.inspect(stick if _screen in [Screen.CONSOLES, Screen.CONSOLE_PROPERTIES] and _shown else Vector2.ZERO)
+	_consoles.inspect(stick if _screen in _CONSOLE_SCREENS and _shown else Vector2.ZERO)
 	if not _game_launch.is_busy():
-		_row.inspect(stick if _screen in [Screen.GAMES, Screen.PROPERTIES] else Vector2.ZERO)
+		_row.inspect(stick if _screen in _GAME_SCREENS else Vector2.ZERO)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -334,6 +352,23 @@ func _gui_input(event: InputEvent) -> void:
 			_drag(_finger.moved)
 
 
+## The screen shown, or the one the animation goes to.
+func screen() -> Screen:
+	return _screen
+
+
+## The system's back, a gesture or a button, is B on every screen: pressed, then let go a frame
+## later, as a real press is.
+func _press_back() -> void:
+	for pressed: bool in [true, false]:
+		var back := InputEventAction.new()
+		back.action = &"screen_back"
+		back.pressed = pressed
+		Input.parse_input_event(back)
+		if pressed:
+			await get_tree().process_frame
+
+
 func _share_clock() -> void:
 	_order.clock = clock
 	_properties.clock = clock
@@ -349,7 +384,7 @@ func _touchable() -> bool:
 ## Where the console or the game in the middle rests on the screen (not where it is passing
 ## through as it slides there).
 func _selected_point() -> Vector2:
-	if _screen in [Screen.CONSOLES, Screen.CONSOLE_PROPERTIES]:
+	if _screen in _CONSOLE_SCREENS:
 		return _screens.console_point
 	return _camera.unproject_position(_row.to_global(Vector3.ZERO))
 
@@ -410,11 +445,6 @@ func _step_beside(towards: int) -> void:
 		_row.step(towards)
 
 
-## The screen shown, or the one the animation goes to.
-func screen() -> Screen:
-	return _screen
-
-
 ## Debug builds: how long after the carousel showed, at [param shown_ms], the selected game's label
 ## replaced its title, for `dev/bench.sh`.
 func _trace_selected_label(shown_ms: int) -> void:
@@ -472,10 +502,14 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 			_shelf = i
 	if _shelves.is_empty():
 		return
+	# Only the media of the library's consoles: the others are never loaded.
+	var models: Array[PackedScene] = []
 	var items: Array[ConsoleRow.Item] = []
 	for shelf in _shelves:
+		models.append(_appearance.model_of(_platforms[shelf.platform_id].media))
 		_positions[shelf.platform_id] = shelf.selected
 		items.append(_console_item(shelf.platform_id))
+	_row.prepare(models)
 	_consoles.show_consoles(items, _shelf)
 	# A console alone has no order to be put in.
 	_arrange_hint.visible = _shelves.size() > 1
@@ -495,7 +529,7 @@ func _console_item(platform_id: String) -> ConsoleRow.Item:
 	if platform_id in _appearance.consoles:
 		var console: ConsoleModel = _appearance.consoles[platform_id].instantiate()
 		return ConsoleRow.Item.new(console, rest)
-	var medium := ShelfRow.LabelledModel.new(_appearance.models[platform.media])
+	var medium := ShelfRow.LabelledModel.new(_appearance.model_of(platform.media))
 	medium.draw_label(platform.name, _look(platform_id))
 	return ConsoleRow.Item.new(medium, rest)
 
@@ -505,7 +539,7 @@ func _console_item(platform_id: String) -> ConsoleRow.Item:
 func _show_platform() -> void:
 	var shelf := _shelves[_shelf]
 	var platform := _platforms[shelf.platform_id]
-	_row.show_shelf(shelf.games, _positions[shelf.platform_id], _appearance.models[platform.media],
+	_row.show_shelf(shelf.games, _positions[shelf.platform_id], _appearance.model_of(platform.media),
 		_look(shelf.platform_id))
 	_sequence.use(_appearance.animation_of(shelf.platform_id))
 	_console_name.text = _console_name_of(shelf.platform_id)
@@ -595,10 +629,12 @@ func _show_message(text: String) -> void:
 
 
 func _on_art_changed(change: AndroidServices.ArtChange) -> void:
+	var progress := change.progress
+	_downloading = progress.done < progress.total and progress.stall.is_empty()
 	if change.has_found:
 		_art.add(change.found)
 		_row.refresh_label(change.found.game_id)
-	_show_art_progress(change.progress)
+	_show_art_progress(progress)
 
 
 func _on_row_selection_changed(game: AndroidServices.Game) -> void:
@@ -615,10 +651,6 @@ func _on_consoles_selection_changed(index: int) -> void:
 
 func _on_clock_timeout() -> void:
 	_clock.text = Time.get_time_string_from_system().left(5)
-	if _clock_ticks % _BATTERY_EVERY_S == 0:
-		var battery := android.battery()
-		_battery.text = ("%d %%" % battery.level_percent if battery.has_level else "") + (" ⚡" if battery.charging else "")
-	_clock_ticks += 1
 
 
 func _on_game_launch_failed(code: StringName) -> void:
@@ -640,13 +672,15 @@ func _show_front(front: bool) -> void:
 		part.visible = not front
 	_console_title.visible = not front
 	_pill.visible = not front and not _shelves.is_empty()
+	_games_hints.visible = not front
 	if front:
+		_sequence.behind_amount = 0.0
 		_art_progress.hide()
 
 
 ## The consoles come in, no longer hidden by the screens in front.
 func _come_in() -> void:
-	_arriving = false
+	_resting.wake()
 	_show_front(false)
 	_arrive()
 
@@ -690,6 +724,8 @@ func _open_settings() -> void:
 	_cover()
 	if await _screens.open_settings():
 		_come_in()
+	else:
+		_show_front(false)
 	_shown = true
 
 
@@ -790,15 +826,18 @@ func _open_properties() -> void:
 func _add_console() -> void:
 	_cover()
 	await _screens.add_console()
+	_show_front(false)
 	_reopen_add_ball()
 	_shown = true
 
 
-## Before screens open over the consoles: the carousel takes no press, and the art's progress is
-## not followed under them.
+## Before screens open over the consoles: the carousel takes no press, its message goes, and the
+## art's progress is not followed under them.
 func _cover() -> void:
 	_shown = false
 	_hold_select.stop()
+	_message_timer.stop()
+	_on_message_timer_timeout()
 	# A direction let go under the screens never reaches the row.
 	_row.freeze()
 	_art_progress.hide()
@@ -817,14 +856,6 @@ func _on_screens_library_edited(library: AndroidServices.Library) -> void:
 	# Shown again from the start, the carousel is back on the consoles screen.
 	if _screen == Screen.GAMES:
 		_go(Screen.CONSOLES)
-	# Back once the settings close, coming in as after a first console.
-	if _shelves.is_empty():
-		_arriving = true
-		_show_front(true)
-
-
-func _on_screens_covering(covers: bool) -> void:
-	_show_front(covers or _arriving)
 
 
 func _on_screens_welcome_closed() -> void:

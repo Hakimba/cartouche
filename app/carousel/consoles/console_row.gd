@@ -43,6 +43,8 @@ var pose_amount := 1.0
 var sway_degrees := CarouselLayout.SWAY_DEGREES
 var bob_height := CarouselLayout.BOB_HEIGHT
 var others_opacity := 1.0
+## How fast the consoles float and sway, from 1 down to 0, still ([Resting]).
+var pace := 1.0
 ## How far the row has come in on screen, from 0 (a point) to 1 (beyond, as it overshoots): every
 ## console grows out of its own centre with it, opaque all along (a fading model would draw with
 ## other shaders, compiled on the spot).
@@ -66,11 +68,15 @@ var pointed := -1
 var held := -1
 var peel := 0.0
 var pose := ShelfRow.Pose.new()
+## Whether the consoles are drawn apart, behind the games ([ConsoleLayer]): there, they move only in
+## the frames [ConsoleSequence] arranges them in, and stand still in the others.
+var behind := false
 
 var _items: Array[Item] = []
 var _position := 0
 var _scroll := 0.0
-var _clock_s := 0.0
+## How far the consoles' float and sway have gone, in seconds at full pace.
+var _pose_s := 0.0
 var _stick := Vector2.ZERO
 var _turn := StickTurn.new()
 ## Where each console stands round the ring this frame, sliding towards its slot.
@@ -79,14 +85,18 @@ var _slid: Array[float] = []
 ## drawn as a sticker. -1 for none.
 var _peeled := -1
 var _stuck := -1
+## Whether they were arranged since this node's last frame: then, behind the games too, they are
+## arranged again as the clock moves on.
+var _arranged := false
 
 
 func _ready() -> void:
+	add_to_group(Resting.PACED)
 	set_process(false)
 
 
 func _process(delta: float) -> void:
-	_clock_s += delta
+	_pose_s += delta * pace
 	_scroll = CarouselLayout.scrolled(_scroll, _position, delta)
 	_turn.follow(_stick, _position, delta)
 	_slide(delta)
@@ -94,7 +104,9 @@ func _process(delta: float) -> void:
 	if held >= 0 or peel <= 0.0:
 		_peeled = held
 	_stick_on()
-	arrange()
+	if not behind or _arranged:
+		arrange()
+	_arranged = false
 
 
 ## Shows [param items], in their order, from [param from].
@@ -111,6 +123,8 @@ func show_consoles(items: Array[Item], from: int) -> void:
 			item.geometry.append(item.model)
 	_peeled = -1
 	_stuck = -1
+	# New models are drawn in front.
+	behind = false
 	wheel_slots.assign(range(_items.size()))
 	_slid.assign(wheel_slots)
 	_position = from
@@ -193,14 +207,16 @@ func let_go() -> void:
 
 ## Draws every console in the render layers of [param mask].
 func show_in_layers(mask: int) -> void:
+	behind = mask == ConsoleLayer.BEHIND
 	for item in _items:
 		for geometry in item.geometry:
 			geometry.layers = mask
 
 
-## Stands every console as the properties above have it; each frame does, and so does whoever
-## needs where they stand at once.
+## Stands every console as the properties above have it; each frame does (behind the games, only
+## the frames they were arranged in), and so does whoever needs where they stand at once.
 func arrange() -> void:
+	_arranged = true
 	var shown := CarouselLayout.offsets(_items.size(), _scroll)
 	for i in _items.size():
 		var item := _items[i]
@@ -217,14 +233,17 @@ func arrange() -> void:
 		var centred := CarouselLayout.centred(offset) * amount
 		var place := CarouselLayout.place(offset)
 		pose.sway = (sway_degrees if chosen else rest.sway_degrees) * unstaged
-		var bob := CarouselLayout.float_height(_clock_s, bob_height if chosen else rest.bob_height, centred * unstaged)
+		var bob := CarouselLayout.float_height(_pose_s, bob_height if chosen else rest.bob_height, centred * unstaged)
 		var turned := _three_euler(console_rotation if chosen else rest.console_rotation)
 		var size := (console_scale if chosen else rest.console_scale) * maxf(arrival, 0.001) * lerpf(1.0, staged_size, staged)
-		var posed := place.basis * pose.at(_clock_s, centred * lerpf(1.0, _STAGED_POSE, staged)) * _turn.of(i)
+		var posed := place.basis * pose.at(_pose_s, centred * lerpf(1.0, _STAGED_POSE, staged)) * _turn.of(i)
 		var stand := posed * turned.scaled(Vector3.ONE * size)
 		var lift := Vector3.UP * (bob + staged_lift * staged)
 		var in_row := Transform3D(stand, at_position + place.origin + lift)
-		item.model.transform = in_row.interpolate_with(_on_ring(i), wheel) if wheel > 0.0 else in_row
+		var moved := in_row.interpolate_with(_on_ring(i), wheel) if wheel > 0.0 else in_row
+		# Set again, even unchanged, it would be sent to every part of the console.
+		if item.model.transform != moved:
+			item.model.transform = moved
 		var presence := 1.0 if chosen else others_opacity * (1.0 - stage)
 		item.fade.call(lerpf(CarouselLayout.faded(offset, presence), 0.0, wheel))
 		if chosen and item.model is ConsoleModel:

@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name SettingsMenu
 extends Control
-## "Settings", over the screen it was opened from: the platforms set up, and the button style.
-## B closes.
+## "Settings", over the screen it was opened from: the platforms set up, the button style and the
+## graphics (the edges' smoothing). B closes.
 
-## [param choice] is `platforms`, `button_style`, or `close` (B).
+## [param choice] is `platforms`, `button_style`, `graphics`, or `close` (B).
 signal chosen(choice: StringName)
 
 @onready var _platforms: FieldButton = %Platforms
 @onready var _button_style: FieldButton = %ButtonStyle
+@onready var _graphics: FieldButton = %Graphics
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -17,14 +18,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		chosen.emit(&"close")
 
 
-## Shows how many [param platforms] are set up and the button style, the focus on the line of
-## [param focus] (a choice). With no platform, its line cannot be opened.
+## Shows how many [param platforms] are set up, the button style and the edges' smoothing, the focus
+## on the line of [param focus] (a choice). With no platform, its line cannot be opened.
 func open(platforms: int, focus: StringName) -> void:
 	_platforms.show_value(str(platforms))
 	_platforms.disabled = platforms == 0
 	_platforms.focus_mode = FOCUS_NONE if _platforms.disabled else FOCUS_ALL
 	_button_style.show_value(Controls.style_name())
-	(_button_style if focus == &"button_style" or _platforms.disabled else _platforms).grab_focus()
+	_graphics.show_value(tr(EdgeSmoothingScreen.NAMES[EdgeSmoothingScreen.of(get_viewport())]))
+	if focus == &"graphics":
+		_graphics.grab_focus()
+	else:
+		(_button_style if focus == &"button_style" or _platforms.disabled else _platforms).grab_focus()
 
 
 func _on_platforms_pressed() -> void:
@@ -33,3 +38,7 @@ func _on_platforms_pressed() -> void:
 
 func _on_button_style_pressed() -> void:
 	chosen.emit(&"button_style")
+
+
+func _on_graphics_pressed() -> void:
+	chosen.emit(&"graphics")

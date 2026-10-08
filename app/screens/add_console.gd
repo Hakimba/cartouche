@@ -104,27 +104,6 @@ func back_from_removal(failed: bool) -> void:
 	_cancel.grab_focus()
 
 
-func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: AndroidServices.Folder,
-		taken: PackedStringArray) -> void:
-	# An answer still on its way belongs to the form as it was.
-	_counts += 1
-	_edited_id = edited_id
-	_taken = taken
-	library = null
-	platform_id = edited_id
-	_title.text = tr("Edit the platform") if edited_id else tr("Add a console")
-	_cancel.text = tr("Remove") if edited_id else tr("Cancel")
-	_add.text = tr("Save") if edited_id else tr("Add")
-	_type.show_value(platform_name() if platform_id else tr("Choose…"))
-	_folder = folder
-	_has_folder = choices.has_folder
-	_folder_field.show_value(folder_place(folder) if _has_folder else tr("Choose…"))
-	_games = -1
-	_subfolders.set_pressed_no_signal(choices.folder_depth == "subfolders")
-	_discs.set_pressed_no_signal(choices.disc_grouping == "grouped")
-	_read_players(choices.player_id)
-
-
 ## The choices made, as the plugin takes them.
 func setup() -> AndroidServices.PlatformSetup:
 	var choices := AndroidServices.PlatformSetup.new()
@@ -153,6 +132,28 @@ func platform_name() -> String:
 		if platform.id == platform_id:
 			return platform.name
 	return platform_id
+
+
+func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: AndroidServices.Folder,
+		taken: PackedStringArray) -> void:
+	android.prepare_titles()
+	# An answer still on its way belongs to the form as it was.
+	_counts += 1
+	_edited_id = edited_id
+	_taken = taken
+	library = null
+	platform_id = edited_id
+	_title.text = tr("Edit the platform") if edited_id else tr("Add a console")
+	_cancel.text = tr("Remove") if edited_id else tr("Cancel")
+	_add.text = tr("Save") if edited_id else tr("Add")
+	_type.show_value(platform_name() if platform_id else tr("Choose…"))
+	_folder = folder
+	_has_folder = choices.has_folder
+	_folder_field.show_value(folder_place(folder) if _has_folder else tr("Choose…"))
+	_games = -1
+	_subfolders.set_pressed_no_signal(choices.folder_depth == "subfolders")
+	_discs.set_pressed_no_signal(choices.disc_grouping == "grouped")
+	_read_players(choices.player_id)
 
 
 ## The catalog's platforms by name, as the type list shows them, but for those [member _taken].

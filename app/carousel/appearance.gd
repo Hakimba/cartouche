@@ -4,9 +4,9 @@ extends RefCounted
 ## How the carousel shows its platforms, as `data/carousel/appearance.json` has it: a model per
 ## media, a console per platform that has one (its scene, its launch animation's steps, the name and
 ## model shown above it), the steps of the platforms shown by their medium, label colours and bands,
-## the pose, and each media's insertion. Read once, its launch animations made once each.
+## the pose, and each media's insertion. Read once, its launch animations made once each; a medium's
+## model is loaded the first time it is asked for.
 
-var models: Dictionary[String, PackedScene] = {}
 var consoles: Dictionary[String, PackedScene] = {}
 ## The short name and the model of each console, as shown above it: "PlayStation 2", "Slim".
 var console_names: Dictionary[String, String] = {}
@@ -19,6 +19,9 @@ var pose := ShelfRow.Pose.new()
 
 var _animations: Dictionary[String, Animation] = {}
 var _media_animation: Animation
+## Each medium's model, by media, and where it is, until it is first asked for.
+var _models: Dictionary[String, PackedScene] = {}
+var _model_paths: Dictionary[String, String] = {}
 
 
 ## The appearance the file at [param path] describes; what cannot be taken as written is reported.
@@ -26,9 +29,7 @@ static func read(path: String) -> Appearance:
 	var appearance := Appearance.new()
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var models_data: Dictionary = data["models"]
-	for media: String in models_data:
-		var model: String = models_data[media]
-		appearance.models[media] = load(model)
+	appearance._model_paths.assign(models_data)
 	var consoles_data: Dictionary = data["consoles"]
 	for platform_id: String in consoles_data:
 		var console: Dictionary = consoles_data[platform_id]
@@ -68,3 +69,12 @@ static func read(path: String) -> Appearance:
 ## The launch animation of [param platform_id]'s console, or of the platforms shown by their medium.
 func animation_of(platform_id: String) -> Animation:
 	return _animations.get(platform_id, _media_animation)
+
+
+## The model of [param media] (`dvd`, `minidisc`, `cartridge`).
+func model_of(media: String) -> PackedScene:
+	if media not in _models:
+		var started := Time.get_ticks_usec()
+		_models[media] = load(_model_paths[media])
+		Diagnostics.trace("appearance", "%s model loaded in %.1f ms" % [media, (Time.get_ticks_usec() - started) / 1000.0])
+	return _models[media]

@@ -7,7 +7,6 @@ import android.graphics.ImageDecoder
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.Uri
-import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
@@ -65,6 +64,7 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.settings.ButtonStyle
+import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
 import arrow.core.Option
@@ -105,10 +105,11 @@ import app.cartouche.core.settings.Settings as AppSettings
  * and wrapped by `app/adapters/android/android_services.gd`. The wire format is described in
  * `Wire.kt`.
  *
- * Methods are called on Godot's render thread. Getters answer directly. Operations take a request id
- * and answer it exactly once, later, through the `answered` signal: their work runs in [scope] on the
- * IO dispatcher (the folder pick on the main thread), activity starts on the main thread, and every
- * exception stops at [answer], except the cancellation of [scope] when the activity is destroyed.
+ * Methods are called on Godot's render thread. Getters answer directly, and [prepareTitles] only
+ * starts its work. Operations take a request id and answer it exactly once, later, through the
+ * `answered` signal: their work runs in [scope] on the IO dispatcher (the folder pick on the main
+ * thread), activity starts on the main thread, and every exception stops at [answer], except the
+ * cancellation of [scope] when the activity is destroyed.
  */
 public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     // A failure no operation stops is logged, and ends only its own coroutine.
@@ -126,6 +127,11 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private val variantDownloads by lazy {
         VariantDownloads(artStore, fetch, scope, Dispatchers.IO.limitedParallelism(VARIANT_DOWNLOADS), ::variantDownloaded)
     }
+
+    // Told on the render thread, after Godot has registered this plugin's signals there: at a cold
+    // start, the battery's first broadcast can come before.
+    private val batteryWatch = BatteryWatch { runOnRenderThread { emitSignal(BATTERY_SIGNAL, it.toWire()) } }
+
     private val network =
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) = scraper.networkBack()
@@ -139,7 +145,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /** Written on the render thread, read by operations too; immutable, so publishing it is enough. */
     @Volatile private var catalog = Catalog()
 
-    /** Reference lists by platform, as loaded; each is indexed on its first scan. */
+    /** Reference lists by platform, as loaded; each is indexed on first use, or ahead by [prepareTitles]. */
     @Volatile private var titleLists: Map<PlatformId, String> = emptyMap()
 
     @Volatile private var titleIndexes = ConcurrentHashMap<PlatformId, TitleIndex>()
@@ -159,6 +165,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /** Runs every library call, one at a time (see [LibraryService]). */
     private val libraryThread = Dispatchers.IO.limitedParallelism(1)
 
+    /** Plans each look for art, one at a time, in the order asked. */
+    private val artPlanning = Dispatchers.IO.limitedParallelism(1)
+
     /** Only used on [libraryThread], which [useDemoLibrary] replaces it on. */
     private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
 
@@ -174,16 +183,21 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         SignalInfo(ANSWERED_SIGNAL, Dictionary::class.java),
         SignalInfo(ART_SIGNAL, Dictionary::class.java),
         SignalInfo(VARIANT_SIGNAL, Dictionary::class.java),
+        SignalInfo(BATTERY_SIGNAL, Dictionary::class.java),
     )
 
     override fun onMainResume() {
         installed.clear()
         curtain.lower()
         scraper.start()
+        batteryWatch.follow(context)
     }
 
-    // Nothing is downloaded while a game is played.
-    override fun onMainPause(): Unit = scraper.stop()
+    // Nothing is downloaded, and the battery not followed, while a game is played.
+    override fun onMainPause() {
+        scraper.stop()
+        batteryWatch.stop(context)
+    }
 
     override fun onMainDestroy() {
         curtain.lower()
@@ -226,9 +240,17 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             Catalog.parse(sources, DefinitionSource("profiles.json", profiles)).let {
                 it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + times.swap().getOrNone().toList() + it.rejected)
             }
-        // Indexing takes a second or so on a handheld: done now, the first scan does not wait for it.
-        scope.launch { Either.catch { titleLists.keys.forEach(::titles) }.onLeft(::unexpected) }
         return catalog.toWire()
+    }
+
+    /**
+     * Indexes the reference lists in the background, as the settings or the form adding a console
+     * open: a start that adds or changes no console does not pay for it, and the form's first count
+     * of a folder does not wait for it.
+     */
+    @UsedByGodot
+    public fun prepareTitles() {
+        scope.launch { titleLists.keys.forEach(::titles) }
     }
 
     /** Installed players able to open [fileName], in definition order. */
@@ -253,14 +275,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     public fun curtainAllowed(): Boolean = curtain.isAllowed
 
-    /** `{"level_percent": int (absent when unknown), "charging": bool}` */
+    /** The battery now, as [BatteryState.toWire] has it; then [BATTERY_SIGNAL] tells each change. */
     @UsedByGodot
-    public fun battery(): Dictionary {
-        val manager = context.getSystemService(BatteryManager::class.java).toOption()
-        // An unsupported capacity reads as Int.MIN_VALUE, or 0 on some devices.
-        val level = manager.map { it.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) }.filter { it in 1..100 }
-        return dictionary("charging" to manager.isSome { it.isCharging }).putSome("level_percent", level)
-    }
+    public fun battery(): Dictionary = BatteryState.now(context).toWire()
 
     /** Such as `Acme Handheld 2, Android 13`. */
     @UsedByGodot
@@ -309,8 +326,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         }
 
     override fun onMainActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        trace("activity result") { "request $requestCode, result $resultCode, data ${data.toOption().flatMap { it.data.toOption() }}" }
-        val picked = data.toOption().flatMap { it.data.toOption() }.filter { resultCode == Activity.RESULT_OK }
+        val uri = data.toOption().flatMap { it.data.toOption() }
+        trace("activity result") { "request $requestCode, result $resultCode, data $uri" }
+        val picked = uri.filter { resultCode == Activity.RESULT_OK }
         when (requestCode) {
             REQUEST_PICK_FOLDER -> folderPicked(picked)
             REQUEST_PICK_PICTURE -> picturePicked(picked)
@@ -349,11 +367,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
                 picked.fold(
                     { failure(ErrorCode.CANCELLED, "Picker closed without a picture") },
                     { uri ->
-                        ownPictures.keep(ImageDecoder.createSource(context.contentResolver, uri)).fold({ it.toWire() }, {
-                            success(
-                                "picture" to it.toWire(),
-                            )
-                        })
+                        ownPictures
+                            .keep(ImageDecoder.createSource(context.contentResolver, uri))
+                            .fold({ it.toWire() }, { success("picture" to it.toWire()) })
                     },
                 )
             }
@@ -382,13 +398,13 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Answers with `{"folders"}`, the folders whose access survived until now. */
     @UsedByGodot
-    public fun persistedFolders(requestId: Int): Unit = inBackground(requestId) {
+    public fun persistedFolders(requestId: Int): Unit = answering(requestId) {
         folders.persisted().fold({ it.toWire() }, { list -> success("folders" to list.toWireArray { it.toWire() }) })
     }
 
     /** Lists one level of `{"tree_uri", "document_id"?}` (its root without a document id); answers with `{"entries"}`. */
     @UsedByGodot
-    public fun listFolder(requestId: Int, location: Dictionary): Unit = inBackground(requestId) {
+    public fun listFolder(requestId: Int, location: Dictionary): Unit = answering(requestId) {
         val tree = location.text("tree_uri").flatMap(ContentUri::parse)
         tree.fold({ invalid("listFolder needs a tree URI") }) { uri ->
             folders
@@ -399,7 +415,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Answers with `{"apps"}`, the apps with a launcher icon. */
     @UsedByGodot
-    public fun listLaunchableApps(requestId: Int): Unit = inBackground(requestId) {
+    public fun listLaunchableApps(requestId: Int): Unit = answering(requestId) {
         success("apps" to InstalledApps.launchable(context.packageManager).toWireArray { it.toWire() })
     }
 
@@ -415,10 +431,19 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
      */
     @UsedByGodot
     public fun library(requestId: Int) {
+        val asked = TimeSource.Monotonic.markNow()
         answering(requestId, libraryThread) {
+            val started = asked.elapsedNow().inWholeMilliseconds
             library.value.run {
+                val loaded = asked.elapsedNow().inWholeMilliseconds
                 val stored = library().games.flatMap { game -> artStore.stored(game.id).map { FoundArt(game.id, it) }.toList() }
-                success("library" to wire(this), "art" to stored.artWireJson()).putSome("load_problem", loadProblem)
+                val found = asked.elapsedNow().inWholeMilliseconds
+                success("library" to wire(this), "art" to stored.artWireJson()).putSome("load_problem", loadProblem).also {
+                    trace("library") {
+                        "answered ${asked.elapsedNow().inWholeMilliseconds} ms after asked: started at $started ms, " +
+                            "library at $loaded ms, stored art at $found ms"
+                    }
+                }
             }
         }
         lookForArt()
@@ -447,7 +472,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         success("report" to inLibrary { preview(platform, choices, titles(platform.id), dataFolders) }.toWire())
     }
 
-    /** Answers with the settings, `{"first_launch", "button_style"?}`. */
+    /** Answers with the settings, as [AppSettings.toWire] has them. */
     @UsedByGodot
     public fun settings(requestId: Int): Unit = answering(requestId, libraryThread) {
         val settings = storedSettings()
@@ -460,6 +485,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val chosen = code("button_style", Some(style), ButtonStyle.entries, ButtonStyle::wire)
         settingsStore.save(storedSettings().copy(buttonStyle = Some(chosen))).mapLeft { it.toWire() }.bind()
         trace("settings") { "button style: $style" }
+        success()
+    }
+
+    /** Stores the edge smoothing the user chose, [smoothing] as [settings] names it. */
+    @UsedByGodot
+    public fun saveEdgeSmoothing(requestId: Int, smoothing: String): Unit = answering(requestId, libraryThread) {
+        val chosen = code("edge_smoothing", Some(smoothing), EdgeSmoothing.entries, EdgeSmoothing::wire)
+        settingsStore.save(storedSettings().copy(edgeSmoothing = chosen)).mapLeft { it.toWire() }.bind()
+        trace("settings") { "edge smoothing: $smoothing" }
         success()
     }
 
@@ -602,17 +636,12 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             trace("launch") { "${choice.file.name.value} in ${launch.spec.targetPackage.fold({ "the app Android picks" }) { it.value }}" }
             val intent = launcher.prepareGame(launch, choice.file.uri).mapLeft { it.toWire() }.bind()
             onMain {
-                curtain.over(
-                    curtainTimes.timeFor(launch.spec.targetPackage),
-                ) { launcher.start(act, intent) }
+                curtain.over(curtainTimes.timeFor(launch.spec.targetPackage)) { launcher.start(act, intent) }
             }.mapLeft { it.toWire() }.bind()
             // Answered at once, for the black to last no longer than the start; a failure to
             // remember the disc must not report the launch as failed.
             scope.launch(libraryThread) {
-                Either
-                    .catch { library.value.recordLaunch(choice.game.id, choice.disc) }
-                    .onLeft(::unexpected)
-                    .onRight { saved -> saved.onLeft { trace("library") { "last disc not saved: ${it.message}" } } }
+                library.value.recordLaunch(choice.game.id, choice.disc).onLeft { trace("library") { "last disc not saved: ${it.message}" } }
             }
             success()
         }
@@ -637,9 +666,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     // Plumbing
 
     /**
-     * Deletes the art of games no longer in the library, then looks for the art of its games that
-     * have none, in library order, on [libraryThread] after the calls already there: an answer never
-     * waits for it, and its failure fails no answer.
+     * Deletes the art of games no longer in the library, on [libraryThread] after the calls already
+     * there, then looks for the art of its games that have none, in library order, planned on
+     * [artPlanning]: an answer never waits for it, and its failure fails no answer.
      */
     private fun lookForArt() {
         scope.launch(libraryThread) {
@@ -650,11 +679,11 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
                     .onRight { deleted -> if (deleted > 0) trace("art") { "$deleted images of games no longer in the library deleted" } }
                     .onLeft { trace("art") { "images of games no longer in the library not deleted: ${it.message}" } }
             }
-            val requests =
-                library.value.library().games.flatMap { game ->
-                    sources(game.platform).requestFor(game).toList()
-                }
-            scraper.lookFor(requests)
+            val games = library.value.library().games
+            scope.launch(artPlanning) {
+                val versionOf = { platform: PlatformId -> artLists.getOrNone(platform).flatMap(ArtIndex::versionOf) }
+                scraper.lookFor(ArtSources.requests(games, artStore::wants, versionOf, ::sources))
+            }
             if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
         }
     }
@@ -678,22 +707,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     /** Downloads over HTTP; in debug builds, `--art-refused` makes every server refuse, to try the message and the retries. */
-    private fun artFetch(): Fetch = if (BuildConfig.DEBUG &&
-        "--art-refused" in launchArguments()
-    ) {
-        Fetch { FetchFailure.Refused(503).left() }
-    } else {
-        HttpFetch("Cartouche")
-    }
-
-    private suspend fun <T> onLibrary(block: LibraryService.() -> T): T = withContext(libraryThread) { library.value.block() }
+    private fun artFetch(): Fetch =
+        if ("--art-refused" in launchArguments()) Fetch { FetchFailure.Refused(503).left() } else HttpFetch("Cartouche")
 
     private fun libraryIn(folder: File): LibraryService =
         LibraryService(LibraryStore(File(folder, LIBRARY_FILE)), SelectionStore(File(folder, "selection.json")), folders)
 
-    /** [onLibrary] for a call that can fail: its failure becomes the answer. */
+    /** Runs [block] on [libraryThread]; its failure becomes the answer. */
     private suspend fun <T> Raise<Dictionary>.inLibrary(block: LibraryService.() -> Either<LibraryFailure, T>): T =
-        onLibrary(block).mapLeft { it.toWire() }.bind()
+        withContext(libraryThread) { library.value.block() }.mapLeft { it.toWire() }.bind()
 
     /**
      * Answers [requestId] with what [work] returns, or with the failure it raises. Library calls
@@ -774,10 +796,8 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     /** `{platform id: text}` as sent by the adapter, texts of another type left out. */
-    private fun Dictionary.textsByPlatform(): Map<PlatformId, String> = keys
-        .flatMap { id ->
-            text(id).map { PlatformId(id) to it }.toList()
-        }.toMap()
+    private fun Dictionary.textsByPlatform(): Map<PlatformId, String> =
+        keys.flatMap { id -> text(id).map { PlatformId(id) to it }.toList() }.toMap()
 
     private fun invalid(detail: String): Dictionary = failure(ErrorCode.INVALID_REQUEST, detail)
 
@@ -788,13 +808,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private fun isInstalled(packageName: PackageName): Boolean =
         InstalledApps.isInstalled(context.packageManager, packageName).also { trace("installed") { "${packageName.value}: $it" } }
 
-    private fun inBackground(requestId: Int, work: suspend () -> Dictionary) {
-        scope.launch { answer(requestId) { work() } }
-    }
-
     /** Runs [work] in the background with the current activity; activity starts go through [onMain]. */
     private fun withActivity(requestId: Int, work: suspend (Activity) -> Either<LaunchFailure, Unit>): Unit =
-        onActivity(requestId) { act -> inBackground(requestId) { work(act).toWire() } }
+        onActivity(requestId) { act -> answering(requestId) { work(act).toWire() } }
 
     private fun onActivity(requestId: Int, work: (Activity) -> Unit): Unit =
         activity.toOption().fold({ answer(requestId) { failure(ErrorCode.NO_ACTIVITY, "No activity") } }, work)
@@ -828,6 +844,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         const val ART_SIGNAL = "art_changed"
 
         const val VARIANT_SIGNAL = "label_variant_downloaded"
+
+        /** The battery's level, or whether a charger is plugged in, changed. */
+        const val BATTERY_SIGNAL = "battery_changed"
 
         const val VARIANT_DOWNLOADS = 3
     }

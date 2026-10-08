@@ -35,18 +35,25 @@ func test_INV_E6_05_a_fresh_install_goes_from_the_welcome_to_its_console_with_th
 	assert_bool(device.setting_opened).is_true()
 	await Fixtures.resume(self)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
+	assert_int(device.titles_prepared).is_equal(0)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
+	# What counting a folder's games needs is prepared as the form opens.
+	assert_int(device.titles_prepared).is_equal(1)
 	await Fixtures.choose_console(self, carousel, device)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.focus(self).name == "Add")).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "Discovery")).is_true()
+	# It plays without a press: the app does not rest meanwhile.
+	assert_bool(carousel._resting.moving.call()).is_true()
 	# The discovery stays until "Continue" is there and pressed.
 	for frame in 10:
 		await await_idle_frame()
 	assert_bool(carousel._shown).is_false()
 	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.focus(self) != null and Fixtures.focus(self).name == "Continue")).is_true()
+	# Played, it waits for the press: the app may rest again.
+	assert_bool(carousel._resting.moving.call()).is_false()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
 	var consoles: ConsoleRow = carousel.get_node("%Consoles")
@@ -62,6 +69,14 @@ func test_INV_E6_05_a_fresh_install_goes_from_the_welcome_to_its_console_with_th
 	assert_str(added.player_id).is_equal("ps2.armsx2")
 	assert_str(added.folder_depth).is_equal("subfolders")
 	assert_str(added.disc_grouping).is_equal("grouped")
+
+
+func test_the_battery_shows_as_the_carousel_starts() -> void:
+	var carousel := Fixtures.fresh_carousel(self, Fixtures.past_first_launch(self, {"ps2": 3}))
+	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	var chip: BatteryChip = carousel.get_node("%Battery")
+	assert_str(chip.text).is_equal("99 %")
+	assert_array(chip.bolt()).is_empty()
 
 
 func test_INV_E6_05_an_app_already_set_up_opens_on_its_consoles_after_the_welcome() -> void:

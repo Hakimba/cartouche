@@ -232,10 +232,11 @@ public data class Scan(
 ) {
     public companion object {
         /**
-         * Sorts the files of [folder] into games and ignored files, and keeps its skipped sub-folders. A file is a game when a player of [platform]
-         * accepts it, unless it looks like a BIOS, or is unknown to [titles] and smaller than any
-         * game of the platform. With [DiscGrouping.GROUPED], `Game (Disc 1)` and `Game (Disc 2)` make one game.
-         * Pure and total; the result does not depend on the order of the files.
+         * Sorts the files of [folder] into games and ignored files, and keeps its skipped sub-folders.
+         * A file is a game when a player of [platform] accepts it, unless it looks like a BIOS, or is
+         * unknown to [titles] and smaller than any game of the platform. With [DiscGrouping.GROUPED],
+         * `Game (Disc 1)` and `Game (Disc 2)` make one game. Pure and total; the result does not
+         * depend on the order of the files.
          */
         public fun of(platform: Platform, folder: FolderContents, titles: TitleIndex, discs: DiscGrouping): Scan {
             val (ignored, kept) = folder.files.sortedWith(FILE_ORDER).separateEither { classify(platform, titles, it) }
@@ -336,8 +337,7 @@ public data class Library(
             }
         return copy(
             games = games.filter { it.platform != platform } + scanned,
-            skippedFolders =
-                skippedFolders + (platform to scan.skippedFolders),
+            skippedFolders = skippedFolders + (platform to scan.skippedFolders),
         ).withIgnored(platform, scan.ignored)
     }
 

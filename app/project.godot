@@ -9,6 +9,7 @@ run/main_scene="uid://zf0ykprx4cdu"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 config/quit_on_go_back=false
+run/low_processor_mode_sleep_usec=33333
 boot_splash/show_image=false
 boot_splash/bg_color=Color(0.114, 0.122, 0.141, 1)
 
@@ -124,7 +125,6 @@ locale/translations=PackedStringArray("res://locale/fr.po")
 [rendering]
 
 anti_aliasing/quality/msaa_3d=2
-limits/time/time_rollover_secs=3598.0
 rendering_device/pipeline_cache/save_chunk_size_mb=0.001
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true

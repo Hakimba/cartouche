@@ -12,9 +12,14 @@ import arrow.core.raise.ensure
 import arrow.core.raise.option
 import arrow.core.toNonEmptyListOrNone
 
-/** A disc as a reference list knows it: its exact name ([text], read as [name]) and its serials, such as `SLES-53047`. */
+/**
+ * A disc as a reference list knows it: its exact name ([text], read as [name]) and its serials, such
+ * as `SLES-53047`. The list files it by its title alone ([filing]): the whole name is read only once
+ * a file could be the disc, a few of the list's thousands.
+ */
 public data class KnownTitle(public val text: String, public val serials: List<String>) {
-    public val name: GameName = GameName.parse(text)
+    public val name: GameName by lazy { GameName.parse(text) }
+    internal val filing: GameName.Filing = GameName.filing(text)
 }
 
 /** What a file name tells about the disc a file is. */
@@ -52,9 +57,9 @@ public class TitleIndex private constructor(
      * translation `(Japan) (En) (v1.1)` still is the Japanese disc). The file is that very disc
      * when a single one has exactly its regions, languages and version; otherwise it is one disc of
      * a release, known by the serials all such discs share (two versions of a release often keep
-     * one serial). When they share none, it is not identified: a wrong serial is worse than none. A title given without its
-     * subtitle (`Dragon Quest V` for `Dragon Quest V - Tenkuu no Hanayome`) still matches when a
-     * single title starts that way.
+     * one serial). When they share none, it is not identified: a wrong serial is worse than none. A
+     * title given without its subtitle (`Dragon Quest V` for `Dragon Quest V - Tenkuu no Hanayome`)
+     * still matches when a single title starts that way.
      */
     public fun identify(file: GameName): Option<Identification> {
         val sameTitle = byTitle.getOrElse(file.key) { byMainTitle.getOrNone(file.key).filter(::oneTitle).getOrElse { emptyList() } }
@@ -84,7 +89,7 @@ public class TitleIndex private constructor(
         /** Reads a reference list; lines that are not `name<TAB>serials` are skipped. */
         public fun parse(text: String): TitleIndex {
             val titles = text.lines().map(::parseLine).filterOption()
-            return TitleIndex(titles.groupBy { it.name.key }, titles.groupBy { it.name.mainKey.getOrElse { it.name.key } })
+            return TitleIndex(titles.groupBy { it.filing.key }, titles.groupBy { it.filing.mainKey })
         }
 
         private fun parseLine(line: String): Option<KnownTitle> = option {
@@ -95,7 +100,7 @@ public class TitleIndex private constructor(
 
         private fun List<KnownTitle>.preferring(closer: (KnownTitle) -> Boolean): List<KnownTitle> = filter(closer).ifEmpty { this }
 
-        private fun oneTitle(titles: List<KnownTitle>): Boolean = titles.map { it.name.key }.distinct().size == 1
+        private fun oneTitle(titles: List<KnownTitle>): Boolean = titles.map { it.filing.key }.distinct().size == 1
 
         /** Whether nothing in [known]'s name contradicts [file]'s. */
         private fun canBe(file: GameName, known: GameName): Boolean =

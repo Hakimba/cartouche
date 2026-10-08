@@ -38,7 +38,7 @@ func add(art: AndroidServices.Art, image: Texture2D = null) -> void:
 
 ## Forgets the art of the games not in [param games] (a platform removed or rescanned).
 func keep_only(games: Array[AndroidServices.Game]) -> void:
-	var kept := {}
+	var kept: Dictionary[String, bool] = {}
 	for game in games:
 		kept[game.id] = true
 	for known: Dictionary in [_art, _textures, _unreadable]:

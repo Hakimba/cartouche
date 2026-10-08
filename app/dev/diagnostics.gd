@@ -2,13 +2,15 @@
 extends Node
 ## Traces what the app receives to the log in debug builds, registered as the `Diagnostics`
 ## autoload: input events with the actions they match, focus changes, lifecycle notifications,
-## frames that miss 60 fps, and whatever other code passes to [method trace] (plugin traffic, for
-## instance). On a device, `dev/logs.sh` follows them together with the Kotlin plugin's traces.
-## Release builds trace nothing.
+## frames that miss their rate (60 a second, 30 at rest), and whatever other code passes to
+## [method trace] (plugin traffic, for instance). On a device, `dev/logs.sh` follows them together
+## with the Kotlin plugin's traces. Release builds trace nothing.
 
 const _MAX_DETAIL := 500
 ## Longer frames are traced: at 60 fps, a frame takes 16.7 ms.
 const SLOW_FRAME_MS := 20.0
+## Under a rate cap, a frame lands within this of its share of the second.
+const _CAPPED_MARGIN_MS := 3.3
 const _NOTIFICATIONS: Dictionary[int, String] = {
 	NOTIFICATION_WM_GO_BACK_REQUEST: "back request",
 	NOTIFICATION_APPLICATION_RESUMED: "resumed",
@@ -33,11 +35,24 @@ var enabled := OS.is_debug_build()
 var _pipelines: Dictionary[String, int] = {}
 ## Whether each joypad axis (keyed by device * 100 + axis) is past half-way.
 var _axes_past_half: Dictionary[int, bool] = {}
+## The rate the last frame ended under (see [method _rate]); 0 for none.
+var _rate_cap := 0
+
+
+## A frame's budget under a rate cap of [param fps] frames a second, 0 for none.
+static func _budget_ms(fps: int) -> float:
+	return SLOW_FRAME_MS if fps == 0 else maxf(SLOW_FRAME_MS, 1000.0 / fps + _CAPPED_MARGIN_MS)
+
+
+## The frames a second the engine's loop runs at most: its rate in low processor mode, else 0 for none.
+static func _rate() -> int:
+	return int(1_000_000.0 / OS.low_processor_usage_mode_sleep_usec) if OS.low_processor_usage_mode else 0
 
 
 func _ready() -> void:
 	set_process(enabled)
 	if enabled:
+		trace("app", "engine ready %d ms after it started" % Time.get_ticks_msec())
 		RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 		get_tree().root.window_input.connect(_on_window_input)
 		get_viewport().gui_focus_changed.connect(_on_focus_changed)
@@ -51,7 +66,11 @@ func _process(delta: float) -> void:
 		if count != before:
 			compiled.append("%s %d" % [monitor, count - before])
 			_pipelines[monitor] = count
-	if delta * 1000.0 > SLOW_FRAME_MS:
+	# At rest the app's loop runs about 30 times a second ([Resting]): a frame is slow past the budget
+	# of the rate it ran under, as it was before a change of rate or after it.
+	var budget_ms := maxf(_budget_ms(_rate_cap), _budget_ms(_rate()))
+	_rate_cap = _rate()
+	if delta * 1000.0 > budget_ms:
 		# Where the time went in the previous frame: scripts and engine on the main thread, drawing
 		# on the CPU and the GPU.
 		var viewport := get_viewport().get_viewport_rid()

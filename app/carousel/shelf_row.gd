@@ -27,6 +27,8 @@ var label_images: GameArt:
 var pose := Pose.new()
 ## How much of its pose and float the selected game has, from 0 (none) to 1.
 var pose_amount := 1.0
+## How fast the selected game floats and sways, from 1 down to 0, still ([Resting]).
+var pace := 1.0
 ## How present the games beside the selected one are, and the selected one itself, from 0 (gone) to
 ## 1 (as the layout fades them).
 var neighbours := 1.0
@@ -48,6 +50,8 @@ var _held := 0
 var _held_steps := 0
 var _next_repeat_s := 0.0
 var _clock_s := 0.0
+## How far the selected game's float and sway have gone, in seconds at full pace.
+var _pose_s := 0.0
 var _stick := Vector2.ZERO
 var _turn := StickTurn.new()
 var _places: Array[Place] = []
@@ -70,6 +74,7 @@ func _ready() -> void:
 		var place := Place.new()
 		add_child(place)
 		_places.append(place)
+	add_to_group(Resting.PACED)
 	# Nothing moves before a shelf is shown.
 	set_process(false)
 
@@ -78,6 +83,7 @@ func _ready() -> void:
 # them.
 func _process(delta: float) -> void:
 	_clock_s += delta
+	_pose_s += delta * pace
 	if _held != 0 and _clock_s >= _next_repeat_s:
 		step(_held)
 		_held_steps += 1
@@ -261,9 +267,13 @@ func _arrange() -> void:
 			if place not in _unlabelled:
 				_unlabelled.append(place)
 	var stretch := minf(absf(_speed) * _STRETCH, _MAX_STRETCH)
+	# Gone, as on the consoles screen, every game is wholly faded: where it stands is not drawn.
+	var gone := selected_presence <= 0.0 and neighbours <= 0.0 and stage <= 0.0 and not _launched
 	for place in _places:
 		place.visible = place.game >= 0
-		if place.visible and _launched and place.game == selected_index():
+		if place.visible and gone:
+			place.shown.fade(1.0)
+		elif place.visible and _launched and place.game == selected_index():
 			place.transform = _launch_stand
 			place.shown.spin(_launch_spin, _launch_blur)
 			place.shown.fade(0.0)
@@ -272,15 +282,18 @@ func _arrange() -> void:
 			var centred := CarouselLayout.centred(offset)
 			var posed_part := centred * pose_amount
 			var stand := CarouselLayout.place(offset)
-			stand.origin.y += CarouselLayout.float_height(_clock_s, CarouselLayout.BOB_HEIGHT, posed_part)
+			stand.origin.y += CarouselLayout.float_height(_pose_s, CarouselLayout.BOB_HEIGHT, posed_part)
 			var spun := Basis(Vector3.UP, TAU * turntable * _clock_s * centred)
 			var turn := spun * _turn.of(place.game)
 			var stretched := Basis.from_scale(Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0))
-			var posed := stand.basis * pose.at(_clock_s, posed_part) * turn * stretched
-			place.transform = Transform3D(posed, stand.origin)
+			var posed := stand.basis * pose.at(_pose_s, posed_part) * turn * stretched
+			var placed := Transform3D(posed, stand.origin)
 			if stage > 0.0 and place.game == selected_index():
 				var on_stage := Transform3D(staged.basis * turn, staged.origin)
-				place.transform = place.transform.interpolate_with(on_stage, stage)
+				placed = placed.interpolate_with(on_stage, stage)
+			# Set again, even unchanged, it would be sent to every part of the model.
+			if place.transform != placed:
+				place.transform = placed
 			var presence := selected_presence if place.game == selected_index() else neighbours
 			place.shown.fade(CarouselLayout.faded(offset, presence))
 

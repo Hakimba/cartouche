@@ -83,3 +83,29 @@ func test_a_console_renamed_is_read_with_its_name_and_one_given_its_own_back_wit
 	var library := AndroidServices.Library.new({"console_names": {"ps2": "Ma PS2"}})
 	assert_str(library.console_names.get("ps2", "")).is_equal("Ma PS2")
 
+
+func test_an_answer_asked_for_early_is_taken_once_it_arrives_however_late() -> void:
+	# As on a device: the plugin answers frames after the asking.
+	var late := AndroidServices.Asked.new(func() -> String:
+		await get_tree().process_frame
+		await get_tree().process_frame
+		return "late")
+	assert_bool(late.has_arrived).is_false()
+	assert_str(await late.taken()).is_equal("late")
+	# Already there when taken.
+	var at_once := AndroidServices.Asked.new(func() -> String: return "at once")
+	assert_bool(at_once.has_arrived).is_true()
+	assert_str(await at_once.taken()).is_equal("at once")
+
+
+func test_the_battery_is_read_as_the_plugin_sends_it_plugged_or_not_its_level_when_known() -> void:
+	var plugged := AndroidServices.Battery.new({"level_percent": 57, "plugged": true})
+	assert_bool(plugged.has_level).is_true()
+	assert_int(plugged.level_percent).is_equal(57)
+	assert_bool(plugged.plugged).is_true()
+	var unknown := AndroidServices.Battery.new({"plugged": false})
+	assert_bool(unknown.has_level).is_false()
+	assert_bool(unknown.plugged).is_false()
+	# Without the plugin: nothing known, and no bolt.
+	var none := Android.battery()
+	assert_bool(none.has_level or none.plugged).is_false()

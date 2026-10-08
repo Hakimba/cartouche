@@ -14,7 +14,6 @@ func _on_consoles(names: Dictionary[String, String] = {}) -> Array:
 	return [carousel, device]
 
 
-
 func _open(carousel: Carousel) -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	await Fixtures.settled_consoles(self, carousel)
@@ -160,7 +159,10 @@ func test_INV_E7_02_whatever_is_pressed_and_when_the_console_s_properties_settle
 			ConsoleProperties.Step.CLOSED:
 				assert_object(properties._staging).is_same(ConsoleProperties._in_row)
 				assert_bool((carousel.get_node("%Light") as CanvasItem).visible).is_false()
-				if carousel.screen() == Carousel.Screen.CONSOLES:
+				if carousel.screen() == Carousel.Screen.CONSOLES and Fixtures.shown_screen(carousel) != null:
+					# Under the settings Y opened, the carousel draws nothing of its own (the screens in front cover it).
+					assert_bool(carousel._console_title.visible or carousel._consoles.visible).is_false()
+				elif carousel.screen() == Carousel.Screen.CONSOLES:
 					# The consoles screen whole again: its title, its hints, no pill, the row.
 					assert_bool(await Fixtures.until(self, func() -> bool:
 						return carousel._console_title.visible and carousel._console_title.modulate.a == 1.0)).is_true()

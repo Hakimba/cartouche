@@ -4,11 +4,10 @@ extends RefCounted
 ## Makes a console's [Animation] from its steps (`data/launch/<console>.json`, see ONBOARDING): each
 ## step a whole state of the scene, reached from the previous one in `dur` seconds (a hundredth at
 ## least) along its `ease` (`linear`, `in`, `out`, `inOut`, the default, or the rebound `outBack`),
-## then held `hold` seconds (none at least). A value left out takes its default (see [method _value]).
-## Distances are in centimetres there, angles in degrees, the blur in pixels of the carousel's screen;
-## the animation's tracks are in world units and
-## radians, on the carousel's nodes (paths from the carousel, the player's root). The camera stays
-## the carousel's.
+## then held `hold` seconds (none at least). A value left out takes its default (see
+## [method _value]). Distances are in centimetres there, angles in degrees, the blur in pixels of
+## the carousel's screen; the animation's tracks are in world units and radians, on the carousel's
+## nodes (paths from the carousel, the player's root). The camera stays the carousel's.
 ##
 ## Its moments, in seconds ([method moment]): `consoles` once the first step's hold is over, `games`
 ## where the step the game is chosen at is reached, `launch` once that step's hold is over, `seated`

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ImageReader
 extends Node
-## Reads image files into textures without stalling a frame: each image is read and its mipmaps
-## made on a worker thread, as that takes tens of milliseconds on a handheld; at most one texture a
-## frame is then sent to the GPU. What is asked again, or cancelled, while it is read is dropped
-## once read.
+## Reads image files into textures without stalling a frame: each image is read, its mipmaps made
+## and its colours laid out as the GPU takes them on a worker thread, as that takes tens of
+## milliseconds on a handheld; at most one texture a frame is then sent to the GPU. What is asked
+## again, or cancelled, while it is read is dropped once read.
 
 ## The image asked for as [param key] is ready; [param texture] is none when it could not be read.
 signal read(key: String, texture: Texture2D)
@@ -71,6 +71,9 @@ func _read(key: String, path: String, title: String, ticket: int) -> void:
 	var started := Time.get_ticks_usec()
 	var image := Image.load_from_file(path)
 	if image and not image.is_empty():
+		# Godot's renderer would turn three-byte colours into four on the main thread.
+		if image.get_format() == Image.FORMAT_RGB8:
+			image.convert(Image.FORMAT_RGBA8)
 		image.generate_mipmaps()
 		var elapsed := (Time.get_ticks_usec() - started) / 1000.0
 		Diagnostics.trace("art", "%s read in %.1f ms" % [title, elapsed])

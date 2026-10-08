@@ -40,6 +40,7 @@ import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.settings.ButtonStyle
+import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.storage.DocumentId
@@ -113,6 +114,8 @@ class WireTest {
             success("library" to library.toWireJson(None), "art" to listOf(found).artWireJson()),
             AppSettings(Some(ButtonStyle.NINTENDO)).toWire(false),
             success("folder" to placed.toWire()),
+            BatteryState(Some(57), plugged = true).toWire(),
+            BatteryState.NONE.toWire(),
         ).forEach { it.isGodotValue() shouldBe true }
         arrayOf("a").isGodotValue() shouldBe true
         listOf("a").toTypedArray<Any>().isGodotValue() shouldBe false
@@ -123,9 +126,10 @@ class WireTest {
 
     @Test
     fun `the settings and a folder's place reach Godot with the keys the GDScript adapter reads`() {
-        AppSettings().toWire(true) shouldBe dictionary("first_launch" to true)
-        AppSettings(Some(ButtonStyle.PLAYSTATION)).toWire(false) shouldBe
-            dictionary("first_launch" to false, "button_style" to "playstation")
+        AppSettings().toWire(true) shouldBe dictionary("first_launch" to true, "edge_smoothing" to "4x")
+        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) shouldBe
+            dictionary("first_launch" to false, "button_style" to "playstation", "edge_smoothing" to "2x")
+        AppSettings(edgeSmoothing = EdgeSmoothing.OFF).toWire(false)["edge_smoothing"] shouldBe "off"
         val place = placed.toWire()["place"] as Dictionary
         place["volume"] shouldBe "card"
         (place["folders"] as Array<*>).toList() shouldBe listOf("ROMs", "ps2")

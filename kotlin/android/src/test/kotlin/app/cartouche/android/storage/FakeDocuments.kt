@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.pm.ProviderInfo
 import android.database.Cursor
 import android.database.MatrixCursor
+import android.net.Uri
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract.Document
@@ -38,6 +39,9 @@ internal class FakeDocuments : DocumentsProvider() {
 
     override fun isChildDocument(parentDocumentId: String?, documentId: String?): Boolean = true
 }
+
+/** A folder [name] of the memory card, as the external storage provider's picker grants it. */
+internal fun cardTree(name: String): Uri = Uri.parse("content://com.android.externalstorage.documents/tree/1A2B-3C4D%3AROMs%2F$name")
 
 internal const val AUTHORITY = "app.cartouche.test.documents"
 

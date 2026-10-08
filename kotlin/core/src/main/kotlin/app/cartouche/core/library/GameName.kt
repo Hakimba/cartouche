@@ -29,14 +29,16 @@ public data class GameName(
     public val version: Option<String> get() = Some(versions.joinToString(" ")).filter(String::isNotEmpty)
 
     /** The title as players read it: `The Punisher` rather than Redump's `Punisher, The`. */
-    public val displayTitle: String get() = title.split(SUBTITLE).joinToString(SUBTITLE, transform = ::uninvertArticle)
+    public val displayTitle: String get() = displayed(title)
 
     /** The title reduced for matching: no articles moved, accents, case or punctuation. */
     public val key: TitleKey get() = TitleKey.of(displayTitle)
 
     /** The key of the title before its first ` - `, or none when it has no subtitle. */
-    public val mainKey: Option<TitleKey>
-        get() = Some(displayTitle.split(SUBTITLE)).filter { it.size > 1 }.map { TitleKey.of(it.first()) }
+    public val mainKey: Option<TitleKey> get() = mainKeyOf(displayTitle)
+
+    /** Where a reference list files a name: under its [key], and its [mainKey] or else its key. */
+    internal data class Filing(val key: TitleKey, val mainKey: TitleKey)
 
     public companion object {
         /** Reads a file name without its extension, or a Redump name. Total: any text gives a name. */
@@ -45,7 +47,7 @@ public data class GameName(
             // A second languages tag is not the disc's languages: it stays among the other tags.
             val languageTag = tags.firstOrNone(LANGUAGES::matches)
             return GameName(
-                title = withoutTags(text).replace(SPACES, " ").trim().ifEmpty { text.trim() },
+                title = titleOf(text),
                 regions = tags.flatMap(::regionsOf).distinct(),
                 languages = languageTag.fold({ emptyList() }) { it.split(',').map(String::trim) },
                 versions = tags.filter(VERSION::matches),
@@ -58,6 +60,13 @@ public data class GameName(
                             languageTag == Some(it)
                     },
             )
+        }
+
+        /** Where [text], read as a name, is filed: from its title alone, its tags left unclassified. */
+        internal fun filing(text: String): Filing {
+            val shown = displayed(titleOf(text))
+            val key = TitleKey.of(shown)
+            return Filing(key, mainKeyOf(shown).getOrElse { key })
         }
 
         private const val SUBTITLE = " - "
@@ -82,6 +91,13 @@ public data class GameName(
         /** The regions a tag lists, such as `Europe, Australia`; empty when it is not a region tag. */
         private fun regionsOf(tag: String): List<String> =
             option { tag.split(',').map { REGIONS.getOrNone(it.trim().lowercase()).bind() } }.getOrElse { emptyList() }
+
+        private fun titleOf(text: String): String = withoutTags(text).replace(SPACES, " ").trim().ifEmpty { text.trim() }
+
+        private fun displayed(title: String): String = title.split(SUBTITLE).joinToString(SUBTITLE, transform = ::uninvertArticle)
+
+        private fun mainKeyOf(shown: String): Option<TitleKey> =
+            Some(shown.split(SUBTITLE)).filter { it.size > 1 }.map { TitleKey.of(it.first()) }
 
         /** [text] without its tags, including those that removing others brings together. */
         private tailrec fun withoutTags(text: String): String {

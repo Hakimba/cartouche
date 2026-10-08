@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name DevSounds
 extends RefCounted
-## Debug builds only: sounds put by hand in [constant FOLDER], to try a launch's sounds before
-## freely licensed ones are chosen. Each is named after its [Insertion.Cue] (`ps2-clip.mp3`); the
-## cues' settings in `appearance.json` suit the sounds tried so far. They are never published;
-## release builds play none.
+## Debug builds only: sounds put by hand in [constant FOLDER], to try a launch's sounds that are not
+## freely licensed. Each is named after its [Insertion.Cue] (`ps2-clip.mp3`). They are never
+## published; release builds play none.
 
 const FOLDER := "user://dev-sounds"
 const _EXTENSIONS: Array[String] = ["mp3", "ogg", "wav"]

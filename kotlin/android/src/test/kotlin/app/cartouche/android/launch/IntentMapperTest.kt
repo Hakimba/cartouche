@@ -70,9 +70,7 @@ class IntentMapperTest {
             (Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         forEveryResolvedTemplate { _, spec ->
             val expected =
-                spec.switches.fold(
-                    Intent.FLAG_ACTIVITY_NEW_TASK,
-                ) { flags, switch -> flags or with(IntentMapper) { switch.flag } }
+                spec.switches.fold(Intent.FLAG_ACTIVITY_NEW_TASK) { flags, switch -> flags or with(IntentMapper) { switch.flag } }
             IntentMapper.toIntent(spec).flags and expected shouldBe expected
         }
     }

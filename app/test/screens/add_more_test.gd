@@ -9,10 +9,7 @@ const Fixtures := preload("res://test/screens/fixtures.gd")
 ## The carousel shown on a device whose library holds [param consoles] (games by platform id),
 ## an emulator installed for every platform.
 func _shown(consoles: Dictionary[String, int]) -> Array:
-	var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
-	device.first_launch = false
-	device.curtain = true
-	device.consoles = consoles
+	var device := Fixtures.past_first_launch(self, consoles)
 	device.players_everywhere = true
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
@@ -45,10 +42,9 @@ func test_INV_E6_07_A_on_the_button_adds_one_more_console_chosen_from_nothing_an
 	var shown := await _shown({"ps2": 3})
 	var device: Fixtures.NewDevice = shown[0]
 	var carousel: Carousel = shown[1]
-	await Fixtures.hold(self, &"ui_up")
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.hold(self, &"ui_up", false)
-	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
+	# Only the media of the library's consoles are loaded: the PS2's disc.
+	assert_array(carousel._appearance._models.keys()).contains_exactly(["dvd"])
+	await Fixtures.open_add_console(self, carousel)
 	var form: AddConsole = carousel.get_node("%Screens/AddConsole")
 	assert_str((form.get_node("%Title") as Label).text).is_equal("Add a console")
 	# Nothing chosen in advance; a console set up already is not offered again.
@@ -72,6 +68,7 @@ func test_INV_E6_07_A_on_the_button_adds_one_more_console_chosen_from_nothing_an
 	assert_bool((carousel.get_node("%Screens/Discovery") as Control).visible).is_false()
 	assert_bool(device.consoles.has(added)).is_true()
 	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal(added)
+	assert_array(carousel._appearance._models.keys()).contains_exactly_in_any_order(["dvd", "cartridge"])
 	assert_bool((carousel.get_node("%Consoles") as Node3D).visible).is_true()
 	assert_bool(_ball(carousel).is_open).is_false()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -82,10 +79,7 @@ func test_the_form_given_up_leaves_the_consoles_as_they_were() -> void:
 	var shown := await _shown({"ps2": 3})
 	var device: Fixtures.NewDevice = shown[0]
 	var carousel: Carousel = shown[1]
-	await Fixtures.hold(self, &"ui_up")
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.hold(self, &"ui_up", false)
-	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
+	await Fixtures.open_add_console(self, carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel._shown)).is_true()
 	assert_array(device.set_up).is_empty()
@@ -132,10 +126,7 @@ func test_INV_E6_07_the_first_form_does_not_offer_a_console_set_up_without_games
 
 ## A device whose PS2 is set up with no game: the carousel stays on "No console".
 func _shown_with_no_games() -> Array:
-	var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
-	device.first_launch = false
-	device.curtain = true
-	device.consoles = {"ps2": 0}
+	var device := Fixtures.past_first_launch(self, {"ps2": 0})
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	return [device, carousel]

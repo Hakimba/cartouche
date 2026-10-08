@@ -34,13 +34,20 @@ var layer_opacity := 1.0
 var saturation := 1.0
 ## How much of the screen the black covers, from 0 to 1 (see [GameLaunch]).
 var black := 0.0
+## How much of the consoles behind the games shows, from 0 (none) to 1 (as the animation has them):
+## the carousel takes them away once on the games screen, back for a launch or to go out.
+var behind_amount := 1.0:
+	set(amount):
+		behind_amount = amount
+		# Playing, the next frame shows it.
+		if not is_processing():
+			_look_behind(consoles.behind)
 
 var _animation := Animation.new()
 var _at_s := 0.0
 var _to_s := 0.0
 ## Where the animation settles once there: its start, when it goes back out.
 var _settle_s := 0.0
-var _behind := false
 var _spin := 0.0
 ## The label's blur while it spins: the turn it makes during one frame.
 var _spin_blur := 0.0
@@ -125,12 +132,6 @@ func black_origin() -> Vector3:
 	return row.global_position
 
 
-## Shows the consoles behind the games [param amount] as present as the animation has them, from 0
-## (gone) to 1, as when a game's properties hide them; only while still on the games screen.
-func fade_behind(amount: float) -> void:
-	layer.look(_behind and layer_opacity * amount > 0.001, blur, layer_opacity * amount, saturation)
-
-
 func _play(from_s: float, to_s: float, settle_s: float) -> void:
 	_seek(from_s)
 	_to_s = to_s
@@ -146,13 +147,19 @@ func _seek(time: float) -> void:
 	_at_s = time
 	player.seek(time, true)
 	var behind := blur > 0.3 or layer_opacity < 0.97 or saturation < 0.97
-	if behind != _behind:
-		_behind = behind
+	if behind != consoles.behind:
 		consoles.show_in_layers(ConsoleLayer.BEHIND if behind else ConsoleLayer.FRONT)
-	# Behind and gone, the consoles are not drawn at all.
-	layer.look(behind and layer_opacity > 0.001, blur, layer_opacity, saturation)
+	_look_behind(behind)
+	layer.draw_again()
 	consoles.arrange()
 	_place_disc()
+
+
+## The consoles drawn behind the games when [param behind], as the animation and
+## [member behind_amount] have them; not at all once gone.
+func _look_behind(behind: bool) -> void:
+	var opacity := layer_opacity * behind_amount
+	layer.look(behind and opacity > 0.001, blur, opacity, saturation)
 
 
 ## The chosen disc, out of the row, between where it stood and the console's spindle; back in the

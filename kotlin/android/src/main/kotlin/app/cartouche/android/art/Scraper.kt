@@ -70,7 +70,7 @@ internal class Scraper(
             // Under the lock: a game a worker stores meanwhile is either stored or still under way.
             update(None) {
                 if (run.isOver) began = TimeSource.Monotonic.markNow()
-                val missing = requests.filter { store.stored(it.game).isNone() && !store.isAbsent(it) }
+                val missing = requests.filter { store.wants(it.game, it.version) }
                 trace("art") { "${missing.size} of ${requests.size} games to look for" }
                 run.with(missing)
             }

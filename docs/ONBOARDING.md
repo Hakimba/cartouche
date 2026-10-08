@@ -62,6 +62,12 @@ The same words are used in the code, the tests and this document.
   `CartridgeShape`); each **part** of the model (label, mirror, shell) is a mesh built from them.
 - **Pose**: how the selected game or console is shown, leaning back, turned and slowly swaying, so
   that the light moves over it. The right stick turns it further, as far as the user likes.
+- **Rest**: the app left alone (`Resting`; its first press always wakes it and acts, INV-E8-01):
+  from 2 s in Godot's low processor mode, its loop running about 30 times a second (the engine's
+  frame rate is never capped: lifting a cap leaves frames slow for about a second), then
+  **still** from 6.2 s, drawn only when something on screen changes, until the next press. What moves
+  by itself (the backdrop's dots, the pose's float and sway, the welcome's worm) joins the group
+  `paced` and goes at its **pace**, from 1 awake down to 0 still.
 - **Consoles screen**: the first screen, one **console** per platform with games (its 3D model,
   or its media until it has one), in a row laid out like the games'. **Going in** (A) and **going
   out** (B) play the console's **launch animation** between it and the platform's **games screen**
@@ -114,18 +120,21 @@ The same words are used in the code, the tests and this document.
   out **requests** (a game and where to look, best first); a **stall** (offline, a server refusing,
   no room to store) stops it until the network is back or a delay passes. Games no source has are
   remembered as **absent** until the extract changes.
-- **Screens**: what shows in front of the carousel, over its background: the **welcome** at each
+- **Screens**: what shows in front of the carousel, over its background alone: the **welcome** at each
   start, a title screen that waits for a button while the app loads; on the **first launch** (no
   controller set up and no platform), the **button style** (how buttons are drawn: Nintendo, Xbox or
   PlayStation) and the **curtain permission**; while no console has games, **no console** and the
   **form** adding one, whose **count** (the compatible games of the chosen folder) is a scan that
   saves nothing; then the **discovery** of the console added. Y opens the **settings** over the
   consoles screen or the games screen: the **platforms** set up, each opened in the same form to
-  **edit** it (saved and scanned again) or **remove** it after a confirmation, and the button style.
+  **edit** it (saved and scanned again) or **remove** it after a confirmation, the button style, and
+  **Graphics**: the edges' smoothing (4×, 2× or none), each card showing a close-up of an edge drawn
+  with it.
   Above the console, a **"+" ball**: holding up turns it into "Add a platform" (its strokes
   spreading into the button's outline), and A adds one more console, the consoles screen coming back
   on it.
-- **Settings**: the app's own choices, apart from the library: the button style.
+- **Settings**: the app's own choices, apart from the library: the button style and the edges'
+  smoothing (`EdgeSmoothing`: the 3D's multisampling, 4× unless the user chooses less).
 - **Removing a platform**: its choices, games, selection, art and folder access go (INV-E6-03);
   the game files stay.
 - **Demo library**: a made-up library of any size, in debug builds, for measuring at scale.
@@ -149,7 +158,9 @@ The same words are used in the code, the tests and this document.
 - **`library/`** is the game library:
   - `GameName` reads names the Redump and No-Intro way (`Title (Region) (Languages) (Disc 2)`);
   - `TitleIndex` identifies a file by its name alone: as an exact reference disc, or as one disc of
-    a release known by the serials all its versions share, or not at all (never a wrong serial);
+    a release known by the serials all its versions share, or not at all (never a wrong serial). It
+    files each reference disc by its title alone (`GameName.filing`) and reads a disc's whole name
+    only when a file could be that disc;
   - `FolderWalk` lists a folder's files, and its sub-folders' when asked, through any `children`
     function: the Android plugin passes the documents provider, tests an in-memory tree. Hidden,
     too deep and unreadable sub-folders, and those named like emulator data
@@ -174,13 +185,15 @@ The same words are used in the code, the tests and this document.
   none), `Regions` orders scans by how close their region is to the game's (NTSC-U, PAL, NTSC-J
   groups), `SerialScans` names a serial source's scans, `ArtSources.requestFor` makes a game's
   request (the scan of the region chosen for its label, the extract's, then the serial source's)
-  and lists its images by region (`variantsOf`). `Scraping` is a run's state (waiting,
+  and lists its images by region (`variantsOf`); `ArtSources.requests` plans a library's: only its
+  games still wanting art in their sources' version (`ArtIndex.versionOf`, the extract's first
+  line), so that no extract is indexed when none does. `Scraping` is a run's state (waiting,
   under way, done, stall, retry delay), changed only by its operations; `AbsentArt` stores the games
   no source has, with the version of the sources they were looked for in.
 - **`library/DemoLibrary.kt`** makes up libraries of any size, the same for the same arguments.
 - **`storage/DocumentPaths.kt`** maps document ids such as `1A2B-3C4D:ROMs/ps2` to paths such as
   `/storage/1A2B-3C4D/ROMs/ps2`, and to a **place** the user reads (the SD card, then `ROMs`, `ps2`).
-- **`settings/`** holds the app's `Settings` (the button style), whether the first launch is still
+- **`settings/`** holds the app's `Settings` (the button style, the edges' smoothing), whether the first launch is still
   to do, and their stored format.
 - **`Values.kt`** holds the newtypes shared across modules: `PackageName`, `ContentUri` (built
   with `ContentUri.parse`, so it is always a `content://` URI), `FilePath`, `FileName`.
@@ -192,6 +205,9 @@ The same words are used in the code, the tests and this document.
   In debug builds, `launchArguments` hands GDScript the `arguments` extra of the launch intent
   (`--demo-games=N`, `--bench=scroll`), and `useDemoLibrary` swaps the library for a demo one,
   stored apart from the user's.
+- **`Battery.kt`**: `BatteryWatch` follows the system's battery broadcast from each resume to the
+  next pause and tells each new state (level, plugged in) through `battery_changed`, on Godot's
+  render thread, where the plugin's signals are registered; `BatteryState.now` answers `battery()`.
 - **`Wire.kt`** defines the Dictionary format and the stable error codes (`ErrorCode`). The
   library, with its shelves, travels as one JSON text instead: on a handheld, each Dictionary costs
   about 0.1 ms on Godot's main thread, so thousands of them freeze the screen, while Godot parses
@@ -237,7 +253,8 @@ The same words are used in the code, the tests and this document.
   in front of it and returns once the carousel can be used; each screen is a scene of its own that
   says when it is done. The settings (`SettingsMenu`, `PlatformList`, `ConfirmRemoval`) reuse the
   form adding a console (`AddConsole`) to edit one. `Controls` holds the button style that
-  `ButtonGlyph`, `ButtonHint` and `ButtonMark` draw. The theme
+  `ButtonGlyph`, `ButtonHint` and `ButtonMark` draw; the edges' smoothing is the root viewport's
+  `msaa_3d`, set at start from the settings and by `EdgeSmoothingScreen`. The theme
   (`carousel/carousel_theme.tres`) holds the buttons, fields, toggles and focus ring of every
   screen; the font is Fredoka throughout (`fonts/`, two weights of its variable font).
 - **Controller buttons** (`adapters/android/android_buttons.gd`): on Android, A confirms and B goes
@@ -292,7 +309,7 @@ The same words are used in the code, the tests and this document.
   `NameEditor` is the name's field and keyboard (`GamepadKeyboard`), used by both.
   `ConsoleProperties` stages the selected console (`ConsoleRow.stage`), its name with a callout on
   its right, and "Change place" (or Y), which leaves for `ConsoleOrder`. `DiscProperties` stages the selected disc
-  (`ShelfRow.stage` and `staged`, the neighbours and the consoles behind fading), shows its zones
+  (`ShelfRow.stage` and `staged`, the neighbours fading), shows its zones
   (`LabelZone`, a black ring drawn as it has the focus, `FocusCallout` naming it with an arrow) and
   its images by region (`LabelCard`, `label_thumbnail.gdshader`) and frames a picture of the user's
   own (`LabelFraming`, the same rule as the core's `LabelFraming`, shown through the label shader's
@@ -309,8 +326,9 @@ The same words are used in the code, the tests and this document.
 - **Models** are data: `data/carousel/appearance.json` names a scene per media, a label colour
   per platform, the pose and the insertions. A model is any scene with a `Label` mesh whose material uses
   `carousel/models/label.gdshader` (the carousel sets `label_texture`); replacing a model is
-  changing that file. Every place makes its model of each media at start, as the first instance
-  of a model takes 10 to 30 ms on a handheld.
+  changing that file. As a library is shown, every place makes its model of each of its media,
+  as the first instance of a model takes 10 to 30 ms on a handheld; the other media are never
+  loaded.
 - **The shipped models are built from their shapes** (`carousel/models/*_shape.tres`): each part
   is a `ShapedMesh` naming one of the shape's `parts()`, which asks the shape for its arrays;
   `DiscGeometry` turns profiles around the disc's axis, `CartridgeGeometry` sweeps rounded
@@ -325,15 +343,25 @@ The same words are used in the code, the tests and this document.
   (`Folder`, `Entry`, `Candidate`…) and exposes operations as coroutines, such as
   `await Android.list_folder(folder)`; see its header for running without the plugin.
 - **`Diagnostics`** (autoload, `dev/diagnostics.gd`) traces every input event with the actions it
-  matches, focus changes, lifecycle notifications, the plugin traffic, and frames that miss 60 fps
+  matches, focus changes, lifecycle notifications, the plugin traffic, and frames that miss their rate (60 a second, 30 at rest)
   (with the rendering pipelines compiled meanwhile, the usual cause), in debug builds only. The
   Kotlin side traces intents, activity results, installation checks, title indexing, scans (their
   timings, ignored files and skipped folders) and library problems the same way (`trace` in
   `Wire.kt`). Add trace points
   with every feature.
 - **`CarouselBench`** (`dev/`) drives the carousel like a user for `dev/bench.sh`: held scrolling,
-  platform changes or a turning game for 30 s, then one line of frame statistics; or one launch
-  (`--bench=launch`), which `GameLaunch` measures itself.
+  platform changes, a turning game, the properties, the ring, swipes, or nothing at all on the games
+  screen, the consoles screen or under the settings (`idle`, `idle_consoles`, `settings`) for 30 s,
+  then one line of frame statistics, draw calls and the main loop's and the drawing's CPU time per
+  frame; or one launch (`--bench=launch`), which `GameLaunch` measures itself. The scenarios with
+  presses keep the app awake (`Resting.stays_awake`), so that their frames are the motion's; `idle`,
+  `idle_consoles` and `settings` are measured once it rests, still. `--msaa=N` sets the 3D's
+  antialiasing for a run.
+- **`FrameShots`** (`dev/`, `--shots=DIR` with Godot's `--fixed-fps 60` on a computer) saves pictures
+  of the carousel at set frames, presses (and a push of the stick) sent at set frames too, many of
+  them half-way through an animation: with time fixed per frame, two runs of the same code give the
+  same pixels. Run it on a console with its own model and on one drawn by its medium (`--shelf=…`):
+  an optimisation must leave every picture of both identical.
 - **The device check** opens from the carousel by holding Select for 2 s, in debug builds; back at
   its root returns to the carousel. It has a Library tab (folder, emulator, scan, games, ignored
   files, launch), and is built from one scene per tab over a shared `DeviceCheckPage` base, with
@@ -351,7 +379,31 @@ The same words are used in the code, the tests and this document.
   runs every Kotlin test; the core tests also parse the definition files shipped in `app/data`.
   `dev/test_godot.sh` runs the GDScript tests.
 - `dev/bench.sh` measures a debug build on a device at several library sizes (the device's own,
-  and demo ones of 150 to 5,000 games) and can record every measurement as a JSON line.
+  and demo ones of 150 to 5,000 games) and can record every measurement as a JSON line, labelled
+  (`--label`) to follow a series of changes. Besides times and frames, it measures what each
+  scenario costs in energy: the app's processor time per second and, where the GPU tells it (Adreno),
+  how busy the GPU is and at which clock. Every scenario starts on the PS2's games; the device's own
+  art is set aside while the scans are downloaded again, then put back as it was.
+- **Keeping it frugal**: left alone, the app rests (`Resting`): from 2 s Godot's low-processor
+  mode draws only what changes, its loop running about 30 times a second; from 5 s what moves by
+  itself (the nodes of the `paced` group, each at its `pace`: the backdrop's dots, the rows' float
+  and sway, the welcome's worm) slows to a stop, and nothing more is drawn. Anything that moves on its own must join that group,
+  or keep the app awake while it plays (`Resting.moving`: labels downloading, a launch, the way into
+  or out of a console, a discovery); other animations (a message) play on at rest, drawn as they
+  change. The screens in front hide the
+  carousel under them; on the games screen the consoles behind are not drawn, brought back
+  as a game goes into its console or to go out; the media's models are loaded and made ready as a
+  library with consoles of those media is shown, never the others (`Appearance.model_of`); the
+  battery's bolt is drawn (`BatteryChip`) rather than written with the
+  system's emoji font, and the plugin tells each change of the battery as it comes (`Battery.kt`).
+  Awake, the work per frame is what costs energy. What nobody sees is not redone: the consoles
+  behind the games are arranged only in the frames `ConsoleSequence` moves them in, and their blurred
+  view is drawn again only then; the games' row skips its layout while it is wholly faded; the
+  consoles' and games' transforms, the lid, the properties' light and the focus bubble are set only
+  when they change. What a start does not need waits: the title lists are indexed only once the
+  settings or the form adding a console open (filed by their titles alone, a disc's whole name read
+  only when a file could be it), the art index only when a game may still find art, and the library is
+  asked for as the carousel's scene starts.
 - **Without the plugin** (the editor, a desktop run), the carousel shows the demo library of
   `dev/demo/desktop.json`, with made-up label artwork: models and materials are tuned on a
   computer. The file is what the plugin would send; `DesktopDemoTest` (Kotlin) fails when it is out
@@ -373,7 +425,7 @@ The same words are used in the code, the tests and this document.
 - **Debug arguments** (`--esa arguments` on the device, after `--` on a desktop):
   `--turntable=0.25` turns the selected game to show all its sides, `--shelf=gba` opens on a
   platform's shelf, `--art-refused` makes every art server refuse (to see the message and the
-  retries), `--demo-games=N` and `--bench=…` as in `dev/bench.sh`.
+  retries), `--demo-games=N` and `--bench=…` as in `dev/bench.sh`, `--shots=DIR` (`FrameShots`).
 - **Shaders are only compiled when something is drawn**: the headless runs of `dev/build.sh` do
   not see their errors. After changing one, run the desktop demo or the device and look for
   `SHADER ERROR` in the log.

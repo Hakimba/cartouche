@@ -2,9 +2,9 @@
 class_name AddBall
 extends Control
 ## The "+" ball above the consoles: one more can be added. Opened (while up is held), it becomes a
-## button, "Add a platform": the two strokes of its "+" spread apart and stretch into the button's outline (the
-## horizontal one into its top and bottom edges, the vertical one into its round ends), the white
-## widening with them, then the text comes in. Closed, the other way round.
+## button, "Add a platform": the two strokes of its "+" spread apart and stretch into the button's
+## outline (the horizontal one into its top and bottom edges, the vertical one into its round ends),
+## the white widening with them, then the text comes in. Closed, the other way round.
 
 const _BALL := 64.0
 const _BUTTON := Vector2(330.0, 46.0)

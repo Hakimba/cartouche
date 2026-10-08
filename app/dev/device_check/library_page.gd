@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends DeviceCheckPage
 ## One platform's library: its folder, emulator and scan options, the games a scan found, and the
-## files and sub-folders it set aside. Games launch with the platform's emulator, from the disc chosen here.
+## files and sub-folders it set aside. Games launch with the platform's emulator, from the disc
+## chosen here.
 
 const _AUTOMATIC := "Emulator: first installed (%s)"
 const _NO_FOLDER := "No folder (add one in the Storage tab)"
@@ -127,7 +128,8 @@ func _on_launch_pressed() -> void:
 	var game: AndroidServices.Game = _games.get_item_metadata(_games.get_selected_items()[0])
 	_launching = true
 	_launch.disabled = true
-	_scan.disabled = true  # A rescan during the launch would change the game being launched.
+	# A rescan during the launch would change the game being launched.
+	_scan.disabled = true
 	var result := await Android.launch_game(game, _disc.selected)
 	_launching = false
 	_launch.disabled = false
@@ -174,8 +176,9 @@ func _platform_id() -> String:
 func _show_platform() -> void:
 	var platform_id := _platform_id()
 	var folders := await Android.persisted_folders()
+	# Another platform chosen meanwhile fills the controls with its own call.
 	if _platform_id() != platform_id:
-		return  # Another platform was chosen meanwhile; its own call fills the controls.
+		return
 	# Read after the wait: a choice stored meanwhile must show.
 	var setup := _library.setup_of(platform_id)
 	_filling = true

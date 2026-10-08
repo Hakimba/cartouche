@@ -3,8 +3,8 @@ class_name LabelFraming
 extends RefCounted
 ## How the user frames a picture of their own on a label: [member zoom] times closer than the
 ## largest square that fits in it (1 to [constant MAX_ZOOM]), centred at [member centre], fractions
-## of its width and height. The plugin cuts the label with the same rule (`LabelFraming` in the core),
-## so the square shown while framing is the one kept.
+## of its width and height. The plugin cuts the label with the same rule (`LabelFraming` in the
+## core), so the square shown while framing is the one kept.
 
 const MAX_ZOOM := 6.0
 

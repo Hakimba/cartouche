@@ -17,17 +17,51 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.string
+import io.kotest.property.checkAll
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.io.File
+import java.security.MessageDigest
 
 @RunWith(RobolectricTestRunner::class)
 class ArtStoreTest {
     private val folder = File(RuntimeEnvironment.getApplication().filesDir, "art")
     private val game = GameId("ps2/content://p/document/Okage (USA).iso")
     private val image = byteArrayOf(1, 2, 3)
+    private val older = Some(ArtVersion("2026-09-28"))
+    private val newer = Some(ArtVersion("2026-10-01"))
+
+    private fun request(game: GameId, version: Option<ArtVersion> = older) =
+        ArtRequest(game, "A", nonEmptyListOf(ArtUrl("https://a/a.png")), version)
+
+    @Test
+    fun `INV-E4-06 an image's name is its game id's SHA-1 in lower-case hexadecimal, for any id`() = runBlocking<Unit> {
+        checkAll(Arb.string()) { text ->
+            val digest = MessageDigest.getInstance("SHA-1").digest(text.encodeToByteArray())
+            ArtStore.sha1(text) shouldBe digest.joinToString("") { "%02x".format(it) }
+        }
+    }
+
+    @Test
+    fun `INV-E4-06 images named by earlier versions are found again and kept`() {
+        // Named after their game id's SHA-1, of its UTF-8 bytes, as every version has named them.
+        val named =
+            mapOf(
+                game to "2698dfea0d2e70e3bfe8720d328fa7c9e86ab981",
+                GameId("ps2/Pokémon (Europe).iso") to "65b88836cd13fdf68b2e0d28b37312e9312d0094",
+            )
+        folder.mkdirs()
+        named.values.forEach { File(folder, "$it.jpg").writeBytes(image) }
+        val store = ArtStore(folder)
+        named.forEach { (id, stem) -> store.stored(id).shouldBeSome().file.name shouldBe "$stem.jpg" }
+        store.keepOnly(named.keys) shouldBe Either.Right(0)
+        named.values.forEach { File(folder, "$it.jpg").exists() shouldBe true }
+    }
 
     @Test
     fun `a stored image is found again at the next start, for its game only`() {
@@ -71,36 +105,43 @@ class ArtStoreTest {
 
     @Test
     fun `INV-E4-05 games without art are remembered for the sources they were looked for in, and an unreadable memory forgets them`() {
-        fun request(game: GameId, version: Option<String>) = ArtRequest(
-            game,
-            "A",
-            nonEmptyListOf(ArtUrl("https://a/a.png")),
-            version.map(::ArtVersion),
-        )
         val store = ArtStore(folder)
-        store.markAbsent(request(game, Some("2026-09-28"))).shouldBeRight()
-        store.markAbsent(request(GameId("ps2/b"), Some("2026-09-28"))).shouldBeRight()
-        ArtStore(folder).isAbsent(request(game, Some("2026-09-28"))) shouldBe true
-        ArtStore(folder).isAbsent(request(GameId("ps2/b"), Some("2026-09-28"))) shouldBe true
-        ArtStore(folder).isAbsent(request(game, Some("2026-10-01"))) shouldBe false
-        ArtStore(folder).isAbsent(request(GameId("ps2/c"), Some("2026-09-28"))) shouldBe false
+        store.markAbsent(request(game)).shouldBeRight()
+        store.markAbsent(request(GameId("ps2/b"))).shouldBeRight()
+        ArtStore(folder).isAbsent(game, older) shouldBe true
+        ArtStore(folder).isAbsent(GameId("ps2/b"), older) shouldBe true
+        ArtStore(folder).isAbsent(game, newer) shouldBe false
+        ArtStore(folder).isAbsent(GameId("ps2/c"), older) shouldBe false
         store.markAbsent(request(GameId("ps2/c"), None)).shouldBeRight()
-        ArtStore(folder).isAbsent(request(GameId("ps2/c"), None)) shouldBe false
+        ArtStore(folder).isAbsent(GameId("ps2/c"), None) shouldBe false
         folder.setWritable(false)
         try {
-            store.markAbsent(request(GameId("ps2/d"), Some("2026-09-28"))).shouldBeLeft()
+            store.markAbsent(request(GameId("ps2/d"))).shouldBeLeft()
         } finally {
             folder.setWritable(true)
         }
         // Not remembered, so looked for again.
-        store.isAbsent(request(GameId("ps2/d"), Some("2026-09-28"))) shouldBe false
+        store.isAbsent(GameId("ps2/d"), older) shouldBe false
         File(folder, "absent.json").writeText("{broken")
-        ArtStore(folder).isAbsent(request(game, Some("2026-09-28"))) shouldBe false
+        ArtStore(folder).isAbsent(game, older) shouldBe false
+    }
+
+    @Test
+    fun `a game's art is wanted until it is stored or known to be missing from its sources' version`() {
+        val store = ArtStore(folder)
+        store.wants(game, older) shouldBe true
+        store.markAbsent(request(game)).shouldBeRight()
+        store.wants(game, older) shouldBe false
+        store.wants(game, newer) shouldBe true
+        store.wants(game, None) shouldBe true
+        val stored = GameId("ps2/stored")
+        store.save(stored, image).shouldBeRight()
+        store.wants(stored, older) shouldBe false
+        store.wants(stored, None) shouldBe false
     }
 
     @Test
     fun `INV-E6-03 only the images and absences of the games kept stay, at once and after a restart`() {
-        fun request(game: GameId) = ArtRequest(game, "A", nonEmptyListOf(ArtUrl("https://a/a.png")), Some(ArtVersion("2026-09-28")))
         val kept = GameId("ps2/kept")
         val gone = listOf(game, GameId("gba/gone"))
         val store = ArtStore(folder)
@@ -111,8 +152,8 @@ class ArtStoreTest {
         listOf(store, ArtStore(folder)).forEach { again ->
             again.stored(kept).shouldBeSome()
             gone.forEach { again.stored(it).shouldBeNone() }
-            again.isAbsent(request(kept)) shouldBe true
-            gone.forEach { again.isAbsent(request(it)) shouldBe false }
+            again.isAbsent(kept, older) shouldBe true
+            gone.forEach { again.isAbsent(it, older) shouldBe false }
         }
         store.keepOnly(setOf(kept)) shouldBe Either.Right(0)
     }

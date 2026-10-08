@@ -26,13 +26,6 @@ func _text(carousel: Carousel, path: String) -> String:
 	return carousel.get_node("%Screens/" + path).get(&"text")
 
 
-func _name(device: Fixtures.NewDevice, platform_id: String) -> String:
-	for platform in device.catalog.platforms:
-		if platform.id == platform_id:
-			return platform.name
-	return ""
-
-
 ## From the consoles screen to the settings, then to the list of platforms.
 func _to_list(carousel: Carousel) -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
@@ -107,7 +100,7 @@ func test_INV_E6_03_removing_the_last_console_asks_first_then_leads_to_no_consol
 	assert_str(_text(carousel, "AddConsole/%Folder/%Value")).is_equal("SD card › ROMs › ps2")
 	assert_str(_focused()).is_equal("Emulator")
 	await _ask_removal(carousel)
-	assert_str(_text(carousel, "Confirm/%Title")).is_equal("Remove %s?" % _name(device, "ps2"))
+	assert_str(_text(carousel, "Confirm/%Title")).is_equal("Remove %s?" % Fixtures.platform_name(device, "ps2"))
 	assert_str(_text(carousel, "Confirm/%Text")).contains("Its 3 games").contains("SD card")
 	# The focus starts on "Cancel": a second A does not remove.
 	assert_str(_focused()).is_equal("Cancel")
@@ -156,15 +149,15 @@ func test_INV_E6_03_removing_one_of_two_consoles_lists_the_other_and_the_carouse
 	await _open(carousel, 1)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
-	assert_str(_focused_row()).is_equal(_name(device, "ps2"))
+	assert_str(_focused_row()).is_equal(Fixtures.platform_name(device, "ps2"))
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	await _ask_removal(carousel)
 	await _confirm(carousel)
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
 	assert_array(device.removed).is_equal(["ps2"])
-	assert_array(_rows(carousel)).is_equal([_name(device, "gba")])
-	assert_str(_focused_row()).is_equal(_name(device, "gba"))
+	assert_array(_rows(carousel)).is_equal([Fixtures.platform_name(device, "gba")])
+	assert_str(_focused_row()).is_equal(Fixtures.platform_name(device, "gba"))
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
 	assert_str(_focused()).is_equal("Platforms")
@@ -189,15 +182,25 @@ func test_a_console_that_could_not_be_removed_says_so_and_stays() -> void:
 	assert_str((Fixtures.focus(self) as Button).text).is_equal("Remove")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
-	assert_array(_rows(carousel)).is_equal([_name(device, "ps2")])
+	assert_array(_rows(carousel)).is_equal([Fixtures.platform_name(device, "ps2")])
 	assert_int(carousel._shelves.size()).is_equal(1)
+
+
+func test_what_a_form_counts_games_with_is_prepared_as_the_settings_open_never_at_start() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	var carousel := await _shown(device)
+	assert_int(device.titles_prepared).is_equal(0)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	# Before any form: the one editing a platform counts its games as it opens.
+	assert_int(device.titles_prepared).is_equal(1)
 
 
 func test_the_platforms_list_in_catalog_order_and_B_goes_back_one_screen_at_a_time() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3, "gba": 2})
 	var carousel := await _shown(device)
 	await _to_list(carousel)
-	assert_array(_rows(carousel)).is_equal([_name(device, "gba"), _name(device, "ps2")])
+	assert_array(_rows(carousel)).is_equal([Fixtures.platform_name(device, "gba"), Fixtures.platform_name(device, "ps2")])
 	await _open(carousel, 0)
 	await _ask_removal(carousel)
 	for screen: String in ["AddConsole", "Platforms", "Settings"]:
@@ -264,11 +267,11 @@ func test_saving_another_type_adds_that_console_and_removes_the_one_edited_which
 	var list: Control = carousel.get_node("%Screens/AddConsole/%Choice")
 	assert_bool(await Fixtures.until(self, func() -> bool: return list.visible)).is_true()
 	for item: Button in list.get_node("%Items").get_children():
-		assert_str(item.text).is_not_equal(_name(device, "gc"))
-	await Fixtures.choose_in_list(self, carousel, _name(device, "gba"))
+		assert_str(item.text).is_not_equal(Fixtures.platform_name(device, "gc"))
+	await Fixtures.choose_in_list(self, carousel, Fixtures.platform_name(device, "gba"))
 	# Removing now still names the console edited.
 	await _ask_removal(carousel)
-	assert_str(_text(carousel, "Confirm/%Title")).is_equal("Remove %s?" % _name(device, "ps2"))
+	assert_str(_text(carousel, "Confirm/%Title")).is_equal("Remove %s?" % Fixtures.platform_name(device, "ps2"))
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	# Another type: its emulator is to choose again.
@@ -279,7 +282,7 @@ func test_saving_another_type_adds_that_console_and_removes_the_one_edited_which
 	await _save(carousel)
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
 	assert_array(device.removed).is_equal(["ps2"])
-	assert_array(_rows(carousel)).is_equal([_name(device, "gba"), _name(device, "gc")])
+	assert_array(_rows(carousel)).is_equal([Fixtures.platform_name(device, "gba"), Fixtures.platform_name(device, "gc")])
 
 
 func test_a_console_set_up_without_games_found_again_from_no_console_brings_the_carousel() -> void:
@@ -329,7 +332,7 @@ func test_the_button_style_changes_from_the_settings_and_B_there_keeps_it() -> v
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
 	assert_str(_focused()).is_equal("Xbox")
-	# A screen of its own: the carousel hides behind it, and shows again under the settings.
+	# A screen of its own, as the settings: the carousel stays hidden under both (the screens in front cover it).
 	var consoles: Node3D = carousel.get_node("%Consoles")
 	assert_bool(consoles.visible).is_false()
 	assert_bool((carousel.get_node("%ConsoleTitle") as Control).visible).is_false()
@@ -338,7 +341,7 @@ func test_the_button_style_changes_from_the_settings_and_B_there_keeps_it() -> v
 	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
 	assert_str(Controls.style).is_equal("xbox")
 	assert_str(_focused()).is_equal("ButtonStyle")
-	assert_bool(consoles.visible).is_true()
+	assert_bool(consoles.visible).is_false()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
 	await Fixtures.action(self, &"ui_right")
@@ -419,3 +422,69 @@ func test_INV_E6_01_on_every_settings_screen_exactly_one_control_of_it_has_the_f
 	await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.wander(self, carousel, "ButtonStyle", random)
+
+
+## What the carousel draws of its own, besides its background and the top bar: its games, its
+## consoles, the console's name, the pill, the games' hints, a message, the art's bar, and the
+## consoles blurred behind the games.
+func _drawn(carousel: Carousel) -> Array[bool]:
+	return [carousel._row.visible, carousel._consoles.visible, carousel._console_title.visible, carousel._pill.visible,
+		carousel._games_hints.visible, carousel._message.visible, carousel._art_progress.visible, carousel._sequence.layer.visible]
+
+
+## Under the screens in front: nothing of the carousel's own, its top bar still there, and the app
+## free to rest.
+func _assert_covered(carousel: Carousel) -> void:
+	assert_array(_drawn(carousel)).is_equal([false, false, false, false, false, false, false, false])
+	assert_bool(carousel._top_bar.visible).is_true()
+	assert_bool(carousel._resting.moving.call()).is_false()
+
+
+func test_under_the_settings_and_the_forms_the_carousel_draws_only_its_background_then_shows_as_it_was() -> void:
+	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3, "gba": 2}))
+	# Once the consoles and their name have come in.
+	assert_bool(await Fixtures.until(self, func() -> bool:
+		return not get_tree().get_processed_tweens().any(func(tween: Tween) -> bool: return tween.is_running()))).is_true()
+	var whole := _drawn(carousel)
+	var title_alpha := carousel._console_title.modulate.a
+	# A message about to stay four seconds: it goes with the carousel.
+	carousel._show_message("Message")
+	await _to_list(carousel)
+	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
+	_assert_covered(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	_assert_covered(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _closed(carousel)).is_true()
+	assert_array(_drawn(carousel)).is_equal(whole)
+	# As it was: the consoles do not come in again.
+	assert_float(carousel._consoles.arrival).is_equal(1.0)
+	assert_float(carousel._console_title.modulate.a).is_equal(title_alpha)
+	# The form adding one more console, from the "+" above the consoles.
+	await Fixtures.open_add_console(self, carousel)
+	_assert_covered(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _closed(carousel)).is_true()
+	assert_array(_drawn(carousel)).is_equal(whole)
+	assert_float(carousel._consoles.arrival).is_equal(1.0)
+	# On the PS2's games screen, its consoles shown behind the games: under the settings, gone at once,
+	# and still gone once they close.
+	for step in 2:
+		if carousel._shelves[carousel._shelf].platform_id != "ps2":
+			await Fixtures.action(self, &"carousel_right")
+	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal("ps2")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
+	# Held there, rather than left to fade by themselves.
+	carousel.set_process(false)
+	carousel._sequence.behind_amount = 1.0
+	assert_bool(carousel._sequence.layer.visible).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	_assert_covered(carousel)
+	carousel.set_process(true)
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _closed(carousel)).is_true()
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+	assert_array(_drawn(carousel)).is_equal([true, true, true, true, true, false, false, false])

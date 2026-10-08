@@ -2,11 +2,11 @@
 class_name ScreenFlow
 extends Control
 ## The screens in front of the carousel, over its background: the welcome at each start, while the
-## library loads, until a button is pressed; on a first launch the button style, then the curtain permission when Android
-## does not allow it yet; while no console has games, "No console" and the form adding one, then
-## the discovery of the console added. Later, the settings (Y): the platforms set up, each to
-## change or remove, and the button style; and the form adding one more console (the "+" above
-## the consoles). One screen shows at a time, with the focus on it.
+## library loads, until a button is pressed; on a first launch the button style, then the curtain
+## permission when Android does not allow it yet; while no console has games, "No console" and the
+## form adding one, then the discovery of the console added. Later, the settings (Y): the platforms
+## set up, each to change or remove, the button style and the edges' smoothing; and the form adding
+## one more console (the "+" above the consoles). One screen shows at a time, with the focus on it.
 ## Closes once the carousel can be used.
 
 ## The first console was added: [param library] is the library with its games.
@@ -18,9 +18,8 @@ signal console_added(library: AndroidServices.Library, platform_id: String)
 signal library_edited(library: AndroidServices.Library)
 ## The welcome, which has no top bar, is over.
 signal welcome_closed
-## A screen shows: one that [param covers] the carousel, or a panel over it (the forms, the
-## settings).
-signal covering(covers: bool)
+## A screen shows, over the carousel's background: the carousel shows nothing else meanwhile.
+signal covering
 
 ## Seconds the discovery plays before the carousel is set up behind it.
 const _LIBRARY_AFTER_S := 1.15
@@ -48,6 +47,7 @@ var _emptied := false
 
 @onready var _welcome: Welcome = %Welcome
 @onready var _button_style: ButtonStyleScreen = %ButtonStyle
+@onready var _edge_smoothing: EdgeSmoothingScreen = %EdgeSmoothing
 @onready var _permission: CurtainPermission = %Permission
 @onready var _no_console: NoConsole = %NoConsole
 @onready var _add_console: AddConsole = %AddConsole
@@ -98,6 +98,11 @@ func add_console() -> void:
 	_close()
 
 
+## Whether a screen plays an animation of its own: the discovery of a console added.
+func is_playing() -> bool:
+	return visible and _discovery.is_processing()
+
+
 func _close() -> void:
 	Diagnostics.trace("screens", "closed")
 	hide()
@@ -121,6 +126,19 @@ func _choose_button_style(can_go_back := false) -> void:
 	var saved := await android.save_button_style(style)
 	if not saved.ok:
 		Diagnostics.trace("screens", "button style not saved (%s): %s" % [saved.code, saved.detail])
+
+
+## The edges' smoothing, drawn and saved once chosen; B leaves it as it was.
+func _choose_edge_smoothing() -> void:
+	_show(_edge_smoothing)
+	_edge_smoothing.focus()
+	var smoothing: StringName = await _edge_smoothing.chosen
+	if smoothing.is_empty():
+		return
+	get_viewport().msaa_3d = EdgeSmoothingScreen.MSAA[smoothing]
+	var saved := await android.save_edge_smoothing(smoothing)
+	if not saved.ok:
+		Diagnostics.trace("screens", "edge smoothing not saved (%s): %s" % [saved.code, saved.detail])
 
 
 ## "No console" until the form adds one, then its discovery. Returns at once when a console of
@@ -158,6 +176,8 @@ func _add_first_console() -> void:
 
 ## "Settings" until B, or until no platform is set up any more.
 func _settings_menu() -> void:
+	# The form editing a platform counts its games as it opens: what that needs is prepared meanwhile.
+	android.prepare_titles()
 	var focus := &"platforms"
 	while true:
 		_show(_settings)
@@ -168,6 +188,8 @@ func _settings_menu() -> void:
 				return
 			&"button_style":
 				await _choose_button_style(true)
+			&"graphics":
+				await _choose_edge_smoothing()
 			&"platforms":
 				await _platform_menu()
 				if library.set_up_platforms().is_empty():
@@ -249,5 +271,5 @@ func _show(screen: Control) -> void:
 	for child: Control in get_children():
 		child.visible = child == screen
 	show()
-	covering.emit(screen not in [_add_console, _settings, _platforms, _confirm])
+	covering.emit()
 	Diagnostics.trace("screens", "showing %s" % screen.name)

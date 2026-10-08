@@ -8,6 +8,7 @@ import app.cartouche.android.storage.write
 import app.cartouche.core.art.AbsentArt
 import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtUrl
+import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.library.GameId
 import arrow.core.Either
 import arrow.core.None
@@ -29,11 +30,16 @@ internal value class StoredArt(val file: File)
 /**
  * The label images found for games, one file each in [folder] (the app's private storage), named
  * after a hash of the game's id, and the games no source has art for ([AbsentArt]), so that they
- * are not looked for at every start. Images are written atomically: a file there is always a whole image. Safe to use from
- * several threads.
+ * are not looked for at every start. Images are written atomically: a file there is always a whole
+ * image. Safe to use from several threads.
  */
 internal class ArtStore(private val folder: File) {
     private val absentFile = AtomicFile(File(folder, "absent.json"))
+
+    /** The games no source has art for, read on first use, then kept in step with their file. */
+    private var absent: Option<AbsentArt> = None
+
+    private val variants = File(folder, "variants")
 
     /** The stored images by file name stem (the hash), read from [folder] on first use. */
     private val stored: ConcurrentHashMap<String, StoredArt> by lazy {
@@ -94,8 +100,6 @@ internal class ArtStore(private val folder: File) {
         }
     }
 
-    private val variants = File(folder, "variants")
-
     private fun variantFile(url: ArtUrl): File = File(variants, "${sha1(url.value)}.jpg")
 
     /**
@@ -113,12 +117,12 @@ internal class ArtStore(private val folder: File) {
         return (if (absentKept == absent()) Unit.right() else writeAbsent(absentKept)).map { gone.size }
     }
 
-    /** The games no source has art for, read on first use, then kept in step with their file. */
-    private var absent: Option<AbsentArt> = None
-
-    /** Whether [request]'s game is known to have no art in its sources. */
+    /** Whether [game] is known to have no art in sources of [version]. */
     @Synchronized
-    fun isAbsent(request: ArtRequest): Boolean = absent().covers(request)
+    fun isAbsent(game: GameId, version: Option<ArtVersion>): Boolean = absent().covers(game, version)
+
+    /** Whether [game]'s art is still to be looked for in sources of [version]: none is stored, nor known to be missing there. */
+    fun wants(game: GameId, version: Option<ArtVersion>): Boolean = stored(game).isNone() && !isAbsent(game, version)
 
     /** Remembers that no source of [request] has art for its game. */
     @Synchronized
@@ -145,7 +149,8 @@ internal class ArtStore(private val folder: File) {
         /** Enough for a few screens of a game's images, a few megabytes. */
         const val VARIANTS_KEPT = 48
 
-        private fun sha1(text: String): String =
-            MessageDigest.getInstance("SHA-1").digest(text.encodeToByteArray()).joinToString("") { "%02x".format(it) }
+        /** [text]'s SHA-1 in lower-case hexadecimal; made for every game at each start, so without `format`. */
+        @OptIn(ExperimentalStdlibApi::class)
+        internal fun sha1(text: String): String = MessageDigest.getInstance("SHA-1").digest(text.encodeToByteArray()).toHexString()
     }
 }

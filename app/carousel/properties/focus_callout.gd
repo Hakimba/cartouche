@@ -38,9 +38,11 @@ func point(caption: String, at: Vector2, target: Vector2) -> void:
 		_caption.reset_size()
 		_fade_to(1.0)
 	_caption.position = at - Vector2(0.0, _caption.size.y / 2.0)
-	_from = at
-	_to = target
-	queue_redraw()
+	# Pointed at every frame: the arrow is drawn again only when it moves.
+	if at != _from or target != _to:
+		_from = at
+		_to = target
+		queue_redraw()
 
 
 func clear() -> void:

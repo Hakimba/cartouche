@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Runs the GDScript tests of app/test with GdUnit4, headless; with arguments, only the test
-# folders or files they name (`dev/test_godot.sh res://test/screens`). GdUnit4 (MIT) is not part of the
-# repository: the pinned release is downloaded once into build/, checked, and linked into
+# folders or files they name (`dev/test_godot.sh res://test/screens`). GdUnit4 (MIT) is not part of
+# the repository: the pinned release is downloaded once into build/, checked, and linked into
 # app/addons/gdUnit4 (ignored by git, left out of exports).
 #
 # Usage: dev/test_godot.sh [res://test/PATH...]   Needs Godot on PATH or in GODOT.

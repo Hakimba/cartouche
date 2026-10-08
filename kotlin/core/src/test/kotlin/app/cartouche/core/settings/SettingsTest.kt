@@ -37,4 +37,9 @@ class SettingsTest {
     fun `INV-E6-05 a fresh install, with no settings and no platform, is on its first launch`() {
         Settings().isFirstLaunch(Library()) shouldBe true
     }
+
+    @Test
+    fun `INV-E8-02 a fresh install smooths the edges 4x`() {
+        Settings().edgeSmoothing shouldBe EdgeSmoothing.FOUR_TIMES
+    }
 }

@@ -14,6 +14,9 @@ static func carousel_for(suite: GdUnitTestSuite, device: NewDevice) -> Carousel:
 	carousel.clock = clock.now
 	var screens: ScreenFlow = carousel.get_node("%Screens")
 	screens.welcome_waits = false
+	# Left alone between two presses, the app would rest: these tests keep it awake. Not ready yet,
+	# the carousel is reached by its scene.
+	(carousel.get_node(^"%Resting") as Resting).stays_awake = true
 	return carousel
 
 
@@ -164,6 +167,15 @@ static func action(suite: GdUnitTestSuite, name: StringName) -> void:
 	await _press(suite, event)
 
 
+## From the consoles screen, the form adding one more console: up held turns the "+" ball into its
+## button, A opens the form.
+static func open_add_console(suite: GdUnitTestSuite, carousel: Carousel) -> void:
+	await hold(suite, &"ui_up")
+	await joypad(suite, JOY_BUTTON_A)
+	await hold(suite, &"ui_up", false)
+	suite.assert_bool(await on(suite, carousel, "AddConsole")).is_true()
+
+
 ## [param name] held down, or let go when not [param pressed]; returns a frame on.
 static func hold(suite: GdUnitTestSuite, name: StringName, pressed := true) -> void:
 	var event := InputEventAction.new()
@@ -275,12 +287,14 @@ class NewDevice extends AndroidServices:
 	var slow: Array[StringName] = []
 	var failing: Array[StringName] = []
 	var saved_styles: Array[StringName] = []
+	var saved_smoothings: Array[StringName] = []
 	var previews: Array[AndroidServices.PlatformSetup] = []
 	var previewed_platforms: Array[String] = []
 	var set_up: Array[AndroidServices.PlatformSetup] = []
 	var scans := 0
 	var removed: Array[String] = []
 	var setting_opened := false
+	var titles_prepared := 0
 	## The images every game's label can show, as the plugin lists them: `{"region", "path"?}`.
 	var variants: Array[Dictionary] = []
 	## The regions whose image was chosen for a label, in order.
@@ -295,13 +309,16 @@ class NewDevice extends AndroidServices:
 	func is_available() -> bool:
 		return true
 
+	## A frame after it is asked for, as the plugin answers: after the scene's first frame.
 	func settings() -> AndroidServices.SettingsAnswer:
+		await _frames(1)
 		var answer := {"ok": true, "first_launch": first_launch}
 		if button_style:
 			answer["button_style"] = button_style
 		return AndroidServices.SettingsAnswer.new(answer)
 
 	func library() -> AndroidServices.LibraryAnswer:
+		await _frames(1)
 		if has_games:
 			return AndroidServices.LibraryAnswer.new({"ok": true, "library": JSON.stringify(AndroidServices._desktop_demo("library"))})
 		return AndroidServices.LibraryAnswer.new({"ok": true, "library": _library()})
@@ -317,6 +334,10 @@ class NewDevice extends AndroidServices:
 		saved_styles.append(style)
 		return AndroidServices.Result.new({"ok": true})
 
+	func save_edge_smoothing(smoothing: StringName) -> AndroidServices.Result:
+		saved_smoothings.append(smoothing)
+		return AndroidServices.Result.new({"ok": true})
+
 	func installed_players(platform_id: String) -> Array[AndroidServices.Player]:
 		var found: Array[AndroidServices.Player] = []
 		if platform_id != "ps2" and not players_everywhere:
@@ -328,6 +349,9 @@ class NewDevice extends AndroidServices:
 	func pick_folder() -> AndroidServices.Pick:
 		return AndroidServices.Pick.new({"ok": true, "folder": {"uri": "content://tree/card%3AROMs%2Fps2", "name": "ps2",
 			"place": {"volume": "card", "folders": PackedStringArray(["ROMs", "ps2"])}}})
+
+	func prepare_titles() -> void:
+		titles_prepared += 1
 
 	func preview_platform(platform_id: String, setup: AndroidServices.PlatformSetup) -> AndroidServices.PreviewAnswer:
 		previewed_platforms.append(platform_id)
@@ -373,7 +397,7 @@ class NewDevice extends AndroidServices:
 		return AndroidServices.FolderList.new({"ok": true, "folders": folders})
 
 	func battery() -> AndroidServices.Battery:
-		return AndroidServices.Battery.new({"level_percent": 99, "charging": false})
+		return AndroidServices.Battery.new({"level_percent": 99, "plugged": false})
 
 	func select_game(_game: AndroidServices.Game) -> AndroidServices.Result:
 		return AndroidServices.Result.new({"ok": true})

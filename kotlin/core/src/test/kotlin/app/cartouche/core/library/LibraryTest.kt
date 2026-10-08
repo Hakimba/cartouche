@@ -23,6 +23,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
 class LibraryTest {
+    private fun scan(files: List<ListedFile>) = Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED)
+
     @Test
     fun `the chosen player opens games when installed, else the first installed one`() {
         val chd = FileName("Game.chd")
@@ -42,7 +44,7 @@ class LibraryTest {
             val before = story + files
             val after = story + files.filterIndexed { i, _ -> i % 2 == 0 } + added.map { it.copy(uri = uri(it.uri.value + "-new")) }
             val other = game("X", platform = "gba", discs = nonEmptyListOf(Disc(None, listed("X.gba"))))
-            val first = Scan.of(ps2, contents(before), ps2Titles, DiscGrouping.GROUPED)
+            val first = scan(before)
             val library =
                 Library(
                     games = listOf(other),
@@ -53,7 +55,7 @@ class LibraryTest {
                     .withSetup(other.platform, setup)
                     .withScan(ps2.id, first)
                     .let { lib -> lib.games.fold(lib) { acc, game -> acc.withLastDisc(game.id, lastDisc) } }
-            val second = Scan.of(ps2, contents(after), ps2Titles, DiscGrouping.GROUPED)
+            val second = scan(after)
             val rescanned = library.withScan(ps2.id, second)
             val ps2Games = rescanned.games.filter { it.platform == ps2.id }
             ps2Games.map { it.id } shouldBe second.games.map { it.id }
@@ -91,8 +93,6 @@ class LibraryTest {
             var gone = 0
             val japan = LabelChoice.Region(LabelRegion("Japan"))
             val other = game("X", platform = "gba", discs = nonEmptyListOf(Disc(None, listed("X.gba")))).copy(label = japan)
-
-            fun scan(files: List<ListedFile>) = Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED)
             checkAll(folderFiles, Arb.list(labelChoices, 0..20)) { files, labels ->
                 val scanned = Library(games = listOf(other)).withScan(ps2.id, scan(files))
                 val ps2Games = scanned.games.filter { it.platform == ps2.id }
@@ -132,16 +132,11 @@ class LibraryTest {
                     platform = "gba",
                     discs = nonEmptyListOf(Disc(None, listed("X.gba"))),
                 ).copy(displayName = DisplayName.of("Mine"))
-
-            fun scan(files: List<ListedFile>) = Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED)
             checkAll(folderFiles, Arb.list(typedNames, 0..20)) { files, typed ->
                 val scanned = Library(games = listOf(other)).withScan(ps2.id, scan(files))
                 val ps2Games = scanned.games.filter { it.platform == ps2.id }
                 val renamed =
-                    ps2Games
-                        .zip(
-                            typed,
-                        ).fold(scanned) { library, (game, text) -> library.withDisplayName(game.id, DisplayName.of(text)) }
+                    ps2Games.zip(typed).fold(scanned) { library, (game, text) -> library.withDisplayName(game.id, DisplayName.of(text)) }
                 LibraryFormat.decode(LibraryFormat.encode(renamed)).shouldBeRight().library shouldBe renamed
                 renamed.games.forEach { game ->
                     // Only the name changes: the title, which identification and art look for, stays.
@@ -187,16 +182,12 @@ class LibraryTest {
     @Test
     fun `INV-E7-07 a console's name stays through saving, reading back and rescans, and goes with its platform`() = runBlocking<Unit> {
         var named = 0
-
-        fun scan(files: List<ListedFile>) = Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED)
         checkAll(folderFiles, typedNames, typedNames) { files, ps2Name, gbaName ->
             val gba = PlatformId("gba")
             val library =
                 Library()
-                    .withScan(
-                        ps2.id,
-                        scan(files),
-                    ).withConsoleName(ps2.id, DisplayName.of(ps2Name), "PlayStation 2")
+                    .withScan(ps2.id, scan(files))
+                    .withConsoleName(ps2.id, DisplayName.of(ps2Name), "PlayStation 2")
                     .withConsoleName(gba, DisplayName.of(gbaName), "Game Boy Advance")
             LibraryFormat.decode(LibraryFormat.encode(library)).shouldBeRight().library shouldBe library
             library.withScan(ps2.id, scan(files.drop(1))).consoleNames shouldBe library.consoleNames

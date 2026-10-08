@@ -2,24 +2,27 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Measures a debug build on the device connected through adb, at several library sizes: the
 # user's own library ("real") and made-up ones of N games (`--demo-games`). For each size: cold
-# starts (start to carousel shown, library read and sent, title indexing, first frames), then the
+# starts (start to carousel shown, library read and sent, first frames), then the
 # carousel held scrolling, going into a console and back out, stepping along the consoles,
 # turning the selected game, opening a game's properties and closing them, moving a console round
-# the ring that puts them in order and swiping the games by touch, for 30 s each (frame times),
-# the app's memory and the save of the
-# selection. With the user's own library, it also
+# the ring that puts them in order, swiping the games by touch, and staying still on the games
+# screen and on the consoles screen, for 30 s each (frame times, draw calls, and what each costs
+# in energy: the app's processor time a second and, where the GPU tells it, how busy it is and at
+# which clock), the app's memory and the save of the selection. With the user's own library, it also
 # launches the selected game once (insertion frames, times to check it and to start its emulator,
 # time for the emulator to show), then comes back and stops that emulator, just started: nothing
-# of the user's is running in it. First, with the user's own library, the art downloaded so far is
-# deleted and downloaded again while the carousel scrolls (time for 40 games and for all, frame
-# times meanwhile); the starts that follow read it from the device (the selected game's label
-# shown, the slowest label read). Run it after `dev/build.sh --install`, with the device online.
+# of the user's is running in it. First, with the user's own library, its art is set aside and the
+# scans downloaded again from nothing while the carousel scrolls (time for 40 games and for all,
+# frame times meanwhile), then the user's art is put back as it was; the starts that follow read it
+# from the device (the selected game's label shown, the slowest label read). Every scenario starts
+# on the PS2's games, whichever console the app showed last. Run it after `dev/build.sh --install`,
+# with the device online.
 #
 # Prints one line per measurement; with --record FILE, also appends each one to FILE as a JSON
 # record: {"date", "commit", "build", "device", "android", "scenario", "games", "metric",
-# "value", "unit", "run"}.
+# "value", "unit", "run", "label"}, the label naming the run (--label, empty by default).
 #
-# Usage: dev/bench.sh [--record FILE] [--starts N] [SIZE...]   (sizes: real or a number;
+# Usage: dev/bench.sh [--record FILE] [--label TEXT] [--starts N] [SIZE...]   (sizes: real or a number;
 #        default: real 150 1000 5000)
 set -euo pipefail
 # Decimal points, whatever the machine's language.
@@ -27,14 +30,16 @@ export LC_ALL=C
 cd "$(dirname "$0")/.."
 adb="${ANDROID_HOME:?ANDROID_HOME is not set}/platform-tools/adb"
 record=""
+label=""
 starts=3
 sizes=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --record) record="$2"; shift 2 ;;
+    --label) label="$2"; shift 2 ;;
     --starts) starts="$2"; shift 2 ;;
     real | [0-9]*) sizes+=("$1"); shift ;;
-    *) echo "usage: dev/bench.sh [--record FILE] [--starts N] [real|N...]" >&2; exit 2 ;;
+    *) echo "usage: dev/bench.sh [--record FILE] [--label TEXT] [--starts N] [real|N...]" >&2; exit 2 ;;
   esac
 done
 [ ${#sizes[@]} -gt 0 ] || sizes=(real 150 1000 5000)
@@ -47,11 +52,10 @@ android=$("$adb" shell getprop ro.build.version.release | tr -d '\r')
 # emit SCENARIO GAMES METRIC VALUE UNIT RUN
 emit() {
   printf '%-12s %-5s %-24s %10s %s (run %s)\n' "$1" "$2" "$3" "$4" "$5" "$6"
-  [ -z "$record" ] || printf '{"date":"%s","commit":"%s","build":"debug","device":"%s","android":"%s","scenario":"%s","games":"%s","metric":"%s","value":%s,"unit":"%s","run":%s}\n' \
-    "$date" "$commit" "$device" "$android" "$1" "$2" "$3" "${4:-null}" "$5" "$6" >> "$record"
+  [ -z "$record" ] || printf '{"date":"%s","commit":"%s","build":"debug","device":"%s","android":"%s","scenario":"%s","games":"%s","metric":"%s","value":%s,"unit":"%s","run":%s,"label":"%s"}\n' \
+    "$date" "$commit" "$device" "$android" "$1" "$2" "$3" "${4:-null}" "$5" "$6" "$label" >> "$record"
 }
 
-# start ARGUMENTS: a cold start, the launch arguments joined by commas.
 # start [ARGUMENTS]: Cartouche started anew with the comma-separated ARGUMENTS, past its welcome
 # screen (which waits for a press).
 start() {
@@ -68,6 +72,32 @@ wait_for() {
     waited=$((waited + 1))
     [ "$waited" -lt $(($2 * 2)) ] || { echo "error: no \"$1\" within $2 s" >&2; exit 1; }
   done
+}
+
+# sampled SCENARIO SIZE: from the scenario's start to its `bench:` line, the app's processor time
+# a second and, each second, how busy the GPU is and its clock (Adreno's kgsl files; left out
+# where the GPU does not tell).
+gpu=/sys/class/kgsl/kgsl-3d0
+sampled() {
+  wait_for "bench: $1 started" 60
+  local pid ticks started busy=0 clock=0 samples=0 reading
+  pid=$("$adb" shell pidof app.cartouche | tr -d '\r')
+  ticks=$("$adb" shell cat "/proc/$pid/stat" | awk '{ print $14 + $15 }')
+  started=$(date +%s.%N)
+  until "$adb" logcat -d | grep -qE "bench: $1:"; do
+    reading=$("$adb" shell "cat $gpu/gpu_busy_percentage $gpu/clock_mhz 2> /dev/null" | tr -d '\r %' | paste -sd ' ')
+    if [ -n "$reading" ]; then
+      busy=$(echo "$busy ${reading% *}" | awk '{ print $1 + $2 }')
+      clock=$(echo "$clock ${reading#* }" | awk '{ print $1 + $2 }')
+      samples=$((samples + 1))
+    fi
+    sleep 1
+  done
+  # Clock ticks of 10 ms (USER_HZ 100).
+  emit "$1" "$2" cpu_ms_per_s "$("$adb" shell cat "/proc/$pid/stat" | awk -v t="$ticks" -v s="$started" -v n="$(date +%s.%N)" \
+    '{ printf "%.0f", ($14 + $15 - t) * 10 / (n - s) }')" ms 1
+  [ "$samples" -eq 0 ] || emit "$1" "$2" gpu_busy "$(awk -v b="$busy" -v n="$samples" 'BEGIN { printf "%.1f", b / n }')" % 1
+  [ "$samples" -eq 0 ] || emit "$1" "$2" gpu_mhz "$(awk -v c="$clock" -v n="$samples" 'BEGIN { printf "%.0f", c / n }')" MHz 1
 }
 
 # emit_bench SCENARIO SIZE KEY...: the KEYs of the scenario's `bench:` line.
@@ -90,13 +120,29 @@ seconds_between() {
     $0 ~ start && !s { s = $1 } $0 ~ end && s { if (++n == nth) { printf "%.1f", $1 - s; exit } }'
 }
 
+# The user's art, the scans downloaded and the pictures of their own put on labels, is set aside
+# while the scans are downloaded again from nothing (set_art_aside), then put back exactly as it was
+# (put_art_back), even when the run stops early. Art left aside by an earlier run is the user's: it
+# is put back first. Only the folder made for the run, marked, is ever deleted: when the app made
+# another one meanwhile, both are the user's and the run stops, for them to be put together by hand.
+put_art_back() {
+  "$adb" shell am force-stop app.cartouche
+  "$adb" shell "run-as app.cartouche sh -c 'if [ -d files/art.aside ]; then [ ! -d files/art ] || [ -f files/art/.bench ] || exit 3;
+    rm -rf files/art; mv files/art.aside files/art; fi'" || { echo "files/art and files/art.aside both hold the user's art" >&2; exit 1; }
+}
+set_art_aside() {
+  put_art_back
+  "$adb" shell "run-as app.cartouche sh -c 'if [ -d files/art ]; then mv files/art files/art.aside; fi; mkdir files/art; touch files/art/.bench'"
+  trap put_art_back EXIT
+}
+
 for size in "${sizes[@]}"; do
   demo=$([ "$size" = real ] || echo "--demo-games=$size")
-  args=${demo:+$demo,}
+  # The same console's games each time, whichever the app showed last.
+  args="${demo:+$demo,}--shelf=ps2,"
   if [ "$size" = real ]; then
-    # Cartouche's own downloads, downloaded again below: nothing else is deleted.
-    "$adb" shell run-as app.cartouche rm -rf files/art
-    start "--bench=scrape"
+    set_art_aside
+    start "${args}--bench=scrape"
     wait_for "bench: scrape:" 90
     emit_bench scrape "$size" fps worst_ms p95_ms slow_frames steps
     wait_for "art: run over" 300
@@ -104,9 +150,11 @@ for size in "${sizes[@]}"; do
     emit scrape "$size" scrape_all "$(first 'run over: [0-9]+ games in [0-9]+ s')" s 1
     emit scrape "$size" scrape_games "$(first 'run over: [0-9]+ games')" count 1
     emit scrape "$size" labels_stored "$("$adb" logcat -d | grep -c ', stored in ')" count 1
+    put_art_back
+    trap - EXIT
   fi
   for run in $(seq "$starts"); do
-    start "$demo"
+    start "${args%,}"
     wait_for "carousel: shown" 30
     sleep 3
     # The device's own clock: from the start request to the first frame showing the carousel.
@@ -120,17 +168,19 @@ for size in "${sizes[@]}"; do
     # The first frames showing the shelf: the slowest of them.
     worst=$("$adb" logcat -d | grep -oE "first frames: [0-9., ]+ ms" | head -1 | grep -oE "[0-9]+\.[0-9]+" | sort -n | tail -1)
     emit first_frames "$size" first_frames_worst "$worst" ms "$run"
-    indexed=$(first 'titles: ps2: [0-9]+ indexed in [0-9]+ ms' || true)
-    [ -z "$indexed" ] || emit titles "$size" title_index_ps2 "$indexed" ms "$run"
     selected=$(first 'selected label shown [0-9]+ ms after' || true)
     [ -z "$selected" ] || emit art "$size" selected_label_shown "$selected" ms "$run"
     read_worst=$("$adb" logcat -d | grep -oE "art: .* read in [0-9.]+" | grep -oE "[0-9.]+$" | sort -n | tail -1 || true)
     [ -z "$read_worst" ] || emit art "$size" label_read_worst "$read_worst" ms "$run"
   done
-  for scenario in scroll enter step turn properties order swipe; do
-    start "$args--bench=$scenario"
-    wait_for "bench: $scenario:" 60
-    emit_bench "$scenario" "$size" fps worst_ms p95_ms slow_frames steps
+  for scenario in scroll enter step turn properties order swipe idle idle_consoles; do
+    start "${args}--bench=$scenario"
+    sampled "$scenario" "$size"
+    # At rest the app draws 30 times a second, when anything changes: its frame times say nothing.
+    case "$scenario" in
+      idle*) emit_bench "$scenario" "$size" steps draw_calls process_ms draw_cpu_ms ;;
+      *) emit_bench "$scenario" "$size" fps worst_ms p95_ms slow_frames steps draw_calls process_ms draw_cpu_ms ;;
+    esac
     if [ "$scenario" = scroll ]; then
       emit memory "$size" memory_pss "$("$adb" shell dumpsys meminfo app.cartouche | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
       # Leaving the app (here for the system settings) saves the selection.
@@ -140,7 +190,7 @@ for size in "${sizes[@]}"; do
     fi
   done
   if [ "$size" = real ]; then
-    start "--bench=launch"
+    start "${args}--bench=launch"
     wait_for "bench: launch:" 60
     emit_bench launch "$size" worst_ms p95_ms slow_frames check_ms start_ms
     emulator=$("$adb" logcat -d | grep -oE "launch: .* in [A-Za-z0-9_.]+$" | head -1 | awk '{ print $NF }')

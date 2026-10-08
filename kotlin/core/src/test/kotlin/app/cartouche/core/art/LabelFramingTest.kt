@@ -11,6 +11,7 @@ import io.kotest.property.arbitrary.int
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import kotlin.math.abs
 
 class LabelFramingTest {
     // Every double, the impossible ones and those far out of range included.
@@ -21,6 +22,8 @@ class LabelFramingTest {
             Arb.element(Double.MIN_VALUE, 1e300),
         )
     private val sides = Arb.choice(Arb.int(1..4000), Arb.element(1, 2, 3, Int.MAX_VALUE))
+    private val zooms = Arb.double(1.0, LabelFraming.MAX_ZOOM)
+    private val centres = Arb.double(0.0, 1.0)
 
     @Test
     fun `a picture first framed shows the largest square in its middle`() {
@@ -51,20 +54,14 @@ class LabelFramingTest {
     @Test
     fun `a square that fits round the centre asked is centred on it, within a pixel`() = runBlocking<Unit> {
         var centred = 0
-        checkAll(Arb.int(16..4000), Arb.int(16..4000), Arb.double(1.0, LabelFraming.MAX_ZOOM), Arb.double(0.0, 1.0), Arb.double(0.0, 1.0)) {
-            width,
-            height,
-            zoom,
-            x,
-            y,
-            ->
+        checkAll(Arb.int(16..4000), Arb.int(16..4000), zooms, centres, centres) { width, height, zoom, x, y ->
             val square = LabelFraming(zoom, x, y).square(width, height)
             val half = square.side / 2.0
             if (x * width in half..width - half) {
-                (kotlin.math.abs(square.left + half - x * width) <= 1.0) shouldBe true
+                (abs(square.left + half - x * width) <= 1.0) shouldBe true
                 centred++
             }
-            if (y * height in half..height - half) (kotlin.math.abs(square.top + half - y * height) <= 1.0) shouldBe true
+            if (y * height in half..height - half) (abs(square.top + half - y * height) <= 1.0) shouldBe true
         }
         // Most framings fit round their centre: the law is not checked on a handful of cases only.
         centred shouldBeGreaterThan 400
@@ -72,12 +69,7 @@ class LabelFramingTest {
 
     @Test
     fun `a closer framing never shows a larger square`() = runBlocking<Unit> {
-        checkAll(Arb.int(1..4000), Arb.int(1..4000), Arb.double(1.0, LabelFraming.MAX_ZOOM), Arb.double(1.0, LabelFraming.MAX_ZOOM)) {
-            width,
-            height,
-            one,
-            other,
-            ->
+        checkAll(Arb.int(1..4000), Arb.int(1..4000), zooms, zooms) { width, height, one, other ->
             val near = LabelFraming(maxOf(one, other), 0.5, 0.5).square(width, height)
             val far = LabelFraming(minOf(one, other), 0.5, 0.5).square(width, height)
             (near.side <= far.side) shouldBe true

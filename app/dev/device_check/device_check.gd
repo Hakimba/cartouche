@@ -43,17 +43,15 @@ func _notification(what: int) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"tab_next"):
+		get_viewport().set_input_as_handled()
 		_tabs.select_next_available()
 	elif event.is_action_pressed(&"tab_previous"):
+		get_viewport().set_input_as_handled()
 		_tabs.select_previous_available()
 	elif event.is_action_pressed(&"app_back"):
 		# Handled first: going back may leave the scene, and its viewport with it.
 		get_viewport().set_input_as_handled()
 		_go_back()
-		return
-	else:
-		return
-	get_viewport().set_input_as_handled()
 
 
 func _on_tabs_tab_changed(_tab: int) -> void:
@@ -64,7 +62,7 @@ func _on_clock_timeout() -> void:
 	if _ticks % _BATTERY_EVERY_TICKS == 0:
 		var battery := Android.battery()
 		_battery = ("battery %d %%" % battery.level_percent if battery.has_level else "battery ?") \
-				+ (" (charging)" if battery.charging else "")
+				+ (" (plugged in)" if battery.plugged else "")
 	_ticks += 1
 	var time := Time.get_time_string_from_system().left(5)
 	_status.text = "%s   ·   %s   ·   %d fps" % [time, _battery, Engine.get_frames_per_second()]

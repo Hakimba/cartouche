@@ -24,7 +24,6 @@ var _drawn := []
 
 func _ready() -> void:
 	_material.set_shader_parameter(&"picture", _view.get_texture())
-	_view.msaa_3d = get_viewport().msaa_3d
 	get_window().size_changed.connect(_fit)
 	watch(false)
 
@@ -33,6 +32,8 @@ func _ready() -> void:
 func watch(on: bool) -> void:
 	set_process(on)
 	if on:
+		# The edges' smoothing the user chose may have changed since the last time.
+		_view.msaa_3d = get_viewport().msaa_3d
 		_fit()
 	else:
 		_view.size = Vector2i.ONE

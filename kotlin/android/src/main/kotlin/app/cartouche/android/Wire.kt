@@ -35,6 +35,7 @@ import app.cartouche.core.platforms.MediaType
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
 import app.cartouche.core.settings.ButtonStyle
+import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Settings
 import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.storage.Volume
@@ -291,6 +292,9 @@ internal val FolderDepth.wire: String
             FolderDepth.SUBFOLDERS -> "subfolders"
         }
 
+/** `{"level_percent": int (absent when unknown), "plugged": bool}` */
+internal fun BatteryState.toWire(): Dictionary = dictionary("plugged" to plugged).putSome("level_percent", levelPercent)
+
 internal val ButtonStyle.wire: String
     get() =
         when (this) {
@@ -299,9 +303,18 @@ internal val ButtonStyle.wire: String
             ButtonStyle.PLAYSTATION -> "playstation"
         }
 
-/** `{"first_launch", "button_style"?}`: the style is absent until one is chosen. */
-internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary("first_launch" to firstLaunch)
-    .putSome("button_style", buttonStyle.map { it.wire })
+internal val EdgeSmoothing.wire: String
+    get() =
+        when (this) {
+            EdgeSmoothing.FOUR_TIMES -> "4x"
+            EdgeSmoothing.TWICE -> "2x"
+            EdgeSmoothing.OFF -> "off"
+        }
+
+/** `{"first_launch", "button_style"?, "edge_smoothing"}`: the style is absent until one is chosen. */
+internal fun Settings.toWire(firstLaunch: Boolean): Dictionary =
+    dictionary("first_launch" to firstLaunch, "edge_smoothing" to edgeSmoothing.wire)
+        .putSome("button_style", buttonStyle.map { it.wire })
 
 internal val MediaType.wire: String
     get() =
@@ -364,8 +377,7 @@ internal fun ScanReport.toWire(): Dictionary = dictionary(
 )
 
 internal fun Catalog.toWire(): Dictionary = dictionary(
-    "platforms" to
-        platforms.toWireArray { dictionary("id" to it.id.value, "name" to it.name, "media" to it.profile.media.wire) },
+    "platforms" to platforms.toWireArray { dictionary("id" to it.id.value, "name" to it.name, "media" to it.profile.media.wire) },
     "rejected" to rejected.toWireArray { dictionary("source" to it.source, "detail" to it.message) },
 )
 

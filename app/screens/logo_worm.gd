@@ -14,12 +14,19 @@ const _STEP := 2.0
 @export var turn_s := 27.0
 @export var colour_s := 7.0
 
+## How fast it crawls, from 1 down to 0, still ([Resting]).
+var pace := 1.0:
+	set(value):
+		pace = value
+		set_process(pace > 0.0 and not _ring.is_empty())
+
 ## Points evenly spaced along the edge, [constant _STEP] apart, going round once.
 var _ring := PackedVector2Array()
 var _time := 0.0
 
 
 func _ready() -> void:
+	add_to_group(Resting.PACED)
 	set_process(false)
 
 
@@ -49,11 +56,11 @@ func follow(label: Label) -> void:
 			outer = outline
 	_ring = _evenly_spaced(outer, _STEP)
 	position = label.position
-	set_process(true)
+	set_process(pace > 0.0)
 
 
 func _process(delta: float) -> void:
-	_time += delta
+	_time += delta * pace
 	var count := _ring.size()
 	var head := fposmod(_time / turn_s, 1.0) * count
 	var tail := head + length_part * count

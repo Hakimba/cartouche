@@ -10,9 +10,10 @@ extends Node3D
 ## How far the lid is open, in degrees.
 var lid_degrees := 0.0:
 	set(value):
-		lid_degrees = value
-		if is_node_ready():
+		# Given each frame by the consoles' row: the lid is moved only when it turns.
+		if value != lid_degrees and is_node_ready():
 			_lid.rotation.x = -deg_to_rad(value)
+		lid_degrees = value
 
 var _fade: ModelFade
 
@@ -24,7 +25,7 @@ func _ready() -> void:
 	_lid.position = shape.hinge()
 	spindle.transform = shape.seat()
 	_fade = ModelFade.new(self)
-	lid_degrees = lid_degrees
+	_lid.rotation.x = -deg_to_rad(lid_degrees)
 
 
 ## Where a seated disc's centre is, in the world, its axis (Z) pointing up out of the well.

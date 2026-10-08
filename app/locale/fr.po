@@ -326,3 +326,36 @@ msgstr "à côté de {other}"
 
 msgid "This order could not be kept."
 msgstr "Cet ordre n’a pas pu être gardé."
+
+msgid "Graphics"
+msgstr "Graphismes"
+
+msgid "Which edge smoothing?"
+msgstr "Quel lissage des bords ?"
+
+msgid "This only changes how the edges of discs and consoles are drawn. Less smoothed, they ask less of the graphics card."
+msgstr "Ce choix change seulement le dessin des bords des disques et des consoles. Moins lissés, ils demandent moins de travail à la carte graphique."
+
+msgid "4× (default)"
+msgstr "4× (par défaut)"
+
+msgid "The smoothest edges."
+msgstr "Les bords les plus lisses."
+
+msgid "Slightly sharper edges; a little less work for the graphics card."
+msgstr "Bords un peu plus marqués ; la carte graphique travaille un peu moins."
+
+msgid "Off"
+msgstr "Sans"
+
+msgid "Edges in small steps; much less work for the graphics card."
+msgstr "Bords en petits escaliers ; la carte graphique travaille nettement moins."
+
+msgid "Smoothing 4×"
+msgstr "Lissage 4×"
+
+msgid "Smoothing 2×"
+msgstr "Lissage 2×"
+
+msgid "No smoothing"
+msgstr "Sans lissage"

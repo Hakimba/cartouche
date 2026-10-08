@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Derives app/data/art/<platform>.tsv from the LaunchBox Games Database dump (Metadata.zip).
 
-One line per game: `name<TAB>alternate names<TAB>discs`. Alternate names are
-separated by `|`; discs are `region=file` pairs separated by `;`, the region empty when the database
-names none, the file relative to https://images.launchbox-app.com/. Fan-made images are left out. The first line,
+One line per game: `name<TAB>alternate names<TAB>discs`. Alternate names are separated by `|`;
+discs are `region=file` pairs separated by `;`, the region empty when the database names none, the
+file relative to https://images.launchbox-app.com/. Fan-made images are left out. The first line,
 `# <date>`, is the dump's date: games found in no source are looked up again once it changes.
 
 Usage: dev/launchbox_art.py Metadata.zip "Sony Playstation 2" > app/data/art/ps2.tsv
@@ -14,7 +14,6 @@ import datetime
 import sys
 import xml.etree.ElementTree as ElementTree
 import zipfile
-
 
 
 def clean(text: str) -> str:

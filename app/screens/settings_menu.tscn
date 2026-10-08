@@ -57,6 +57,11 @@ unique_name_in_owner = true
 layout_mode = 2
 label = "Button style"
 
+[node name="Graphics" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 2
+label = "Graphics"
+
 [node name="Gap" type="Control" parent="Panel/Items"]
 custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
@@ -72,3 +77,4 @@ text = "Close"
 
 [connection signal="pressed" from="Panel/Items/Platforms" to="." method="_on_platforms_pressed"]
 [connection signal="pressed" from="Panel/Items/ButtonStyle" to="." method="_on_button_style_pressed"]
+[connection signal="pressed" from="Panel/Items/Graphics" to="." method="_on_graphics_pressed"]

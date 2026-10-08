@@ -37,10 +37,7 @@ func before() -> void:
 ## A device past its first launch with three PS2 games, each with [param variants] (the usual
 ## ones by default), its carousel on the games screen.
 func _on_games(variants: Array[Dictionary] = _variants) -> Array:
-	var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
-	device.first_launch = false
-	device.curtain = true
-	device.consoles = {"ps2": 3}
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	device.variants = variants
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
@@ -79,6 +76,44 @@ func _label(carousel: Carousel) -> Texture2D:
 	var row := carousel._row
 	var place: ShelfRow.Place = row._placed[row.selected_index()]
 	return place.shown._materials[0].get_shader_parameter(&"label_texture")
+
+
+func test_the_light_given_each_frame_goes_to_the_gpu_only_when_it_changes() -> void:
+	var light: OperatingLight = auto_free(OperatingLight.new())
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://carousel/properties/operating_light.gdshader")
+	light.material = material
+	add_child(light)
+	light.look(Vector2(10.0, 20.0), 30.0, 0.5)
+	assert_float(material.get_shader_parameter(&"radius")).is_equal(30.0)
+	assert_bool(light.visible).is_true()
+	# Something else in its place shows that the same light is not sent again.
+	material.set_shader_parameter(&"radius", 99.0)
+	light.look(Vector2(10.0, 20.0), 30.0, 0.5)
+	assert_float(material.get_shader_parameter(&"radius")).is_equal(99.0)
+	light.look(Vector2(10.0, 20.0), 31.0, 0.5)
+	assert_float(material.get_shader_parameter(&"radius")).is_equal(31.0)
+	light.look(Vector2(11.0, 20.0), 31.0, 0.5)
+	assert_vector(material.get_shader_parameter(&"centre")).is_equal(Vector2(11.0, 20.0))
+	light.look(Vector2(11.0, 20.0), 31.0, 0.0)
+	assert_bool(light.visible).is_false()
+
+
+func test_the_callout_pointed_each_frame_draws_its_arrow_again_only_when_it_moves() -> void:
+	var callout: FocusCallout = auto_free(FocusCallout.new())
+	var caption := Label.new()
+	caption.name = "Caption"
+	callout.add_child(caption)
+	add_child(callout)
+	var draws := [0]
+	callout.draw.connect(func() -> void: draws[0] += 1)
+	for frame in 5:
+		callout.point("Name", Vector2(10.0, 20.0), Vector2(40.0, 20.0))
+		await await_idle_frame()
+	assert_int(draws[0]).is_equal(1)
+	callout.point("Name", Vector2(10.0, 20.0), Vector2(41.0, 20.0))
+	await await_idle_frame()
+	assert_int(draws[0]).is_equal(2)
 
 
 func test_X_stages_the_selected_disc_under_the_light_and_B_puts_it_back_in_the_row() -> void:

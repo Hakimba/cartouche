@@ -56,8 +56,7 @@ class ShelvesTest {
                 shelves.shelves.forEach { shelf ->
                     shelf.games shouldContainExactlyInAnyOrder library.games.filter { it.platform == shelf.platform }
                     shelf.games.zipWithNext().forEach { (a, b) ->
-                        readerOrder.compare(SelectedGame.of(a), SelectedGame.of(b)) shouldBeLessThan
-                            0
+                        readerOrder.compare(SelectedGame.of(a), SelectedGame.of(b)) shouldBeLessThan 0
                     }
                 }
             }

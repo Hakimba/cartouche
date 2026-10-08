@@ -5,6 +5,8 @@ import app.cartouche.core.Shipped
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
+import arrow.core.firstOrNone
+import arrow.core.getOrElse
 import arrow.core.singleOrNone
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
@@ -30,6 +32,18 @@ class ArtIndexTest {
 
     /** The index of scan `d<i>.png`. */
     private fun number(file: String) = file.removePrefix("d").removeSuffix(".png").toInt()
+
+    @Test
+    fun `an extract's version is what its first line states after a hash, read without the rest`() = runBlocking<Unit> {
+        val lines = Arb.element("# 2026-09-28", "#2026-10-01 ", "Okage\t\tUSA=o.png", "", "# ", "text")
+        checkAll(Arb.list(lines, 0..4), Arb.element("\n", "\r\n", "\r")) { extract, newLine ->
+            val text = extract.joinToString(newLine)
+            val first = extract.firstOrNone().getOrElse { "" }
+            val stated = if (first.startsWith("#")) Some(ArtVersion(first.removePrefix("#").trim())) else None
+            ArtIndex.versionOf(text) shouldBe stated
+            ArtIndex.parse(text).version shouldBe stated
+        }
+    }
 
     @Test
     fun `a game's scans come closest to its region first`() {

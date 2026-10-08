@@ -32,6 +32,7 @@ import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.raise.either
 import arrow.core.raise.ensure
+import arrow.core.right
 import kotlin.time.TimeSource
 
 internal sealed interface LibraryFailure {
@@ -224,9 +225,9 @@ internal class LibraryService(private val store: LibraryStore, private val selec
         trace("scan") { "${platform.id.value}: $report, of which listing $listed ms" }
         // A folder may hold thousands of files that are not games: the log shows how many, and the first ones.
         scan.ignored.groupBy { it.reason }.forEach { (reason, files) ->
-            trace(
-                "scan",
-            ) { "ignored $reason: ${files.size}, such as ${files.take(IgnoredCount.EXAMPLES).joinToString { it.file.name.value }}" }
+            trace("scan") {
+                "ignored $reason: ${files.size}, such as ${files.take(IgnoredCount.EXAMPLES).joinToString { it.file.name.value }}"
+            }
         }
         scan.skippedFolders.forEach { trace("scan") { "skipped folder ${it.path.value}: ${it.reason}" } }
         scan to report
@@ -240,7 +241,9 @@ internal class LibraryService(private val store: LibraryStore, private val selec
         LaunchChoice(game, index, game.discs[index].file, library().setup(game.platform))
     }
 
-    fun recordLaunch(id: GameId, disc: Int): Either<LibraryFailure, Library> = save(library().withLastDisc(id, disc))
+    /** Records [disc] as the one game [id] starts from next; nothing is written when it already does. */
+    fun recordLaunch(id: GameId, disc: Int): Either<LibraryFailure, Library> =
+        library().withLastDisc(id, disc).let { if (it == library()) it.right() else save(it) }
 
     /** Records which image game [id]'s label shows. */
     fun chooseLabel(id: GameId, label: LabelChoice): Either<LibraryFailure, Library> = either {

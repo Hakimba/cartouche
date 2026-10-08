@@ -50,7 +50,7 @@ public object LibraryFormat {
             ignored.entries.fold(Library(setups, games)) { library, (platform, files) -> library.withIgnored(platform, files) }
     }
 
-    /** Read first, alone, so that a file from another version is reported as such. */
+    /** Read alone when a file is not of this version, so that one from another version is reported as such. */
     @Serializable
     private data class Version(val version: Int)
 
@@ -64,11 +64,13 @@ public object LibraryFormat {
 
     public fun decode(text: String): Either<LibraryError, StoredLibrary> = either {
         fun <T> read(decode: () -> T): T = Either.catch(decode).mapLeft { LibraryError.Unreadable(it.toString()) }.bind()
-        val version = read { lenient.decodeFromString(Version.serializer(), text) }.version
+        // A file of this version, the usual case, is read in one pass; any other goes through its version first.
+        val current = Either.catch { json.decodeFromString(Stored.serializer(), text) }.getOrNone().filter { it.version == VERSION }
+        val version = current.fold({ read { lenient.decodeFromString(Version.serializer(), text) }.version }) { VERSION }
         val library =
             when (version) {
                 1 -> read { lenient.decodeFromString(StoredV1.serializer(), text) }.library.upgraded()
-                VERSION -> read { json.decodeFromString(Stored.serializer(), text) }.library
+                VERSION -> current.fold({ read { json.decodeFromString(Stored.serializer(), text) } }) { it }.library
                 else -> raise(LibraryError.UnsupportedVersion(version))
             }
         // A hand-edited file may point past a game's discs: launches then start from the first one.

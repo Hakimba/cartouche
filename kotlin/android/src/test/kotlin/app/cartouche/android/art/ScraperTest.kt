@@ -158,7 +158,7 @@ class ScraperTest {
                     .values
                     .forEach { it.sum() shouldBeLessThanOrEqual 1 }
                 val all = requests(held, held.size)
-                val absent = all.filter(store::isAbsent).map { it.game }.toSet()
+                val absent = all.filter { store.isAbsent(it.game, it.version) }.map { it.game }.toSet()
                 // At the next start, only the games neither stored nor absent are looked for.
                 val restarted = FakeFetch(emptyMap())
                 Scraper(ArtStore(folder), restarted, scope) { _, _ -> }.lookFor(all)
@@ -222,7 +222,7 @@ class ScraperTest {
         harness.scope.runCurrent()
         fetch.asked.drop(1).first() shouldBe url(0, 0)
         store.stored(GameId("ps2/0")).shouldBeSome()
-        (store.isAbsent(requests(listOf(listOf(Held.NOTHING, Held.IMAGE)), 1).single())) shouldBe false
+        requests(listOf(listOf(Held.NOTHING, Held.IMAGE)), 1).single().let { store.isAbsent(it.game, it.version) } shouldBe false
     }
 
     @Test
@@ -269,7 +269,7 @@ class ScraperTest {
         harness.scraper.lookFor(request)
         harness.scope.runCurrent()
         harness.last.stall shouldBe Some(Stall.STORAGE)
-        store.isAbsent(request.single()) shouldBe false
+        request.single().let { store.isAbsent(it.game, it.version) } shouldBe false
     }
 
     @Test

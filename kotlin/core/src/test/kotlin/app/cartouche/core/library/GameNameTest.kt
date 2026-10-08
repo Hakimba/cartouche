@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.library
 
+import app.cartouche.core.Shipped
 import arrow.core.None
 import arrow.core.Some
+import arrow.core.getOrElse
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
@@ -36,6 +39,13 @@ class GameNameTest {
         GameName.parse("Dr. Muto (Europe)").key shouldBe GameName.parse("DR MUTO").key
         GameName.parse("Pokémon").key shouldBe GameName.parse("Pokemon").key
         GameName.parse("Let's Ansatsu!_ Nerawareta").key shouldBe GameName.parse("Let's Ansatsu! Nerawareta").key
+    }
+
+    @Test
+    fun `a name is filed from its title alone under the keys its whole reading has`() = runBlocking<Unit> {
+        fun filedAsRead(text: String) = GameName.parse(text).let { GameName.Filing(it.key, it.mainKey.getOrElse { it.key }) }
+        Shipped.text("redump/ps2.tsv").lines().map { it.substringBefore('\t') }.forEach { GameName.filing(it) shouldBe filedAsRead(it) }
+        checkAll(Arb.choice(fileNames, Arb.string())) { text -> GameName.filing(text) shouldBe filedAsRead(text) }
     }
 
     @Test

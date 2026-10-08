@@ -217,7 +217,6 @@ static func stand(random: RandomNumberGenerator) -> Transform3D:
 	return Transform3D(turned.scaled_local(scale), origin)
 
 
-## Disc scans kept in memory by title, ready at once; none unless given.
 ## The carousel of the demo library, shown on its consoles screen in [param suite], moved on by the
 ## test itself (see [method step_frame]).
 static func shown_carousel(suite: GdUnitTestSuite) -> Carousel:
@@ -237,6 +236,7 @@ static func shown_carousel(suite: GdUnitTestSuite) -> Carousel:
 	row.set_process(false)
 	carousel.set_process(false)
 	carousel._consoles.set_process(false)
+	carousel._resting.set_process(false)
 	return carousel
 
 
@@ -279,6 +279,7 @@ static func button(action: StringName, pressed: bool) -> InputEventAction:
 	return event
 
 
+## Disc scans kept in memory by title, ready at once; none unless given.
 class FakeArt extends GameArt:
 	var _images: Dictionary[String, Texture2D]
 
@@ -334,6 +335,19 @@ class FakeAndroid extends AndroidServices:
 			if request not in silent:
 				break
 		return AndroidServices.Result.new({"ok": true} if code.is_empty() else {"ok": false, "code": code, "detail": "fake"})
+
+
+## Counts the transforms its parent passes on to it, the same one set again included: what a
+## transform set costs every part of a model. Heard once the frame's notifications are sent.
+class TransformProbe extends Node3D:
+	var heard := 0
+
+	func _init() -> void:
+		set_notify_transform(true)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_TRANSFORM_CHANGED:
+			heard += 1
 
 
 ## The centre of a box of [param size] that [param random] puts anywhere within [param room], a

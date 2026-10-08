@@ -28,9 +28,25 @@ public enum class ButtonStyle {
     PLAYSTATION,
 }
 
+/** How smooth the 3D's edges are drawn (multisample antialiasing); less asks less of the graphics card. */
+@Serializable
+public enum class EdgeSmoothing {
+    @SerialName("4x")
+    FOUR_TIMES,
+
+    @SerialName("2x")
+    TWICE,
+
+    @SerialName("off")
+    OFF,
+}
+
 /** The app's own settings, apart from the library. */
 @Serializable
-public data class Settings(public val buttonStyle: Option<ButtonStyle> = None) {
+public data class Settings(
+    public val buttonStyle: Option<ButtonStyle> = None,
+    public val edgeSmoothing: EdgeSmoothing = EdgeSmoothing.FOUR_TIMES,
+) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An
      * app updated from a build without settings, already set up, does not see it again.

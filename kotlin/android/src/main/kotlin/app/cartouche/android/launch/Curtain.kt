@@ -89,20 +89,14 @@ internal class Curtain(private val context: Context, private val scope: Coroutin
                     .getOrElse { raise(CurtainRefused("no main display")) }
             val window = context.createDisplayContext(display).createWindowContext(LayoutParams.TYPE_APPLICATION_OVERLAY, null)
             val manager =
-                window
-                    .getSystemService(
-                        WindowManager::class.java,
-                    ).toOption()
-                    .getOrElse { raise(CurtainRefused("no window manager")) }
+                window.getSystemService(WindowManager::class.java).toOption().getOrElse { raise(CurtainRefused("no window manager")) }
             val view = View(window).apply { setBackgroundColor(Color.BLACK) }
             manager.addView(view, layout())
             manager to view
         }) { e: RuntimeException ->
             when (e) {
                 is WindowManager.BadTokenException, is SecurityException, is UnsupportedOperationException ->
-                    raise(
-                        CurtainRefused(e.toString()),
-                    )
+                    raise(CurtainRefused(e.toString()))
                 else -> throw e
             }
         }

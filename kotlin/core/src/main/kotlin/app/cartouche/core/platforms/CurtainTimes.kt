@@ -8,6 +8,7 @@ import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.raise.either
 import arrow.core.raise.ensure
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,7 +36,7 @@ public class CurtainTimes private constructor(private val default: Duration, pri
          * Reads `{"default_ms": time, "emulators": {package name: time}}`, times in milliseconds from
          * zero to [LONGEST].
          */
-        @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+        @OptIn(ExperimentalSerializationApi::class)
         public fun parse(source: DefinitionSource): Either<CatalogError, CurtainTimes> = either {
             val file =
                 Either
@@ -49,17 +50,14 @@ public class CurtainTimes private constructor(private val default: Duration, pri
                     }.bind()
 
             fun time(key: String, millis: Long): Duration = millis.milliseconds.also {
-                ensure(
-                    it in Duration.ZERO..LONGEST,
-                ) { CatalogError.InvalidValue(source.name, key, "$millis ms is not between 0 and $LONGEST") }
+                ensure(it in Duration.ZERO..LONGEST) {
+                    CatalogError.InvalidValue(source.name, key, "$millis ms is not between 0 and $LONGEST")
+                }
             }
             val emulators =
                 file.emulators.entries.associate { (name, millis) ->
                     val emulator =
-                        PackageName
-                            .parse(
-                                name,
-                            ).getOrElse { raise(CatalogError.InvalidValue(source.name, name, "not a package name")) }
+                        PackageName.parse(name).getOrElse { raise(CatalogError.InvalidValue(source.name, name, "not a package name")) }
                     emulator to time(name, millis)
                 }
             CurtainTimes(time("default_ms", file.defaultMs), emulators)

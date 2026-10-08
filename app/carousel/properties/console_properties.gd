@@ -23,8 +23,8 @@ const _CAPTION_AWAY := 70.0
 const _CAPTION_ROOM := 40.0
 
 ## Where the console stands and how the light falls on it: in the row; on its properties, a little
-## higher, clear of its name, the room half dark round a pool of light 440 pixels wide; with its name's keyboard, risen
-## 3.6 cm and smaller.
+## higher, clear of its name, the room half dark round a pool of light 440 pixels wide; with its
+## name's keyboard, risen 3.6 cm and smaller.
 static var _in_row := Staging.new(0.0, 0.0, 1.0, 0.0, 440.0)
 static var _on_properties := Staging.new(1.0, 0.12, 1.0, 0.5, 440.0)
 static var _on_naming := Staging.new(1.0, 0.36, 0.65, 0.35, 240.0)
@@ -42,6 +42,9 @@ var _platform_id := ""
 ## The name the console shows, and its own.
 var _shown := ""
 var _own := ""
+## The caption measured last, and how wide it is with its arrow's room: not measured each frame.
+var _measured := ""
+var _wide := 0.0
 
 @onready var _change_place: Button = %ChangePlace
 
@@ -63,12 +66,14 @@ func _process(_delta: float) -> void:
 		var box := _name.get_rect()
 		var middle := box.position.y + box.size.y / 2.0
 		var caption := tr("Console name")
-		var wide := _callout.get_theme_font(&"font").get_string_size(caption).x + _CAPTION_ROOM
+		if caption != _measured:
+			_measured = caption
+			_wide = _callout.get_theme_font(&"font").get_string_size(caption).x + _CAPTION_ROOM
 		# Right of the name while there is room, else above its end, as a game's name has it.
-		if box.end.x + _CAPTION_AWAY + wide <= size.x:
+		if box.end.x + _CAPTION_AWAY + _wide <= size.x:
 			_callout.point(caption, Vector2(box.end.x + _CAPTION_AWAY, middle), Vector2(box.end.x + 14.0, middle))
 		else:
-			var at := Vector2(box.end.x - wide, box.position.y - _CAPTION_AWAY)
+			var at := Vector2(box.end.x - _wide, box.position.y - _CAPTION_AWAY)
 			_callout.point(caption, at, Vector2(box.end.x - 30.0, box.position.y - 10.0))
 	else:
 		_callout.clear()

@@ -16,9 +16,8 @@ object Shipped {
 
     val definitions: List<DefinitionSource> =
         File(data, "platforms/daijishou")
-            .listFiles { file ->
-                file.extension == "json"
-            }.orEmpty()
+            .listFiles { file -> file.extension == "json" }
+            .orEmpty()
             .map { DefinitionSource(it.name, it.readText()) }
 
     val profiles = DefinitionSource("profiles.json", text("platforms/profiles.json"))

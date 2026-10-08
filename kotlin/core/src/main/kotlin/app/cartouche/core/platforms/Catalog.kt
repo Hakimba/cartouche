@@ -182,8 +182,9 @@ public sealed interface CatalogError {
  * profiles ([PlatformProfile]). Adding a platform takes data only: a definition and a profile.
  *
  * A broken or duplicate player is rejected on its own and the rest of its platform is kept; a broken
- * or duplicate platform file, or one without a profile, is rejected whole. Every rejection is kept in [rejected]: bad data is visible, never
- * silently missing. Hidden files are never offered to a player, whatever the patterns say.
+ * or duplicate platform file, or one without a profile, is rejected whole. Every rejection is kept
+ * in [rejected]: bad data is visible, never silently missing. Hidden files are never offered to a
+ * player, whatever the patterns say.
  */
 public data class Catalog(public val platforms: List<Platform> = emptyList(), public val rejected: List<CatalogError> = emptyList()) {
     private val all: List<Candidate> get() = platforms.flatMap { platform -> platform.players.map { Candidate(platform, it) } }

@@ -5,8 +5,11 @@ const Fixtures := preload("res://test/carousel/fixtures.gd")
 const DEMO := "res://dev/demo/desktop.json"
 const PS2 := preload("res://carousel/consoles/ps2_slim.tscn")
 const MOVING: Array[Carousel.Screen] = [Carousel.Screen.ENTERING, Carousel.Screen.LEAVING]
-## Turns of this size or more show a turn happened.
-const TURNED := 0.0001
+
+
+func after_test() -> void:
+	for action: StringName in [&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down"]:
+		Input.action_release(action)
 
 
 func test_INV_E5_01_INV_E5_02_the_stick_turns_the_console_on_the_consoles_screen_the_disc_on_the_games_screen_and_nothing_else() -> void:
@@ -289,6 +292,241 @@ func test_the_consoles_are_drawn_in_one_view_the_blurred_one_once_behind_the_gam
 	assert_int(blurred).is_greater(0)
 
 
+func test_behind_the_games_the_consoles_stand_still_and_their_view_is_drawn_again_only_when_they_move() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	# The PS2's animation draws the consoles behind the games.
+	var ps2 := carousel._platform_ids().find("ps2")
+	assert_int(ps2).is_not_negative()
+	_select(carousel, ps2)
+	Fixtures.press(carousel, &"ui_accept")
+	_until(carousel, Carousel.Screen.GAMES)
+	var consoles := carousel._consoles
+	var selected := consoles.selected().model
+	var stood := selected.transform
+	var view := carousel._sequence.layer.view
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	# Arranged each frame, a pose would sway it: nothing arranges it there but the animation, nor
+	# draws its view again.
+	consoles.pose_amount = 1.0
+	Fixtures.step_frames(carousel, 30)
+	assert_bool(selected.transform == stood).is_true()
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
+	# Taken away on the games screen, brought back for a launch: their view is not drawn again for an
+	# opacity, only as they show again once gone.
+	carousel._sequence.behind_amount = 1.0
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	carousel._sequence.behind_amount = 0.5
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
+	view.render_target_update_mode = SubViewport.UPDATE_ONCE
+	carousel._sequence.behind_amount = 0.0
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
+	carousel._sequence.behind_amount = 0.5
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	carousel._sequence.show_games()
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	# Back in front, the consoles are arranged each frame again.
+	Fixtures.press(carousel, &"screen_back")
+	_until(carousel, Carousel.Screen.CONSOLES)
+	consoles.pose_amount = 1.0
+	stood = selected.transform
+	Fixtures.step_frames(carousel, 30)
+	assert_bool(selected.transform == stood).is_false()
+
+
+func test_on_the_games_screen_the_consoles_behind_fade_out_back_in_to_go_out_or_for_a_launch() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	_select(carousel, carousel._platform_ids().find("ps2"))
+	var sequence := carousel._sequence
+	Fixtures.press(carousel, &"ui_accept")
+	for frame in 600:
+		# Going in, they show as the animation has them.
+		assert_float(sequence.behind_amount).is_equal(1.0)
+		Fixtures.step_frame(carousel)
+		if carousel._screen == Carousel.Screen.GAMES:
+			break
+	assert_bool(sequence.layer.visible).is_true()
+	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
+	assert_float(sequence.behind_amount).is_equal(0.0)
+	assert_bool(sequence.layer.visible).is_false()
+	# Going out, they come back as the animation brings them in front, in 0.3 s.
+	Fixtures.press(carousel, &"screen_back")
+	Fixtures.step_frame(carousel)
+	assert_float(sequence.behind_amount).is_equal_approx(Fixtures.FRAME_S / 0.3, 1e-6)
+	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
+	assert_float(sequence.behind_amount).is_equal(1.0)
+	_until(carousel, Carousel.Screen.CONSOLES)
+	# A launch brings them back too, the console taking the disc.
+	Fixtures.press(carousel, &"ui_accept")
+	_until(carousel, Carousel.Screen.GAMES)
+	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
+	Fixtures.press(carousel, &"ui_accept")
+	assert_bool(carousel._game_launch.is_busy()).is_true()
+	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
+	assert_float(sequence.behind_amount).is_equal(1.0)
+
+
+func test_the_game_s_properties_keep_the_consoles_behind_away() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	_select(carousel, carousel._platform_ids().find("ps2"))
+	Fixtures.press(carousel, &"ui_accept")
+	_until(carousel, Carousel.Screen.GAMES)
+	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
+	Fixtures.press(carousel, &"open_properties")
+	assert_int(carousel._screen).is_equal(Carousel.Screen.PROPERTIES)
+	for frame in 60:
+		Fixtures.step_frame(carousel)
+		assert_float(carousel._sequence.behind_amount).is_equal(0.0)
+		assert_bool(carousel._sequence.layer.visible).is_false()
+
+
+func test_the_consoles_behind_stay_away_while_a_launch_is_checked_and_as_the_carousel_shows_after_the_game() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
+	carousel._game_launch.android = android
+	_select(carousel, carousel._platform_ids().find("ps2"))
+	var sequence := carousel._sequence
+	Fixtures.press(carousel, &"ui_accept")
+	_until(carousel, Carousel.Screen.GAMES)
+	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
+	# Refused once checked, late: nothing of them shows meanwhile.
+	android.check_code = &"not_installed"
+	android.late = true
+	Fixtures.press(carousel, &"ui_accept")
+	assert_bool(carousel._game_launch.is_busy()).is_true()
+	for frame in 30:
+		Fixtures.step_frame(carousel)
+		assert_float(sequence.behind_amount).is_equal(0.0)
+	android.late = false
+	android.replied.emit()
+	assert_bool(carousel._game_launch.is_busy()).is_false()
+	# A game that starts: they come back as it goes into the console, and are gone at once as the
+	# carousel shows after it.
+	android.check_code = &""
+	Fixtures.press(carousel, &"ui_accept")
+	for frame in 600:
+		Fixtures.step_frame(carousel)
+		if carousel._game_launch._stage == GameLaunch.Stage.AWAY:
+			break
+	assert_float(sequence.behind_amount).is_equal(1.0)
+	carousel._game_launch.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
+	carousel._game_launch.notification(Node.NOTIFICATION_APPLICATION_RESUMED)
+	Fixtures.step_frame(carousel)
+	assert_float(sequence.behind_amount).is_equal(0.0)
+	assert_bool(sequence.layer.visible).is_false()
+
+
+func test_at_rest_the_consoles_stop_floating_and_swaying() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	var consoles := carousel._consoles
+	var selected := consoles.selected().model
+	consoles.pose_amount = 1.0
+	Fixtures.step_frames(carousel, 30)
+	consoles.pace = 0.0
+	var stood := selected.transform
+	var moved_s := consoles._pose_s
+	Fixtures.step_frames(carousel, 120)
+	assert_bool(selected.transform == stood).is_true()
+	assert_float(consoles._pose_s).is_equal(moved_s)
+	# Woken, it goes on from there, without a jump.
+	consoles.pace = 1.0
+	Fixtures.step_frames(carousel, 30)
+	assert_bool(selected.transform == stood).is_false()
+	assert_float(consoles._pose_s).is_equal_approx(moved_s + 30 * Fixtures.FRAME_S, 1e-6)
+
+
+func test_going_in_a_launch_checked_late_and_going_out_keep_the_app_awake() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
+	carousel._game_launch.android = android
+	var resting := carousel._resting
+	var awake_fps := Engine.max_fps
+	# Each frame, the rest node too, as the engine runs it: never slowed meanwhile.
+	var awake_until := func(done: Callable) -> void:
+		for frame in 600:
+			assert_bool(resting.moving.call()).is_true()
+			Fixtures.step_frame(carousel)
+			resting._process(Fixtures.FRAME_S)
+			assert_float(resting.pace).is_equal(1.0)
+			assert_int(Engine.max_fps).is_equal(awake_fps)
+			if done.call():
+				break
+	_select(carousel, carousel._platform_ids().find("ps2"))
+	assert_bool(resting.moving.call()).is_false()
+	Fixtures.press(carousel, &"ui_accept")
+	awake_until.call(func() -> bool: return carousel._screen == Carousel.Screen.GAMES)
+	assert_bool(resting.moving.call()).is_false()
+	android.late = true
+	Fixtures.press(carousel, &"ui_accept")
+	# The check, answered late (longer than the rest takes to slow), then the insertion.
+	var waited := [0]
+	awake_until.call(func() -> bool:
+		waited[0] += 1
+		if waited[0] == 200:
+			android.late = false
+			android.replied.emit()
+		return carousel._game_launch._stage == GameLaunch.Stage.AWAY)
+	carousel._game_launch.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
+	carousel._game_launch.notification(Node.NOTIFICATION_APPLICATION_RESUMED)
+	awake_until.call(func() -> bool: return not carousel._game_launch.is_busy())
+	assert_bool(resting.moving.call()).is_false()
+	Fixtures.press(carousel, &"screen_back")
+	awake_until.call(func() -> bool: return carousel._screen == Carousel.Screen.CONSOLES)
+	assert_bool(resting.moving.call()).is_false()
+
+
+func test_behind_the_games_a_console_its_animation_moves_stands_each_frame_where_the_clock_has_it() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	# Drawn by its medium, a console sways and floats as it fades behind the games, turning back too.
+	var medium := carousel._shelves.find_custom(func(shelf: AndroidServices.Shelf) -> bool:
+		return shelf.platform_id not in carousel._appearance.consoles)
+	assert_int(medium).is_not_negative()
+	_select(carousel, medium)
+	var consoles := carousel._consoles
+	var selected := consoles.selected().model
+	consoles.touch_turn(Vector2(300.0, 0.0))
+	consoles.let_go()
+	var behind := 0
+	var ways: Dictionary[StringName, Carousel.Screen] = {
+		&"ui_accept": Carousel.Screen.GAMES, &"screen_back": Carousel.Screen.CONSOLES}
+	for way in ways:
+		Fixtures.press(carousel, way)
+		for frame in 600:
+			if carousel._screen == ways[way]:
+				break
+			Fixtures.step_frame(carousel)
+			if consoles.behind:
+				behind += 1
+				var stood := selected.transform
+				consoles.arrange()
+				assert_bool(selected.transform == stood).is_true()
+		assert_int(carousel._screen).is_equal(ways[way])
+	assert_int(behind).is_greater(10)
+
+
+func test_at_rest_a_console_standing_still_is_not_placed_again_and_its_parts_hear_nothing() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	var consoles := carousel._consoles
+	Fixtures.step_frames(carousel, 60)
+	# Beside the selected console, one stands still; the selected one sways, as a guard that probes
+	# do hear.
+	var beside := 1 if consoles.selected_index() == 0 else consoles.selected_index() - 1
+	assert_bool(consoles._items[beside].model.visible).is_true()
+	var still: Fixtures.TransformProbe = auto_free(Fixtures.TransformProbe.new())
+	var swaying: Fixtures.TransformProbe = auto_free(Fixtures.TransformProbe.new())
+	consoles._items[beside].model.add_child(still)
+	consoles.selected().model.add_child(swaying)
+	await await_idle_frame()
+	still.heard = 0
+	swaying.heard = 0
+	for frame in 10:
+		Fixtures.step_frame(carousel)
+		await await_idle_frame()
+	assert_int(still.heard).is_equal(0)
+	assert_int(swaying.heard).is_equal(10)
+
+
 func test_the_pill_names_the_game_over_the_games_and_never_shows_over_the_consoles() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	for index in carousel._consoles._items.size():
@@ -346,11 +584,6 @@ func test_INV_E5_01_a_console_chosen_as_the_row_still_moves_goes_in_from_the_mid
 	assert_int(consoles.selected_index()).is_equal(1)
 	var shown := CarouselLayout.offsets(consoles._items.size(), consoles._scroll)
 	assert_float(shown[1]).is_equal(0.0)
-
-
-func after_test() -> void:
-	for action: StringName in [&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down"]:
-		Input.action_release(action)
 
 
 ## A random input, now and then: the stick, a direction, A, B.

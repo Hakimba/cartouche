@@ -97,7 +97,7 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 		if launch._stage not in stages:
 			stages.append(launch._stage)
 			if launch._stage == GameLaunch.Stage.INSERTING:
-				# From where the game stood as the insertion started, as_it_was its first frame.
+				# From where the game stood as the insertion started, before its first frame.
 				assert_bool(launch._start.is_equal_approx(stood)).is_true()
 				# Into the console for the platform that has a launch animation.
 				assert_bool(launch._into_console).is_equal(carousel._shelves[shelf].platform_id == "ps2")
@@ -173,7 +173,7 @@ func _leave_or_come_back(launch: GameLaunch, outcome: Outcome, random: RandomNum
 		_leave_and_come_back(launch)
 	if outcome == Outcome.AWAY_AND_BACK and launch._stage == GameLaunch.Stage.AWAY and random.randf() < 0.05:
 		_leave_and_come_back(launch)
-	# Some time away, the screen still black, as_it_was coming back.
+	# Some time away, the screen still black, before coming back.
 	if outcome == Outcome.LEFT_BEFORE_THE_ANSWER and launch._stage == GameLaunch.Stage.AWAY_LEFT and random.randf() < 0.1:
 		launch.notification(Node.NOTIFICATION_APPLICATION_RESUMED)
 
@@ -278,7 +278,6 @@ func _assert_nothing_shown(carousel: Carousel, as_it_was: Dictionary[CanvasItem,
 		assert_float(control.modulate.a).is_equal(as_it_was[control])
 
 
-
 ## Once seated, the game is on its console's spindle.
 func _assert_on_the_console_spindle(carousel: Carousel) -> void:
 	var row := carousel._row
@@ -331,7 +330,7 @@ func _assert_black(launch: GameLaunch) -> void:
 		assert_float(radius).is_greater_equal(corner.distance_to(centre) - 0.001)
 
 
-## The selected game where the row places it again (it may still be finishing a move begun as_it_was
+## The selected game where the row places it again (it may still be finishing a move begun before
 ## A), unturned and faded as laid out; the controls as [param as_it_was]; no spindle, no black.
 func _assert_as_before_the_launch(carousel: Carousel, as_it_was: Dictionary[CanvasItem, float]) -> void:
 	var row := carousel._row

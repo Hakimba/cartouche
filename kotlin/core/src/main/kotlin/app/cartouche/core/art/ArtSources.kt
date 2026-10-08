@@ -2,7 +2,9 @@
 package app.cartouche.core.art
 
 import app.cartouche.core.library.Game
+import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LabelChoice
+import app.cartouche.core.platforms.PlatformId
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.toNonEmptyListOrNone
@@ -36,5 +38,20 @@ public class ArtSources(private val index: ArtIndex, private val bySerial: Optio
     private fun chosen(game: Game): List<ArtUrl> = when (val label = game.label) {
         LabelChoice.Automatic, LabelChoice.Own -> emptyList()
         is LabelChoice.Region -> variantsOf(game).filter { it.region == label.region }.map { it.url }
+    }
+
+    public companion object {
+        /**
+         * Where to look for the art of [games] that still want it in their sources' version ([wants],
+         * told what [versionOf] their platform's extract states), in their order, each from its
+         * platform's [sources], asked for only for those games: when none wants art, as at most
+         * starts, no extract is indexed.
+         */
+        public fun requests(
+            games: List<Game>,
+            wants: (GameId, Option<ArtVersion>) -> Boolean,
+            versionOf: (PlatformId) -> Option<ArtVersion>,
+            sources: (PlatformId) -> ArtSources,
+        ): List<ArtRequest> = games.filter { wants(it.id, versionOf(it.platform)) }.flatMap { sources(it.platform).requestFor(it).toList() }
     }
 }

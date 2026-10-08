@@ -72,3 +72,10 @@ func test_images_read_together_reach_the_gpu_one_a_frame() -> void:
 		var frame: int = _told[i][2]
 		var previous: int = _told[i - 1][2]
 		assert_int(frame).is_greater(previous)
+
+
+func test_an_image_of_three_byte_colours_reaches_the_gpu_in_four() -> void:
+	_reader.request("rgb", _image("rgb.png", 8), "rgb")
+	await _idle()
+	var texture: ImageTexture = _told[0][1]
+	assert_int(texture.get_format()).is_equal(Image.FORMAT_RGBA8)

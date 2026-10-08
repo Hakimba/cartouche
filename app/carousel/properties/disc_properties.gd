@@ -3,14 +3,14 @@ class_name DiscProperties
 extends PropertiesScreen
 ## The properties of the selected game. Its disc leaves the row for the middle of the screen, still
 ## and facing the camera, under the light of an operating table ([OperatingLight]), while the other
-## discs and the console behind fade out; up and down go from one part of it to the other (its
-## label, its name), the one with the focus outlined in black and named by a callout. A on the label opens the images it can show,
-## one per region the art sources have, the closest to the game's own first: the disc shows the one
-## with the focus at once, A keeps it, B goes back without changing it. The last card opens the
-## system's picker on the user's own pictures: the one picked shows on the disc, to be framed with
-## the stick (moving it) and L1 / R1 (zooming), then A keeps it, B goes back to the cards. A on the
-## name opens a keyboard played with the stick: X erases, Y types a space, Start keeps the name (blank,
-## the game's own title comes back), B goes back without changing it. B goes back to the row.
+## discs fade out; up and down go from one part of it to the other (its label, its name), the one
+## with the focus outlined in black and named by a callout. A on the label opens the images it can
+## show, one per region the art sources have, the closest to the game's own first: the disc shows
+## the one with the focus at once, A keeps it, B goes back without changing it. The last card opens
+## the system's picker on the user's own pictures: the one picked shows on the disc, to be framed
+## with the stick (moving it) and L1 / R1 (zooming), then A keeps it, B goes back to the cards. A on
+## the name opens a keyboard played with the stick: X erases, Y types a space, Start keeps the name
+## (blank, the game's own title comes back), B goes back without changing it. B goes back to the row.
 ## By touch, a tap on the label, the name, a card or a key does what A does; the picture being
 ## framed follows a finger dragged over it, and a pinch zooms it.
 
@@ -57,7 +57,6 @@ static var _framing_left := Move.new(Leave.FADE, 0.15, 0.4, Arrive.FADE, 0.2, 0.
 
 ## Set by the carousel before the first [method open].
 var row: ShelfRow
-var sequence: ConsoleSequence
 var art: GameArt
 
 var _step := Step.CLOSED
@@ -118,20 +117,6 @@ func _process(delta: float) -> void:
 	_point_at_focus(centre, _zone.size.x / 2.0)
 
 
-## Says what the focus is on: the label, round the disc of [param ring] pixels round [param centre],
-## or the name.
-func _point_at_focus(centre: Vector2, ring: float) -> void:
-	if _zone.has_focus():
-		var rim := centre + Vector2.from_angle(_RIM_ANGLE) * (ring + 10.0)
-		_callout.point(tr("Label image"), Vector2(centre.x + ring + _CAPTION_AWAY, rim.y - _CAPTION_AWAY), rim)
-	elif _name.has_focus():
-		var name_box := _name.get_rect()
-		var at := Vector2(maxf(name_box.end.x - 140.0, centre.x + ring + _CAPTION_AWAY), name_box.position.y - _CAPTION_AWAY)
-		_callout.point(tr("Game name"), at, Vector2(minf(name_box.end.x - 30.0, at.x), name_box.position.y - 10.0))
-	else:
-		_callout.clear()
-
-
 func _unhandled_input(event: InputEvent) -> void:
 	if _step == Step.CLOSED or event.is_echo():
 		return
@@ -161,6 +146,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close()
 
 
+# Pinching zooms the picture being framed. Godot hands the same pinch over twice in a frame: only
+# the first counts.
+func _input(event: InputEvent) -> void:
+	var pinch := event as InputEventMagnifyGesture
+	if pinch and _step == Step.FRAMING and not _busy:
+		get_viewport().set_input_as_handled()
+		var seen := [Engine.get_process_frames(), pinch.position, pinch.factor]
+		if seen == _pinched:
+			return
+		_pinched = seen
+		_framing.zoom_by(pinch.factor, _picture.size)
+		row.preview_label(_picture_texture, _framing.window(_picture.size))
+
+
 ## Whether the properties show, or are coming or going.
 func is_open() -> bool:
 	return _step != Step.CLOSED or _busy
@@ -179,6 +178,20 @@ func open() -> void:
 	set_process(true)
 	await _move(behind, [_properties, _zone], _on_properties, _opening)
 	_zone.grab_focus()
+
+
+## Says what the focus is on: the label, round the disc of [param ring] pixels round [param centre],
+## or the name.
+func _point_at_focus(centre: Vector2, ring: float) -> void:
+	if _zone.has_focus():
+		var rim := centre + Vector2.from_angle(_RIM_ANGLE) * (ring + 10.0)
+		_callout.point(tr("Label image"), Vector2(centre.x + ring + _CAPTION_AWAY, rim.y - _CAPTION_AWAY), rim)
+	elif _name.has_focus():
+		var name_box := _name.get_rect()
+		var at := Vector2(maxf(name_box.end.x - 140.0, centre.x + ring + _CAPTION_AWAY), name_box.position.y - _CAPTION_AWAY)
+		_callout.point(tr("Game name"), at, Vector2(minf(name_box.end.x - 30.0, at.x), name_box.position.y - 10.0))
+	else:
+		_callout.clear()
 
 
 func _close() -> void:
@@ -475,7 +488,6 @@ func _place() -> void:
 	row.neighbours = 1.0 - _staging.amount
 	var centre := row.to_local(Vector3(0.0, _staging.height, row.global_position.z))
 	row.staged = Transform3D(Basis.from_scale(Vector3.ONE * _staging.size), centre)
-	sequence.fade_behind(1.0 - _staging.amount)
 
 
 func _on_zone_input(event: InputEvent) -> void:
@@ -495,18 +507,4 @@ func _on_framing_input(event: InputEvent) -> void:
 	if dragged and not _busy:
 		_framing_screen.accept_event()
 		_framing.move(-_finger.moved / _label_px, _picture.size)
-		row.preview_label(_picture_texture, _framing.window(_picture.size))
-
-
-# Pinching zooms the picture being framed. Godot hands the same pinch over twice in a frame: only
-# the first counts.
-func _input(event: InputEvent) -> void:
-	var pinch := event as InputEventMagnifyGesture
-	if pinch and _step == Step.FRAMING and not _busy:
-		get_viewport().set_input_as_handled()
-		var seen := [Engine.get_process_frames(), pinch.position, pinch.factor]
-		if seen == _pinched:
-			return
-		_pinched = seen
-		_framing.zoom_by(pinch.factor, _picture.size)
 		row.preview_label(_picture_texture, _framing.window(_picture.size))

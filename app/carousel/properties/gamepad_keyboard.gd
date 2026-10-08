@@ -2,9 +2,10 @@
 class_name GamepadKeyboard
 extends VBoxContainer
 ## A keyboard played with the stick or the d-pad, A typing the key with the focus: digits, letters
-## in the French order, accents and a few signs, then Shift, Space, Erase and OK. A capital comes first and after
-## each space, as names are written; Shift turns the next letter the other way. Its keys are made
-## when it is first needed ([method build]): some 15 ms on a handheld, not to be paid at every start.
+## in the French order, accents and a few signs, then Shift, Space, Erase and OK. A capital comes
+## first and after each space, as names are written; Shift turns the next letter the other way. Its
+## keys are made when it is first needed ([method build]): some 15 ms on a handheld, not to be paid
+## at every start.
 
 ## [param character] typed: a letter, a digit, a sign or a space.
 signal typed(character: String)

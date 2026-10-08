@@ -4,7 +4,8 @@ extends TextureRect
 ## The consoles drawn apart, behind the games, blurred, faded and greyed as the launch animation has
 ## them, so that the games stay readable over them. They are drawn here only while they are behind;
 ## otherwise in the carousel's own view, where a game can go into them. Behind the games they stand
-## still, as the steps have them: the view is drawn again only when the animation moves them.
+## still, as the steps have them: the view is drawn again only when the animation moves them, not
+## when only their opacity changes.
 
 ## The render layers the consoles are drawn in: in front, then behind the games, where only this
 ## view's camera sees them (the carousel's leaves layer 2 out).
@@ -22,6 +23,7 @@ const _RESOLUTION := 0.5
 @export var camera: Camera3D
 
 @onready var _material: ShaderMaterial = material
+@onready var _design_width: float = ProjectSettings.get_setting("display/window/size/viewport_width")
 
 
 func _ready() -> void:
@@ -32,25 +34,31 @@ func _ready() -> void:
 
 ## Shows the consoles [param behind] the games, blurred over [param blur] pixels of the carousel's
 ## screen (as wide as its viewport width setting), at [param opacity], their colours at
-## [param saturation]; or not at all.
+## [param saturation]; or not at all. Their view is drawn as they appear, then only through
+## [method draw_again].
 func look(behind: bool, blur: float, opacity: float, saturation: float) -> void:
-	if behind and not visible:
+	var appearing := behind and not visible
+	visible = behind
+	if appearing:
 		# From the first frame drawn, where the carousel's camera looks.
 		_fit()
 		camera.global_transform = watched.global_transform
 		camera.fov = watched.fov
-	visible = behind
-	view.render_target_update_mode = SubViewport.UPDATE_ONCE if behind else SubViewport.UPDATE_DISABLED
 	if not behind:
+		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		return
-	var width: float = ProjectSettings.get_setting("display/window/size/viewport_width")
 	# In the window's pixels, which the blur's taps step through.
-	_material.set_shader_parameter(&"radius", blur * get_window().size.x / width)
+	_material.set_shader_parameter(&"radius", blur * get_window().size.x / _design_width)
 	_material.set_shader_parameter(&"opacity", opacity)
 	_material.set_shader_parameter(&"saturation", saturation)
 
 
-func _fit() -> void:
-	view.size = Vector2i(Vector2(get_window().size) * _RESOLUTION)
+## The consoles moved: their view is drawn again, while they show.
+func draw_again() -> void:
 	if visible:
 		view.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+func _fit() -> void:
+	view.size = Vector2i(Vector2(get_window().size) * _RESOLUTION)
+	draw_again()

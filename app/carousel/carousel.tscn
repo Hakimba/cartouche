@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=26 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -21,6 +21,9 @@
 [ext_resource type="PackedScene" path="res://carousel/properties/disc_properties.tscn" id="24"]
 [ext_resource type="PackedScene" path="res://carousel/properties/console_properties.tscn" id="25"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/console_order.tscn" id="26"]
+[ext_resource type="Script" path="res://carousel/backdrop.gd" id="27"]
+[ext_resource type="Script" path="res://carousel/battery_chip.gd" id="28"]
+[ext_resource type="Script" path="res://carousel/resting.gd" id="29"]
 
 [sub_resource type="ShaderMaterial" id="backdrop_material"]
 shader = ExtResource("3")
@@ -71,6 +74,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+script = ExtResource("27")
 
 [node name="ConsoleView" type="TextureRect" parent="Backdrop" node_paths=PackedStringArray("watched", "view", "camera")]
 visible = false
@@ -376,6 +380,7 @@ mouse_filter = 2
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"Chip"
+script = ExtResource("28")
 
 [node name="Front" type="CanvasLayer" parent="."]
 
@@ -406,6 +411,10 @@ script = ExtResource("8")
 [node name="ClockTimer" type="Timer" parent="."]
 autostart = true
 
+[node name="Resting" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("29")
+
 [node name="MessageTimer" type="Timer" parent="."]
 unique_name_in_owner = true
 one_shot = true
@@ -423,6 +432,5 @@ one_shot = true
 [connection signal="timeout" from="HoldSelect" to="." method="_on_hold_select_timeout"]
 [connection signal="library_changed" from="Screens" to="." method="_on_screens_library_changed"]
 [connection signal="console_added" from="Screens" to="." method="_on_screens_console_added"]
-[connection signal="covering" from="Screens" to="." method="_on_screens_covering"]
 [connection signal="library_edited" from="Screens" to="." method="_on_screens_library_edited"]
 [connection signal="welcome_closed" from="Screens" to="." method="_on_screens_welcome_closed"]

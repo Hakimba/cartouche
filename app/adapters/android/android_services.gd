@@ -6,7 +6,8 @@ extends Node
 ## below. The wire format is described in `Wire.kt`; a missing value is an absent key, surfaced
 ## here as a `has_*` flag.
 ##
-## Getters answer at once. Operations are coroutines (`await Android.list_folder(folder)`); without
+## Getters answer at once, and [method prepare_titles] only starts its work. Operations are coroutines
+## (`await Android.list_folder(folder)`), and [AndroidServices.Asked] asks one early; without
 ## the plugin (editor, desktop) they fail with `code == &"unavailable"` and getters return empty
 ## values, except the catalog and the demo library, read from [constant DESKTOP_DEMO], and the
 ## launch check, which lets every game's insertion play.
@@ -16,6 +17,8 @@ signal art_changed(change: ArtChange)
 ## One of the images [method label_variants] listed, not downloaded then, was downloaded or could
 ## not be.
 signal label_variant_downloaded(variant: LabelVariant)
+## The battery's level, or whether the device is plugged in, changed.
+signal battery_changed(battery: Battery)
 ## Every operation's answer; callers await the one carrying their request id.
 signal _answered(payload: Dictionary)
 
@@ -46,6 +49,7 @@ func _ready() -> void:
 		_plugin.connect(&"art_changed", func(payload: Dictionary) -> void: art_changed.emit(ArtChange.new(payload)))
 		_plugin.connect(&"label_variant_downloaded", func(payload: Dictionary) -> void:
 			label_variant_downloaded.emit(LabelVariant.new(payload)))
+		_plugin.connect(&"battery_changed", func(payload: Dictionary) -> void: battery_changed.emit(Battery.new(payload)))
 	if OS.has_feature("android"):
 		AndroidButtons.follow_android()
 	_load_catalog()
@@ -59,15 +63,20 @@ func is_available() -> bool:
 
 ## Loads the bundled platform definitions, profiles and reference lists into the plugin, once.
 func _load_catalog() -> void:
+	var started := Time.get_ticks_usec()
 	var profiles := FileAccess.get_file_as_string(_PLATFORM_PROFILES)
 	var definitions := _files_in(_PLATFORM_DEFINITIONS, ".json")
 	var titles := _files_in(_TITLE_LISTS, ".tsv", true)
 	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
 	var curtains := FileAccess.get_file_as_string(_CURTAINS)
 	var art := _files_in(_ART, ".tsv", true)
+	var read := Time.get_ticks_usec()
 	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders, curtains, art],
 		_desktop_demo("catalog"))
 	catalog = CatalogSummary.new(summary)
+	if Diagnostics.enabled:
+		Diagnostics.trace("plugin", "catalog read in %.1f ms, loaded in %.1f ms" % [(read - started) / 1000.0,
+			(Time.get_ticks_usec() - read) / 1000.0])
 
 
 ## Installed players of [param platform_id], in definition order.
@@ -174,6 +183,12 @@ func set_up_platform(platform_id: String, setup: PlatformSetup) -> LibraryAnswer
 	return LibraryAnswer.new(await _request(&"setUpPlatform", [platform_id, setup.to_wire()]))
 
 
+## Prepares in the background what looking at a folder needs (the reference lists' indexes), as a
+## console is about to be added or changed.
+func prepare_titles() -> void:
+	_query(&"prepareTitles", [], null)
+
+
 ## How many games a scan of [param platform_id] with [param setup] would find, without saving
 ## anything; its scan after [method set_up_platform] finds the same.
 func preview_platform(platform_id: String, setup: PlatformSetup) -> PreviewAnswer:
@@ -190,6 +205,11 @@ func settings() -> SettingsAnswer:
 ## Stores the button style the user chose, [param style] as [SettingsAnswer] names it.
 func save_button_style(style: StringName) -> Result:
 	return Result.new(await _request(&"saveButtonStyle", [style]))
+
+
+## Stores the edge smoothing the user chose, [param smoothing] as [SettingsAnswer] names it.
+func save_edge_smoothing(smoothing: StringName) -> Result:
+	return Result.new(await _request(&"saveEdgeSmoothing", [smoothing]))
 
 
 ## Scans the folder of [param platform_id] and replaces its games.
@@ -332,6 +352,29 @@ func _request(method: StringName, args: Array = []) -> Dictionary:
 
 # Values
 
+## An answer asked for now, with one of these operations, and taken later, once other work is done:
+## the plugin answers meanwhile.
+class Asked:
+	signal arrived
+	var value: Variant
+	var has_arrived := false
+
+	## Asks with [param asking].
+	func _init(asking: Callable) -> void:
+		_settle(asking)
+
+	## The answer, once it has arrived.
+	func taken() -> Variant:
+		if not has_arrived:
+			await arrived
+		return value
+
+	func _settle(asking: Callable) -> void:
+		value = await asking.call()
+		has_arrived = true
+		arrived.emit()
+
+
 class Result:
 	var ok: bool
 	## Stable error code (`not_installed`, `permission_denied`…); empty when [member ok].
@@ -410,12 +453,13 @@ class App:
 class Battery:
 	var has_level: bool
 	var level_percent: int
-	var charging: bool
+	## Whether the device is plugged into a charger, charging or full.
+	var plugged: bool
 
 	func _init(payload: Dictionary) -> void:
 		has_level = payload.has("level_percent")
 		level_percent = payload.get("level_percent", 0)
-		charging = payload.get("charging", false)
+		plugged = payload.get("plugged", false)
 
 
 class Platform:
@@ -747,12 +791,15 @@ class SettingsAnswer extends Result:
 	var has_button_style: bool
 	## `xbox`, `nintendo` or `playstation`: how the buttons are drawn.
 	var button_style: StringName
+	## `4x`, `2x` or `off`: how smooth the 3D's edges are drawn.
+	var edge_smoothing: StringName
 
 	func _init(payload: Dictionary) -> void:
 		super(payload)
 		first_launch = payload.get("first_launch", false)
 		has_button_style = payload.has("button_style")
 		button_style = payload.get("button_style", &"")
+		edge_smoothing = payload.get("edge_smoothing", &"4x")
 
 
 class ScanAnswer extends LibraryAnswer:

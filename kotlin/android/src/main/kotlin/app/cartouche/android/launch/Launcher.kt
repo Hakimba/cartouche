@@ -54,7 +54,7 @@ internal sealed interface LaunchFailure {
 
 /**
  * Starts emulators, apps and system screens. Preparing an intent does IO and runs off the main
- * thread; [start] and [pickFolder] run on the main thread, which owns activity starts.
+ * thread; [start] and the pickers run on the main thread, which owns activity starts.
  *
  * Never grants a URI to a package directly: only the documents provider could revoke such a grant,
  * so it would last until reboot. The intent's own grant ([IntentMapper]) ends with the emulator.

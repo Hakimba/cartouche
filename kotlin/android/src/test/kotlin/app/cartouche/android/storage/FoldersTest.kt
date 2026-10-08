@@ -50,7 +50,7 @@ class FoldersTest {
 
     @Test
     fun `INV-E0-14 access to a picked folder is kept read-only`() {
-        val tree = Uri.parse("content://com.android.externalstorage.documents/tree/1A2B-3C4D%3AROMs%2Fps2")
+        val tree = cardTree("ps2")
         Folders(context).keepAccess(tree).shouldBeRight().name shouldBe "ps2"
         context.contentResolver.persistedUriPermissions.map { Triple(it.uri, it.isReadPermission, it.isWritePermission) } shouldBe
             listOf(Triple(tree, true, false))
@@ -196,9 +196,8 @@ class FoldersTest {
                 override fun moveToNext(): Boolean = position < 0 && super.moveToNext()
             }
         }
-        Folders(
-            context,
-        ).files(tree, FolderDepth.TOP_LEVEL, DataFolders.NONE).shouldBeLeft().unlisted().shouldBeInstanceOf<StorageFailure.Unavailable>()
+        val failure = Folders(context).files(tree, FolderDepth.TOP_LEVEL, DataFolders.NONE).shouldBeLeft()
+        failure.unlisted().shouldBeInstanceOf<StorageFailure.Unavailable>()
     }
 
     private companion object {
@@ -207,8 +206,7 @@ class FoldersTest {
 
     @Test
     fun `INV-E6-03 the access to the folders no platform uses is given up, the others kept`() {
-        fun tree(name: String) = Uri.parse("content://com.android.externalstorage.documents/tree/1A2B-3C4D%3AROMs%2F$name")
-        val trees = listOf("ps2", "gba", "gc").map(::tree)
+        val trees = listOf("ps2", "gba", "gc").map(::cardTree)
         val folders = Folders(context)
         val kept = trees.map { folders.keepAccess(it).shouldBeRight().uri }
         folders.keepOnly(setOf(kept[1])).shouldBeRight() shouldBe 2

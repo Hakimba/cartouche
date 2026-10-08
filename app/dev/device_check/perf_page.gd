@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends DeviceCheckPage
-## Renders a load close to the future carousel and reports frame times over 5-second windows.
+## Renders a load close to the carousel's and reports frame times over 5-second windows.
 
 const _WINDOW_MS := 5000
 

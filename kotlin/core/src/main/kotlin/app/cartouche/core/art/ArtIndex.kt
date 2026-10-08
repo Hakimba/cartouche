@@ -5,8 +5,8 @@ import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.TitleKey
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.filterOption
-import arrow.core.firstOrNone
 import arrow.core.getOrElse
 import arrow.core.raise.ensure
 import arrow.core.raise.option
@@ -29,9 +29,9 @@ public class ArtIndex private constructor(
     }
 
     /**
-     * The disc scans of the game titled [title], closest to [regions] first (see [Regions]). The title is the game's name, or else one of its alternate names, whatever
-     * their case, accents, punctuation and spaces; a title that names several games names none, as
-     * it could be any of them.
+     * The disc scans of the game titled [title], closest to [regions] first (see [Regions]). The title
+     * is the game's name, or else one of its alternate names, whatever their case, accents,
+     * punctuation and spaces; a title that names several games names none, as it could be any of them.
      */
     public fun scansOf(title: String, regions: List<String>): List<ArtUrl> =
         discsOf(title).sortedBy { Regions.rank(regions, it.region) }.map { it.url }
@@ -59,9 +59,8 @@ public class ArtIndex private constructor(
 
         /** Reads an extract; lines that are not `name<TAB>alternate names<TAB>discs` are skipped. */
         public fun parse(text: String): ArtIndex {
-            val lines = text.lines()
-            val version = lines.firstOrNone().filter { it.startsWith("#") }.map { ArtVersion(it.removePrefix("#").trim()) }
-            val games = lines.map(::parseLine).filterOption()
+            val version = versionOf(text)
+            val games = text.lines().map(::parseLine).filterOption()
             val byAlternateName = games.flatMap { (_, alternates, entry) -> alternates.map { it to entry } }
             return ArtIndex(
                 version,
@@ -71,14 +70,17 @@ public class ArtIndex private constructor(
             )
         }
 
+        /** The version an extract states on its first line (`# version`), the rest left unread. */
+        public fun versionOf(text: String): Option<ArtVersion> =
+            Some(text.takeWhile { it != '\n' && it != '\r' }).filter { it.startsWith("#") }.map { ArtVersion(it.removePrefix("#").trim()) }
+
         private fun parseLine(line: String): Option<Triple<String, Set<String>, List<Image>>> = option {
             val fields = line.split('\t')
-            ensure(fields.size == 3 && !line.startsWith("#"))
+            ensure(fields.size == 3 && !line.startsWith("#") && fields[0].isNotBlank())
             // A name of no Latin letter or digit, such as a Japanese one, reduces to nothing: it finds no
             // game, but its romanised alternate names still do.
             val name = key(fields[0])
             val alternates = fields[1].split('|').map(::key).filter(String::isNotEmpty).toSet() - name
-            ensure(fields[0].isNotBlank())
             Triple(name, alternates, images(fields[2]))
         }
 

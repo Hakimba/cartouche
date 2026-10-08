@@ -8,6 +8,9 @@ const BESIDE := Vector2(420.0, 0.0)
 const HELD_S := 0.7
 ## Where the image of a region found for the games is.
 const EUROPE := "user://touch-test-europe.png"
+## The screens a finger reaches.
+const REACHABLE: Array[Carousel.Screen] = [Carousel.Screen.CONSOLES, Carousel.Screen.GAMES, Carousel.Screen.PROPERTIES,
+	Carousel.Screen.CONSOLE_PROPERTIES]
 
 
 func before() -> void:
@@ -268,9 +271,9 @@ func _back(carousel: Carousel) -> void:
 
 
 ## A second finger, or a touch the system takes back, at [param at]: neither counts.
-func _stray_touch(at: Vector2, cancelled: bool) -> void:
-	await Fixtures.finger(self, at, true, 0 if cancelled else 1)
-	await Fixtures.finger(self, at, false, 0 if cancelled else 1, cancelled)
+func _stray_touch(at: Vector2, canceled: bool) -> void:
+	await Fixtures.finger(self, at, true, 0 if canceled else 1)
+	await Fixtures.finger(self, at, false, 0 if canceled else 1, canceled)
 
 
 func test_the_system_s_back_is_B_on_the_games_the_ring_the_properties_and_the_keyboard() -> void:
@@ -351,14 +354,11 @@ func test_INV_E7_10_whatever_a_finger_does_nothing_is_launched_and_the_screens_s
 		assert_int(device.launches).is_equal(0)
 		# Back from the screens a finger does not reach (the ring, the settings), and now and then
 		# from any, so that the walk goes on.
-		var reachable := [Carousel.Screen.CONSOLES, Carousel.Screen.GAMES, Carousel.Screen.PROPERTIES,
-			Carousel.Screen.CONSOLE_PROPERTIES]
-		if carousel.screen() not in reachable or Fixtures.shown_screen(carousel) != null or random.randf() < 0.15:
+		if carousel.screen() not in REACHABLE or Fixtures.shown_screen(carousel) != null or random.randf() < 0.15:
 			await Fixtures.joypad(self, JOY_BUTTON_B)
 			await _settled(carousel)
 		if is_failure():
 			return
-	for screen: Carousel.Screen in [Carousel.Screen.CONSOLES, Carousel.Screen.GAMES, Carousel.Screen.PROPERTIES,
-			Carousel.Screen.CONSOLE_PROPERTIES]:
+	for screen in REACHABLE:
 		assert_bool(touched.has(screen)).override_failure_message(str(Carousel.Screen.keys()[screen])).is_true()
 	assert_int(taps_on_disc).is_greater(5)

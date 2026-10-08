@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+@abstract
 class_name PropertiesScreen
 extends Control
 ## What the properties screens share (a game's, [DiscProperties]; a console's,
@@ -59,14 +60,12 @@ func _ready() -> void:
 	_naming.submitted.connect(_keep_name)
 
 
-## Opens the keyboard of the name: each screen has its own.
-func _open_naming() -> void:
-	pass
+## Opens the keyboard of the name.
+@abstract func _open_naming() -> void
 
 
-## Keeps the name typed: each screen asks the plugin its own way.
-func _keep_name() -> void:
-	pass
+## Keeps the name typed, asking the plugin.
+@abstract func _keep_name() -> void
 
 
 ## Takes X, Y or Start on the keyboard, unless the plugin answers; whether [param event] was one.
@@ -157,9 +156,8 @@ func _stage(amount: float, from: Staging, to: Staging) -> void:
 	_place()
 
 
-## Stands the model as [member _staging] has it: each screen its own.
-func _place() -> void:
-	pass
+## Stands the model as [member _staging] has it.
+@abstract func _place() -> void
 
 
 func _release_focus() -> void:

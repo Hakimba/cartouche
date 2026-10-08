@@ -13,8 +13,8 @@ import kotlinx.serialization.json.Json
  */
 @Serializable
 public data class AbsentArt(private val games: Map<GameId, ArtVersion> = emptyMap()) {
-    /** Whether [request]'s game is known to have no art in the sources it would be looked for in. */
-    public fun covers(request: ArtRequest): Boolean = request.version.isSome { games.getOrNone(request.game) == Option(it) }
+    /** Whether [game] is known to have no art in sources of [version]; never in sources of no version. */
+    public fun covers(game: GameId, version: Option<ArtVersion>): Boolean = version.isSome { games.getOrNone(game) == Option(it) }
 
     /** Remembers that no source of [request] has art for its game. */
     public fun with(request: ArtRequest): AbsentArt = request.version.fold({ this }) { copy(games = games + (request.game to it)) }

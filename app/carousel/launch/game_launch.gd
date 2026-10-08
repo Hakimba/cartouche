@@ -115,6 +115,12 @@ func is_busy() -> bool:
 	return _stage != Stage.READY
 
 
+## Whether the game goes into its console or is away, from the insertion until the carousel shows
+## again: not while it is checked, nor as the black fades.
+func is_inserting() -> bool:
+	return _stage not in [Stage.READY, Stage.CHECKING, Stage.SHOWING]
+
+
 ## Makes the players of [param insertions]' sounds, once, rather than as a launch starts.
 func prepare(insertions: Array[Insertion]) -> void:
 	for insertion in insertions:
@@ -199,8 +205,8 @@ func _give_up(code: StringName) -> void:
 ## spindle, the black, the controls, the sounds.
 func _insert(delta: float) -> void:
 	var t := _clock_s
-	var black := 0.0
-	var origin := Vector3.ZERO
+	var black: float
+	var origin: Vector3
 	if _into_console:
 		sequence.launch_at(t, delta)
 		black = sequence.black

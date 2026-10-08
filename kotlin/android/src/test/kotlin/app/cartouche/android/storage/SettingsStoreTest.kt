@@ -2,6 +2,7 @@
 package app.cartouche.android.storage
 
 import app.cartouche.core.settings.ButtonStyle
+import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Settings
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeLeft
@@ -18,7 +19,7 @@ class SettingsStoreTest {
 
     @Test
     fun `saved settings load back, and no file means none set`() {
-        val settings = Settings(Some(ButtonStyle.PLAYSTATION))
+        val settings = Settings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.OFF)
         SettingsStore(file).load().shouldBeRight(Settings())
         SettingsStore(file).save(settings).shouldBeRight()
         SettingsStore(file).load().shouldBeRight(settings)

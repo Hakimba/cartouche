@@ -7,6 +7,7 @@ import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.storage.SelectionStore
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.android.storage.TREE
+import app.cartouche.android.storage.cardTree
 import app.cartouche.android.storage.fileRow
 import app.cartouche.android.storage.folderRow
 import app.cartouche.android.storage.installDocuments
@@ -187,6 +188,17 @@ class LibraryServiceTest {
     }
 
     @Test
+    fun `a launch from the disc a game starts from writes nothing, and one from another disc is kept`() {
+        val service = scanned("Game (Disc 1)", "Game (Disc 2)")
+        val game = service.library().games.single()
+        file.setLastModified(1_000L)
+        service.recordLaunch(game.id, game.lastDisc).shouldBeRight()
+        file.lastModified() shouldBe 1_000L
+        service.recordLaunch(game.id, 1).shouldBeRight()
+        service().library().games.single().lastDisc shouldBe 1
+    }
+
+    @Test
     fun `INV-E6-06 the discs of one game count as one game when grouped, as many when not, before and after adding`() {
         installDocuments { rows(fileRow("root/Game (Disc 1).iso"), fileRow("root/Game (Disc 2).iso"), fileRow("root/Other.iso")) }
         listOf(DiscGrouping.GROUPED to 2, DiscGrouping.SEPARATE to 3).forEach { (discs, games) ->
@@ -268,7 +280,7 @@ class LibraryServiceTest {
     @Test
     fun `INV-E6-03 a removed platform leaves nothing of it, after a restart too, and gives up its folder unless another uses it`() {
         val other = PlatformId("other")
-        val otherTree = tree("gba")
+        val otherTree = cardTree("gba")
         val folders = Folders(context)
         folders.keepAccess(Uri.parse(TREE.value)).shouldBeRight()
         val otherFolder = folders.keepAccess(otherTree).shouldBeRight().uri
@@ -289,21 +301,19 @@ class LibraryServiceTest {
         kept() shouldBe emptyList()
     }
 
-    private fun tree(name: String) = Uri.parse("content://com.android.externalstorage.documents/tree/1A2B-3C4D%3AROMs%2F$name")
-
     private fun kept() = context.contentResolver.persistedUriPermissions.map { it.uri }
 
     @Test
     fun `INV-E6-03 moving a platform to another folder gives up the old one and keeps the new`() {
         val folders = Folders(context)
-        service().setUp(platform.id, PlatformSetup(Some(folders.keepAccess(tree("old")).shouldBeRight().uri))).shouldBeRight()
-        service().setUp(platform.id, PlatformSetup(Some(folders.keepAccess(tree("new")).shouldBeRight().uri))).shouldBeRight()
-        kept() shouldBe listOf(tree("new"))
+        service().setUp(platform.id, PlatformSetup(Some(folders.keepAccess(cardTree("old")).shouldBeRight().uri))).shouldBeRight()
+        service().setUp(platform.id, PlatformSetup(Some(folders.keepAccess(cardTree("new")).shouldBeRight().uri))).shouldBeRight()
+        kept() shouldBe listOf(cardTree("new"))
     }
 
     @Test
     fun `INV-E6-03 a removal that cannot be saved leaves the library and the folder access as they were`() {
-        val folder = Folders(context).keepAccess(tree("ps2")).shouldBeRight().uri
+        val folder = Folders(context).keepAccess(cardTree("ps2")).shouldBeRight().uri
         service().setUp(platform.id, PlatformSetup(Some(folder))).shouldBeRight()
         val files = file.parentFile.shouldNotBeNull()
         files.setWritable(false)
@@ -314,19 +324,19 @@ class LibraryServiceTest {
             files.setWritable(true)
         }
         service().library().setups.keys shouldBe setOf(platform.id)
-        kept() shouldBe listOf(tree("ps2"))
+        kept() shouldBe listOf(cardTree("ps2"))
     }
 
     @Test
     fun `INV-E6-03 while the library cannot be read, no folder access is given up and no art is known to go`() {
         scanned("A").gamesWithArt().shouldBeSome().size shouldBe 1
         // The folder of a platform of the library that can no longer be read.
-        Folders(context).keepAccess(tree("gba")).shouldBeRight()
+        Folders(context).keepAccess(cardTree("gba")).shouldBeRight()
         file.writeText("not a library")
         val service = service()
         service.gamesWithArt().shouldBeNone()
         service.setUp(platform.id, PlatformSetup(Some(TREE))).shouldBeRight()
-        kept() shouldBe listOf(tree("gba"))
+        kept() shouldBe listOf(cardTree("gba"))
     }
 
     @Test
