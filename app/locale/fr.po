@@ -359,3 +359,38 @@ msgstr "Lissage 2×"
 
 msgid "No smoothing"
 msgstr "Sans lissage"
+
+msgid "Search"
+msgstr "Chercher"
+
+msgid "Clear the filter"
+msgstr "Effacer le filtre"
+
+msgid "Letter"
+msgstr "Lettre"
+
+msgid "Region"
+msgstr "Région"
+
+msgid "Type the key"
+msgstr "Taper"
+
+msgid "Other index"
+msgstr "Autre index"
+
+msgid "Go back"
+msgstr "Revenir"
+
+msgid "Enter"
+msgstr "Entrer"
+
+msgid "By region"
+msgstr "Par région"
+
+msgid "“{typed}” — {found} of {total}"
+msgstr "« {typed} » — {found} sur {total}"
+
+msgid "{count} game"
+msgid_plural "{count} games"
+msgstr[0] "{count} jeu"
+msgstr[1] "{count} jeux"

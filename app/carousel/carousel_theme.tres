@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=32 format=3 uid="uid://voyem7672a04"]
+[gd_resource type="Theme" load_steps=38 format=3 uid="uid://voyem7672a04"]
 
 [ext_resource type="FontVariation" path="res://fonts/fredoka_medium.tres" id="1"]
 [ext_resource type="FontVariation" path="res://fonts/fredoka_semibold.tres" id="2"]
@@ -266,6 +266,73 @@ shadow_color = Color(0, 0, 0, 0.12)
 shadow_size = 8
 shadow_offset = Vector2(0, 2)
 
+[sub_resource type="StyleBoxFlat" id="ribbon"]
+content_margin_left = 12.0
+content_margin_right = 12.0
+bg_color = Color(1, 1, 1, 0.95)
+corner_radius_top_left = 30
+corner_radius_top_right = 30
+corner_radius_bottom_right = 30
+corner_radius_bottom_left = 30
+shadow_color = Color(0, 0, 0, 0.14)
+shadow_size = 10
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxEmpty" id="ribbon_key"]
+content_margin_left = 9.0
+content_margin_right = 9.0
+
+[sub_resource type="StyleBoxFlat" id="ribbon_key_on"]
+content_margin_left = 9.0
+content_margin_right = 9.0
+bg_color = Color(0.13, 0.14, 0.17, 1)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+
+[sub_resource type="StyleBoxFlat" id="search_chip"]
+content_margin_left = 16.0
+content_margin_top = 4.0
+content_margin_right = 16.0
+content_margin_bottom = 4.0
+bg_color = Color(1, 1, 1, 0.95)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(0, 0, 0, 0.12)
+shadow_size = 8
+shadow_offset = Vector2(0, 1)
+
+[sub_resource type="StyleBoxFlat" id="big_letter"]
+content_margin_left = 40.0
+content_margin_top = 12.0
+content_margin_right = 40.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 1, 1, 0.95)
+corner_radius_top_left = 36
+corner_radius_top_right = 36
+corner_radius_bottom_right = 36
+corner_radius_bottom_left = 36
+shadow_color = Color(0, 0, 0, 0.18)
+shadow_size = 24
+shadow_offset = Vector2(0, 6)
+
+[sub_resource type="StyleBoxFlat" id="filter_pill"]
+content_margin_left = 16.0
+content_margin_top = 2.0
+content_margin_right = 16.0
+content_margin_bottom = 2.0
+bg_color = Color(0.13, 0.14, 0.17, 0.9)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(0, 0, 0, 0.14)
+shadow_size = 5
+shadow_offset = Vector2(0, 1)
+
 [resource]
 default_font = ExtResource("1")
 default_font_size = 26
@@ -424,3 +491,32 @@ NameField/styles/panel = SubResource("card")
 NameFieldText/base_type = &"Label"
 NameFieldText/font_sizes/font_size = 36
 NameFieldText/fonts/font = ExtResource("2")
+Ribbon/base_type = &"PanelContainer"
+Ribbon/styles/panel = SubResource("ribbon")
+RibbonKey/base_type = &"PanelContainer"
+RibbonKey/styles/panel = SubResource("ribbon_key")
+RibbonKeyOn/base_type = &"PanelContainer"
+RibbonKeyOn/styles/panel = SubResource("ribbon_key_on")
+RibbonText/base_type = &"Label"
+RibbonText/font_sizes/font_size = 26
+RibbonText/fonts/font = ExtResource("2")
+RibbonTextOn/base_type = &"RibbonText"
+RibbonTextOn/colors/font_color = Color(1, 1, 1, 1)
+SearchChip/base_type = &"PanelContainer"
+SearchChip/styles/panel = SubResource("search_chip")
+SearchText/base_type = &"Label"
+SearchText/font_sizes/font_size = 28
+SearchText/fonts/font = ExtResource("2")
+SearchCount/base_type = &"Label"
+SearchCount/colors/font_color = Color(0.36, 0.38, 0.43, 1)
+SearchCount/font_sizes/font_size = 22
+BigLetter/base_type = &"PanelContainer"
+BigLetter/styles/panel = SubResource("big_letter")
+BigLetterText/base_type = &"Label"
+BigLetterText/font_sizes/font_size = 190
+BigLetterText/fonts/font = ExtResource("2")
+FilterPill/base_type = &"PanelContainer"
+FilterPill/styles/panel = SubResource("filter_pill")
+FilterText/base_type = &"Label"
+FilterText/colors/font_color = Color(1, 1, 1, 1)
+FilterText/font_sizes/font_size = 22

@@ -34,6 +34,8 @@ import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.MediaType
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
+import app.cartouche.core.search.Mark
+import app.cartouche.core.search.View
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Settings
@@ -332,6 +334,27 @@ internal fun Scraping.toWire(): Dictionary = dictionary("done" to done, "total" 
 
 /** `{"game_id", "path"}`, the path an absolute one to a JPEG. */
 internal fun FoundArt.toWire(): Dictionary = dictionary("game_id" to game.value, "path" to art.file.path)
+
+/**
+ * What the carousel shows of a shelf of [count] games, as JSON text: `{"count", "games": [position
+ * in the shelf], "groups": [{"label", "start"}], "keys": {key: position in games}}`, a key being a
+ * lowercase letter, a digit or a space. Thousands of positions cost a few milliseconds this way.
+ */
+internal fun View.toWireJson(count: Int): String {
+    // Answered at each key typed: thousands of positions written straight, not as a tree of elements.
+    val groups =
+        groups.toJson {
+            buildJsonObject {
+                put("label", it.label)
+                put("start", it.start)
+            }
+        }
+    val keys = keys.toJson(Char::toString, ::JsonPrimitive)
+    return """{"count":$count,"games":[${games.joinToString(",")}],"groups":$groups,"keys":$keys}"""
+}
+
+/** Where to underline a title, as JSON text: `[[start, length]]`, in characters. */
+internal fun List<Mark>.toWireJson(): String = toJson { JsonArray(listOf(JsonPrimitive(it.start), JsonPrimitive(it.length))) }.toString()
 
 /** Stored art as JSON text, `[{"game_id", "path"}]`: a library's worth of Dictionaries would cost as much as its games (see [toWireJson]). */
 internal fun List<FoundArt>.artWireJson(): String = toJson { found ->

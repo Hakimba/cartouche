@@ -5,7 +5,13 @@ extends PanelContainer
 
 ## The button, as [method Controls.mark] names it.
 @export var button := &"a"
-@export var text := ""
+@export var text := "":
+	set(shown):
+		text = shown
+		if _label:
+			_label.text = shown
+
+var _label: Label
 
 
 func _ready() -> void:
@@ -16,9 +22,9 @@ func _ready() -> void:
 	var glyph := ButtonGlyph.new()
 	glyph.button = button
 	glyph.size_flags_vertical = SIZE_SHRINK_CENTER
-	var label := Label.new()
-	label.theme_type_variation = &"HintText"
-	label.text = text
+	_label = Label.new()
+	_label.theme_type_variation = &"HintText"
+	_label.text = text
 	items.add_child(glyph)
-	items.add_child(label)
+	items.add_child(_label)
 	add_child(items)

@@ -19,6 +19,28 @@ func test_the_shelves_sent_by_the_plugin_are_read_as_the_library_games_they_poin
 	assert_array(ids).is_equal([["ps2", 1, ["ps2/A", "ps2/Z"]], ["gba", 0, ["gba/B"]]])
 
 
+func test_what_the_carousel_shows_of_a_shelf_is_read_as_the_plugin_sends_it() -> void:
+	# The shape of `View.toWireJson` in Wire.kt, numbers read from JSON as floats.
+	var view: Dictionary = JSON.parse_string("""{"count": 3, "games": [2, 0], "groups": [{"label": "A", "start": 0},
+		{"label": "#", "start": 1}], "keys": {"a": 0, " ": 1}}""")
+	var browse := AndroidServices.Browse.new(view)
+	assert_int(browse.count).is_equal(3)
+	assert_array(Array(browse.games)).is_equal([2, 0])
+	assert_array(browse.groups.map(func(group: AndroidServices.Group) -> Array: return [group.label, group.start])).is_equal(
+		[["A", 0], ["#", 1]])
+	assert_dict(browse.keys).is_equal({"a": 0, " ": 1})
+	# From the plugin, its answer read as is; where the words typed are, as (start, length).
+	var services: AndroidServices = auto_free(AndroidServices.new())
+	services._plugin = auto_free(FakePlugin.new())
+	assert_array(Array(services.browse("ps2", &"title", "ace").games)).is_equal([2, 0])
+	assert_array(services.title_marks("ps2", 0, "dist ace")).is_equal([Vector2i(0, 3), Vector2i(13, 4)])
+	# Without the plugin, nothing: no game, no key.
+	var none := Android.browse("ps2", &"title", "ace")
+	assert_int(none.count).is_equal(0)
+	assert_array(Array(none.games)).is_empty()
+	assert_array(Android.title_marks("ps2", 0, "ace")).is_empty()
+
+
 func test_a_library_without_shelves_has_none() -> void:
 	var library := AndroidServices.Library.new({"games": []})
 	assert_array(library.shelves).is_empty()
@@ -109,3 +131,12 @@ func test_the_battery_is_read_as_the_plugin_sends_it_plugged_or_not_its_level_wh
 	# Without the plugin: nothing known, and no bolt.
 	var none := Android.battery()
 	assert_bool(none.has_level or none.plugged).is_false()
+
+
+## Answers as the Kotlin plugin does, as JSON text.
+class FakePlugin extends Object:
+	func browse(_platform_id: String, _order: String, _typed: String) -> String:
+		return """{"count": 3, "games": [2, 0], "groups": [], "keys": {}}"""
+
+	func titleMarks(_platform_id: String, _position: int, _typed: String) -> String:
+		return "[[0, 3], [13, 4]]"

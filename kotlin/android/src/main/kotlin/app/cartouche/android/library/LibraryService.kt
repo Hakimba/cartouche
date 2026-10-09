@@ -22,6 +22,7 @@ import app.cartouche.core.library.TitleIndex
 import app.cartouche.core.library.WalkFailure
 import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.search.Finders
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
 import arrow.core.Either
@@ -77,13 +78,30 @@ internal data class ScanReport(
 )
 
 /**
- * The library and the selection, held in memory and in their files. Not thread-safe: the plugin
- * runs every call on one single-threaded dispatcher, in the order the calls arrive. A launch reads
- * its choice, starts the emulator on the main thread, then records its disc: other calls can run in
- * between.
+ * The library and the selection, held in memory and in their files. Not thread-safe but for
+ * [finders]: the plugin runs every call on one single-threaded dispatcher, in the order the calls
+ * arrive. A launch reads its choice, starts the emulator on the main thread, then records its disc:
+ * other calls can run in between.
  */
-internal class LibraryService(private val store: LibraryStore, private val selections: SelectionStore, private val folders: Folders) {
+internal class LibraryService(
+    private val store: LibraryStore,
+    private val selections: SelectionStore,
+    private val folders: Folders,
+    /** Given new [finders] to make, as soon as possible but not on the caller's thread. */
+    private val prepare: (Finders) -> Unit = {},
+) {
     private var loaded: Option<Library> = None
+        set(kept) {
+            field = kept
+            val next = kept.fold({ Finders.NONE }, finders::after)
+            if (next !== finders) prepare(next)
+            finders = next
+        }
+
+    /** The finders of the library last kept: read from Godot's thread, as the getters answer at once. */
+    @Volatile
+    var finders: Finders = Finders.NONE
+        private set
 
     private var selected: Option<Selection> = None
 

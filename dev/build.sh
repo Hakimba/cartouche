@@ -21,13 +21,17 @@ command -v "$GODOT" > /dev/null || fail "Godot not found: put it on PATH or set 
 java_version=$("${JAVA_HOME:?JAVA_HOME is not set}/bin/java" -version 2>&1 | head -1)
 [[ $java_version =~ \"17[.\"] ]] || fail "JDK 17 required, JAVA_HOME points to: $java_version"
 
-(cd kotlin && ./gradlew --quiet ktlintCheck :core:test :android:testDebugUnitTest :android:lintDebug :android:assemble)
+# Every step is bounded, a hung one stopped: `timeout` is GNU coreutils (`gtimeout` on macOS with
+# Homebrew); without either, the runs are not bounded.
+bounded=$(command -v timeout || command -v gtimeout || true)
+status=0
+(cd kotlin && ${bounded:+"$bounded" -k 10 1800} ./gradlew --quiet ktlintCheck :core:test :android:testDebugUnitTest :android:lintDebug \
+  :android:assemble) || status=$?
+[ "$status" -ne 124 ] || fail "the Kotlin build and tests did not finish within 1800 s"
+[ "$status" -eq 0 ] || exit "$status"
 mkdir -p build
 GODOT="$GODOT" dev/test_godot.sh
 # The export packs scripts that fail to compile: run the project briefly to catch them first.
-# `timeout` is GNU coreutils (`gtimeout` on macOS with Homebrew); without either, the run is not bounded.
-bounded=$(command -v timeout || command -v gtimeout || true)
-status=0
 ${bounded:+"$bounded" -k 10 120} "$GODOT" --headless --path app --quit-after 30 > build/run.log 2>&1 || status=$?
 [ "$status" -ne 124 ] || fail "the project did not stop within 120 s (full log: build/run.log)"
 [ "$status" -eq 0 ] || fail "the project did not run (exit $status, full log: build/run.log)"

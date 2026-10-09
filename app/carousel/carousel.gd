@@ -6,7 +6,8 @@ extends Control
 ## screen: the platform's shelf of games, the selected game in the middle. There, left and right
 ## move along the shelf (held, faster and faster), A launches the selected game into its console
 ## ([GameLaunch]), B goes back out to the consoles, X opens the selected game's properties
-## ([DiscProperties]). The right stick turns the selected console on the consoles screen, the
+## ([DiscProperties]); down opens the ribbon that searches the shelf, L1 and R1 go from letter to
+## letter ([GameSearch]). The right stick turns the selected console on the consoles screen, the
 ## selected game on the games screen and in its properties, nothing in between. Where the user
 ## was is remembered across restarts. The games' disc scans arrive as the plugin finds them
 ## ([GameArt]), a bar at the bottom right, beside the hints, telling how it goes.
@@ -32,7 +33,7 @@ extends Control
 ##
 ## In debug builds, holding Select opens the device check, and command-line arguments set up
 ## measurements: `--welcome=skip` goes past the welcome without a press, `--demo-games=N` shows a
-## made-up library of N games, `--bench=scroll`, `enter`, `turn` or `launch` runs [CarouselBench],
+## made-up library of N games (all on one console with `--demo-shelf=ps2`), `--bench=scroll`, `enter`, `turn` or `launch` runs [CarouselBench],
 ## `--turntable=T` turns the selected game T times a second to show all its sides, `--shelf=gba`
 ## opens on that platform, `--shots=DIR` saves pictures at set frames ([FrameShots]). Without the
 ## Android plugin (the editor, a desktop run), the demo library is shown.
@@ -69,6 +70,8 @@ const _ARRIVAL_POINT := 0.01
 const _CONSOLES_LOWER_PX := 58.0
 ## How far down the screen the camera centres the selected console.
 const _CONSOLE_Y := 420.0
+## The games rise this much, in pixels of the screen, while the ribbon is open under them.
+const _SEARCH_LIFT_PX := 54.0
 ## A finger this close to the console or game in the middle, in pixels, is on it; swiped this far
 ## sideways from where it came down, it moves one console or game.
 const _ON_SELECTED_PX := 270.0
@@ -109,6 +112,10 @@ var _finger := Finger.new()
 ## moved one already.
 var _finger_on_selected := false
 var _swiped := false
+## The row's height, the ribbon closed, and how much it rises while it is open, in world units.
+var _row_y := 0.0
+var _search_lift := 0.0
+var _lift: Tween
 
 @onready var _row: ShelfRow = %Row
 @onready var _consoles: ConsoleRow = %Consoles
@@ -140,6 +147,11 @@ var _swiped := false
 @onready var _properties: DiscProperties = %Properties
 @onready var _order: ConsoleOrder = %ConsoleOrder
 @onready var _arrange_hint: Control = %Arrange
+@onready var _search: GameSearch = %Search
+@onready var _title_marks: TitleMarks = %TitleMarks
+@onready var _clear_hint: Control = %ClearFilter
+@onready var _previous_letter_hint: ButtonHint = %PreviousLetter
+@onready var _next_letter_hint: ButtonHint = %NextLetter
 
 
 func _ready() -> void:
@@ -161,17 +173,21 @@ func _ready() -> void:
 	var demo_games := Diagnostics.argument("demo-games").to_int()
 	_demo = demo_games > 0 or not android.is_available()
 	var asked_library := AndroidServices.Asked.new(
-		android.use_demo_library.bind(demo_games) if _demo else android.library)
+		android.use_demo_library.bind(demo_games, Diagnostics.argument("demo-shelf")) if _demo else android.library)
 	var asked_settings := AndroidServices.Asked.new(android.settings)
 	for platform in android.catalog.platforms:
 		_platforms[platform.id] = platform
 	_appearance = Appearance.read(_APPEARANCE)
 	var read_ms := Time.get_ticks_msec()
-	# At the consoles' depth, the screen's height spans 2·d·tan(fov / 2).
-	var depth := _camera.global_position.z - _consoles.global_position.z
 	var shown := get_viewport_rect().size
-	_consoles.position.y -= _CONSOLES_LOWER_PX / shown.y * 2.0 * depth * tan(deg_to_rad(_camera.fov / 2.0))
+	_consoles.position.y -= _world_height(_CONSOLES_LOWER_PX, _consoles)
 	_screens.console_point = Vector2(shown.x / 2.0, _CONSOLE_Y + _CONSOLES_LOWER_PX)
+	_row_y = _row.position.y
+	_search_lift = _world_height(_SEARCH_LIFT_PX, _row)
+	_search.android = android
+	_search.row = _row
+	_search.changed.connect(_on_search_changed)
+	_search.opened.connect(_on_search_opened)
 	_screens.appearance = _appearance
 	_screens.console_of = func(platform_id: String) -> Node3D: return _console_item(platform_id).model
 	_row.pose = _appearance.pose
@@ -186,7 +202,7 @@ func _ready() -> void:
 		properties.rename_failed.connect(_show_message.bind(tr("This name could not be kept.")))
 	_properties.row = _row
 	_properties.art = _art
-	_properties.behind.assign([_pill, _games_hints])
+	_properties.behind.assign([_pill, _games_hints, _search])
 	_properties.closed.connect(_go.bind(Screen.GAMES))
 	_properties.choice_failed.connect(func() -> void:
 		_show_message(tr("This image could not be kept.")))
@@ -295,6 +311,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_hold_select.stop()
 	elif not _row.has_games():
 		return
+	elif _screen == Screen.GAMES and _search.is_open():
+		_search.take(event, _direction, moved)
 	elif _screen in [Screen.CONSOLES, Screen.GAMES] and event.is_action_pressed(&"open_settings"):
 		_open_settings()
 	elif _screen == Screen.CONSOLES and moved and _direction.held:
@@ -322,6 +340,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_row.release(_direction.direction)
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_accept"):
 		_launch()
+	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_down"):
+		_row.freeze()
+		_search.open()
+	elif _screen == Screen.GAMES and event.is_action_pressed(&"previous_letter"):
+		_search.leap(-1)
+	elif _screen == Screen.GAMES and event.is_action_pressed(&"next_letter"):
+		_search.leap(1)
+	elif _screen == Screen.GAMES and event.is_action_pressed(&"screen_back") and _search.is_filtered():
+		_search.clear()
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"screen_back"):
 		_leave()
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"open_properties"):
@@ -378,7 +405,7 @@ func _share_clock() -> void:
 ## animation into or out of a console, or the ring (which reads its own).
 func _touchable() -> bool:
 	return _shown and _row.has_games() and not _game_launch.is_busy() and _screen not in _MOVING \
-		and _screen != Screen.ORDER
+		and _screen != Screen.ORDER and not _search.is_open()
 
 
 ## Where the console or the game in the middle rests on the screen (not where it is passing
@@ -389,12 +416,20 @@ func _selected_point() -> Vector2:
 	return _camera.unproject_position(_row.to_global(Vector3.ZERO))
 
 
+## [param pixels] of the screen's height, in world units at [param part]'s depth: there, the screen's
+## height spans 2·d·tan(fov / 2).
+func _world_height(pixels: float, part: Node3D) -> float:
+	var depth := _camera.global_position.z - part.global_position.z
+	return pixels / get_viewport_rect().size.y * 2.0 * depth * tan(deg_to_rad(_camera.fov / 2.0))
+
+
 ## Forgets the finger, as if lifted: a screen changing under it leaves nothing pending.
 func _let_go() -> void:
 	if _finger.is_down:
 		_finger = Finger.new()
 	_consoles.let_go()
 	_row.let_go()
+	_search.let_go()
 
 
 func _tap() -> void:
@@ -541,6 +576,7 @@ func _show_platform() -> void:
 	var platform := _platforms[shelf.platform_id]
 	_row.show_shelf(shelf.games, _positions[shelf.platform_id], _appearance.model_of(platform.media),
 		_look(shelf.platform_id))
+	_search.use_shelf(shelf.platform_id, shelf.games)
 	_sequence.use(_appearance.animation_of(shelf.platform_id))
 	_console_name.text = _console_name_of(shelf.platform_id)
 	_console_model.text = _appearance.console_models.get(shelf.platform_id, "")
@@ -582,9 +618,15 @@ func _leave() -> void:
 	_go(Screen.CONSOLES)
 
 
-## The pill names the selected game; it shows over the games only.
+## The pill names the selected game, the words typed in the ribbon underlined; it shows over the
+## games only. L1 and R1's hints tell where they lead from it.
 func _show_title() -> void:
 	_title.text = _row.selected_game().title
+	_title_marks.marks = _search.marks()
+	for hint: ButtonHint in [_previous_letter_hint, _next_letter_hint]:
+		hint.text = _search.leap_label(-1 if hint == _previous_letter_hint else 1)
+		hint.visible = not hint.text.is_empty()
+	_clear_hint.visible = _search.is_filtered()
 
 
 func _go(screen_to: Screen) -> void:
@@ -614,7 +656,7 @@ func _launch() -> void:
 func _remember() -> void:
 	if _shelves.is_empty() or not _row.has_games():
 		return
-	_positions[_shelves[_shelf].platform_id] = _row.selected_index()
+	_positions[_shelves[_shelf].platform_id] = _search.shown_position()
 	var result := await android.select_game(_row.selected_game())
 	if not result.ok:
 		Diagnostics.trace("carousel", "selection not saved (%s): %s" % [result.code, result.detail])
@@ -637,9 +679,25 @@ func _on_art_changed(change: AndroidServices.ArtChange) -> void:
 	_show_art_progress(progress)
 
 
-func _on_row_selection_changed(game: AndroidServices.Game) -> void:
+func _on_row_selection_changed(_game: AndroidServices.Game) -> void:
 	if _screen == Screen.GAMES:
-		_title.text = game.title
+		_show_title()
+
+
+## What the ribbon shows changed: over the games, the pill and the hints follow.
+func _on_search_changed() -> void:
+	if _screen in _GAME_SCREENS:
+		_show_title()
+
+
+## The ribbon opened or closed: the games rise above it, or come back down; the games screen's
+## hints give way to the ribbon's.
+func _on_search_opened(open: bool) -> void:
+	_games_hints.visible = not open
+	if _lift:
+		_lift.kill()
+	_lift = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_lift.tween_property(_row, ^"position:y", _row_y + (_search_lift if open else 0.0), GameSearch.RISE_S)
 
 
 func _on_consoles_selection_changed(index: int) -> void:
@@ -671,6 +729,7 @@ func _show_front(front: bool) -> void:
 	for part: Node3D in [_row, _consoles]:
 		part.visible = not front
 	_console_title.visible = not front
+	_search.visible = not front
 	_pill.visible = not front and not _shelves.is_empty()
 	_games_hints.visible = not front
 	if front:
@@ -838,8 +897,9 @@ func _cover() -> void:
 	_hold_select.stop()
 	_message_timer.stop()
 	_on_message_timer_timeout()
-	# A direction let go under the screens never reaches the row.
+	# A direction let go under the screens never reaches the row, nor the ribbon.
 	_row.freeze()
+	_search.let_go()
 	_art_progress.hide()
 	_add_ball.close(false)
 

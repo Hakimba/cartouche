@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=28 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -24,6 +24,8 @@
 [ext_resource type="Script" path="res://carousel/backdrop.gd" id="27"]
 [ext_resource type="Script" path="res://carousel/battery_chip.gd" id="28"]
 [ext_resource type="Script" path="res://carousel/resting.gd" id="29"]
+[ext_resource type="PackedScene" path="res://carousel/search/game_search.tscn" id="30"]
+[ext_resource type="Script" path="res://carousel/search/title_marks.gd" id="31"]
 
 [sub_resource type="ShaderMaterial" id="backdrop_material"]
 shader = ExtResource("3")
@@ -296,6 +298,17 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"Title"
 
+[node name="TitleMarks" type="Control" parent="Pill/Items/Title"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("31")
+
 [node name="GamesHints" type="HBoxContainer" parent="."]
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0)
@@ -320,6 +333,40 @@ theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"x"
 text = "Properties"
+
+[node name="ClearFilter" type="PanelContainer" parent="GamesHints"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"b"
+text = "Clear the filter"
+
+[node name="PreviousLetter" type="PanelContainer" parent="GamesHints"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"l1"
+
+[node name="NextLetter" type="PanelContainer" parent="GamesHints"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"r1"
+
+[node name="SearchHint" type="PanelContainer" parent="GamesHints"]
+layout_mode = 2
+theme_type_variation = &"ButtonHint"
+script = ExtResource("20")
+button = &"↓"
+text = "Search"
+
+[node name="Search" parent="." instance=ExtResource("30")]
+unique_name_in_owner = true
+layout_mode = 1
 
 [node name="Properties" parent="." instance=ExtResource("24")]
 unique_name_in_owner = true
@@ -402,7 +449,7 @@ row = NodePath("../Row")
 spindle = NodePath("../Row/Spindle")
 sequence = NodePath("../Sequence")
 blackout = NodePath("../Front/Blackout")
-controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill"), NodePath("../ConsoleTitle")]
+controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill"), NodePath("../ConsoleTitle"), NodePath("../Search")]
 
 [node name="Art" type="Node" parent="."]
 unique_name_in_owner = true

@@ -63,6 +63,9 @@ import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
 import app.cartouche.core.platforms.PlayerId
+import app.cartouche.core.search.Finder
+import app.cartouche.core.search.Finders
+import app.cartouche.core.search.Order
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.storage.DocumentId
@@ -87,6 +90,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -97,6 +101,7 @@ import org.godotengine.godot.plugin.SignalInfo
 import org.godotengine.godot.plugin.UsedByGodot
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import kotlin.time.TimeSource
 import app.cartouche.core.settings.Settings as AppSettings
 
@@ -165,11 +170,21 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /** Runs every library call, one at a time (see [LibraryService]). */
     private val libraryThread = Dispatchers.IO.limitedParallelism(1)
 
+    /** Makes the finders of each library kept, one at a time (see [prepare]). */
+    private val preparing =
+        Executors
+            .newSingleThreadExecutor {
+                Thread(it, "finders").apply { priority = Thread.MIN_PRIORITY }
+            }.asCoroutineDispatcher()
+
     /** Plans each look for art, one at a time, in the order asked. */
     private val artPlanning = Dispatchers.IO.limitedParallelism(1)
 
-    /** Only used on [libraryThread], which [useDemoLibrary] replaces it on. */
-    private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
+    /**
+     * Used on [libraryThread], which [useDemoLibrary] replaces it on; read from Godot's thread too,
+     * by [browse] and [titleMarks], for the finders it publishes.
+     */
+    @Volatile private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
 
     /** Only used on [libraryThread]. */
     private val settingsStore by lazy { SettingsStore(File(context.filesDir, "settings.json")) }
@@ -252,6 +267,28 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun prepareTitles() {
         scope.launch { titleLists.keys.forEach(::titles) }
     }
+
+    /**
+     * What the carousel shows of [platformId]'s shelf (see [View.toWireJson]): the games found for
+     * [typed], or with nothing typed the index by `title` or by `region` ([order]). Answers at once,
+     * from the library last kept; a platform without games has none.
+     */
+    @UsedByGodot
+    public fun browse(platformId: String, order: String, typed: String): String {
+        val started = TimeSource.Monotonic.markNow()
+        val finders = library.value.finders
+        val platform = PlatformId(platformId)
+        val view = finders.view(platform, if (order == "region") Order.REGION else Order.TITLE, typed)
+        return view.toWireJson(finders.size(platform)).also {
+            val spent = started.elapsedNow().inWholeMicroseconds
+            trace("search") { "'$typed' ($order): ${view.games.size} games, ${view.keys.size} keys in $spent µs" }
+        }
+    }
+
+    /** Where [typed] is in the title of the game at [position] on [platformId]'s shelf (see [Finder.marks]): JSON text, at once. */
+    @UsedByGodot
+    public fun titleMarks(platformId: String, position: Int, typed: String): String =
+        library.value.finders.marks(PlatformId(platformId), position, typed).toWireJson()
 
     /** Installed players able to open [fileName], in definition order. */
     @UsedByGodot
@@ -526,17 +563,19 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /**
      * Debug builds only: replaces the library with a made-up one of [games] games spread over the
-     * catalog's platforms, stored apart (the user's library is left alone), for measuring at
-     * scale; answers with `{"library"}`.
+     * catalog's platforms, or all on [platformId] unless it is empty (one shelf at fan size), stored
+     * apart (the user's library is left alone), for measuring at scale; answers with `{"library"}`.
      */
     @UsedByGodot
-    public fun useDemoLibrary(requestId: Int, games: Int): Unit = answering(requestId, libraryThread) {
+    public fun useDemoLibrary(requestId: Int, games: Int, platformId: String): Unit = answering(requestId, libraryThread) {
         ensure(BuildConfig.DEBUG) { invalid("The demo library only exists in debug builds") }
+        val platforms = if (platformId.isEmpty()) catalog.platforms.map { it.id } else listOf(platform(PlatformId(platformId)).id)
         // Named after the library format: a library saved by an older build is never measured again.
-        val folder = File(context.filesDir, "demo-${LibraryFormat.VERSION}-$games").apply { mkdirs() }
+        val name = "demo-${LibraryFormat.VERSION}-$games" + if (platformId.isEmpty()) "" else "-$platformId"
+        val folder = File(context.filesDir, name).apply { mkdirs() }
         val store = LibraryStore(File(folder, LIBRARY_FILE))
         if (store.load().fold({ true }) { it.library.games.isEmpty() }) {
-            store.save(DemoLibrary.of(games, catalog.platforms.map { it.id })).mapLeft { it.toWire() }.bind()
+            store.save(DemoLibrary.of(games, platforms)).mapLeft { it.toWire() }.bind()
         }
         library = lazyOf(libraryIn(folder))
         demo = true
@@ -711,7 +750,22 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         if ("--art-refused" in launchArguments()) Fetch { FetchFailure.Refused(503).left() } else HttpFetch("Cartouche")
 
     private fun libraryIn(folder: File): LibraryService =
-        LibraryService(LibraryStore(File(folder, LIBRARY_FILE)), SelectionStore(File(folder, "selection.json")), folders)
+        LibraryService(LibraryStore(File(folder, LIBRARY_FILE)), SelectionStore(File(folder, "selection.json")), folders, ::prepare)
+
+    /**
+     * Makes [finders] in the background, once the library call that kept them is over (its answer
+     * is not slowed down), on a thread of low priority that leaves the first frames their time: the
+     * first search of a shelf of thousands then answers at once.
+     */
+    private fun prepare(finders: Finders) {
+        scope.launch(preparing) {
+            // Queued after the call under way on the library's single thread.
+            withContext(libraryThread) {}
+            val started = TimeSource.Monotonic.markNow()
+            finders.prepare()
+            trace("search") { "finders made in ${started.elapsedNow().inWholeMilliseconds} ms" }
+        }
+    }
 
     /** Runs [block] on [libraryThread]; its failure becomes the answer. */
     private suspend fun <T> Raise<Dictionary>.inLibrary(block: LibraryService.() -> Either<LibraryFailure, T>): T =

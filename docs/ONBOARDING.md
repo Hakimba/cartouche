@@ -55,6 +55,13 @@ The same words are used in the code, the tests and this document.
 - **Shelf**: one platform's games in the carousel, in title order. The **selection** remembers the
   platform shown last and each platform's selected game, and places the user back when the app
   starts.
+- **Ribbon**: the row of keys (A to Z, 0 to 9, a space) that down opens under the games. With
+  nothing typed it is the shelf's **index**, by letter or by region, the carousel jumping to each
+  **group**; a key typed starts a **search**: the carousel keeps the games **found**, those whose
+  title has, for each word typed, another word starting with it, in any order. A key is **lit**
+  when typing it still finds a game. What is found can be **kept** while browsing it (the
+  **filter** shown at the top). L1 and R1 **leap** to the next group, or once keys are typed to
+  the next lit key.
 - **Place**: one of the carousel's recycled slots, showing a game's **model** (the 3D media of
   its platform) with a **label** on it: an image of the real one, or the game's title drawn on the
   platform's label colour.
@@ -176,6 +183,15 @@ The same words are used in the code, the tests and this document.
   gives the same shelves), and restores the `Selection` on them; `SelectionFormat` stores the
   selection in its own small file, so remembering it costs the same whatever the size of the
   library.
+- **`search/`** finds the games of a shelf: `Words` reads a title the way the search does (its
+  words in lowercase Latin letters and digits, accents and "the" left out, each with where it is in
+  the title, in characters, for underlining), `Query` what is typed, and `Finder`, made once per
+  shelf, answers the index (by title or by region: the order, the groups, where each key sends the
+  carousel) and the search (the games found in shelf order, and each lit key with the first game it
+  finds), each title filed under its first letter (`TitleLetter`; under **#** for a digit, a sign
+  or another script); it keeps what it found for the words typed lately, so that typing on (or erasing) only
+  narrows it. `Finders` makes them for a whole library at once, and stays the same across a save that
+  changes nothing searched (a launch, a label chosen).
 - **`platforms/CurtainTimes.kt`** reads how long the curtain stays over each emulator
   (`data/launch/curtains.json`, milliseconds per package name, from 0 for none to 10 s): the time
   its own screens (splash, game list) take to give way to the game, measured on a device by
@@ -229,7 +245,11 @@ The same words are used in the code, the tests and this document.
 - **`library/LibraryService.kt`** runs scans, counts (`preview`: the scan's own walk and sorting,
   nothing saved), choices, removals, selections and library launches on one thread, in the order
   they arrive. Setting a platform up or removing one gives up the access to folders no platform
-  uses any more.
+  uses any more. Each library it keeps is published with its `Finders` (`@Volatile`), made in the
+  background once the call that kept it is over, on a thread of low priority; the plugin's `browse`
+  and `titleMarks` read them at once from Godot's thread: a key typed is answered
+  within the frame, as JSON (`View.toWireJson`), with the shelf's size so that a view of another
+  library is set aside.
 - **`art/`** runs scraping: `Scraper` hands a run's requests to four workers, which download
   through the `Fetch` port (`HttpFetch` in the app, `FakeFetch` in tests), cut the scan to a
   square label (`ArtImages`: to its disc, 1,024 pixels at most, JPEG)
@@ -282,6 +302,11 @@ The same words are used in the code, the tests and this document.
   frame, until a game's art is read (`GameArt`: on a worker thread, one texture sent to the GPU a
   frame, the latest 24 kept); a game without a scan gets its shelf's blank (`LabelLook`, colours
   and band from `appearance.json`). `CarouselLayout` holds the mechanics as pure functions.
+  `GameSearch` (`carousel/search/`) is the ribbon: the carousel hands it ↓, L1, R1 and, while
+  what is found is kept, B; open, it takes every press. It asks the plugin for each view and shows
+  it with `ShelfRow.show_games` (the same models, another list) and `ShelfRow.jump`; the pill
+  underlines the words typed (`TitleMarks`), the hints tell where L1 and R1 lead. Without the
+  plugin (a desktop run) nothing is found, and the index is empty.
   Scraping's progress is a bar at the bottom right, beside the hints, where a message shows too: it moves to each count, greys with the reason while
   the run waits, fades once full, hides for a launch's message, and shows and fades with the pill
   in a launch animation. `Appearance` reads `appearance.json` once, each launch animation made once.
@@ -429,7 +454,8 @@ The same words are used in the code, the tests and this document.
 - **Debug arguments** (`--esa arguments` on the device, after `--` on a desktop):
   `--turntable=0.25` turns the selected game to show all its sides, `--shelf=gba` opens on a
   platform's shelf, `--art-refused` makes every art server refuse (to see the message and the
-  retries), `--demo-games=N` and `--bench=…` as in `dev/bench.sh`, `--shots=DIR` (`FrameShots`).
+  retries), `--demo-games=N` (all on one console with `--demo-shelf=ps2`, for a shelf of fan
+  size) and `--bench=…` as in `dev/bench.sh`, `--shots=DIR` (`FrameShots`).
 - **Shaders are only compiled when something is drawn**: the headless runs of `dev/build.sh` do
   not see their errors. After changing one, run the desktop demo or the device and look for
   `SHADER ERROR` in the log.

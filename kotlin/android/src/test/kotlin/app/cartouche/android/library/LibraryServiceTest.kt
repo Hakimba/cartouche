@@ -32,6 +32,8 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.catalog
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.playerJson
+import app.cartouche.core.search.Finders
+import app.cartouche.core.search.Query
 import app.cartouche.core.shelves.Selection
 import arrow.core.None
 import arrow.core.Some
@@ -349,6 +351,43 @@ class LibraryServiceTest {
         service().library().games.single { it.title == "Ico" }.label shouldBe LabelChoice.Automatic
         val missing = GameId("test/none")
         service.chooseLabel(missing, japan).shouldBeLeft(LibraryFailure.UnknownGame(missing))
+    }
+
+    @Test
+    fun `the search follows the library kept, a game renamed found under its new name, in the order of its shelf`() {
+        val service = scanned("Okage", "Ico", "The Bouncer")
+
+        fun LibraryService.found(typed: String) =
+            finders.of(platform.id).shouldBeSome().search(Query.of(typed).shouldBeSome()).games.map { at ->
+                shelves(listOf(platform.id)).shouldBeSome().shelves.single().games[at].shownTitle
+            }
+        service.found("o") shouldBe listOf("Okage")
+        service.rename(service.library().games.single { it.title == "Ico" }.id, DisplayName.of("Ico Odyssey")).shouldBeRight()
+        service.found("o") shouldBe listOf("Ico Odyssey", "Okage")
+        service.found("bou") shouldBe listOf("The Bouncer")
+        // Read again after a restart.
+        service().apply { library() }.found("o") shouldBe listOf("Ico Odyssey", "Okage")
+    }
+
+    @Test
+    fun `the finders are made anew, and prepared once, only when what is searched changes`() {
+        val prepared = mutableListOf<Finders>()
+        val service = LibraryService(LibraryStore(file), SelectionStore(selectionFile), Folders(context), prepared::add)
+        service.setUp(platform.id, PlatformSetup(Some(TREE))).shouldBeRight()
+        installDocuments { rows(fileRow("root/Okage (Disc 1).iso"), fileRow("root/Okage (Disc 2).iso"), fileRow("root/Ico.iso")) }
+        service.scan().shouldBeRight()
+        val scanned = service.finders
+        prepared.last() shouldBe scanned
+        val okage = service.library().games.single { it.title == "Okage" }
+        val count = prepared.size
+        // A launch from another disc saves the library: nothing searched changed.
+        service.recordLaunch(okage.id, 1).shouldBeRight()
+        service.finders shouldBe scanned
+        prepared.size shouldBe count
+        service.rename(okage.id, DisplayName.of("Okage: Shadow King")).shouldBeRight()
+        (service.finders === scanned) shouldBe false
+        prepared.size shouldBe count + 1
+        prepared.last() shouldBe service.finders
     }
 
     @Test

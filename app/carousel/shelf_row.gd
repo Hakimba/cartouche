@@ -116,19 +116,48 @@ func prepare(models: Array[PackedScene]) -> void:
 ## Shows [param games] (in shelf order) from index [param selected], on models of [param model]
 ## with labels of [param look].
 func show_shelf(games: Array[AndroidServices.Game], selected: int, model: PackedScene, look: LabelLook) -> void:
-	_games = games
 	_look = look
+	# Another shelf, or the same one again after a change: no label is kept.
+	_placed.clear()
+	for place in _places:
+		place.use_model(model)
+	set_process(true)
+	show_games(games, selected)
+
+
+## Shows [param games] instead, at least one, on the same models: the shelf's games found by a
+## search, or all of them again, from index [param selected]. A game still in view keeps its place
+## and its label.
+func show_games(games: Array[AndroidServices.Game], selected: int) -> void:
+	var kept: Dictionary[String, Place] = {}
+	for game: int in _placed:
+		kept[_games[game].id] = _placed[game]
+	_games = games
 	_position = selected
 	_scroll = selected
 	_turn = StickTurn.new()
 	_held = 0
-	set_process(true)
 	_placed.clear()
-	_unlabelled.clear()
 	for place in _places:
 		place.game = -1
-		place.use_model(model)
+	for game: int in CarouselLayout.offsets(_games.size(), _scroll):
+		var place: Place = kept.get(_games[game].id)
+		if place:
+			place.game = game
+			_placed[game] = place
+	_unlabelled = _unlabelled.filter(func(place: Place) -> bool: return place.game >= 0)
 	_arrange()
+
+
+## Brings the game at [param index] to the centre at once, the row sliding in from [param slide]
+## places before it, towards [param direction] (-1 or 1).
+func jump(index: int, direction: int, slide: float) -> void:
+	_position = CarouselLayout.nearest(_position, index, _games.size())
+	_scroll = _position - direction * slide
+	_turn.release()
+	if Diagnostics.enabled:
+		Diagnostics.trace("carousel", "jump to %d" % selected_index())
+	selection_changed.emit(selected_game())
 
 
 ## Whether the shelf has games; the other methods need one.

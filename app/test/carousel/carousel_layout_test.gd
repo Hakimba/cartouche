@@ -101,3 +101,17 @@ func test_INV_E2_02_a_shelf_of_4_games_is_shown_whole_and_one_of_5_goes_round() 
 	assert_int(CarouselLayout.stepped(3, 1, 4)).is_equal(0)
 	assert_array(CarouselLayout.offsets(5, 0.0).keys()).contains_exactly_in_any_order([3, 4, 0, 1, 2])
 	assert_int(CarouselLayout.stepped(4, 1, 5)).is_equal(5)
+
+
+func test_a_jump_goes_the_shorter_way_round_an_endless_row_and_straight_to_its_game_on_a_short_one() -> void:
+	var random := Fixtures.cases(94)
+	for i in Fixtures.CASES:
+		var count := random.randi_range(1, 40)
+		var index := random.randi_range(0, count - 1)
+		var position := random.randi_range(-100, 100) if count > WHOLE else random.randi_range(0, count - 1)
+		var target := CarouselLayout.nearest(position, index, count)
+		if count > WHOLE:
+			assert_int(posmod(target, count)).is_equal(index)
+			assert_int(absi(target - position) * 2).is_less_equal(count)
+		else:
+			assert_int(target).is_equal(index)

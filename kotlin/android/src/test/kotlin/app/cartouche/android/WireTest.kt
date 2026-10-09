@@ -39,6 +39,9 @@ import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
+import app.cartouche.core.search.Group
+import app.cartouche.core.search.Mark
+import app.cartouche.core.search.View
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.shelves.Selection
@@ -183,6 +186,16 @@ class WireTest {
         val found = sent.getValue("shelves").jsonObject
         found.getValue("selected").jsonPrimitive.int shouldBe 1
         found.getValue("shelves").jsonArray.map { it.jsonObject.getValue("selected").jsonPrimitive.int } shouldBe listOf(0, 1)
+    }
+
+    @Test
+    fun `what the carousel shows of a shelf reaches Godot as JSON of this shape, which the GDScript adapter reads`() {
+        val view = View(listOf(2, 0), listOf(Group("A", 0), Group("#", 1)), mapOf('a' to 0, ' ' to 1))
+        Json.parseToJsonElement(view.toWireJson(3)) shouldBe
+            Json.parseToJsonElement(
+                """{"count": 3, "games": [2, 0], "groups": [{"label": "A", "start": 0}, {"label": "#", "start": 1}], "keys": {"a": 0, " ": 1}}""",
+            )
+        Json.parseToJsonElement(listOf(Mark(0, 3), Mark(13, 4)).toWireJson()) shouldBe Json.parseToJsonElement("[[0, 3], [13, 4]]")
     }
 
     @Test

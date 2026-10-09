@@ -52,6 +52,15 @@ static func stepped(position: int, direction: int, count: int) -> int:
 	return position + direction if count > WHOLE_SHELF else posmod(position + direction, count)
 
 
+## The position showing game [param index] nearest [param position]: on an endless row, the one
+## the shorter way round.
+static func nearest(position: int, index: int, count: int) -> int:
+	if count <= WHOLE_SHELF:
+		return index
+	var ahead := posmod(index - position, count)
+	return position + (ahead if ahead * 2 <= count else ahead - count)
+
+
 ## How a game [param offset] places from the centre stands; the selected game is then posed (see
 ## [ShelfRow.Pose]).
 static func place(offset: float) -> Transform3D:

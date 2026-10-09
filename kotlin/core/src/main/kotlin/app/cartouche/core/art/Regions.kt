@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
+import arrow.core.Option
+import arrow.core.firstOrNone
 import arrow.core.getOrElse
 import arrow.core.getOrNone
 
@@ -50,6 +52,13 @@ internal object Regions {
             else -> OTHER_GROUPS + group.fold({ Group.entries.size }, Group::ordinal)
         }
     }
+
+    /** The umbrella regions, in the order of their groups: North America, Europe, Japan. */
+    val umbrellas: List<String> = Group.entries.map(Group::umbrella)
+
+    /** The umbrella region of the first of [game]'s regions whose group is known; none for the world or unknown regions. */
+    fun umbrellaOf(game: List<String>): Option<String> =
+        game.flatMap { GROUPS.getOrNone(same(it)).toList() }.firstOrNone().map(Group::umbrella)
 
     /** The name [region] goes by here, whichever source named it (`USA` is `North America`). */
     fun same(region: String): String = SAME.getOrElse(region) { region }

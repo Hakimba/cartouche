@@ -87,6 +87,28 @@ func installed_players(platform_id: String) -> Array[Player]:
 	return found
 
 
+## What the carousel shows of [param platform_id]'s shelf (see [Browse]): the games found for
+## [param typed], or with nothing typed the index by `title` or `region` ([param order]). Without
+## the plugin, nothing.
+func browse(platform_id: String, order: StringName, typed: String) -> Browse:
+	var text: String = _query(&"browse", [platform_id, String(order), typed], "{}")
+	var view: Dictionary = JSON.parse_string(text)
+	return Browse.new(view)
+
+
+## Where the words of [param typed] are in the title of the game at [param position] of
+## [param platform_id]'s shelf, as (start, length) in characters; none when it is not found.
+func title_marks(platform_id: String, position: int, typed: String) -> Array[Vector2i]:
+	var text: String = _query(&"titleMarks", [platform_id, position, typed], "[]")
+	var found: Array = JSON.parse_string(text)
+	var marks: Array[Vector2i] = []
+	for mark: Array in found:
+		var start: int = mark[0]
+		var length: int = mark[1]
+		marks.append(Vector2i(start, length))
+	return marks
+
+
 ## Installed players able to open [param file_name], in definition order.
 func candidates(file_name: String) -> Array[Candidate]:
 	var found: Array[Candidate] = []
@@ -228,13 +250,13 @@ func select_game(game: Game) -> Result:
 	return Result.new(await _request(&"selectGame", [game.id]))
 
 
-## Debug builds only: replaces the library with a made-up one of [param games] games, stored apart
-## from the user's, for measuring at scale. Without the plugin, the desktop demo's, whatever
-## [param games].
-func use_demo_library(games: int) -> LibraryAnswer:
+## Debug builds only: replaces the library with a made-up one of [param games] games, spread over
+## the platforms or all on [param platform_id], stored apart from the user's, for measuring at
+## scale. Without the plugin, the desktop demo's, whatever [param games].
+func use_demo_library(games: int, platform_id := "") -> LibraryAnswer:
 	if not is_available():
 		return LibraryAnswer.new({"ok": true, "library": JSON.stringify(_desktop_demo("library"))})
-	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games]))
+	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games, platform_id]))
 
 
 ## The images the art sources have for [param game]'s label, one per region, closest to the
@@ -320,10 +342,12 @@ static func _strings(item: Dictionary, key: String) -> PackedStringArray:
 	return PackedStringArray(texts)
 
 
+## Asks the plugin itself, even where a fake stands for its operations alone ([method is_available]).
 func _query(method: StringName, args: Array, fallback: Variant) -> Variant:
-	var value: Variant = _plugin.callv(method, args) if is_available() else fallback
-	# The catalog's arguments are the whole data files: not worth formatting.
-	if Diagnostics.enabled and method != &"loadCatalog":
+	var value: Variant = _plugin.callv(method, args) if _plugin else fallback
+	# The catalog's arguments are the whole data files, a shelf's view thousands of positions: not
+	# worth formatting (the plugin traces the view's size).
+	if Diagnostics.enabled and method not in [&"loadCatalog", &"browse"]:
 		Diagnostics.trace("plugin", "%s%s = %s" % [method, args, value])
 	return value
 
@@ -668,6 +692,42 @@ class Shelf:
 		for index: int in item["games"]:
 			games.append(all_games[index])
 		selected = item["selected"]
+
+
+## What the carousel shows of a shelf, sent as JSON (see `View.toWireJson` in `Wire.kt`).
+class Browse:
+	## How many games the shelf has, as the plugin knows it: a view of another library is not
+	## for the shelf shown.
+	var count: int
+	## Positions in the shelf of the games shown, in their order.
+	var games := PackedInt32Array()
+	## The index's groups of [member games] (none while searching).
+	var groups: Array[Group] = []
+	## Each key of the ribbon that leads to a game (a lowercase letter, a digit, a space), and the
+	## index into [member games] it brings the carousel to.
+	var keys: Dictionary[String, int] = {}
+
+	func _init(item: Dictionary) -> void:
+		count = item.get("count", 0)
+		var positions: Array = item.get("games", [])
+		games = PackedInt32Array(positions)
+		for group: Dictionary in item.get("groups", []):
+			groups.append(Group.new(group))
+		var found: Dictionary = item.get("keys", {})
+		for key: String in found:
+			# JSON numbers are read as floats.
+			var at: int = found[key]
+			keys[key] = at
+
+
+## The games of a view from [member start] on that share a [member label]: a letter, `#`, a region.
+class Group:
+	var label: String
+	var start: int
+
+	func _init(item: Dictionary) -> void:
+		label = item["label"]
+		start = item["start"]
 
 
 ## The library, sent as JSON (see `toWireJson` in `Wire.kt`).

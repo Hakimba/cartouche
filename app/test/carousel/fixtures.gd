@@ -315,13 +315,15 @@ class FakeAndroid extends AndroidServices:
 	var start_code := &""
 	var late := false
 	var silent: Array[StringName] = []
-	## Called as the game starts, before the answer.
+	## Called as the game starts, before the answer; as it is checked, with the game.
 	var on_start := func() -> void: pass
+	var on_check := func(_game: AndroidServices.Game) -> void: pass
 	var checks := 0
 	var starts := 0
 
-	func check_launch(_game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
+	func check_launch(game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
 		checks += 1
+		on_check.call(game)
 		return await _answer(&"check", check_code)
 
 	func launch_game(_game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:

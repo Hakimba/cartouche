@@ -53,11 +53,11 @@ public data class Shelves(public val shelves: NonEmptyList<Shelf>, public val se
          */
         public fun of(library: Library, platforms: List<PlatformId>, selection: Selection): Option<Shelves> {
             val order = titleOrder()
-            val byPlatform = library.games.groupBy { it.platform }
+            val byPlatform = gamesByPlatform(library)
             val shelves =
                 library.inConsoleOrder(platforms).flatMap { platform ->
-                    val games = byPlatform.getOrElse(platform) { emptyList() }.sortedWith(compareBy(order, SelectedGame::of))
-                    games
+                    byPlatform
+                        .getOrElse(platform) { emptyList() }
                         .toNonEmptyListOrNone()
                         .map { shelf ->
                             Shelf(platform, shelf, selection.games.getOrNone(platform).fold({ 0 }) { shelf.indexOf(it, order) })
@@ -66,6 +66,12 @@ public data class Shelves(public val shelves: NonEmptyList<Shelf>, public val se
             return shelves.toNonEmptyListOrNone().map { found ->
                 Shelves(found, found.indexOfFirst { Some(it.platform) == selection.platform }.coerceAtLeast(0))
             }
+        }
+
+        /** Each platform's games of [library] in the order of its shelf, whether or not the catalog has the platform. */
+        public fun gamesByPlatform(library: Library): Map<PlatformId, List<Game>> {
+            val order = titleOrder()
+            return library.games.groupBy { it.platform }.mapValues { (_, games) -> games.sortedWith(compareBy(order, SelectedGame::of)) }
         }
 
         /** Titles as a reader sorts them (case and accents count last), then ids: a total order. */
