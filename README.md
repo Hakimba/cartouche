@@ -13,15 +13,17 @@ it and make it theirs; I tried to keep the codebase easy to get into.
 
 ## Status
 
-Early development. The first platform is the PlayStation 2.
+Early development. The PlayStation 2 came first, then the NES, Super Nintendo, Nintendo 64, Game Boy,
+Game Boy Color, Game Boy Advance, GameCube, Wii, PlayStation, Xbox and Xbox 360.
 
 - **Library:** your ROM folders scanned, games identified against the Redump lists.
-- **Consoles:** your consoles in 3D; go into one to see its games.
+- **Consoles:** your consoles in 3D, each modelled after the real one, its lid, tray or slot moving;
+  go into one to see its games.
 - **Carousel:** games as 3D discs and cartridges, one shelf per console, 60 fps with thousands of
   games.
-- **Launching:** the disc goes into the console, then the game starts in its emulator, which stays
-  hidden until the game shows.
-- **Labels:** each game's real disc label, downloaded in the background.
+- **Launching:** the disc or cartridge goes into the console, each its own way, then the game starts
+  in its emulator, which stays hidden until the game shows.
+- **Labels:** each game's real disc or cartridge label, downloaded in the background.
 - **Setting up:** everything with the controller: first launch, adding, editing and removing
   consoles, button style, and in Graphics how smooth the edges are drawn (4× unless you choose 2× or
   none, for less work on the graphics card).
@@ -69,8 +71,8 @@ Cartouche builds on these projects, and thanks their authors.
 | Project | Used for | License |
 |---|---|---|
 | [Daijishō](https://github.com/TapiocaFox/Daijishou) | Platform and emulator definitions (`app/data/platforms/daijishou/`) | MIT |
-| [libretro-database](https://github.com/libretro/libretro-database) | Redump disc titles and serials (`app/data/redump/`) | CC BY-SA 4.0 |
-| [LaunchBox Games Database](https://gamesdb.launchbox-app.com) | Which disc scans each game has (`app/data/art/`), and the scans, downloaded on the device | Used with the database's public dump; images stay their owners' |
+| [libretro-database](https://github.com/libretro/libretro-database) | Redump and No-Intro game titles and serials (`app/data/titles/`) | CC BY-SA 4.0 |
+| [LaunchBox Games Database](https://gamesdb.launchbox-app.com) | Which disc and cartridge scans each game has (`app/data/art/`), and the scans, downloaded on the device | Used with the database's public dump; images stay their owners' |
 | [PlayStation DataCenter](https://psxdatacenter.com) | PS2 disc scans by serial, downloaded on the device | Images stay their owners' |
 | [Fredoka](https://github.com/hafontia/Fredoka-One) | The app's font (`app/fonts/`) | SIL Open Font License 1.1 |
 | [Godot Engine](https://godotengine.org) | Engine, and the Android plugin template the plugin started from | MIT |

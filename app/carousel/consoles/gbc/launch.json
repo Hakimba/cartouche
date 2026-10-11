@@ -1,0 +1,519 @@
+{
+ "model_hash": "b407dca7c71994d05bef77956bd10d8f4f45040ac3fa19856db85e598b5a019a",
+ "choice": 2,
+ "steps": [
+  {
+   "dur": 0,
+   "ease": "inOut",
+   "hold": 0.5,
+   "parts": {
+    "light_energy": 0,
+    "power_mm": 0
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 1,
+    "lift": 13.5,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 0
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 1
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 1,
+    "bar": 1,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 1,
+    "px": 0.443,
+    "py": 1.679,
+    "pz": 0,
+    "rx": -8,
+    "ry": 0,
+    "rz": 0,
+    "scale": 0.5,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.8,
+   "ease": "inOut",
+   "hold": 0,
+   "parts": {
+    "light_energy": 0,
+    "power_mm": 0
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 1,
+    "lift": 13.5,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 0
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 0,
+    "bar": 1,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": -0.036,
+    "py": -0.573,
+    "pz": 19.263,
+    "rx": -2,
+    "ry": 180,
+    "rz": 0,
+    "scale": 0.6,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.5,
+   "ease": "out",
+   "hold": 0,
+   "parts": {
+    "light_energy": 0,
+    "power_mm": 0
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 1,
+    "lift": 13.5,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 1
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 1,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 8.848,
+    "opacity": 0.5,
+    "sat": 0.7
+   },
+   "ui": {
+    "art": 1,
+    "bar": 1,
+    "pill": 1,
+    "tabs": 1
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": -0.036,
+    "py": -0.573,
+    "pz": 19.263,
+    "rx": -2,
+    "ry": 180,
+    "rz": 0,
+    "scale": 0.6,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.45,
+   "ease": "inOut",
+   "hold": 0,
+   "parts": {
+    "light_energy": 0,
+    "power_mm": 0
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 0,
+    "lift": 6.05,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 1
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 0,
+    "bar": 0,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": 0.034,
+    "py": 0.215,
+    "pz": 17.41,
+    "rx": 5,
+    "ry": 180,
+    "rz": 0,
+    "scale": 0.55,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.3,
+   "ease": "out",
+   "hold": 0.2,
+   "parts": {
+    "light_energy": 0,
+    "power_mm": 0
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 0,
+    "lift": 2.99,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 1
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 0,
+    "bar": 0,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": 0.034,
+    "py": 0.215,
+    "pz": 17.41,
+    "rx": 5,
+    "ry": 180,
+    "rz": 0,
+    "scale": 0.55,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.09,
+   "ease": "in",
+   "hold": 0.3,
+   "parts": {
+    "light_energy": 0,
+    "power_mm": 0
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 0,
+    "lift": 0,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 1
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 0,
+    "bar": 0,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": 0.034,
+    "py": -0.135,
+    "pz": 17.41,
+    "rx": 5,
+    "ry": 180,
+    "rz": 0,
+    "scale": 0.5583,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.55,
+   "ease": "inOut",
+   "hold": 0.05,
+   "parts": {
+    "light_energy": 2.5,
+    "power_mm": 4.5
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 0,
+    "lift": 0,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 1
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 0,
+    "bar": 0,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": 0.034,
+    "py": 2.279,
+    "pz": 19.263,
+    "rx": 0,
+    "ry": 0,
+    "rz": 0,
+    "scale": 0.5617,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.45,
+   "ease": "inOut",
+   "hold": 0,
+   "parts": {
+    "light_energy": 2.5,
+    "power_mm": 4.5
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 0,
+    "lift": 0,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 1
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 0,
+    "bar": 0,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 0.55
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": 0,
+    "py": -5.241,
+    "pz": 19.263,
+    "rx": 0,
+    "ry": 0,
+    "rz": 0,
+    "scale": 2.2063,
+    "sway": 3.5
+   }
+  },
+  {
+   "dur": 0.25,
+   "ease": "out",
+   "hold": 0.3,
+   "parts": {
+    "light_energy": 2.5,
+    "power_mm": 4.5
+   },
+   "disc": {
+    "dx": 0,
+    "dy": 0,
+    "inRow": 0,
+    "lift": 0,
+    "rx": 0,
+    "ry": 0,
+    "spin": 0,
+    "visible": 1
+   },
+   "row": {
+    "pose": 1,
+    "scale": 1,
+    "show": 0,
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "consoles": {
+    "show": 0
+   },
+   "look": {
+    "blur": 0.0,
+    "opacity": 1,
+    "sat": 1
+   },
+   "ui": {
+    "art": 0,
+    "bar": 0,
+    "pill": 0,
+    "tabs": 0
+   },
+   "fx": {
+    "black": 0,
+    "fade": 1
+   },
+   "console": {
+    "bob": 0.25,
+    "pose": 0,
+    "px": 0,
+    "py": -5.241,
+    "pz": 19.263,
+    "rx": 0,
+    "ry": 0,
+    "rz": 0,
+    "scale": 2.2063,
+    "sway": 3.5
+   }
+  }
+ ]
+}

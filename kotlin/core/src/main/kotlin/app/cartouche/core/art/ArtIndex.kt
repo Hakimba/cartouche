@@ -3,6 +3,7 @@ package app.cartouche.core.art
 
 import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.TitleKey
+import app.cartouche.core.regions.Regions
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -14,7 +15,8 @@ import arrow.core.singleOrNone
 
 /**
  * One platform's extract of the LaunchBox Games Database (`app/data/art`, written by
- * `dev/launchbox_art.py`): each game's disc scans, by region, found by title.
+ * `dev/launchbox_art.py`): each game's scans, by region, found by title, all of the type of image
+ * its platform's profile names (`ArtKind`: a disc's face, a cartridge's front).
  */
 public class ArtIndex private constructor(
     /** None when the file does not name the database's date on its first line. */
@@ -29,25 +31,25 @@ public class ArtIndex private constructor(
     }
 
     /**
-     * The disc scans of the game titled [title], closest to [regions] first (see [Regions]). The title
+     * The scans of the game titled [title], closest to [regions] first (see [Regions]). The title
      * is the game's name, or else one of its alternate names, whatever their case, accents,
      * punctuation and spaces; a title that names several games names none, as it could be any of them.
      */
     public fun scansOf(title: String, regions: List<String>): List<ArtUrl> =
-        discsOf(title).sortedBy { Regions.rank(regions, it.region) }.map { it.url }
+        imagesOf(title).sortedBy { Regions.rank(regions, it.region) }.map { it.url }
 
     /**
-     * The disc scan of each region the extract has for the game titled [title] (found as by
+     * The scan of each region the extract has for the game titled [title] (found as by
      * [scansOf]), closest to [regions] first: one per region, the first the extract lists for it,
      * whichever name a source gives the region (`USA` and `North America` are one).
      */
-    public fun variantsOf(title: String, regions: List<String>): List<ArtVariant> = discsOf(title)
+    public fun variantsOf(title: String, regions: List<String>): List<ArtVariant> = imagesOf(title)
         .map { ArtVariant(LabelRegion(Regions.same(it.region)), it.url) }
         .distinctBy { it.region }
         .sortedBy { Regions.rank(regions, it.region.name) }
 
     /** The scans of the one game titled [title], in the extract's order; none when no game or several are. */
-    private fun discsOf(title: String): List<Image> = key(title)
+    private fun imagesOf(title: String): List<Image> = key(title)
         .let { key -> byName.getOrElse(key) { byAlternateName.getOrElse(key) { emptyList() } } }
         .singleOrNone()
         .getOrElse { emptyList() }
@@ -57,7 +59,7 @@ public class ArtIndex private constructor(
 
         private const val IMAGES = "https://images.launchbox-app.com/"
 
-        /** Reads an extract; lines that are not `name<TAB>alternate names<TAB>discs` are skipped. */
+        /** Reads an extract; lines that are not `name<TAB>alternate names<TAB>scans` are skipped. */
         public fun parse(text: String): ArtIndex {
             val version = versionOf(text)
             val games = text.lines().map(::parseLine).filterOption()

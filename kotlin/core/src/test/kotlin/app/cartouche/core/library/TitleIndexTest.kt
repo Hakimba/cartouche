@@ -11,15 +11,16 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.Test
 
 class TitleIndexTest {
-    private val ps2Text = Shipped.text("redump/ps2.tsv")
+    private val ps2Text = Shipped.text("titles/ps2.tsv")
     private val ps2 = Shipped.ps2Titles
 
     private fun identify(fileName: String) = ps2.identify(GameName.parse(fileName))
 
     @Test
-    fun `the shipped PS2 list parses whole`() {
+    fun `every shipped list parses whole`() {
         ps2.size shouldBe ps2Text.lines().count { it.isNotBlank() }
         ps2.size shouldBeGreaterThan 10_000
+        Shipped.lists("titles").values.forEach { text -> TitleIndex.parse(text).size shouldBe text.lines().count { it.isNotBlank() } }
     }
 
     @Test

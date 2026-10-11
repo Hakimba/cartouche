@@ -91,9 +91,9 @@ func test_INV_E3_07_the_black_grows_from_nothing_to_the_whole_screen_once_the_ga
 
 func test_INV_E3_08_every_medium_has_an_insertion_short_enough_for_the_launch_budget() -> void:
 	var appearance: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(APPEARANCE))
-	var models: Dictionary = appearance["models"]
+	var kind_media: Dictionary = appearance["kind_media"]
 	var insertions: Dictionary = appearance["insertions"]
-	for media: String in models:
+	for media: String in kind_media:
 		assert_bool(insertions.has(media)).override_failure_message("no insertion for %s" % media).is_true()
 		var data: Dictionary = insertions[media]
 		assert_dict(Insertion.problems(data)).override_failure_message("%s: %s" % [media, Insertion.problems(data)]).is_empty()

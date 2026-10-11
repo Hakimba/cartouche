@@ -2,8 +2,10 @@
 package app.cartouche.core.art
 
 import app.cartouche.core.Shipped
+import app.cartouche.core.platforms.SerialScans
 import io.kotest.assertions.arrow.core.shouldBeNone
 import io.kotest.assertions.arrow.core.shouldBeSome
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldStartWith
 import io.kotest.property.Arb
@@ -13,7 +15,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
 class SerialScansTest {
-    private val source = SerialScans.of("https://scans.test/{serial}/{serial}-D.jpg").shouldBeSome()
+    private val source = SerialScans.of("https://scans.test/{serial}/{serial}-D.jpg", PLAYSTATION_SERIAL).shouldBeSome()
 
     @Test
     fun `a disc's scan is named after each of its serials, in order, once`() {
@@ -27,17 +29,26 @@ class SerialScansTest {
     }
 
     @Test
-    fun `every serial of the shipped PS2 list makes an https URL of the shipped source`() = runBlocking<Unit> {
-        val shipped = SerialScans.of(Shipped.ps2.profile.scansBySerial.shouldBeSome()).shouldBeSome()
-        val serials = Shipped.text("redump/ps2.tsv").lines().flatMap { line -> line.substringAfter('\t').split(',') }
+    fun `every serial of the shipped PS2 list makes an https URL of the shipped source, and most are of its form`() = runBlocking<Unit> {
+        val shipped = Shipped.ps2.profile.scansBySerial.shouldBeSome()
+        val serials = Shipped.text("titles/ps2.tsv").lines().flatMap { line -> line.substringAfter('\t').split(',') }
         checkAll(Arb.element(serials)) { serial ->
             shipped.scansOf(listOf(serial)).forEach { it.value shouldStartWith "https://psxdatacenter.com/" }
         }
+        serials.count { shipped.scansOf(listOf(it)).isNotEmpty() } shouldBeGreaterThan serials.size * 3 / 4
     }
 
     @Test
-    fun `a source that is not https or names no serial is none`() {
-        SerialScans.of("http://scans.test/{serial}.jpg").shouldBeNone()
-        SerialScans.of("https://scans.test/disc.jpg").shouldBeNone()
+    fun `a source names only serials of its platform's form`() {
+        val cartridges = SerialScans.of("https://scans.test/{serial}.png", "[A-Z0-9]{4}").shouldBeSome()
+        cartridges.scansOf(listOf("BJBE", "SLES-53047", "bjbe", "AGB-BJBE")).map { it.value } shouldBe listOf("https://scans.test/BJBE.png")
+        source.scansOf(listOf("BJBE")) shouldBe emptyList()
+    }
+
+    @Test
+    fun `a source that is not https, names no serial or no form of serial is none`() {
+        SerialScans.of("http://scans.test/{serial}.jpg", PLAYSTATION_SERIAL).shouldBeNone()
+        SerialScans.of("https://scans.test/disc.jpg", PLAYSTATION_SERIAL).shouldBeNone()
+        SerialScans.of("https://scans.test/{serial}.jpg", "[A-Z").shouldBeNone()
     }
 }

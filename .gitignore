@@ -9,3 +9,4 @@ app/addons/cartouche_android/bin/
 *.aab
 *.keystore
 app/addons/gdUnit4
+app/override.cfg

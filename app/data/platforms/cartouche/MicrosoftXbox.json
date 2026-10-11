@@ -1,0 +1,42 @@
+{
+  "databaseVersion": 14,
+  "revisionNumber": 1,
+  "platform": {
+    "name": "Microsoft Xbox",
+    "uniqueId": "xbox",
+    "shortname": "xbox",
+    "description": null,
+    "acceptedFilenameRegex": "^(?!(?:\\._|\\.).*).*$",
+    "scraperSourceList": [],
+    "boxArtAspectRatioId": 2,
+    "useCustomBoxArtAspectRatio": false,
+    "customBoxArtAspectRatio": null,
+    "screenAspectRatioId": 1,
+    "useCustomScreenAspectRatio": false,
+    "customScreenAspectRatio": null,
+    "retroAchievementsConsoleIdList": [],
+    "extra": ""
+  },
+  "playerList": [
+    {
+      "name": "xbox - hakuX",
+      "uniqueId": "xbox.com.rfandango.haku_x",
+      "description": "Supported extensions: iso, xiso.",
+      "acceptedFilenameRegex": "^(.*)\\.(?:iso|xiso)$",
+      "amStartArguments": "-n com.rfandango.haku_x/.LauncherActivity\n -a android.intent.action.VIEW\n -d {file.uri}",
+      "killPackageProcesses": false,
+      "killPackageProcessesWarning": true,
+      "extra": ""
+    },
+    {
+      "name": "xbox - X1 BOX",
+      "uniqueId": "xbox.com.izzy2lost.x1box",
+      "description": "Supported extensions: iso, xiso.",
+      "acceptedFilenameRegex": "^(.*)\\.(?:iso|xiso)$",
+      "amStartArguments": "-n com.izzy2lost.x1box/.LauncherActivity\n -a android.intent.action.VIEW\n -d {file.uri}",
+      "killPackageProcesses": false,
+      "killPackageProcessesWarning": true,
+      "extra": ""
+    }
+  ]
+}

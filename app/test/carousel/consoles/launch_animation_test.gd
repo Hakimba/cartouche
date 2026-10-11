@@ -10,12 +10,12 @@ const DEFAULTS: Dictionary[String, Dictionary] = {
 	"console": {"px": 0.0, "py": 0.0, "pz": 0.0, "rx": 0.0, "ry": 0.0, "rz": 0.0, "scale": 1.0, "pose": 1.0,
 		"sway": 7.0, "bob": 0.5},
 	"consoles": {"show": 1.0},
-	"lid": {"angle": 0.0},
+	"parts": {"lid_degrees": 0.0, "flap_cm": 1.5},
 	"disc": {"visible": 1.0, "inRow": 1.0, "lift": 0.0, "dx": 0.0, "dy": 0.0, "rx": 0.0, "ry": 0.0, "spin": 0.0},
 	"row": {"show": 1.0, "x": 0.0, "y": 0.0, "z": 0.0, "scale": 1.0, "pose": 1.0},
 	"look": {"blur": 0.0, "opacity": 1.0, "sat": 1.0},
 	"ui": {"bar": 1.0, "tabs": 1.0, "pill": 1.0},
-	"fx": {"black": 0.0},
+	"fx": {"black": 0.0, "fade": 0.0},
 }
 ## Where carousel.tscn stands the games' row, in centimetres: the steps move it from there.
 const ROW_HEIGHT_CM := 1.8
@@ -32,12 +32,12 @@ func test_INV_E5_03_each_step_is_reached_exactly_and_held_until_the_next_leaves(
 	var random := Fixtures.cases(51)
 	for i in 300:
 		var data := Fixtures.launch_steps(random)
-		var animation := LaunchAnimation.build(data)
+		var animation := LaunchAnimation.build(data, _console())
 		var steps: Array = data["steps"]
 		var times := _times(steps)
 		for s in steps.size():
 			var step: Dictionary = steps[s]
-			for track in LaunchAnimation.TRACKS:
+			for track in _tracks():
 				var index := animation.find_track(NodePath(track), Animation.TYPE_VALUE)
 				var held := maxf(times[s].x, times[s].y - KEY_SNAP_S)
 				for at: float in [times[s].x, lerpf(times[s].x, held, random.randf())]:
@@ -49,7 +49,7 @@ func test_INV_E5_03_between_two_steps_each_value_follows_the_step_s_curve() -> v
 	var followed: Dictionary[String, int] = {}
 	for i in 300:
 		var data := Fixtures.launch_steps(random)
-		var animation := LaunchAnimation.build(data)
+		var animation := LaunchAnimation.build(data, _console())
 		var steps: Array = data["steps"]
 		var times := _times(steps)
 		for s in range(1, steps.size()):
@@ -59,7 +59,7 @@ func test_INV_E5_03_between_two_steps_each_value_follows_the_step_s_curve() -> v
 			# Not at a key, which the animation would read as the key's own (see KEY_SNAP_S).
 			var u := random.randf_range(0.01, 0.99)
 			var at := lerpf(times[s - 1].y, times[s].x, u)
-			for track in LaunchAnimation.TRACKS:
+			for track in _tracks():
 				var index := animation.find_track(NodePath(track), Animation.TYPE_VALUE)
 				var a: Variant = _expected(track, from)
 				var b: Variant = _expected(track, to)
@@ -86,11 +86,11 @@ func test_INV_E5_03_before_its_start_and_after_its_end_the_animation_holds_its_f
 	var random := Fixtures.cases(53)
 	for i in 200:
 		var data := Fixtures.launch_steps(random)
-		var animation := LaunchAnimation.build(data)
+		var animation := LaunchAnimation.build(data, _console())
 		var steps: Array = data["steps"]
 		var first: Dictionary = steps[0]
 		var last: Dictionary = steps[-1]
-		for track in LaunchAnimation.TRACKS:
+		for track in _tracks():
 			var index := animation.find_track(NodePath(track), Animation.TYPE_VALUE)
 			_assert_near(animation.value_track_interpolate(index, -1.0), _expected(track, first), EPSILON, track)
 			_assert_near(animation.value_track_interpolate(index, animation.length + 1.0), _expected(track, last),
@@ -128,19 +128,54 @@ func test_fewer_than_two_steps_make_no_animation() -> void:
 		assert_int(animation.get_track_count()).is_equal(0)
 
 
-func test_INV_E5_08_every_console_takes_a_game_to_the_whole_screen_black_in_2_4_s_at_most() -> void:
-	var appearance: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(APPEARANCE))
-	var consoles: Dictionary = appearance["consoles"]
-	assert_int(consoles.size()).is_greater(0)
-	for platform_id: String in consoles:
-		var console: Dictionary = consoles[platform_id]
-		var steps: String = console["steps"]
-		var animation := LaunchAnimation.read(steps)
-		var launch := LaunchAnimation.moment(animation, &"launch")
-		var black := LaunchAnimation.moment(animation, &"black", INF)
-		assert_float(animation.length).is_greater(launch)
-		assert_float(black).is_less_equal(animation.length)
-		assert_float(black - launch).is_less_equal(2.4)
+func test_INV_E10_01_a_steps_file_moving_a_part_the_console_lacks_is_read_as_no_animation() -> void:
+	var path := "user://launch-animation-test.json"
+	for part: String in ["lid_degrees", "tray_cm"]:
+		var file := FileAccess.open(path, FileAccess.WRITE)
+		file.store_string(JSON.stringify({"choice": 1, "steps": [{}, {"dur": 0.5, "parts": {part: 1.0}}]}))
+		file.close()
+		var tracks := LaunchAnimation.read(path, _console()).get_track_count()
+		assert_int(tracks).is_equal(_tracks().size() if part == "lid_degrees" else 0)
+	DirAccess.remove_absolute(path)
+
+
+func test_INV_E5_08_every_console_takes_a_game_to_the_whole_screen_black_in_2_4_s_unless_its_own_steps_take_longer() -> void:
+	var manifests := ConsoleManifest.found()
+	assert_int(manifests.size()).is_greater(0)
+	for found in manifests:
+		# Each version of a platform's console in an appearance of its own, with its own steps, then
+		# as if it had none.
+		var placeholder: ConsoleManifest = found.duplicate()
+		placeholder.launch = ""
+		for manifest: ConsoleManifest in [found, placeholder]:
+			var appearance := Appearance.read(APPEARANCE)
+			appearance._consoles[manifest.platform] = manifest
+			var animation := appearance.animation_of(Fixtures.platform(manifest.platform),
+				Fixtures.media(manifest.platform)[0])
+			var launch := LaunchAnimation.moment(animation, &"launch")
+			var black := LaunchAnimation.moment(animation, &"black", INF)
+			assert_float(animation.length).is_greater(launch)
+			assert_float(black).is_less_equal(animation.length)
+			assert_float(black).is_greater(launch)
+			if manifest.launch.is_empty():
+				assert_float(black - launch).is_less_equal(2.4)
+
+
+## A console whose parts the steps of [method Fixtures.launch_steps] move, at rest as [constant
+## DEFAULTS] has them.
+func _console() -> Fixtures.Console:
+	var console: Fixtures.Console = auto_free(Fixtures.Console.new())
+	console.name = "Console"
+	console.moving = [MovingPart.new(&"lid_degrees", MovingPart.Role.OPENING, 0.0, 88.0),
+		MovingPart.new(&"flap_cm", MovingPart.Role.POWER, 1.5, -2.0)]
+	return console
+
+
+## The tracks of [method _console]'s animations: the carousel's, then its parts'.
+static func _tracks() -> Array[String]:
+	var tracks := LaunchAnimation.TRACKS.duplicate()
+	tracks.append_array(["Consoles/Console:lid_degrees", "Consoles/Console:flap_cm"])
+	return tracks
 
 
 ## When each step is reached (x) and when its hold is over (y): a hundredth of a second at least
@@ -187,8 +222,10 @@ static func _expected(track: String, step: Dictionary) -> Variant:
 			return _read(step, "console", "bob") / 10.0
 		"Consoles:others_opacity":
 			return _read(step, "consoles", "show")
-		"Consoles:lid_degrees":
-			return _read(step, "lid", "angle")
+		"Consoles/Console:lid_degrees":
+			return _read(step, "parts", "lid_degrees")
+		"Consoles/Console:flap_cm":
+			return _read(step, "parts", "flap_cm")
 		"Row:position":
 			return (_vector(step, "row", "x", "y", "z") + Vector3.UP * ROW_HEIGHT_CM) / 10.0
 		"Row:scale":
@@ -217,6 +254,8 @@ static func _expected(track: String, step: Dictionary) -> Variant:
 			return _read(step, "look", "sat")
 		"Sequence:black":
 			return _read(step, "fx", "black")
+		"Sequence:fade":
+			return _read(step, "fx", "fade")
 		"TopBar:modulate:a":
 			return _read(step, "ui", "bar")
 		"Pill:modulate:a", "ArtProgress:modulate:a":
@@ -225,11 +264,12 @@ static func _expected(track: String, step: Dictionary) -> Variant:
 	return NAN
 
 
-## Where the disc, out of the row, is down on the spindle; where the black is whole.
+## Where the disc, out of the row, is down on the spindle; where the black is whole, grown from the
+## seat or faded over the screen.
 static func _reaches(moment: StringName, step: Dictionary) -> bool:
 	if moment == &"seated":
 		return _read(step, "disc", "inRow") == 0.0 and _read(step, "disc", "lift") == 0.0
-	return _read(step, "fx", "black") == 1.0
+	return _read(step, "fx", "black") == 1.0 or _read(step, "fx", "fade") == 1.0
 
 
 static func _read(step: Dictionary, group: String, key: String) -> float:

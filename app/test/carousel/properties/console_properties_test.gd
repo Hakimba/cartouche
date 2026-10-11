@@ -75,7 +75,7 @@ func test_a_name_erased_whole_gives_the_console_its_own_name() -> void:
 	var setup := await _on_consoles({"ps2": "Mine"})
 	var carousel: Carousel = setup[0]
 	var device: Fixtures.NewDevice = setup[1]
-	var own: String = carousel._appearance.console_names["ps2"]
+	var own: String = carousel._appearance.console_of("ps2").name
 	await _on_keyboard(carousel)
 	for letter in "Mine":
 		await Fixtures.joypad(self, JOY_BUTTON_X)
@@ -211,7 +211,7 @@ func test_its_own_name_typed_back_is_no_name() -> void:
 	var setup := await _on_consoles({"ps2": "Mine"})
 	var carousel: Carousel = setup[0]
 	var device: Fixtures.NewDevice = setup[1]
-	var own: String = carousel._appearance.console_names["ps2"]
+	var own: String = carousel._appearance.console_of("ps2").name
 	await _on_keyboard(carousel)
 	carousel._console_properties._naming.open(own.replace(" ", "  "), own)
 	await Fixtures.joypad(self, JOY_BUTTON_START)

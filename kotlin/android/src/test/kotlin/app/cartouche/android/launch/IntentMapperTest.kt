@@ -54,6 +54,16 @@ class IntentMapperTest {
     }
 
     @Test
+    fun `INV-E0-12 aX360e gets the game URI as text under its own action, and read access to that URI alone`() {
+        val intent = intentFor("-n aenu.ax360e/aenu.ax360e.EmulatorActivity -a aenu.intent.action.AX360E --es game_uri {file.uri}")
+        intent.action shouldBe "aenu.intent.action.AX360E"
+        intent.getStringExtra("game_uri") shouldBe GAME_URI
+        intent.clipData.shouldNotBeNull().let { clip -> (0 until clip.itemCount).map { clip.getItemAt(it).uri.toString() } } shouldBe
+            listOf(GAME_URI)
+        intent.flags and GRANT_FLAGS shouldBe Intent.FLAG_GRANT_READ_URI_PERMISSION
+    }
+
+    @Test
     fun `INV-E0-12 a launch that hands no URI grants nothing, even with a URI written in the template`() {
         val intent = intentFor("-n com.retroarch.aarch64/.Activity -e ROM {file.path} -e X content://other/document/y")
         intent.clipData.shouldBeNull()

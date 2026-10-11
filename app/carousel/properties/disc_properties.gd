@@ -22,7 +22,7 @@ signal name_kept
 enum Step { CLOSED, PROPERTIES, LABELS, FRAMING, NAMING }
 
 ## The disc's label reaches this far from its centre, in world units at the disc's size in the row
-## (`dvd_shape.tres`); its ring stands a little further out.
+## (`ps2_dvd_shape.tres`); its ring stands a little further out.
 const _LABEL_RADIUS := 0.59
 const _RING_OUTSET := 1.04
 ## The callout's caption stands right of what it points at, this far, in pixels, and its arrow
@@ -358,7 +358,7 @@ func _on_picture_read(_key: String, picture: Texture2D) -> void:
 		choice_failed.emit()
 		return
 	_picture_texture = picture
-	_framing = LabelFraming.new()
+	_framing = LabelFraming.new(row.selected_label_proportion())
 	_step = Step.FRAMING
 	row.preview_label(_picture_texture, _framing.window(_picture.size))
 	await _move([_labels], [_framing_screen], _on_framing, _from_picker)
@@ -381,7 +381,7 @@ func _frame(delta: float) -> void:
 ## framing when it cannot be kept.
 func _keep_own() -> void:
 	_busy = true
-	var answer := await android.keep_own_label(_game, _framing.zoom, _framing.centre)
+	var answer := await android.keep_own_label(_game, _framing)
 	if not answer.ok:
 		Diagnostics.trace("properties", "own picture not kept (%s): %s" % [answer.code, answer.detail])
 		_busy = false

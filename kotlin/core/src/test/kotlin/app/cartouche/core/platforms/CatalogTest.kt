@@ -3,8 +3,16 @@ package app.cartouche.core.platforms
 
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.PackageName
 import app.cartouche.core.Shipped
+import app.cartouche.core.art.crop
+import app.cartouche.core.art.front
+import app.cartouche.core.launch.Component
+import app.cartouche.core.launch.Extra
+import app.cartouche.core.launch.ExtraValue
+import app.cartouche.core.launch.GAME_URI
 import app.cartouche.core.launch.GameFile
+import app.cartouche.core.launch.LaunchSpec
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.launch.TemplateError
 import app.cartouche.core.uri
@@ -14,7 +22,9 @@ import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldBeUnique
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
@@ -30,7 +40,8 @@ class CatalogTest {
 
     @Test
     fun `INV-E0-07 every shipped definition parses without rejection, and every player can launch`() {
-        shipped.map { it.name } shouldContain "SonyPlayStation2.json"
+        // The app reads both folders into one map by file name: a repeated name would hide a file.
+        shipped.map { it.name }.shouldBeUnique().shouldContainAll("SonyPlayStation2.json", "MicrosoftXbox.json")
         shippedCatalog.rejected.shouldBeEmpty()
         val game = GameFile(FileName("Game.chd"), uri("content://x"), Some(FilePath("/storage/x/Game.chd")))
         shippedCatalog.platforms.flatMap { it.players }.forEach { it.template.resolve(game).shouldBeRight() }
@@ -70,6 +81,95 @@ class CatalogTest {
         } shouldContain
             Some("com.armsx2")
         shippedCatalog.candidates(FileName("GAME.CHD")).map { it.platform.id } shouldContain PlatformId("ps2")
+    }
+
+    @Test
+    fun `Xbox and Xbox 360 games are DVDs, offered to their emulators, which are handed the game's URI alone`() {
+        fun profile(id: String) = shippedCatalog.platform(PlatformId(id)).shouldBeSome().profile
+        profile("xbox") shouldBe PlatformProfile(MediaType.DVD, MediaRule(mediumId("xbox_dvd")), 16_000_000, art = Some(ArtKind.Disc))
+        profile("xbox360") shouldBe PlatformProfile(MediaType.DVD, MediaRule(mediumId("xbox360_dvd")), 1_048_576, art = Some(ArtKind.Disc))
+
+        fun extensions(id: String) = shippedCatalog.platform(PlatformId(id)).shouldBeSome().players.map { it.accepts.extensions }.toSet()
+        extensions("xbox") shouldBe setOf(Some(listOf("iso", "xiso")))
+        extensions("xbox360") shouldBe setOf(Some(listOf("iso", "xex", "zar")))
+        val game = GameFile(FileName("Halo 3 (USA).iso"), uri(GAME_URI), None)
+        val data = Some(GAME_URI)
+        val view = LaunchSpec(None, Some("android.intent.action.VIEW"), data, None, emptyList(), 0, emptySet(), emptyList(), Some(game.uri))
+        val extras = listOf(Extra("game_uri", ExtraValue.Text(GAME_URI)))
+        val ax360e = view.copy(action = Some("aenu.intent.action.AX360E"), data = None, extras = extras)
+
+        fun LaunchSpec.at(pkg: String, activity: String) = copy(component = PackageName.parse(pkg).map { Component(it, activity) })
+        val launches =
+            mapOf(
+                "xbox.com.rfandango.haku_x" to view.at("com.rfandango.haku_x", "com.rfandango.haku_x.LauncherActivity"),
+                "xbox.com.izzy2lost.x1box" to view.at("com.izzy2lost.x1box", "com.izzy2lost.x1box.LauncherActivity"),
+                "xbox360.aenu.ax360e" to ax360e.at("aenu.ax360e", "aenu.ax360e.EmulatorActivity"),
+                "xbox360.aenu.ax360e.free" to ax360e.at("aenu.ax360e.free", "aenu.ax360e.EmulatorActivity"),
+                "xbox360.xendroid.compose" to view.at("xendroid.compose", "xendroid.compose.EmulatorHostActivity"),
+            )
+        shippedCatalog.platforms.filter { it.id.value.startsWith("xbox") }.flatMap { it.players }.map { it.id.value }.toSet() shouldBe
+            launches.keys
+        launches.forEach { (id, spec) ->
+            shippedCatalog.launch(PlayerId(id), game).shouldBeRight() shouldBe
+                Launch(spec, RunningInstance.KEEP)
+        }
+    }
+
+    @Test
+    fun `INV-E10-06 a profile says what its scans show and each cartridge front's shape and label, and refuses a label off it`() {
+        fun profiles(art: String) = Catalog.parse(
+            listOf(definition(platform = "p")),
+            DefinitionSource("profiles.json", """{"p": {"media": "cartridge", "medium": {"default": "c"}, "minimumGameBytes": 1$art}}"""),
+        )
+
+        fun artOf(art: String) = profiles(art).platform(PlatformId("p")).shouldBeSome().profile.art
+
+        fun fronts(proportion: String, label: String) =
+            """, "art": {"kind": "cartridge_front", "fronts": {"c": {"proportion": 0.9, "label": {"left": 0.1, "top": 0.1, "width": 0.8, "height": 0.5}},
+                "d": {"proportion": $proportion, "label": $label}}}"""
+
+        artOf("") shouldBe None
+        artOf(""", "art": {"kind": "disc"}""") shouldBe Some(ArtKind.Disc)
+        val label = """{"left": 0.15, "top": 0.23, "width": 0.72, "height": 0.62}"""
+        val read = artOf(fronts("1.5", label)).shouldBeSome().shouldBeInstanceOf<ArtKind.CartridgeFront>()
+        read shouldBe
+            ArtKind.CartridgeFront(
+                mapOf(
+                    mediumId("c") to front(0.9, crop(0.1, 0.1, 0.8, 0.5)),
+                    mediumId("d") to front(1.5, crop(0.15, 0.23, 0.72, 0.62)),
+                ),
+            )
+        // In the order the profile gives them, which says which front a scan is read as first.
+        read.fronts.keys.map { it.value } shouldBe listOf("c", "d")
+        val off = """{"left": 0.5, "top": 0.2, "width": 0.6, "height": 0.6}"""
+        listOf(
+            fronts("1.5", off),
+            fronts("0", label),
+            fronts("-1.5", label),
+            """, "art": {"kind": "cartridge_front", "label": $label}""",
+        ).forEach { art ->
+            val refused = profiles(art)
+            refused.platforms.shouldBeEmpty()
+            refused.rejected.first().shouldBeInstanceOf<CatalogError.InvalidJson>()
+        }
+        profiles(""", "scansBySerial": {"url": "https://scans.test/{serial}.png", "serial": "[A-Z"}""").platforms.shouldBeEmpty()
+    }
+
+    @Test
+    fun `INV-E10-06 a shipped cartridge platform has a front for each of its media, a disc platform its face, every extract a kind`() {
+        shippedCatalog.platforms.forEach { platform ->
+            platform.profile.art.onSome { art ->
+                (art is ArtKind.CartridgeFront) shouldBe (platform.profile.media == MediaType.CARTRIDGE)
+                // Every medium a game can come in has its front, whose scans are read first for it.
+                val media = platform.profile.medium.let { listOf(it.default) + it.ntscU.toList() + it.ntscJ.toList() }
+                if (art is ArtKind.CartridgeFront) art.fronts.keys shouldContainAll media
+            }
+        }
+        Shipped.lists("art").keys.forEach { shippedCatalog.platform(it).shouldBeSome().profile.art.shouldBeSome() }
+        val nes = shippedCatalog.platform(PlatformId("nes")).shouldBeSome().profile.art
+        // The Famicom's front too, whose scans are cut by its own crop.
+        nes.shouldBeSome().shouldBeInstanceOf<ArtKind.CartridgeFront>().fronts.keys.map { it.value } shouldBe
+            listOf("nes_cart", "famicom_cart")
     }
 
     @Test

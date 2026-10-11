@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.art
 
+import android.graphics.BitmapFactory
 import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.ArtVersion
+import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.library.GameId
@@ -79,7 +81,7 @@ class ScraperTest {
 
     private fun requests(held: List<List<Held>>, count: Int): List<ArtRequest> = held.take(count).mapIndexed { game, candidates ->
         val artwork = candidates.indices.map { ArtUrl("https://art/$game/$it.png") }
-        ArtRequest(GameId("ps2/$game"), "Game $game", artwork.toNonEmptyListOrNone().shouldBeSome(), Some(version))
+        ArtRequest(GameId("ps2/$game"), "Game $game", artwork.toNonEmptyListOrNone().shouldBeSome(), Some(version), PS2_DISC)
     }
 
     private fun imageUrls(held: List<List<Held>>): Set<String> = held
@@ -270,6 +272,19 @@ class ScraperTest {
         harness.scope.runCurrent()
         harness.last.stall shouldBe Some(Stall.STORAGE)
         request.single().let { store.isAbsent(it.game, it.version) } shouldBe false
+    }
+
+    @Test
+    fun `INV-E10-06 a cartridge's scan is stored as its label alone, a scan of no front's shape passed over for the next`() {
+        val store = ArtStore(folder)
+        val scope = TestScope(StandardTestDispatcher())
+        val cartridge = requests(listOf(listOf(Held.IMAGE, Held.IMAGE)), 1).map { it.copy(cut = cartridgeLabel) }
+        // A square photo first, of no shape the cartridge's front has.
+        val fetch = FakeFetch(mapOf(url(0, 0) to png(300, 300), url(0, 1) to cartridgeFront()))
+        Scraper(store, fetch, scope) { _, _ -> }.lookFor(cartridge)
+        scope.runCurrent()
+        val label = BitmapFactory.decodeFile(store.stored(GameId("ps2/0")).shouldBeSome().file.path)
+        (label.width to label.height) shouldBe (280 to 120)
     }
 
     @Test

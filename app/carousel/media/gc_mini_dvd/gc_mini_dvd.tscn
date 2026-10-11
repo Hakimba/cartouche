@@ -1,0 +1,50 @@
+[gd_scene load_steps=12 format=3 uid="uid://mhdlac3x5x0f"]
+
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/media/gc_mini_dvd/gc_mini_dvd_shape.tres" id="2"]
+[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/disc_mirror.gdshader" id="4"]
+[ext_resource type="Shader" path="res://carousel/models/clear_plastic.gdshader" id="5"]
+
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
+
+[sub_resource type="ShaderMaterial" id="label_material"]
+shader = ExtResource("3")
+shader_parameter/silver = 0.8
+shader_parameter/grooves = 0.5
+
+[sub_resource type="PrimitiveMesh" id="mirror_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"mirror"
+
+[sub_resource type="ShaderMaterial" id="mirror_material"]
+shader = ExtResource("4")
+shader_parameter/mirror_color = Color(0.9, 0.9, 0.92, 1)
+shader_parameter/recorded_color = Color(0.8, 0.8, 0.82, 1)
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+render_priority = 1
+shader = ExtResource("5")
+
+[node name="GcMiniDvd" type="Node3D"]
+
+[node name="Label" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_mesh")
+surface_material_override/0 = SubResource("label_material")
+
+[node name="Mirror" type="MeshInstance3D" parent="."]
+mesh = SubResource("mirror_mesh")
+surface_material_override/0 = SubResource("mirror_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")

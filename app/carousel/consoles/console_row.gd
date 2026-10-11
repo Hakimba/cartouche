@@ -3,11 +3,12 @@ class_name ConsoleRow
 extends Node3D
 ## The consoles screen's row: one console per platform with games, the selected one in the middle,
 ## laid out, faded and posed as the games are ([CarouselLayout], [ShelfRow.Pose]); the right stick
-## turns it ([StickTurn]). Left and right step along the row, from end to end.
+## turns it ([StickTurn]). Left and right step along the row, which has no end, as the games' does
+## ([CarouselLayout]): its position shows console `posmod(position, count)`.
 ##
 ## The selected console stands as its launch animation has it: the animation drives the properties
-## below, from where the console rests to where a game goes into it. The others rest as their own
-## animations start, and fade out with [member others_opacity].
+## below, from where the console rests to where a game goes into it, and the console's own parts.
+## The others rest as their own animations start, and fade out with [member others_opacity].
 ##
 ## To be put in order ([ConsoleOrder]), the consoles leave the row for a ring, further back, where
 ## all of them show: [member wheel] takes them there, [member wheel_slots] says where each one
@@ -49,8 +50,6 @@ var pace := 1.0
 ## console grows out of its own centre with it, opaque all along (a fading model would draw with
 ## other shaders, compiled on the spot).
 var arrival := 1.0
-## How far the selected console's lid is open, when it has one.
-var lid_degrees := 0.0
 ## How far the selected console has left the row for its properties, from 0 to 1: it stops swaying
 ## and floating, keeps a little of its pose, rises [member staged_lift] world units and takes
 ## [member staged_size] times its size, while the others fade out.
@@ -73,6 +72,7 @@ var pose := ShelfRow.Pose.new()
 var behind := false
 
 var _items: Array[Item] = []
+## The position shown, unbounded on an endless row (see [CarouselLayout]).
 var _position := 0
 var _scroll := 0.0
 ## How far the consoles' float and sway have gone, in seconds at full pace.
@@ -98,7 +98,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_pose_s += delta * pace
 	_scroll = CarouselLayout.scrolled(_scroll, _position, delta)
-	_turn.follow(_stick, _position, delta)
+	_turn.follow(_stick, selected_index(), delta)
 	_slide(delta)
 	# The one put down stays peeled off until it lies flat.
 	if held >= 0 or peel <= 0.0:
@@ -135,21 +135,21 @@ func show_consoles(items: Array[Item], from: int) -> void:
 
 
 func selected_index() -> int:
-	return _position
+	return posmod(_position, maxi(_items.size(), 1))
 
 
 func selected() -> Item:
-	return _items[_position]
+	return _items[selected_index()]
 
 
 ## The console at [param index] selected at once, in the middle of the row.
 func select(index: int) -> void:
-	if index == _position:
+	if index == selected_index():
 		return
-	_position = index
-	_scroll = index
+	_position = CarouselLayout.nearest(_position, index, _items.size())
+	_scroll = _position
 	_turn.release()
-	selection_changed.emit(_position)
+	selection_changed.emit(index)
 
 
 ## The consoles in a new order: the one at [param order]'s first index first, and so on. Each one
@@ -163,7 +163,7 @@ func reorder(order: Array[int]) -> void:
 	_items = items
 	_slid = slid
 	wheel_slots.assign(range(_items.size()))
-	_position = order.find(_position)
+	_position = order.find(selected_index())
 	_scroll = _position
 	_turn.index = order.find(_turn.index)
 	pointed = order.find(pointed)
@@ -172,14 +172,13 @@ func reorder(order: Array[int]) -> void:
 	_stuck = order.find(_stuck)
 
 
-## One step towards [param direction] (-1 or 1), stopping at the ends.
+## One step towards [param direction] (-1 or 1); from the last console, the first, and back.
 func step(direction: int) -> void:
-	var next := clampi(_position + direction, 0, _items.size() - 1)
-	if next == _position:
+	if _items.size() < 2:
 		return
-	_position = next
+	_position = CarouselLayout.stepped(_position, direction, _items.size())
 	_turn.release()
-	selection_changed.emit(_position)
+	selection_changed.emit(selected_index())
 
 
 ## Turns the selected console while [param stick] (each axis from -1 to 1) is pushed (see
@@ -223,8 +222,8 @@ func arrange() -> void:
 		item.model.visible = i in shown or wheel > 0.0
 		if not item.model.visible:
 			continue
-		var offset: float = shown.get(i, i - _scroll)
-		var chosen := i == _position
+		var offset: float = shown.get(i, CarouselLayout.nearest(_position, i, _items.size()) - _scroll)
+		var chosen := i == selected_index()
 		var staged := stage if chosen else 0.0
 		var unstaged := 1.0 - staged
 		var rest := item.rest
@@ -246,9 +245,6 @@ func arrange() -> void:
 			item.model.transform = moved
 		var presence := 1.0 if chosen else others_opacity * (1.0 - stage)
 		item.fade.call(lerpf(CarouselLayout.faded(offset, presence), 0.0, wheel))
-		if chosen and item.model is ConsoleModel:
-			var console: ConsoleModel = item.model
-			console.lid_degrees = lid_degrees
 
 
 ## Where console [param index] stands on the ring: in its place round it, the bottom one nearest,

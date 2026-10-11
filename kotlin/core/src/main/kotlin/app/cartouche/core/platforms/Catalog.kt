@@ -104,15 +104,18 @@ public enum class MediaType {
 }
 
 /**
- * What Cartouche adds to a Daijishō platform, from `app/data/platforms/profiles.json`: the physical
- * medium its games are shown as, the size under which an unknown file is not taken for a game, and
- * where its disc scans are named after their serial, if anywhere (see `SerialScans`).
+ * What Cartouche adds to a Daijishō platform, from `app/data/platforms/profiles.json`: the kind of
+ * medium its games are shown as, the exact medium each game comes in ([MediaRule]), the size under
+ * which an unknown file is not taken for a game, what its scans show ([ArtKind]: none when its
+ * games' images are not looked for), and where its scans are named after their serial, if anywhere.
  */
 @Serializable
 public data class PlatformProfile(
     public val media: MediaType,
+    public val medium: MediaRule,
     public val minimumGameBytes: Long,
-    public val scansBySerial: Option<String> = None,
+    public val art: Option<ArtKind> = None,
+    public val scansBySerial: Option<SerialScans> = None,
 )
 
 /** A player able to open a given file, with its platform. */
@@ -178,8 +181,9 @@ public sealed interface CatalogError {
 
 /**
  * The platforms and players Cartouche knows, read from Daijishō definition files (a `platform`
- * object and a `playerList` array, see `app/data/platforms/daijishou/`) and Cartouche's own
- * profiles ([PlatformProfile]). Adding a platform takes data only: a definition and a profile.
+ * object and a `playerList` array, see `app/data/platforms/daijishou/`, and Cartouche's own in
+ * `cartouche/` next to it) and Cartouche's profiles ([PlatformProfile]). Adding a platform takes
+ * data only: a definition and a profile.
  *
  * A broken or duplicate player is rejected on its own and the rest of its platform is kept; a broken
  * or duplicate platform file, or one without a profile, is rejected whole. Every rejection is kept

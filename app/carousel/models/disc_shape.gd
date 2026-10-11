@@ -63,6 +63,10 @@ func parts() -> Array[StringName]:
 	return DiscGeometry.PARTS
 
 
+func _arrays(part: StringName, detail: int) -> Array:
+	return DiscGeometry.arrays(self, part, detail)
+
+
 func _rules() -> Dictionary[StringName, bool]:
 	var edge := radius - thickness / 2.0
 	var hub := ring + ring_width / 2.0
@@ -75,10 +79,6 @@ func _rules() -> Dictionary[StringName, bool]:
 			mirror_inner < data_inner and data_inner < data_outer and data_outer < mirror_outer,
 		&"mirror_inside_rim": mirror_outer < edge,
 	}
-
-
-func mesh_arrays(part: StringName, detail: int) -> Array:
-	return DiscGeometry.arrays(self, part, detail)
 
 
 ## The title goes between the rim and the hub, above it; the platform below the hub.

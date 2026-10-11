@@ -1,0 +1,421 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/psx/psx_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/psx/psx_shape.tres" id="2"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
+[ext_resource type="PackedScene" path="res://carousel/models/spindle.tscn" id="4"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_lid_logo.svg" id="lid_logo_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_sony.svg" id="sony_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_power_label.svg" id="power_label_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_open_label.svg" id="open_label_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_reset_label.svg" id="reset_label_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_port_1.svg" id="port_1_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_port_2.svg" id="port_2_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/psx/psx_memory_card.svg" id="memory_card_logo"]
+
+[sub_resource type="ShaderMaterial" id="body_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.65, 0.65, 0.63, 1)
+shader_parameter/roughness = 0.62
+shader_parameter/clearcoat = 0.1
+shader_parameter/clearcoat_roughness = 0.6
+
+[sub_resource type="ShaderMaterial" id="button_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.62, 0.62, 0.6, 1)
+shader_parameter/roughness = 0.55
+shader_parameter/clearcoat = 0.1
+shader_parameter/clearcoat_roughness = 0.6
+
+[sub_resource type="ShaderMaterial" id="groove_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.2, 0.2, 0.2, 1)
+shader_parameter/roughness = 0.85
+
+[sub_resource type="ShaderMaterial" id="louvre_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.28, 0.28, 0.275, 1)
+shader_parameter/roughness = 0.85
+
+[sub_resource type="ShaderMaterial" id="frame_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.56, 0.56, 0.545, 1)
+shader_parameter/roughness = 0.6
+
+[sub_resource type="ShaderMaterial" id="controller_port_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.22, 0.22, 0.22, 1)
+shader_parameter/roughness = 0.8
+
+[sub_resource type="ShaderMaterial" id="dark_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.1, 0.1, 0.105, 1)
+shader_parameter/roughness = 0.8
+
+[sub_resource type="ShaderMaterial" id="drive_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.03, 0.03, 0.035, 1)
+shader_parameter/roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="lens_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.1, 0.16, 0.42, 1)
+shader_parameter/metallic = 0.2
+shader_parameter/roughness = 0.05
+
+[sub_resource type="ShaderMaterial" id="red_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.8, 0.08, 0.1, 1)
+shader_parameter/roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="yellow_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.97, 0.75, 0.08, 1)
+shader_parameter/roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="white_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.9, 0.9, 0.88, 1)
+shader_parameter/roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="light_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.06, 0.1, 0.07, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/emission = Color(0.25, 1, 0.4, 1)
+shader_parameter/emission_energy = 0
+
+[sub_resource type="PrimitiveMesh" id="left_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"left"
+
+[sub_resource type="PrimitiveMesh" id="right_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"right"
+
+[sub_resource type="PrimitiveMesh" id="centre_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"centre"
+
+[sub_resource type="PrimitiveMesh" id="lid_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lid"
+
+[sub_resource type="PrimitiveMesh" id="power_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power"
+
+[sub_resource type="PrimitiveMesh" id="reset_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset"
+
+[sub_resource type="PrimitiveMesh" id="open_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"open"
+
+[sub_resource type="PrimitiveMesh" id="grooves_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"grooves"
+
+[sub_resource type="PrimitiveMesh" id="light_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"light"
+
+[sub_resource type="PrimitiveMesh" id="vents_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"vents"
+
+[sub_resource type="PrimitiveMesh" id="louvres_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"louvres"
+
+[sub_resource type="ShaderMaterial" id="lid_logo_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("lid_logo_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.62
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="lid_logo_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lid_logo"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="sony_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("sony_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.62
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="sony_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sony"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="power_label_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_label_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.55
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="power_label_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_label"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="open_label_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("open_label_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.55
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="open_label_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"open_label"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="reset_label_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("reset_label_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.55
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="reset_label_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset_label"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="port_1_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("port_1_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.62
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="port_1_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"port_1"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="port_2_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("port_2_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.62
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="port_2_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"port_2"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="memory_card_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("memory_card_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.6
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="memory_card_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"memory_card"
+detail = 8
+
+[sub_resource type="PrimitiveMesh" id="drive_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"drive"
+
+[sub_resource type="PrimitiveMesh" id="lens_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lens"
+
+[sub_resource type="PrimitiveMesh" id="frames_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"frames"
+
+[sub_resource type="PrimitiveMesh" id="controller_ports_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"controller_ports"
+
+[sub_resource type="PrimitiveMesh" id="dark_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"dark"
+
+[sub_resource type="PrimitiveMesh" id="audio_right_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"audio_right"
+
+[sub_resource type="PrimitiveMesh" id="audio_left_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"audio_left"
+
+[sub_resource type="PrimitiveMesh" id="video_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"video"
+
+[node name="Psx" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Left" type="MeshInstance3D" parent="."]
+mesh = SubResource("left_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Right" type="MeshInstance3D" parent="."]
+mesh = SubResource("right_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Centre" type="MeshInstance3D" parent="."]
+mesh = SubResource("centre_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Vents" type="MeshInstance3D" parent="."]
+mesh = SubResource("vents_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Louvres" type="MeshInstance3D" parent="."]
+mesh = SubResource("louvres_mesh")
+surface_material_override/0 = SubResource("louvre_material")
+
+[node name="Grooves" type="MeshInstance3D" parent="."]
+mesh = SubResource("grooves_mesh")
+surface_material_override/0 = SubResource("groove_material")
+
+[node name="Reset" type="MeshInstance3D" parent="."]
+mesh = SubResource("reset_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="Light" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("light_mesh")
+surface_material_override/0 = SubResource("light_material")
+
+[node name="Drive" type="MeshInstance3D" parent="."]
+mesh = SubResource("drive_mesh")
+surface_material_override/0 = SubResource("drive_material")
+
+[node name="Lens" type="MeshInstance3D" parent="."]
+mesh = SubResource("lens_mesh")
+surface_material_override/0 = SubResource("lens_material")
+
+[node name="Frames" type="MeshInstance3D" parent="."]
+mesh = SubResource("frames_mesh")
+surface_material_override/0 = SubResource("frame_material")
+
+[node name="ControllerPorts" type="MeshInstance3D" parent="."]
+mesh = SubResource("controller_ports_mesh")
+surface_material_override/0 = SubResource("controller_port_material")
+
+[node name="Dark" type="MeshInstance3D" parent="."]
+mesh = SubResource("dark_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="AudioRight" type="MeshInstance3D" parent="."]
+mesh = SubResource("audio_right_mesh")
+surface_material_override/0 = SubResource("red_material")
+
+[node name="AudioLeft" type="MeshInstance3D" parent="."]
+mesh = SubResource("audio_left_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Video" type="MeshInstance3D" parent="."]
+mesh = SubResource("video_mesh")
+surface_material_override/0 = SubResource("yellow_material")
+
+[node name="Spindle" parent="." instance=ExtResource("4")]
+unique_name_in_owner = true
+
+[node name="Lid" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cover" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("lid_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="PowerButton" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cap" type="MeshInstance3D" parent="PowerButton"]
+mesh = SubResource("power_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="OpenButton" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cap" type="MeshInstance3D" parent="OpenButton"]
+mesh = SubResource("open_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="LidLogo" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("lid_logo_logo_mesh")
+surface_material_override/0 = SubResource("lid_logo_logo_material")
+
+[node name="Sony" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("sony_logo_mesh")
+surface_material_override/0 = SubResource("sony_logo_material")
+
+[node name="PowerLabel" type="MeshInstance3D" parent="PowerButton"]
+mesh = SubResource("power_label_logo_mesh")
+surface_material_override/0 = SubResource("power_label_logo_material")
+
+[node name="OpenLabel" type="MeshInstance3D" parent="OpenButton"]
+mesh = SubResource("open_label_logo_mesh")
+surface_material_override/0 = SubResource("open_label_logo_material")
+
+[node name="ResetLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("reset_label_logo_mesh")
+surface_material_override/0 = SubResource("reset_label_logo_material")
+
+[node name="Port1" type="MeshInstance3D" parent="."]
+mesh = SubResource("port_1_logo_mesh")
+surface_material_override/0 = SubResource("port_1_logo_material")
+
+[node name="Port2" type="MeshInstance3D" parent="."]
+mesh = SubResource("port_2_logo_mesh")
+surface_material_override/0 = SubResource("port_2_logo_material")
+
+[node name="MemoryCard" type="MeshInstance3D" parent="."]
+mesh = SubResource("memory_card_logo_mesh")
+surface_material_override/0 = SubResource("memory_card_logo_material")

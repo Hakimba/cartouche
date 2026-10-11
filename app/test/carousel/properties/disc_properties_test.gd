@@ -64,7 +64,8 @@ func _cards(carousel: Carousel) -> Array[LabelCard]:
 func _window(carousel: Carousel) -> Vector4:
 	var row := carousel._row
 	var place: ShelfRow.Place = row._placed[row.selected_index()]
-	return place.shown._materials[0].get_shader_parameter(&"label_window")
+	var label: ShaderMaterial = place.shown._label_mesh.get_active_material(0)
+	return label.get_shader_parameter(&"label_window")
 
 
 func _light(carousel: Carousel) -> OperatingLight:
@@ -75,7 +76,8 @@ func _light(carousel: Carousel) -> OperatingLight:
 func _label(carousel: Carousel) -> Texture2D:
 	var row := carousel._row
 	var place: ShelfRow.Place = row._placed[row.selected_index()]
-	return place.shown._materials[0].get_shader_parameter(&"label_texture")
+	var label: ShaderMaterial = place.shown._label_mesh.get_active_material(0)
+	return label.get_shader_parameter(&"label_texture")
 
 
 func test_the_light_given_each_frame_goes_to_the_gpu_only_when_it_changes() -> void:
@@ -472,9 +474,12 @@ func test_INV_E7_02_whatever_is_pressed_and_when_the_properties_settle_on_one_wh
 					else carousel._row.selected_game().own_title())
 		if step != DiscProperties.Step.NAMING:
 			assert_bool(properties._naming.visible).is_false()
-		# Outside the framing, the label shows its texture whole (the kept picture, once read, too).
+		# Outside the framing, the label shows its texture covering it (the kept picture, once read,
+		# too): whole one way, centred.
 		if step != DiscProperties.Step.FRAMING and properties._framed_game == "":
-			assert_vector(_window(carousel)).is_equal(Vector4(0.0, 0.0, 1.0, 1.0))
+			var shown := _window(carousel)
+			assert_bool(is_equal_approx(shown.z, 1.0) or is_equal_approx(shown.w, 1.0)).is_true()
+			assert_vector(Vector2(shown.x + shown.z / 2.0, shown.y + shown.w / 2.0)).is_equal_approx(Vector2.ONE * 0.5, Vector2.ONE * 0.0001)
 		if carousel.screen() == Carousel.Screen.CONSOLES:
 			await Fixtures.joypad(self, JOY_BUTTON_A)
 			assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
@@ -510,6 +515,27 @@ func test_the_user_s_own_picture_picked_shows_on_the_disc_its_largest_square_in_
 	assert_vector(_window(carousel)).is_equal_approx(Vector4(8.0 / 64.0, 0.0, 48.0 / 64.0, 1.0), Vector4.ONE * 0.001)
 
 
+func test_on_a_cartridge_the_user_s_own_picture_is_framed_and_kept_at_its_label_s_proportions() -> void:
+	var device := Fixtures.past_first_launch(self, {"gba": 3})
+	device.variants = _variants
+	var carousel := Fixtures.fresh_carousel(self, device)
+	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
+	await _on_own_card(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _settled(carousel)
+	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.FRAMING)
+	# The GBA cartridge's label, 44 by 22.5: on a picture 64 by 48, its full width, 32 tall in the middle.
+	var proportion := carousel._row.selected_label_proportion()
+	assert_float(proportion).is_equal_approx(44.0 / 22.5, 0.001)
+	# Within a pixel of it: the label covers its face with it.
+	assert_vector(_window(carousel)).is_equal_approx(Vector4(0.0, 8.0 / 48.0, 1.0, 32.0 / 48.0), Vector4.ONE * 0.025)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _settled(carousel)
+	assert_array(device.kept_framings).is_equal([{"zoom": 1.0, "centre": Vector2(0.5, 0.5), "proportion": proportion}])
+
+
 func test_the_stick_and_L1_R1_frame_the_picture_and_A_keeps_it_as_framed() -> void:
 	var setup := await _on_games()
 	var carousel: Carousel = setup[0]
@@ -534,14 +560,15 @@ func test_the_stick_and_L1_R1_frame_the_picture_and_A_keeps_it_as_framed() -> vo
 		Vector4(framed.position.x, framed.position.y, framed.size.x, framed.size.y), Vector4.ONE * 0.0001)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
-	assert_array(device.kept_framings).is_equal([{"zoom": framing.zoom, "centre": framing.centre}])
+	assert_array(device.kept_framings).is_equal([{"zoom": framing.zoom, "centre": framing.centre, "proportion": 1.0}])
 	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
 	assert_object(Fixtures.focus(self)).is_same(properties._zone)
 	assert_bool(game.label_own and not game.has_label_region).is_true()
 	# The picture as framed shows until the kept image is read, then the kept image.
 	assert_bool(await Fixtures.until(self, func() -> bool: return properties._framed_game == "")).is_true()
 	assert_object(_label(carousel)).is_same(carousel._art.texture(game))
-	assert_vector(_window(carousel)).is_equal(Vector4(0.0, 0.0, 1.0, 1.0))
+	# The kept image, 64 by 48 here, covers the disc's label: its middle square.
+	assert_vector(_window(carousel)).is_equal_approx(Vector4(0.125, 0.0, 0.75, 1.0), Vector4.ONE * 0.0001)
 
 
 func _pinch(at: Vector2, factor: float) -> void:

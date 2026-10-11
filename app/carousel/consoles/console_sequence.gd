@@ -5,7 +5,8 @@ extends Node
 ## ([method enter]), back out of it ([method leave]), and a game going into it
 ## ([method launch_at]). The animation drives the consoles, the games' row, the carousel's controls
 ## and the properties below; from them, this node puts the chosen disc between the row and the
-## console's spindle, spins it, and draws the consoles apart, behind the games, while they blur.
+## console's seat ([method ConsoleModel.seat]), has the console hold it as it spins, and draws the
+## consoles apart, behind the games, while they blur.
 ##
 ## The player only samples the animation, at the times this node or [GameLaunch] give it, so that
 ## every move follows the time given to [method _process] and tests can step through it.
@@ -19,21 +20,25 @@ const _ANIMATION := &"launch"
 @export var row: ShelfRow
 @export var consoles: ConsoleRow
 @export var layer: ConsoleLayer
+@export var backdrop: Backdrop
 
-## How far the chosen disc has left the row for the spindle, from 0 to 1; how high it is above the
-## spindle along its axis, moved across it (world units), and tilted (radians, about X then Y).
+## How far the chosen disc has left the row for the seat, from 0 to 1; how far it is from the seat
+## along the console's way in ([method ConsoleModel.approach]), moved across it (world units), and
+## tilted (radians, about X then Y).
 var disc_away := 0.0
 var disc_lift := 0.0
 var disc_offset := Vector2.ZERO
 var disc_tilt := Vector2.ZERO
 var disc_turns_per_s := 0.0
 ## How the consoles show behind the games: blurred over this many pixels of a 1280 pixel wide
-## screen, at this opacity, their colours at this saturation.
+## screen, the backdrop behind them as much, at this opacity, their colours at this saturation.
 var blur := 0.0
 var layer_opacity := 1.0
 var saturation := 1.0
-## How much of the screen the black covers, from 0 to 1 (see [GameLaunch]).
+## How much of the screen the black covers, from 0 to 1, growing from the seat; how dark the whole
+## screen is, from 0 to 1 (see [GameLaunch]).
 var black := 0.0
+var fade := 0.0
 ## How much of the consoles behind the games shows, from 0 (none) to 1 (as the animation has them):
 ## the carousel takes them away once on the games screen, back for a launch or to go out.
 var behind_amount := 1.0:
@@ -69,8 +74,9 @@ func _process(delta: float) -> void:
 		finished.emit()
 
 
-## Plays [param animation] from now on, from its start; never while going in or out.
-func use(animation: Animation) -> void:
+## Plays [param animation] from now on, still at its moment [param at] (see the class description
+## of [LaunchAnimation]), at its start without one; never while going in or out.
+func use(animation: Animation, at := &"") -> void:
 	assert(not is_processing(), "ConsoleSequence: another animation while going in or out")
 	_animation = animation
 	var library := AnimationLibrary.new()
@@ -79,9 +85,8 @@ func use(animation: Animation) -> void:
 		player.remove_animation_library(&"")
 	player.add_animation_library(&"", library)
 	player.assigned_animation = _ANIMATION
-	# The consoles screen, still.
 	set_process(false)
-	_seek(0.0)
+	_seek(_moment(at))
 
 
 ## The games screen, still.
@@ -111,7 +116,7 @@ func launch_duration() -> float:
 	return _moment(&"black", _animation.length) - _moment(&"launch")
 
 
-## When the disc reaches the spindle, from the start of the launch.
+## When the disc reaches the seat, from the start of the launch.
 func seated_s() -> float:
 	return _moment(&"seated", _animation.length) - _moment(&"launch")
 
@@ -123,13 +128,18 @@ func launch_at(time: float, delta: float) -> void:
 	_seek(_moment(&"launch") + time)
 
 
-## Where the black starts from: the selected console's spindle, else the row.
+## Where the black starts from: the selected console's seat, else the row.
 func black_origin() -> Vector3:
 	var console := consoles.selected().model
 	if console is ConsoleModel:
 		var model: ConsoleModel = console
-		return model.seat().origin
+		return model.global_transform * model.seat().origin
 	return row.global_position
+
+
+## The dots blurred as much as the consoles, sharp behind the screens that hide them.
+func blur_dots() -> void:
+	backdrop.blur = blur if consoles.visible else 0.0
 
 
 func _play(from_s: float, to_s: float, settle_s: float) -> void:
@@ -150,6 +160,7 @@ func _seek(time: float) -> void:
 	if behind != consoles.behind:
 		consoles.show_in_layers(ConsoleLayer.BEHIND if behind else ConsoleLayer.FRONT)
 	_look_behind(behind)
+	blur_dots()
 	layer.draw_again()
 	consoles.arrange()
 	_place_disc()
@@ -162,8 +173,8 @@ func _look_behind(behind: bool) -> void:
 	layer.look(behind and opacity > 0.001, blur, opacity, saturation)
 
 
-## The chosen disc, out of the row, between where it stood and the console's spindle; back in the
-## row once it is not out any more.
+## The chosen disc, out of the row, between where it stood and the console's seat; back in the row
+## once it is not out any more.
 func _place_disc() -> void:
 	var console := consoles.selected().model
 	if disc_away <= 0.0 or console is not ConsoleModel:
@@ -174,14 +185,18 @@ func _place_disc() -> void:
 			row.pose_selected()
 			if console is ConsoleModel:
 				var emptied: ConsoleModel = console
-				emptied.spindle.turn(0.0)
+				emptied.hold(0.0)
 		return
 	if not _out:
 		_out = true
 		_left_from = row.selected_stand()
 	var into: ConsoleModel = console
 	var tilt := Basis(Vector3.RIGHT, disc_tilt.x) * Basis(Vector3.UP, disc_tilt.y)
-	var above := Transform3D(tilt, Vector3(disc_offset.x, disc_offset.y, disc_lift))
-	var on_spindle := row.global_transform.affine_inverse() * into.seat() * above
-	row.stand_selected(_left_from.interpolate_with(on_spindle, disc_away), _spin, _spin_blur)
-	into.spindle.turn(_spin if disc_away >= 1.0 else 0.0)
+	# The offset's plane turned from the seat's XY onto the one across the way in.
+	var across := Basis(Quaternion(Vector3.BACK, into.approach()))
+	var above := Transform3D(tilt, across * Vector3(disc_offset.x, disc_offset.y, 0.0) + into.approach() * disc_lift)
+	# At its real size on the seat, growing or shrinking to it on its way from the row.
+	var seat := into.global_transform * into.seat() * above * row.selected_real_size()
+	var seated := row.global_transform.affine_inverse() * seat
+	row.stand_selected(_left_from.interpolate_with(seated, disc_away), _spin, _spin_blur)
+	into.hold(_spin if disc_away >= 1.0 else 0.0)

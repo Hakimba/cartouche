@@ -1,0 +1,124 @@
+[gd_scene load_steps=22 format=3]
+
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/media/gb_cart/gb_cart_shape.tres" id="2"]
+[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="4"]
+[ext_resource type="Texture2D" path="res://carousel/media/gb_cart/gb_cart_logo.svg" id="5"]
+[ext_resource type="Texture2D" path="res://carousel/media/gb_cart/gb_cart_marks.svg" id="6"]
+
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="label_material"]
+shader = ExtResource("3")
+shader_parameter/roughness = 0.5
+shader_parameter/varnish = 0.3
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.718, 0.702, 0.702, 1)
+shader_parameter/roughness = 0.62
+
+[sub_resource type="PrimitiveMesh" id="gloss_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"gloss"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="gloss_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.64, 0.625, 0.625, 1)
+shader_parameter/roughness = 0.3
+
+[sub_resource type="PrimitiveMesh" id="metal_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"metal"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="metal_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.16, 0.16, 0.16, 1)
+shader_parameter/roughness = 0.4
+shader_parameter/metallic = 0.8
+
+[sub_resource type="PrimitiveMesh" id="screw_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"screw"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="screw_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.66, 0.53, 0.3, 1)
+shader_parameter/roughness = 0.35
+shader_parameter/metallic = 0.9
+
+[sub_resource type="PrimitiveMesh" id="logo_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"logo"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="logo_material"]
+shader = ExtResource("3")
+shader_parameter/label_texture = ExtResource("5")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.62
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="marks_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"marks"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="marks_material"]
+shader = ExtResource("3")
+shader_parameter/label_texture = ExtResource("6")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.62
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[node name="GbCart" type="Node3D"]
+transform = Transform3D(1.75, 0, 0, 0, 1.75, 0, 0, 0, 1.75, 0, 0, 0)
+
+[node name="Label" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_mesh")
+surface_material_override/0 = SubResource("label_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")
+
+[node name="Gloss" type="MeshInstance3D" parent="."]
+mesh = SubResource("gloss_mesh")
+surface_material_override/0 = SubResource("gloss_material")
+
+[node name="Metal" type="MeshInstance3D" parent="."]
+mesh = SubResource("metal_mesh")
+surface_material_override/0 = SubResource("metal_material")
+
+[node name="Screw" type="MeshInstance3D" parent="."]
+mesh = SubResource("screw_mesh")
+surface_material_override/0 = SubResource("screw_material")
+
+[node name="Logo" type="MeshInstance3D" parent="."]
+mesh = SubResource("logo_mesh")
+surface_material_override/0 = SubResource("logo_material")
+
+[node name="Marks" type="MeshInstance3D" parent="."]
+mesh = SubResource("marks_mesh")
+surface_material_override/0 = SubResource("marks_material")

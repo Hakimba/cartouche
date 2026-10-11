@@ -13,6 +13,8 @@ uniform float tile = 120.0;
 uniform float dot_radius = 17.0;
 // How far the dots have drifted, in tiles, from 0 to 1.
 uniform float drift = 0.0;
+// In design pixels: the dots blurred as the consoles in front of them (see ConsoleLayer).
+uniform float blur = 0.0;
 
 varying vec2 position;
 
@@ -25,7 +27,7 @@ void fragment() {
 	vec2 shifted = position - vec2(tile) * drift;
 	vec2 cell = mod(shifted, tile);
 	float distance_to_dot = min(length(cell - vec2(tile * 0.25)), length(cell - vec2(tile * 0.75)));
-	float edge = fwidth(distance_to_dot);
+	float edge = max(fwidth(distance_to_dot), blur);
 	float dot = 1.0 - smoothstep(dot_radius - edge, dot_radius + edge, distance_to_dot);
 	COLOR = vec4(mix(color.rgb, dot_color.rgb, dot * dot_color.a), 1.0);
 }

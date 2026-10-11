@@ -44,7 +44,7 @@ class GameNameTest {
     @Test
     fun `a name is filed from its title alone under the keys its whole reading has`() = runBlocking<Unit> {
         fun filedAsRead(text: String) = GameName.parse(text).let { GameName.Filing(it.key, it.mainKey.getOrElse { it.key }) }
-        Shipped.text("redump/ps2.tsv").lines().map { it.substringBefore('\t') }.forEach { GameName.filing(it) shouldBe filedAsRead(it) }
+        Shipped.text("titles/ps2.tsv").lines().map { it.substringBefore('\t') }.forEach { GameName.filing(it) shouldBe filedAsRead(it) }
         checkAll(Arb.choice(fileNames, Arb.string())) { text -> GameName.filing(text) shouldBe filedAsRead(text) }
     }
 

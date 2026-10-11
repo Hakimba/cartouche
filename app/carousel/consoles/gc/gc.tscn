@@ -1,0 +1,329 @@
+[gd_scene load_steps=45 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/gc/gc_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/gc/gc_shape.tres" id="2"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
+[ext_resource type="PackedScene" path="res://carousel/models/spindle.tscn" id="4"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gc/gc_lid_logo.svg" id="lid_logo_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gc/gc_maker_logo.svg" id="maker_logo_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gc/gc_power_label.svg" id="power_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gc/gc_reset_label.svg" id="reset_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gc/gc_open_label.svg" id="open_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gc/gc_port_dots.svg" id="port_dots_image"]
+
+[sub_resource type="ShaderMaterial" id="indigo_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.3, 0.26, 0.54, 1)
+shader_parameter/roughness = 0.55
+shader_parameter/clearcoat = 0.15
+shader_parameter/clearcoat_roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="grey_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.7, 0.7, 0.65, 1)
+shader_parameter/roughness = 0.6
+
+[sub_resource type="ShaderMaterial" id="power_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.8, 0.81, 0.8, 1)
+shader_parameter/roughness = 0.45
+
+[sub_resource type="ShaderMaterial" id="dimple_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.05, 0.055, 0.055, 1)
+shader_parameter/roughness = 0.35
+shader_parameter/clearcoat = 0.2
+shader_parameter/clearcoat_roughness = 0.3
+
+[sub_resource type="ShaderMaterial" id="dark_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.03, 0.03, 0.035, 1)
+shader_parameter/roughness = 0.9
+
+[sub_resource type="ShaderMaterial" id="handle_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.06, 0.06, 0.065, 1)
+shader_parameter/roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="drive_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.16, 0.16, 0.17, 1)
+shader_parameter/roughness = 0.7
+
+[sub_resource type="ShaderMaterial" id="lamp_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.33, 0.35, 0.38, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/emission = Color(1, 0.42, 0.06, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="PrimitiveMesh" id="base_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"base"
+
+[sub_resource type="PrimitiveMesh" id="body_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"body"
+
+[sub_resource type="PrimitiveMesh" id="collars_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"collars"
+
+[sub_resource type="PrimitiveMesh" id="lid_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lid"
+
+[sub_resource type="PrimitiveMesh" id="dimple_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"dimple"
+
+[sub_resource type="PrimitiveMesh" id="power_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power"
+
+[sub_resource type="PrimitiveMesh" id="reset_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset"
+
+[sub_resource type="PrimitiveMesh" id="open_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"open"
+
+[sub_resource type="PrimitiveMesh" id="lamp_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lamp"
+
+[sub_resource type="PrimitiveMesh" id="well_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"well"
+
+[sub_resource type="PrimitiveMesh" id="slot_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"slot"
+
+[sub_resource type="PrimitiveMesh" id="panel_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"panel"
+
+[sub_resource type="PrimitiveMesh" id="ports_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"ports"
+
+[sub_resource type="PrimitiveMesh" id="grille_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"grille"
+
+[sub_resource type="PrimitiveMesh" id="vents_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"vents"
+
+[sub_resource type="PrimitiveMesh" id="handle_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"handle"
+
+[sub_resource type="PrimitiveMesh" id="feet_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"feet"
+
+[sub_resource type="ShaderMaterial" id="lid_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("lid_logo_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.35
+shader_parameter/varnish = 0.2
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="maker_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("maker_logo_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.55
+shader_parameter/varnish = 0.15
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="power_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.55
+shader_parameter/varnish = 0.15
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="reset_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("reset_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.55
+shader_parameter/varnish = 0.15
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="open_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("open_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.55
+shader_parameter/varnish = 0.15
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="port_dots_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("port_dots_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.6
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="lid_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lid_logo"
+
+[sub_resource type="PrimitiveMesh" id="maker_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"maker_logo"
+
+[sub_resource type="PrimitiveMesh" id="power_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_label"
+
+[sub_resource type="PrimitiveMesh" id="reset_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset_label"
+
+[sub_resource type="PrimitiveMesh" id="open_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"open_label"
+
+[sub_resource type="PrimitiveMesh" id="port_dots_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"port_dots"
+
+[node name="Gc" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Base" type="MeshInstance3D" parent="."]
+mesh = SubResource("base_mesh")
+surface_material_override/0 = SubResource("indigo_material")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("body_mesh")
+surface_material_override/0 = SubResource("indigo_material")
+
+[node name="Collars" type="MeshInstance3D" parent="."]
+mesh = SubResource("collars_mesh")
+surface_material_override/0 = SubResource("indigo_material")
+
+[node name="Reset" type="MeshInstance3D" parent="."]
+mesh = SubResource("reset_mesh")
+surface_material_override/0 = SubResource("indigo_material")
+
+[node name="Power" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("power_mesh")
+surface_material_override/0 = SubResource("power_material")
+
+[node name="Open" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("open_mesh")
+surface_material_override/0 = SubResource("indigo_material")
+
+[node name="Light" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("lamp_mesh")
+surface_material_override/0 = SubResource("lamp_material")
+
+[node name="Well" type="MeshInstance3D" parent="."]
+mesh = SubResource("well_mesh")
+surface_material_override/0 = SubResource("drive_material")
+
+[node name="Slot" type="MeshInstance3D" parent="."]
+mesh = SubResource("slot_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Spindle" parent="." instance=ExtResource("4")]
+unique_name_in_owner = true
+
+[node name="Lid" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cover" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("lid_mesh")
+surface_material_override/0 = SubResource("indigo_material")
+
+[node name="Dimple" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("dimple_mesh")
+surface_material_override/0 = SubResource("dimple_material")
+
+[node name="Panel" type="MeshInstance3D" parent="."]
+mesh = SubResource("panel_mesh")
+surface_material_override/0 = SubResource("grey_material")
+
+[node name="Ports" type="MeshInstance3D" parent="."]
+mesh = SubResource("ports_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Grille" type="MeshInstance3D" parent="."]
+mesh = SubResource("grille_mesh")
+surface_material_override/0 = SubResource("indigo_material")
+
+[node name="Vents" type="MeshInstance3D" parent="."]
+mesh = SubResource("vents_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Handle" type="MeshInstance3D" parent="."]
+mesh = SubResource("handle_mesh")
+surface_material_override/0 = SubResource("handle_material")
+
+[node name="Feet" type="MeshInstance3D" parent="."]
+mesh = SubResource("feet_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Logo" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("lid_logo_mesh")
+surface_material_override/0 = SubResource("lid_logo_material")
+
+[node name="MakerLogo" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("maker_logo_mesh")
+surface_material_override/0 = SubResource("maker_logo_material")
+
+[node name="PowerLabel" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("power_label_mesh")
+surface_material_override/0 = SubResource("power_label_material")
+
+[node name="ResetLabel" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("reset_label_mesh")
+surface_material_override/0 = SubResource("reset_label_material")
+
+[node name="OpenLabel" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("open_label_mesh")
+surface_material_override/0 = SubResource("open_label_material")
+
+[node name="PortDots" type="MeshInstance3D" parent="."]
+mesh = SubResource("port_dots_mesh")
+surface_material_override/0 = SubResource("port_dots_material")

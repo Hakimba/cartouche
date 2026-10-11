@@ -15,6 +15,7 @@ import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
 import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtUrl
+import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.library.Disc
@@ -39,6 +40,8 @@ import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
+import app.cartouche.core.platforms.catalog
+import app.cartouche.core.platforms.definition
 import app.cartouche.core.search.Group
 import app.cartouche.core.search.Mark
 import app.cartouche.core.search.View
@@ -67,6 +70,9 @@ import java.io.File
 import app.cartouche.core.settings.Settings as AppSettings
 
 class WireTest {
+    /** The `ps2` platform, whose games are all one medium. */
+    private val ps2 = catalog(definition())
+
     private val found = FoundArt(GameId("ps2/a"), StoredArt(File("/data/art/a.jpg")))
 
     /** The values Godot's JNI bridge converts to Variants; see [toWireArray]. */
@@ -107,14 +113,14 @@ class WireTest {
         val entry = DocumentEntry(FileName("g.chd"), EntryKind.FILE, DocumentId("x:g.chd"), uri, None, None)
         val broken = Catalog.parse(listOf(DefinitionSource("broken.json", "{")), DefinitionSource("profiles.json", "{}"))
         listOf(
-            success("library" to library.toWireJson(None)),
+            success("library" to library.toWireJson(None, ps2)),
             ScanReport(1, 1, 0, 1, 1, 12).toWire(),
             success("folders" to listOf(folder).toWireArray { it.toWire() }),
             success("entries" to listOf(entry).toWireArray { it.toWire() }),
             broken.toWire(),
             failure(ErrorCode.CANCELLED, "x"),
             Scraping.NONE.toWire().putSome("found", Some(found.toWire())),
-            success("library" to library.toWireJson(None), "art" to listOf(found).artWireJson()),
+            success("library" to library.toWireJson(None, ps2), "art" to listOf(found).artWireJson()),
             AppSettings(Some(ButtonStyle.NINTENDO)).toWire(false),
             success("folder" to placed.toWire()),
             BatteryState(Some(57), plugged = true).toWire(),
@@ -140,7 +146,7 @@ class WireTest {
 
     @Test
     fun `a run's progress and the art found reach Godot with the keys and codes the GDScript adapter reads`() {
-        val request = ArtRequest(GameId("ps2/a"), "A", nonEmptyListOf(ArtUrl("https://a/a.png")), None)
+        val request = ArtRequest(GameId("ps2/a"), "A", nonEmptyListOf(ArtUrl("https://a/a.png")), None, PS2_DISC)
         val (_, underWay) = Scraping.NONE.with(listOf(request)).take().shouldBeSome()
         underWay.toWire() shouldBe dictionary("done" to 0, "total" to 1)
         Stall.entries.map { underWay.stalled(request.game, it).toWire()["stall"] } shouldBe listOf("offline", "refused", "storage")
@@ -168,7 +174,7 @@ class WireTest {
     @Test
     fun `the library and its shelves reach Godot as JSON of this shape, which the GDScript adapter reads`() {
         val shelves = Shelves.of(library, listOf(PlatformId("ps2")), Selection())
-        Json.parseToJsonElement(library.toWireJson(shelves)) shouldBe Json.parseToJsonElement(GOLDEN)
+        Json.parseToJsonElement(library.toWireJson(shelves, ps2)) shouldBe Json.parseToJsonElement(GOLDEN)
     }
 
     @Test
@@ -176,7 +182,7 @@ class WireTest {
         val library = Library(games = listOf(game("B", platform = "gba"), game("Z"), game("A"), game("C", platform = "gba")))
         val selection = Selection().with(library.games[3])
         val shelves = Shelves.of(library, listOf(PlatformId("ps2"), PlatformId("gba")), selection)
-        val sent = Json.parseToJsonElement(library.toWireJson(shelves)).jsonObject
+        val sent = Json.parseToJsonElement(library.toWireJson(shelves, ps2)).jsonObject
         val ids = sent.getValue("games").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }
         val shelved =
             sent.getValue("shelves").jsonObject.getValue("shelves").jsonArray.map { shelf ->
@@ -208,7 +214,7 @@ class WireTest {
                         IgnoredFile(listed("._%05d.chd".format(it)), IgnoreReason.HIDDEN),
                     )
                 }
-            return Library().withScan(PlatformId("ps2"), Scan(listOf(game("G")), ignored, emptyList())).toWireJson(None).length
+            return Library().withScan(PlatformId("ps2"), Scan(listOf(game("G")), ignored, emptyList())).toWireJson(None, ps2).length
         }
         sent(5_000) shouldBeLessThanOrEqual sent(IgnoredCount.EXAMPLES) + 10
     }
@@ -233,7 +239,8 @@ class WireTest {
             },
             "games": [{
                 "id": "ps2/G", "platform_id": "ps2", "title": "G", "regions": [], "languages": [], "serials": [],
-                "discs": [{"name": "G (Disc 1).chd", "number": 1}], "last_disc": 0, "identified": false, "version": "v1.1"
+                "discs": [{"name": "G (Disc 1).chd", "number": 1}], "last_disc": 0, "identified": false, "version": "v1.1",
+                "medium": "ps2_dvd"
             }],
             "not_games": {"ps2": ["bios.bin"]},
             "ignored_counts": {
@@ -248,7 +255,7 @@ class WireTest {
     @Test
     fun `a renamed game reaches Godot under its name, with its title beside it`() {
         fun sent(game: Game) = Json
-            .parseToJsonElement(Library(games = listOf(game)).toWireJson(None))
+            .parseToJsonElement(Library(games = listOf(game)).toWireJson(None, ps2))
             .jsonObject
             .getValue("games")
             .jsonArray
@@ -265,7 +272,7 @@ class WireTest {
     @Test
     fun `a game's chosen region reaches Godot under its own key, and an automatic label sends none`() {
         fun sent(label: LabelChoice) = Json
-            .parseToJsonElement(Library(games = listOf(game("Okage").copy(label = label))).toWireJson(None))
+            .parseToJsonElement(Library(games = listOf(game("Okage").copy(label = label))).toWireJson(None, ps2))
             .jsonObject
             .getValue("games")
             .jsonArray
@@ -277,6 +284,24 @@ class WireTest {
         sent(LabelChoice.Own).getValue("label_own").jsonPrimitive.content shouldBe "true"
         sent(LabelChoice.Own).containsKey("label_region") shouldBe false
         VariantFailure.entries.map { it.wire }.distinct().size shouldBe VariantFailure.entries.size
+    }
+
+    @Test
+    fun `INV-E10-05 each game reaches Godot with the medium its platform gives its regions, none when the platform is unknown`() {
+        val medium = """{"default": "nes_cart", "ntsc_j": "famicom_cart"}"""
+        val profiles = """{"nes": {"media": "cartridge", "medium": $medium, "minimumGameBytes": 1}}"""
+        val nes = Catalog.parse(listOf(definition(platform = "nes")), DefinitionSource("profiles.json", profiles))
+        val games =
+            listOf(game("A", "nes").copy(regions = listOf("Japan")), game("B", "nes").copy(regions = listOf("USA")), game("C", "gba"))
+        val sent =
+            Json
+                .parseToJsonElement(Library(games = games).toWireJson(None, nes))
+                .jsonObject
+                .getValue("games")
+                .jsonArray
+                .map { it.jsonObject }
+        sent.take(2).map { it.getValue("medium").jsonPrimitive.content } shouldBe listOf("famicom_cart", "nes_cart")
+        sent.last().containsKey("medium") shouldBe false
     }
 
     @Test

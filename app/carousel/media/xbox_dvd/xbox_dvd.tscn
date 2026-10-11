@@ -1,0 +1,81 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/media/xbox_dvd/xbox_dvd_shape.tres" id="2"]
+[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/disc_mirror.gdshader" id="4"]
+[ext_resource type="Shader" path="res://carousel/models/clear_plastic.gdshader" id="5"]
+[ext_resource type="Resource" path="res://carousel/media/xbox_dvd/xbox_dvd_hub_shape.tres" id="6"]
+[ext_resource type="Texture2D" path="res://carousel/media/xbox_dvd/xbox_dvd_hub.svg" id="7"]
+
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
+
+[sub_resource type="ShaderMaterial" id="label_material"]
+shader = ExtResource("3")
+shader_parameter/silver = 0.8
+shader_parameter/grooves = 0.5
+
+[sub_resource type="PrimitiveMesh" id="mirror_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"mirror"
+
+[sub_resource type="ShaderMaterial" id="mirror_material"]
+shader = ExtResource("4")
+shader_parameter/mirror_color = Color(0.9, 0.9, 0.92, 1)
+shader_parameter/recorded_color = Color(0.82, 0.83, 0.85, 1)
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+render_priority = 1
+shader = ExtResource("5")
+shader_parameter/opacity = 0.35
+
+[sub_resource type="PrimitiveMesh" id="hub_mesh"]
+script = ExtResource("1")
+shape = ExtResource("6")
+part = &"label"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="hub_material"]
+shader = ExtResource("3")
+shader_parameter/label_texture = ExtResource("7")
+shader_parameter/has_label = true
+shader_parameter/scanned = true
+shader_parameter/silver = 1.0
+shader_parameter/roughness = 0.2
+shader_parameter/varnish = 1.0
+shader_parameter/grain = 0.0
+shader_parameter/grooves = 1.0
+shader_parameter/groove_count = 90.0
+
+[node name="XboxDvd" type="Node3D"]
+
+[node name="Label" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_mesh")
+surface_material_override/0 = SubResource("label_material")
+
+[node name="Mirror" type="MeshInstance3D" parent="."]
+mesh = SubResource("mirror_mesh")
+surface_material_override/0 = SubResource("mirror_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")
+
+[node name="Hub" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -0.006)
+mesh = SubResource("hub_mesh")
+surface_material_override/0 = SubResource("hub_material")
+
+[node name="HubThroughLabelSide" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.006)
+mesh = SubResource("hub_mesh")
+surface_material_override/0 = SubResource("hub_material")

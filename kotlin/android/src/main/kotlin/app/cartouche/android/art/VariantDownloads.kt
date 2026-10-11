@@ -2,6 +2,7 @@
 package app.cartouche.android.art
 
 import app.cartouche.core.art.ArtVariant
+import app.cartouche.core.art.LabelCut
 import app.cartouche.core.library.GameId
 import arrow.core.Either
 import arrow.core.flatMap
@@ -16,7 +17,7 @@ internal enum class VariantFailure {
     REFUSED,
     NOT_FOUND,
 
-    /** Downloaded, but not an image Android can read. */
+    /** Downloaded, but not an image Android can read, or a scan of no shape its label can be cut from. */
     UNREADABLE,
     STORAGE,
 }
@@ -35,12 +36,12 @@ internal class VariantDownloads(
 ) {
     private val underWay = ConcurrentHashMap.newKeySet<ArtVariant>()
 
-    /** Downloads [game]'s [variants] that are not under way. */
-    fun download(game: GameId, variants: List<ArtVariant>) {
+    /** Downloads [game]'s [variants], whose labels [cut] gives, that are not under way. */
+    fun download(game: GameId, variants: List<ArtVariant>, cut: LabelCut) {
         variants.filter(underWay::add).forEach { variant ->
             scope.launch(downloads) {
                 try {
-                    done(game, variant, kept(variant))
+                    done(game, variant, kept(variant, cut))
                 } finally {
                     underWay.remove(variant)
                 }
@@ -48,7 +49,7 @@ internal class VariantDownloads(
         }
     }
 
-    private fun kept(variant: ArtVariant): Either<VariantFailure, StoredArt> = fetch
+    private fun kept(variant: ArtVariant, cut: LabelCut): Either<VariantFailure, StoredArt> = fetch
         .get(variant.url)
         .mapLeft { failure ->
             when (failure) {
@@ -56,6 +57,6 @@ internal class VariantDownloads(
                 is FetchFailure.Offline -> VariantFailure.OFFLINE
                 is FetchFailure.Refused -> VariantFailure.REFUSED
             }
-        }.flatMap { image -> ArtImages.label(image).toEither { VariantFailure.UNREADABLE } }
+        }.flatMap { image -> ArtImages.label(image, cut).toEither { VariantFailure.UNREADABLE } }
         .flatMap { label -> store.saveVariant(variant.url, label).mapLeft { VariantFailure.STORAGE } }
 }

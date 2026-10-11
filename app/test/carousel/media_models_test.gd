@@ -7,28 +7,48 @@ const PROFILES := "res://data/platforms/profiles.json"
 
 
 func test_INV_E2_06_every_media_of_the_platforms_has_a_model() -> void:
-	var models: Dictionary = _json(APPEARANCE)["models"]
+	var kind_media: Dictionary = _json(APPEARANCE)["kind_media"]
+	var found := MediumManifest.found()
 	var profiles: Dictionary = _json(PROFILES)
 	for platform: String in profiles:
 		var profile: Dictionary = profiles[platform]
-		assert_bool(models.has(profile["media"])).override_failure_message("no model for %s" % platform).is_true()
+		assert_bool(kind_media.get(profile["media"], "") in found).override_failure_message(
+			"no model for %s" % platform).is_true()
 
 
 func test_INV_E2_06_every_model_loads_with_a_label_the_carousel_draws_on() -> void:
-	var models: Dictionary = _json(APPEARANCE)["models"]
-	for media: String in models:
-		var path: String = models[media]
+	for path in _scenes():
 		var scene: PackedScene = load(path)
 		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
 		add_child(model)
 		model.draw_label("Title", ShelfRow.LabelLook.new())
-		var uniforms := model._materials[0].shader.get_shader_uniform_list().map(func(uniform: Dictionary) -> String: return uniform["name"])
+		var label: ShaderMaterial = model._label_mesh.get_active_material(0)
+		var uniforms := label.shader.get_shader_uniform_list().map(func(uniform: Dictionary) -> String: return uniform["name"])
 		assert_array(uniforms).override_failure_message("%s: its label cannot be drawn" % path).contains(["label_texture", "has_label"])
 
 
+func test_INV_E10_06_an_image_of_another_shape_covers_the_label_its_middle_shown_never_stretched() -> void:
+	for path in _scenes():
+		var scene: PackedScene = load(path)
+		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
+		add_child(model)
+		for size: Vector2i in [Vector2i(400, 100), Vector2i(100, 400), Vector2i(300, 300)]:
+			var image := ImageTexture.create_from_image(Image.create_empty(size.x, size.y, false, Image.FORMAT_RGB8))
+			for window: Rect2 in [ShelfRow.WHOLE, Rect2(0.25, 0.0, 0.5, 0.5)]:
+				model.show_label(image, true, window)
+				var material: ShaderMaterial = model._label_mesh.get_active_material(0)
+				var shown: Vector4 = material.get_shader_parameter(&"label_window")
+				var part := Rect2(shown.x, shown.y, shown.z, shown.w)
+				# Within the window asked, round its centre, filling it one way, of the label's own shape.
+				assert_bool(window.grow(0.0001).encloses(part)).override_failure_message("%s: %s off %s" % [path, part, window]).is_true()
+				assert_vector(part.get_center()).is_equal_approx(window.get_center(), Vector2.ONE * 0.0001)
+				assert_bool(is_equal_approx(part.size.x, window.size.x) or is_equal_approx(part.size.y, window.size.y)).is_true()
+				var pixels := part.size * Vector2(size)
+				assert_float(pixels.x / pixels.y).is_equal_approx(model.label_proportion, 0.0001)
+
+
 func test_INV_E2_5_04_every_model_is_built_from_dimensions_that_fit_and_every_part_has_faces() -> void:
-	var models: Dictionary = _json(APPEARANCE)["models"]
-	for path: String in models.values():
+	for path in _scenes():
 		var scene: PackedScene = load(path)
 		var model: Node3D = auto_free(scene.instantiate())
 		var parts := model.find_children("*", "MeshInstance3D", true, false)
@@ -43,8 +63,7 @@ func test_INV_E2_5_04_every_model_is_built_from_dimensions_that_fit_and_every_pa
 
 func test_INV_E2_5_05_a_game_without_a_label_image_shows_its_title_in_ink_that_stands_out() -> void:
 	var random := Fixtures.cases(60)
-	var models: Dictionary = _json(APPEARANCE)["models"]
-	for path: String in models.values():
+	for path in _scenes():
 		var scene: PackedScene = load(path)
 		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
 		add_child(model)
@@ -96,7 +115,7 @@ func test_INV_E2_5_05_a_game_with_a_label_image_shows_it_and_the_others_their_ti
 	var row: ShelfRow = auto_free(ShelfRow.new())
 	row.label_images = auto_free(Fixtures.FakeArt.new(images))
 	add_child(row)
-	row.show_shelf(games, 0, Fixtures.DVD, ShelfRow.LabelLook.new())
+	row.show_shelf(games, 0, Fixtures.DVDS, ShelfRow.LabelLook.new())
 	row.set_process(false)
 	for frame in 10:
 		row._process(Fixtures.FRAME_S)
@@ -122,7 +141,7 @@ func test_INV_E4_07_a_scan_that_arrives_replaces_the_title_of_its_game_in_view_a
 	var row: ShelfRow = auto_free(ShelfRow.new())
 	row.label_images = art
 	add_child(row)
-	row.show_shelf(games, 1, Fixtures.DVD, ShelfRow.LabelLook.new())
+	row.show_shelf(games, 1, Fixtures.DVDS, ShelfRow.LabelLook.new())
 	row.set_process(false)
 	for frame in 10:
 		row._process(Fixtures.FRAME_S)
@@ -153,14 +172,22 @@ func _label_material(model: Node3D) -> ShaderMaterial:
 	return label.get_surface_override_material(0)
 
 
+## The scene of every medium folder.
+func _scenes() -> Array[String]:
+	var found: Array[String] = []
+	for manifest: MediumManifest in MediumManifest.found().values():
+		found.append(manifest.scene)
+	return found
+
+
 func _json(path: String) -> Dictionary:
 	return JSON.parse_string(FileAccess.get_file_as_string(path))
 
 
 func test_a_model_fades_through_transparent_copies_of_its_materials_and_is_opaque_again_once_not_faded() -> void:
 	var random := Fixtures.cases(60)
-	for scene: PackedScene in [preload("res://carousel/models/dvd.tscn"), preload("res://carousel/models/cartridge.tscn"),
-			preload("res://carousel/consoles/ps2_slim.tscn")]:
+	for scene: PackedScene in [Fixtures.DVD, preload("res://carousel/media/gba_cart/gba_cart.tscn"),
+			load(Fixtures.PS2_SLIM)]:
 		var model: Node3D = auto_free(scene.instantiate())
 		add_child(model)
 		var own: Dictionary[MeshInstance3D, Array] = {}
@@ -192,7 +219,7 @@ func test_a_model_fades_through_transparent_copies_of_its_materials_and_is_opaqu
 
 
 func test_a_faded_game_shows_the_label_drawn_on_it_as_it_would_opaque() -> void:
-	for scene: PackedScene in [preload("res://carousel/models/dvd.tscn"), preload("res://carousel/models/cartridge.tscn")]:
+	for scene: PackedScene in [Fixtures.DVD, preload("res://carousel/media/gba_cart/gba_cart.tscn")]:
 		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
 		add_child(model)
 		var label: MeshInstance3D = model.find_child("Label", true, false)

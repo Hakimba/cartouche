@@ -62,6 +62,11 @@ func test_INV_E2_5_01_without_the_plugin_the_catalog_and_the_demo_library_are_th
 	assert_array(answer.library.shelves.map(func(shelf: AndroidServices.Shelf) -> String: return shelf.platform_id)).is_equal(ids)
 
 
+func test_the_plugin_gets_daijisho_s_definitions_and_cartouche_s_own() -> void:
+	assert_array(AndroidServices.platform_definitions().keys()).contains(
+		["SonyPlayStation2.json", "MicrosoftXbox.json", "MicrosoftXbox360.json"])
+
+
 func test_the_library_answer_carries_the_scans_stored_for_its_games() -> void:
 	var answer := AndroidServices.LibraryAnswer.new({
 		"ok": true, "library": "{}", "art": JSON.stringify([{"game_id": "ps2/a", "path": "/art/a.jpg"}]),
@@ -95,6 +100,13 @@ func test_a_picture_picked_is_read_with_its_path_and_size_and_a_label_of_one_s_o
 	assert_str(AndroidServices.Game.new(game).own_title()).is_equal("A of its own")
 	game.erase("original_title")
 	assert_str(AndroidServices.Game.new(game).own_title()).is_equal("A")
+
+
+func test_a_game_is_read_with_the_medium_its_platform_gives_it_and_none_when_it_has_none() -> void:
+	var game := {"id": "snes/A", "platform_id": "snes", "title": "A", "identified": false, "discs": [{"name": "A"}], "last_disc": 0}
+	assert_str(AndroidServices.Game.new(game).medium).is_empty()
+	game["medium"] = "sfc_cart"
+	assert_str(AndroidServices.Game.new(game).medium).is_equal("sfc_cart")
 
 
 func test_a_console_renamed_is_read_with_its_name_and_one_given_its_own_back_without() -> void:

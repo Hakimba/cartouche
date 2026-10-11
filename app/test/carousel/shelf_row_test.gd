@@ -96,7 +96,7 @@ func test_INV_E2_02_however_the_row_moves_each_game_in_view_has_a_place_of_its_o
 func test_after_a_change_of_shelf_every_game_in_view_has_a_place_of_its_own() -> void:
 	var row := _row(30, 0)
 	for count: int in [30, 3, 12, 1]:
-		row.show_shelf(Fixtures.games(count), 0, Fixtures.DVD, ShelfRow.LabelLook.new())
+		row.show_shelf(Fixtures.games(count), 0, Fixtures.DVDS, ShelfRow.LabelLook.new())
 		_frames(row, 1, Fixtures.FRAME_S)
 		_assert_places(row, count)
 
@@ -120,6 +120,58 @@ func test_holding_again_starts_slow_again_and_releasing_the_other_way_changes_no
 		assert_int(row.selected_index()).is_equal(started + 1)
 
 
+func test_every_game_in_view_shows_on_the_model_of_its_own_medium_alone_whatever_the_moves() -> void:
+	var random := Fixtures.cases(64)
+	var models: Dictionary[String, PackedScene] = {"ps2_dvd": Fixtures.DVD, "": Fixtures.DVD,
+		"gba_cart": load("res://carousel/media/gba_cart/gba_cart.tscn"),
+		"gc_mini_dvd": load("res://carousel/media/gc_mini_dvd/gc_mini_dvd.tscn")}
+	var row := _row(1, 0)
+	var seen: Dictionary[String, bool] = {}
+	for i in 20:
+		var games := Fixtures.games(random.randi_range(1, 12))
+		for game in games:
+			game.medium = models.keys()[random.randi_range(0, models.size() - 1)]
+		row.show_shelf(games, random.randi_range(0, games.size() - 1), models, ShelfRow.LabelLook.new())
+		for move in random.randi_range(1, 8):
+			row.step(Fixtures.direction(random))
+			_frames(row, random.randi_range(1, 20), Fixtures.FRAME_S)
+			for place: ShelfRow.Place in row.get_children():
+				if not place.visible:
+					continue
+				var medium := games[place.game].medium
+				seen[medium] = true
+				assert_object(place._models.get(models[medium])).is_same(place.shown)
+				for made: ShelfRow.LabelledModel in place._models.values():
+					assert_bool(made.visible).is_equal(made == place.shown)
+	assert_int(seen.size()).is_equal(models.size())
+
+
+func test_INV_E10_04_a_shelf_makes_each_place_s_model_of_its_media_alone_kept_until_the_library_drops_it() -> void:
+	var cartridge: PackedScene = load("res://carousel/media/gba_cart/gba_cart.tscn")
+	var row := _row(3, 0)
+	var games := Fixtures.games(3)
+	for game in games:
+		game.medium = "gba_cart"
+	var made: Array[ShelfRow.LabelledModel] = []
+	for place: ShelfRow.Place in row._places:
+		assert_array(place._models.keys()).contains_exactly([Fixtures.DVD])
+		made.append(place._models[Fixtures.DVD])
+	# Made as the shelf shows, whether its games are in view or not; the other shelf's kept.
+	row.show_shelf(games, 0, {"gba_cart": cartridge}, ShelfRow.LabelLook.new())
+	for place: ShelfRow.Place in row._places:
+		assert_array(place._models.keys()).contains_exactly_in_any_order([Fixtures.DVD, cartridge])
+	var alive := ShelfRow.LabelledModel.alive
+	row.keep_models([cartridge])
+	assert_int(ShelfRow.LabelledModel.alive).is_equal(alive - made.size())
+	for place: ShelfRow.Place in row._places:
+		assert_array(place._models.keys()).contains_exactly([cartridge])
+	assert_bool(made.any(is_instance_valid)).is_false()
+	row.show_shelf(games, 1, {"gba_cart": cartridge}, ShelfRow.LabelLook.new())
+	_frames(row, 1, Fixtures.FRAME_S)
+	for place: ShelfRow.Place in row._places:
+		assert_object(place.shown).is_same(place._models[cartridge])
+
+
 func test_a_shelf_of_one_game_does_not_move() -> void:
 	var row := _row(1, 0)
 	row.hold(1)
@@ -134,7 +186,7 @@ func _row(count: int, selected: int, pose := ShelfRow.Pose.new()) -> ShelfRow:
 	row.label_images = auto_free(Fixtures.FakeArt.new())
 	row.pose = pose
 	add_child(row)
-	row.show_shelf(Fixtures.games(count), selected, Fixtures.DVD, ShelfRow.LabelLook.new())
+	row.show_shelf(Fixtures.games(count), selected, Fixtures.DVDS, ShelfRow.LabelLook.new())
 	row.set_process(false)
 	return row
 
@@ -163,7 +215,8 @@ func _assert_places(row: ShelfRow, count: int) -> void:
 		if place.visible:
 			shown.append(place.game)
 			assert_float(place.transform.origin.x).is_equal_approx(CarouselLayout.place(offsets[place.game]).origin.x, 0.0001)
-			if place.shown._materials[0].get_shader_parameter(&"has_label"):
+			var label: ShaderMaterial = place.shown._label_mesh.get_active_material(0)
+			if label.get_shader_parameter(&"has_label"):
 				assert_str(place.shown._title.text).is_equal(row._games[place.game].title)
 	shown.sort()
 	var in_view := offsets.keys()
@@ -218,14 +271,15 @@ func test_gone_the_row_still_takes_its_shelves_and_steps_and_comes_back_on_them_
 		var frames := random.randi_range(1, 30)
 		for row: ShelfRow in [gone, shown]:
 			_frames(row, 2, Fixtures.FRAME_S)
-			row.show_shelf(games, selected, Fixtures.DVD, ShelfRow.LabelLook.new())
+			row.show_shelf(games, selected, Fixtures.DVDS, ShelfRow.LabelLook.new())
 			row.step(direction)
 			_frames(row, frames, Fixtures.FRAME_S)
 		for place: ShelfRow.Place in gone.get_children():
 			var twin: ShelfRow.Place = shown.get_child(place.get_index())
 			assert_int(place.game).is_equal(twin.game)
 			assert_bool(place.visible).is_equal(twin.visible)
-			assert_str(place.shown._title.text).is_equal(twin.shown._title.text)
+			if place.visible:
+				assert_str(place.shown._title.text).is_equal(twin.shown._title.text)
 		gone.selected_presence = 1.0
 		gone.neighbours = 1.0
 		_frames(gone, 1, Fixtures.FRAME_S)

@@ -1,0 +1,360 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/xbox360/xbox360_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/xbox360/xbox360_shape.tres" id="2"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/xbox360/xbox360_bezel_logo.svg" id="bezel_logo_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/xbox360/xbox360_top_logo.svg" id="top_logo_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/xbox360/xbox360_memory_a.svg" id="memory_a_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/xbox360/xbox360_memory_b.svg" id="memory_b_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/xbox360/xbox360_power_mark.svg" id="power_mark_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/xbox360/xbox360_eject_mark.svg" id="eject_mark_logo"]
+
+[sub_resource type="ShaderMaterial" id="body_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.88, 0.89, 0.88, 1)
+shader_parameter/roughness = 0.4
+shader_parameter/clearcoat = 0.3
+shader_parameter/clearcoat_roughness = 0.3
+
+[sub_resource type="ShaderMaterial" id="gap_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.05, 0.05, 0.055, 1)
+shader_parameter/roughness = 0.9
+
+[sub_resource type="ShaderMaterial" id="window_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.04, 0.03, 0.035, 1)
+shader_parameter/roughness = 0.1
+shader_parameter/clearcoat = 1
+shader_parameter/clearcoat_roughness = 0.05
+
+[sub_resource type="ShaderMaterial" id="grille_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.38, 0.39, 0.4, 1)
+shader_parameter/metallic = 0.6
+shader_parameter/roughness = 0.55
+
+[sub_resource type="ShaderMaterial" id="drive_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.58, 0.6, 0.62, 1)
+shader_parameter/metallic = 0.3
+shader_parameter/roughness = 0.4
+
+[sub_resource type="ShaderMaterial" id="silver_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.86, 0.87, 0.88, 1)
+shader_parameter/metallic = 0.95
+shader_parameter/roughness = 0.15
+
+[sub_resource type="ShaderMaterial" id="rubber_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.15, 0.15, 0.16, 1)
+shader_parameter/roughness = 0.9
+
+[sub_resource type="ShaderMaterial" id="tray_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.44, 0.49, 0.51, 1)
+shader_parameter/roughness = 0.6
+
+[sub_resource type="ShaderMaterial" id="light_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.55, 0.6, 0.55, 1)
+shader_parameter/roughness = 0.25
+shader_parameter/emission = Color(0.4, 1, 0.3, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="PrimitiveMesh" id="gaps_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"gaps"
+
+[sub_resource type="PrimitiveMesh" id="window_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"window"
+
+[sub_resource type="PrimitiveMesh" id="details_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"details"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="grilles_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"grilles"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="drive_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"drive"
+
+[sub_resource type="PrimitiveMesh" id="badge_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"badge"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="feet_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"feet"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="bezel_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"bezel"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="tray_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"tray"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="tray_window_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"tray_window"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="hub_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"hub"
+detail = 48
+
+[sub_resource type="PrimitiveMesh" id="clamp_ring_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"clamp_ring"
+detail = 48
+
+[sub_resource type="PrimitiveMesh" id="drive_opening_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"drive_opening"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="eject_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"eject"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="power_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="ring_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"ring"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="bezel_logo_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("bezel_logo_logo")
+shader_parameter/has_label = true
+shader_parameter/scanned = true
+shader_parameter/silver = 1.0
+shader_parameter/roughness = 0.15
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="bezel_logo_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"bezel_logo"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="top_logo_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("top_logo_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="top_logo_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"top_logo"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="memory_a_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("memory_a_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="memory_a_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"memory_a"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="memory_b_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("memory_b_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="memory_b_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"memory_b"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="power_mark_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_mark_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="power_mark_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_mark"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="eject_mark_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("eject_mark_logo")
+shader_parameter/has_label = true
+shader_parameter/scanned = true
+shader_parameter/silver = 1.0
+shader_parameter/roughness = 0.15
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="eject_mark_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"eject_mark"
+detail = 8
+
+[node name="Xbox360" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Gaps" type="MeshInstance3D" parent="."]
+mesh = SubResource("gaps_mesh")
+surface_material_override/0 = SubResource("gap_material")
+
+[node name="Window" type="MeshInstance3D" parent="."]
+mesh = SubResource("window_mesh")
+surface_material_override/0 = SubResource("window_material")
+
+[node name="Details" type="MeshInstance3D" parent="."]
+mesh = SubResource("details_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Grilles" type="MeshInstance3D" parent="."]
+mesh = SubResource("grilles_mesh")
+surface_material_override/0 = SubResource("grille_material")
+
+[node name="Drive" type="MeshInstance3D" parent="."]
+mesh = SubResource("drive_mesh")
+surface_material_override/0 = SubResource("drive_material")
+
+[node name="Badge" type="MeshInstance3D" parent="."]
+mesh = SubResource("badge_mesh")
+surface_material_override/0 = SubResource("silver_material")
+
+[node name="Feet" type="MeshInstance3D" parent="."]
+mesh = SubResource("feet_mesh")
+surface_material_override/0 = SubResource("rubber_material")
+
+[node name="Light" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("ring_mesh")
+surface_material_override/0 = SubResource("light_material")
+
+[node name="Tray" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Bezel" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("bezel_mesh")
+surface_material_override/0 = SubResource("silver_material")
+
+[node name="Plate" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("tray_mesh")
+surface_material_override/0 = SubResource("tray_material")
+
+[node name="TrayWindow" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("tray_window_mesh")
+surface_material_override/0 = SubResource("gap_material")
+
+[node name="Hub" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("hub_mesh")
+surface_material_override/0 = SubResource("silver_material")
+
+[node name="ClampRing" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("clamp_ring_mesh")
+surface_material_override/0 = SubResource("rubber_material")
+
+[node name="DriveOpening" type="MeshInstance3D" parent="."]
+mesh = SubResource("drive_opening_mesh")
+surface_material_override/0 = SubResource("gap_material")
+
+[node name="Eject" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cap" type="MeshInstance3D" parent="Eject"]
+mesh = SubResource("eject_mesh")
+surface_material_override/0 = SubResource("silver_material")
+
+[node name="Power" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cap" type="MeshInstance3D" parent="Power"]
+mesh = SubResource("power_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="BezelLogo" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("bezel_logo_logo_mesh")
+surface_material_override/0 = SubResource("bezel_logo_logo_material")
+
+[node name="TopLogo" type="MeshInstance3D" parent="."]
+mesh = SubResource("top_logo_logo_mesh")
+surface_material_override/0 = SubResource("top_logo_logo_material")
+
+[node name="MemoryA" type="MeshInstance3D" parent="."]
+mesh = SubResource("memory_a_logo_mesh")
+surface_material_override/0 = SubResource("memory_a_logo_material")
+
+[node name="MemoryB" type="MeshInstance3D" parent="."]
+mesh = SubResource("memory_b_logo_mesh")
+surface_material_override/0 = SubResource("memory_b_logo_material")
+
+[node name="PowerMark" type="MeshInstance3D" parent="Power"]
+mesh = SubResource("power_mark_logo_mesh")
+surface_material_override/0 = SubResource("power_mark_logo_material")
+
+[node name="EjectMark" type="MeshInstance3D" parent="Eject"]
+mesh = SubResource("eject_mark_logo_mesh")
+surface_material_override/0 = SubResource("eject_mark_logo_material")

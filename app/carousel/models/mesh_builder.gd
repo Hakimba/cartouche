@@ -8,6 +8,10 @@ extends RefCounted
 ## World units per millimetre: a DVD is 1.2 units wide.
 const UNITS_PER_MM := 0.01
 
+## Turns each vertex added, its normal and tangent with it: the pieces of one part laid out in
+## another plane than the part's, such as a side's.
+var basis := Basis()
+
 var _vertices := PackedVector3Array()
 var _normals := PackedVector3Array()
 var _tangents := PackedFloat32Array()
@@ -17,15 +21,17 @@ var _indices := PackedInt32Array()
 
 
 ## Adds a vertex and gives its index. Its [param tangent] is made square to its normal, as normal
-## maps need it: a tangent along the normal falls back to one across it.
+## maps need it: a tangent along the normal falls back to one across it. Its [param colour] marks
+## it for the shaders that read it (a disc's recorded area, its rim): black, by default, for none.
 func add(point: Vector3, normal: Vector3, uv: Vector2, tangent := Vector3.RIGHT,
-		colour := Color.WHITE) -> int:
-	var towards := normal.normalized()
-	var across := tangent - towards * towards.dot(tangent)
+		colour := Color.BLACK) -> int:
+	var towards := (basis * normal).normalized()
+	var turned := basis * tangent
+	var across := turned - towards * towards.dot(turned)
 	if across.length_squared() < 1e-6:
 		across = towards.cross(Vector3.UP if absf(towards.y) < 0.9 else Vector3.RIGHT)
 	across = across.normalized()
-	_vertices.append(point * UNITS_PER_MM)
+	_vertices.append(basis * point * UNITS_PER_MM)
 	_normals.append(towards)
 	_tangents.append_array([across.x, across.y, across.z, 1.0])
 	_uvs.append(uv)

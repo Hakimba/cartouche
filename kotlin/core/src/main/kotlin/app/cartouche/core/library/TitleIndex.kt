@@ -41,7 +41,7 @@ public sealed interface Identification {
 }
 
 /**
- * The discs of one platform's reference list (`app/data/redump`, one `name<TAB>serials` line per
+ * The discs of one platform's reference list (`app/data/titles`, one `name<TAB>serials` line per
  * disc), indexed by title so that a file name finds its disc without reading the file.
  */
 public class TitleIndex private constructor(

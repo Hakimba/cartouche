@@ -32,6 +32,7 @@ import app.cartouche.core.platforms.Candidate
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.MediaType
+import app.cartouche.core.platforms.MediumId
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
 import app.cartouche.core.search.Mark
@@ -46,6 +47,7 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.filterIsInstance
+import arrow.core.getOrNone
 import arrow.core.toOption
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -188,11 +190,13 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
  * "games": [game], "not_games": {platform id: [file name]}, "ignored_counts": {platform id:
  * {"hidden" or "unsupported": {"count", "examples"}}}, "skipped_folders": {platform id: [{"path",
  * "reason"}]}, "shelves"?: {"shelves": [{"platform", "games": [index into games], "selected"}],
- * "selected"}}`, with the keys below; a missing value is an absent key.
+ * "selected"}}`, with the keys below; a missing value is an absent key. Each game carries the medium
+ * [catalog]'s profile of its platform gives it, absent when the catalog does not know the platform.
  */
-internal fun Library.toWireJson(shelves: Option<Shelves>): String = buildJsonObject {
+internal fun Library.toWireJson(shelves: Option<Shelves>, catalog: Catalog): String = buildJsonObject {
+    val media = catalog.platforms.associate { it.id to it.profile.medium }
     put("setups", setups.toJson(PlatformId::value) { it.toJson() })
-    put("games", games.toJson { it.toJson() })
+    put("games", games.toJson { game -> game.toJson(media.getOrNone(game.platform).map { it.of(game.regions) }) })
     put("not_games", notGames.toJson(PlatformId::value) { files -> files.toJson { JsonPrimitive(it.name.value) } })
     put("ignored_counts", ignoredCounts.toJson(PlatformId::value) { counts -> counts.toJson({ it.wire }) { it.toJson() } })
     put("skipped_folders", skippedFolders.toJson(PlatformId::value) { folders -> folders.toJson { it.toJson() } })
@@ -214,12 +218,13 @@ private fun PlatformSetup.toJson(): JsonObject = buildJsonObject {
     putSome("player_id", player.map { it.value })
 }
 
-private fun Game.toJson(): JsonObject = buildJsonObject {
+private fun Game.toJson(medium: Option<MediumId>): JsonObject = buildJsonObject {
     put("id", id.value)
     put("platform_id", platform.value)
     put("title", shownTitle)
     putSome("original_title", displayName.map { title })
     put("regions", regions.toJson(::JsonPrimitive))
+    putSome("medium", medium.map { it.value })
     put("languages", languages.toJson(::JsonPrimitive))
     put("serials", serials.toJson(::JsonPrimitive))
     put("discs", discs.toJson { it.toJson() })

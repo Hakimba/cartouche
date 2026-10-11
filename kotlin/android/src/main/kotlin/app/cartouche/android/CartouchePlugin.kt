@@ -42,7 +42,6 @@ import app.cartouche.core.art.ArtSources
 import app.cartouche.core.art.ArtVariant
 import app.cartouche.core.art.LabelFraming
 import app.cartouche.core.art.Scraping
-import app.cartouche.core.art.SerialScans
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DemoLibrary
@@ -416,22 +415,23 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /**
      * Shows the picture of the user's own picked last ([pickLabelPicture]) on [gameId]'s label from
-     * now on, framed [zoom] times closer than the largest square that fits and centred at [x], [y]
-     * (see [LabelFraming]), and remembers the choice (see [LabelChoices]); answers with
+     * now on, framed [zoom] times closer than the largest rectangle of the label's [proportion] (its
+     * width over its height) that fits, and centred at [x], [y] (see [LabelFraming]), and remembers the choice (see [LabelChoices]); answers with
      * `{"art": {"game_id", "path"}}`. The picture is cut in the background, the library only waiting
      * for the choice to be recorded.
      */
     @UsedByGodot
-    public fun keepOwnLabel(requestId: Int, gameId: String, zoom: Double, x: Double, y: Double): Unit = answering(requestId) {
-        val started = System.nanoTime()
-        val image = ownPictures.framed(LabelFraming(zoom, x, y)).mapLeft { it.toWire() }.bind()
-        withContext(libraryThread) {
-            val game = game(GameId(gameId))
-            val art = LabelChoices(library.value, artStore).keepOwn(game, image).mapLeft { it.toWire() }.bind()
-            trace("art") { "${game.title}: own label kept in ${(System.nanoTime() - started) / 1_000_000} ms" }
-            success("art" to FoundArt(game.id, art).toWire())
+    public fun keepOwnLabel(requestId: Int, gameId: String, zoom: Double, x: Double, y: Double, proportion: Double): Unit =
+        answering(requestId) {
+            val started = System.nanoTime()
+            val image = ownPictures.framed(LabelFraming(zoom, x, y, proportion)).mapLeft { it.toWire() }.bind()
+            withContext(libraryThread) {
+                val game = game(GameId(gameId))
+                val art = LabelChoices(library.value, artStore).keepOwn(game, image).mapLeft { it.toWire() }.bind()
+                trace("art") { "${game.title}: own label kept in ${(System.nanoTime() - started) / 1_000_000} ms" }
+                success("art" to FoundArt(game.id, art).toWire())
+            }
         }
-    }
 
     /** Answers with `{"folders"}`, the folders whose access survived until now. */
     @UsedByGodot
@@ -593,10 +593,11 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     public fun labelVariants(requestId: Int, gameId: String): Unit = answering(requestId, libraryThread) {
         val game = game(GameId(gameId))
-        val stored = sources(game.platform).variantsOf(game).map { it to artStore.variant(it.url) }
+        val sources = sources(game.platform)
+        val stored = sources.variantsOf(game).map { it to artStore.variant(it.url) }
         val missing = stored.filter { it.second.isNone() }.map { it.first }
         trace("art") { "${game.title}: ${stored.size} images, ${missing.size} to download" }
-        variantDownloads.download(game.id, missing)
+        variantDownloads.download(game.id, missing, sources.cutOf(game))
         success(
             "variants" to
                 stored.toWireArray { (variant, art) ->
@@ -739,10 +740,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     private fun sources(platform: PlatformId): ArtSources = artSources.computeIfAbsent(platform) {
         val started = TimeSource.Monotonic.markNow()
-        val bySerial = catalog.platform(platform).flatMap { it.profile.scansBySerial }.flatMap(SerialScans::of)
-        ArtSources(artLists.getOrNone(platform).fold({ ArtIndex.EMPTY }, ArtIndex::parse), bySerial).also {
-            trace("art") { "${platform.value}: ${it.size} games indexed in ${started.elapsedNow().inWholeMilliseconds} ms" }
-        }
+        ArtSources
+            .of(catalog, artLists, platform)
+            .also { trace("art") { "${platform.value}: ${it.size} games indexed in ${started.elapsedNow().inWholeMilliseconds} ms" } }
     }
 
     /** Downloads over HTTP; in debug builds, `--art-refused` makes every server refuse, to try the message and the retries. */
@@ -844,7 +844,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /** The library of [service] and its shelves, for Godot. */
     private fun wire(service: LibraryService): String {
         val started = TimeSource.Monotonic.markNow()
-        return service.library().toWireJson(service.shelves(catalog.platforms.map { it.id })).also {
+        return service.library().toWireJson(service.shelves(catalog.platforms.map { it.id }), catalog).also {
             trace("library") { "${it.length} characters of JSON in ${started.elapsedNow().inWholeMilliseconds} ms" }
         }
     }

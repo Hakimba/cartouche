@@ -44,7 +44,8 @@ class ScrapingTest {
         data class Return(val pick: Int) : Step
     }
 
-    private fun request(game: Int) = ArtRequest(GameId("ps2/$game"), "Game $game", nonEmptyListOf(ArtUrl("https://a/$game.png")), None)
+    private fun request(game: Int) =
+        ArtRequest(GameId("ps2/$game"), "Game $game", nonEmptyListOf(ArtUrl("https://a/$game.png")), None, PS2_DISC)
 
     private val steps: Arb<Step> =
         Arb.choice(

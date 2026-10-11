@@ -5,9 +5,6 @@
    "dur": 0,
    "ease": "inOut",
    "hold": 0,
-   "lid": {
-    "angle": 0
-   },
    "disc": {
     "visible": 0,
     "inRow": 1
@@ -54,9 +51,6 @@
    "dur": 0.3,
    "ease": "out",
    "hold": 0,
-   "lid": {
-    "angle": 0
-   },
    "disc": {
     "visible": 1,
     "inRow": 1

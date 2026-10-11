@@ -29,7 +29,10 @@ class DesktopDemoTest {
     fun `INV-E2_5-01 the desktop demo is the catalog and the demo library as the plugin sends them`() {
         val data = File(app, "data/platforms")
         // In name order, as the plugin reads them.
-        val files = data.resolve("daijishou").listFiles { it.extension == "json" }.orEmpty().sortedBy { it.name }
+        val files =
+            listOf("daijishou", "cartouche")
+                .flatMap { data.resolve(it).listFiles { file -> file.extension == "json" }.orEmpty().toList() }
+                .sortedBy { it.name }
         val definitions = files.map { DefinitionSource(it.name, it.readText()) }
         val catalog = Catalog.parse(definitions, DefinitionSource("profiles.json", data.resolve("profiles.json").readText()))
         val platforms = catalog.platforms.map { it.id }
@@ -37,7 +40,7 @@ class DesktopDemoTest {
         val expected =
             buildJsonObject {
                 put("catalog", catalog.toWire().toJson())
-                put("library", Json.parseToJsonElement(library.toWireJson(Shelves.of(library, platforms, Selection()))))
+                put("library", Json.parseToJsonElement(library.toWireJson(Shelves.of(library, platforms, Selection()), catalog)))
             }
         val fixture = File(app, "dev/demo/desktop.json")
         val found = if (fixture.exists()) Json.parseToJsonElement(fixture.readText()) else JsonObject(emptyMap())

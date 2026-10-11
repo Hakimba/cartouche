@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
+import app.cartouche.core.Shipped
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.game
+import app.cartouche.core.platforms.ArtKind
+import app.cartouche.core.platforms.MediaRule
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.platforms.SerialScans
+import app.cartouche.core.platforms.mediumId
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -26,12 +31,12 @@ import org.junit.Test
 class ArtSourcesTest {
     private val index = ArtIndex.parse(extract(listOf(ExtractGame("Okage", emptySet(), listOf("USA=na.png", "Japan=jp.png")))))
 
-    private val bySerial = SerialScans.of("https://scans.test/{serial}.jpg")
+    private val bySerial = SerialScans.of("https://scans.test/{serial}.jpg", PLAYSTATION_SERIAL)
 
     @Test
     fun `a game is looked for as the extract's scans, then those of its serials, in the sources' version`() {
         val okage = game("Okage").copy(serials = listOf("SCUS-97129"))
-        val request = ArtSources(index, bySerial).requestFor(okage).shouldBeSome()
+        val request = ArtSources(ArtKind.Disc, PS2_MEDIA, index, bySerial).requestFor(okage).shouldBeSome()
         request.title shouldBe "Okage"
         request.version shouldBe Some(ArtVersion("2026-09-28"))
         request.candidates.map { it.value.substringAfterLast('/') } shouldBe listOf("na.png", "jp.png", "SCUS-97129.jpg")
@@ -50,7 +55,8 @@ class ArtSourcesTest {
 
             fun versionOf(platform: PlatformId) = extracts.getOrNone(platform).flatMap(ArtIndex::versionOf)
 
-            fun sources(platform: PlatformId) = ArtSources(extracts.getOrNone(platform).fold({ ArtIndex.EMPTY }, ArtIndex::parse), None)
+            fun sources(platform: PlatformId) =
+                ArtSources(ArtKind.Disc, PS2_MEDIA, extracts.getOrNone(platform).fold({ ArtIndex.EMPTY }, ArtIndex::parse), None)
             val library = listOf(game("Okage"), game("Ico"), game("Unknown"), game("Ikaruga", "gc"), game("Okage", "gba"))
             val versions = Arb.element(Some(ArtVersion("2026-09-28")), newer, None)
             checkAll(Arb.list(Arb.element(library), 0..5), Arb.list(Arb.pair(Arb.element(library), versions), 0..6)) { games, done ->
@@ -70,12 +76,53 @@ class ArtSourcesTest {
         }
 
     @Test
+    fun `a game's label is cut for the medium its regions give it, in each of its requests`() {
+        val kind = cartridge("snes_pal_cart", 1.41, crop(0.09, 0.06, 0.82, 0.4))
+        val sources = ArtSources(kind, MediaRule(mediumId("snes_pal_cart"), Some(mediumId("snes_us_cart"))), index, None)
+        val american = game("Okage").copy(regions = listOf("USA"))
+        sources.cutOf(american) shouldBe LabelCut(kind, mediumId("snes_us_cart"))
+        sources.requestFor(american).shouldBeSome().cut shouldBe sources.cutOf(american)
+        sources.cutOf(game("Okage").copy(regions = listOf("Japan", "Europe"))) shouldBe LabelCut(kind, mediumId("snes_pal_cart"))
+    }
+
+    @Test
+    fun `INV-E10-06 a game is looked for in its own platform's scans only, each of its platform's kind`() = runBlocking<Unit> {
+        val kinds = mapOf("ps2" to ArtKind.Disc, "gba" to cartridge("gba_cart", 1.74, crop(0.147, 0.218, 0.706, 0.628)))
+        val media = mapOf("ps2" to "ps2_dvd", "gba" to "gba_cart").mapValues { mediumId(it.value) }
+        var both = 0
+        checkAll(extracts, extracts, artTitles, Arb.list(regionNames, 0..2)) { ps2, gba, title, regions ->
+            // Every scan's file names its platform too: `gba-g3-disc-1.png`.
+            val texts =
+                mapOf("ps2" to ps2, "gba" to gba)
+                    .map { (platform, games) ->
+                        PlatformId(platform) to
+                            extract(games.map { game -> game.copy(discs = game.discs.map { it.replace("=", "=$platform-") }) })
+                    }.toMap()
+            val asked =
+                kinds.keys.map { platform ->
+                    val sources = ArtSources.of(Shipped.catalog, texts, PlatformId(platform))
+                    val game = game(title, platform).copy(regions = regions)
+                    val request = sources.requestFor(game)
+                    request.onSome {
+                        it.cut shouldBe LabelCut(kinds.getValue(platform), media.getValue(platform))
+                        it.candidates.all { url -> url.value.substringAfterLast('/').startsWith("$platform-") } shouldBe true
+                    }
+                    sources.variantsOf(game).all { it.url.value.substringAfterLast('/').startsWith("$platform-") } shouldBe true
+                    request
+                }
+            if (asked.all { it.isSome() }) both++
+        }
+        // A title often names a game with scans on both platforms, which never mix.
+        both shouldBeGreaterThan 50
+    }
+
+    @Test
     fun `a game the extract does not know is looked for by its serials, and a game no source can have is not`() {
         val unknown = game("Unknown").copy(serials = listOf("SLPS-25358"))
-        ArtSources(index, bySerial).requestFor(unknown).shouldBeSome().candidates.size shouldBe 1
-        ArtSources(index, bySerial).requestFor(game("Unknown")).shouldBeNone()
-        ArtSources(index, None).requestFor(unknown).shouldBeNone()
-        ArtSources(ArtIndex.EMPTY, None).requestFor(game("Okage")).shouldBeNone()
+        ArtSources(ArtKind.Disc, PS2_MEDIA, index, bySerial).requestFor(unknown).shouldBeSome().candidates.size shouldBe 1
+        ArtSources(ArtKind.Disc, PS2_MEDIA, index, bySerial).requestFor(game("Unknown")).shouldBeNone()
+        ArtSources(ArtKind.Disc, PS2_MEDIA, index, None).requestFor(unknown).shouldBeNone()
+        ArtSources(ArtKind.Disc, PS2_MEDIA, ArtIndex.EMPTY, None).requestFor(game("Okage")).shouldBeNone()
     }
 
     @Test
@@ -89,7 +136,7 @@ class ArtSourcesTest {
                 val lines = discs.mapIndexed { i, region -> "$region=d$i.png" }
                 val extract =
                     extract(listOf(ExtractGame("Okage", emptySet(), lines), ExtractGame("Okage 2", emptySet(), listOf("$chosen=o.png"))))
-                val sources = ArtSources(ArtIndex.parse(extract), bySerial)
+                val sources = ArtSources(ArtKind.Disc, PS2_MEDIA, ArtIndex.parse(extract), bySerial)
                 val okage = game("Okage").copy(regions = regions, serials = listOf("SCUS-97129"))
                 val automatic = sources.requestFor(okage).shouldBeSome().candidates
                 val picked = sources.requestFor(okage.copy(label = LabelChoice.Region(LabelRegion(chosen)))).shouldBeSome().candidates
@@ -114,7 +161,7 @@ class ArtSourcesTest {
         checkAll(Arb.list(regionNames, 0..5), Arb.list(regionNames, 0..2), serialLists) { discs, regions, serials ->
             val extract = extract(listOf(ExtractGame("Okage", emptySet(), discs.mapIndexed { i, region -> "$region=d$i.png" })))
             val okage = game("Okage").copy(regions = regions, serials = serials)
-            val sources = ArtSources(ArtIndex.parse(extract), bySerial)
+            val sources = ArtSources(ArtKind.Disc, PS2_MEDIA, ArtIndex.parse(extract), bySerial)
             if (sources.requestFor(okage).isSome()) withScans++
             sources.requestFor(okage.copy(label = LabelChoice.Own)).shouldBeNone()
         }

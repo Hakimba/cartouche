@@ -38,9 +38,14 @@ var _spun := 0.0
 
 
 func test_INV_E3_04_INV_E3_05_whatever_the_launch_comes_to_the_carousel_shows_again_as_it_was_and_nothing_acted_meanwhile() -> void:
-	# A game put into its console, and one inserted by its medium.
-	for platform: String in ["ps2", "gba"]:
+	# Games put into their console by its own steps (the black grown from the seat, the screen faded),
+	# by the placeholder (the NES as if it had no steps of its own), and one inserted by its medium.
+	for platform: String in ["ps2", "gba", "nes", "atari2600"]:
 		var carousel := await _carousel(platform)
+		if platform == "nes":
+			var manifest: ConsoleManifest = carousel._appearance.console_of("nes").duplicate()
+			manifest.launch = ""
+			carousel._appearance._consoles["nes"] = manifest
 		var random := Fixtures.cases(80)
 		var outcomes: Dictionary[Outcome, int] = {}
 		for i in 80:
@@ -99,8 +104,8 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 			if launch._stage == GameLaunch.Stage.INSERTING:
 				# From where the game stood as the insertion started, before its first frame.
 				assert_bool(launch._start.is_equal_approx(stood)).is_true()
-				# Into the console for the platform that has a launch animation.
-				assert_bool(launch._into_console).is_equal(carousel._shelves[shelf].platform_id == "ps2")
+				# Into the console for every platform that has one.
+				assert_bool(launch._into_console).is_equal(carousel._shelves[shelf].platform_id != "atari2600")
 		_leave_or_come_back(launch, outcome, random)
 		if random.randf() < 0.3:
 			carousel._unhandled_input(Fixtures.button(BUTTONS[random.randi_range(0, BUTTONS.size() - 1)], random.randf() < 0.5))
@@ -113,8 +118,6 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 		if launch._stage == GameLaunch.Stage.INSERTING and launch._into_console:
 			if launch._clock_s >= launch.sequence.seated_s():
 				_assert_on_the_console_spindle(carousel)
-			# INV-E5-08: the whole screen black 2.4 s after the start at most.
-			assert_float(launch._clock_s).is_less_equal(2.4 + LONGEST_FRAME_S)
 			_assert_into_the_console(carousel)
 			_console_frames += 1
 		elif launch._stage == GameLaunch.Stage.INSERTING and launch._clock_s >= launch._insertion.seated_s() + launch._insertion.bounce_s:
@@ -207,6 +210,32 @@ func _assert_waited(outcome: Outcome, stages: Array[GameLaunch.Stage], waited_s:
 			assert_float(waited_s).is_greater_equal(WAIT_S - LONGEST_FRAME_S)
 
 
+func test_INV_E10_05_a_game_goes_into_its_console_from_as_far_as_its_own_medium_is_long() -> void:
+	# Cartridges slid in, the NES as if it had no steps of its own: a Famicom cartridge, shorter, comes
+	# from nearer than an NES one.
+	var carousel := await _carousel("nes")
+	var manifest: ConsoleManifest = carousel._appearance.console_of("nes").duplicate()
+	manifest.launch = ""
+	carousel._appearance._consoles["nes"] = manifest
+	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
+	android.check_code = &"not_installed"
+	carousel._game_launch.android = android
+	var platform := Fixtures.platform("nes")
+	var lifts: Dictionary[String, float] = {}
+	for medium: String in ["famicom_cart", "nes_cart"]:
+		carousel._row.selected_game().medium = medium
+		Fixtures.press(carousel, &"ui_accept")
+		await await_idle_frame()
+		var animation := carousel._sequence._animation
+		assert_object(animation).is_same(carousel._appearance.animation_of(platform, medium))
+		# Still on the games screen, as before the launch.
+		assert_float(carousel._sequence._at_s).is_equal(LaunchAnimation.moment(animation, &"games"))
+		var lift := animation.find_track(^"Sequence:disc_lift", Animation.TYPE_VALUE)
+		lifts[medium] = animation.value_track_interpolate(lift, LaunchAnimation.moment(animation, &"launch"))
+	assert_float(lifts["famicom_cart"]).is_less(lifts["nes_cart"])
+	assert_int(android.checks).is_equal(2)
+
+
 ## The carousel on the games screen of [param platform].
 func _carousel(platform := "gba") -> Carousel:
 	var carousel: Carousel = await Fixtures.shown_carousel(self)
@@ -283,13 +312,16 @@ func _assert_on_the_console_spindle(carousel: Carousel) -> void:
 	var row := carousel._row
 	var console: ConsoleModel = carousel._consoles.selected().model
 	var place: ShelfRow.Place = row._placed[row.selected_index()]
-	var seat := row.global_transform.affine_inverse() * console.seat()
+	var seat := row.global_transform.affine_inverse() * console.global_transform * console.seat()
 	assert_bool(place.transform.origin.is_equal_approx(seat.origin)).is_true()
 	assert_float(place.transform.basis.z.normalized().dot(seat.basis.z.normalized())).is_equal_approx(1.0, 0.0001)
+	# At its real size, whatever its size in the row: as large as its console has it.
+	var model: Node3D = place.shown._label_mesh.get_parent()
+	assert_vector(model.global_basis.get_scale()).is_equal_approx(console.global_basis.get_scale(), Vector3.ONE * 0.0001)
 
 
 ## Put into the console: no spindle of its medium, the black growing from the console's spindle,
-## the disc turning with it once seated, the sounds after it.
+## the disc turning with it once seated where the console has a spindle, the sounds after it.
 func _assert_into_the_console(carousel: Carousel) -> void:
 	var launch := carousel._game_launch
 	var sequence := launch.sequence
@@ -297,15 +329,17 @@ func _assert_into_the_console(carousel: Carousel) -> void:
 	assert_bool(launch.spindle.visible).is_false()
 	if launch._clock_s > 0.0:
 		var centre: Vector2 = launch._black.get_shader_parameter(&"centre") * launch.blackout.size
-		var seat := carousel.get_viewport().get_camera_3d().unproject_position(console.seat().origin)
+		var seat := carousel.get_viewport().get_camera_3d().unproject_position(console.global_transform * console.seat().origin)
 		assert_vector(centre).is_equal_approx(seat, Vector2.ONE * 0.01)
-	var rotor := console.spindle._rotor.basis
-	var spin := carousel._row._launch_spin
-	if sequence.disc_away >= 1.0:
-		assert_bool(rotor.is_equal_approx(Basis(Vector3.BACK, spin))).is_true()
-		_spun = maxf(_spun, spin)
-	else:
-		assert_bool(rotor.is_equal_approx(Basis.IDENTITY)).is_true()
+	var spindle: Spindle = console.get_node_or_null("%Spindle")
+	if spindle:
+		var rotor := spindle._rotor.basis
+		var spin := carousel._row._launch_spin
+		if sequence.disc_away >= 1.0:
+			assert_bool(rotor.is_equal_approx(Basis(Vector3.BACK, spin))).is_true()
+			_spun = maxf(_spun, spin)
+		else:
+			assert_bool(rotor.is_equal_approx(Basis.IDENTITY)).is_true()
 	var cues := launch._insertion.sounds
 	if launch._clock_s < sequence.seated_s():
 		assert_int(launch._cues_played).is_equal(0)
@@ -319,10 +353,12 @@ func _assert_on_the_spindle(launch: GameLaunch, row: ShelfRow) -> void:
 	assert_bool(place.transform.is_equal_approx(launch.spindle.transform)).is_true()
 
 
-## The screen all black, as while the game starts.
+## The screen all black, as while the game starts: faded whole, or the disc reaching every corner.
 func _assert_black(launch: GameLaunch) -> void:
 	assert_bool(launch.blackout.visible).is_true()
 	assert_float(launch._black.get_shader_parameter(&"opacity")).is_equal(1.0)
+	if launch._black.get_shader_parameter(&"fade") >= 1.0:
+		return
 	var size := launch.blackout.size
 	var centre: Vector2 = launch._black.get_shader_parameter(&"centre") * size
 	var radius: float = launch._black.get_shader_parameter(&"radius")

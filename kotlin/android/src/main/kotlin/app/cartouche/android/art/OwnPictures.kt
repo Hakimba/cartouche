@@ -15,13 +15,14 @@ import arrow.core.raise.either
 import arrow.core.raise.ensure
 import java.io.File
 import java.io.IOException
+import kotlin.math.roundToInt
 
 /** A picture of the user's own being framed: the app's copy of it, [width] by [height] pixels. */
 internal data class OwnPicture(val file: File, val width: Int, val height: Int)
 
 /**
  * The pictures of their own the user puts on labels, once picked: copied upright and at most
- * [LONGEST] pixels long into [folder] while they are framed, then cut to the framed square at the
+ * [LONGEST] pixels long into [folder] while they are framed, then cut to the framed rectangle at the
  * labels' size ([ArtImages.LARGEST]).
  */
 internal class OwnPictures(private val folder: File) {
@@ -39,14 +40,20 @@ internal class OwnPictures(private val folder: File) {
         }
     }
 
-    /** The square [framing] shows of the picture being framed, at the labels' size, as a JPEG. */
+    /** The rectangle [framing] shows of the picture being framed, [ArtImages.LARGEST] pixels on its longer side, as a JPEG. */
     fun framed(framing: LabelFraming): Either<LabelFailure, ByteArray> = either {
         ensure(picked.isFile) { LabelFailure.NotPicked }
         val picture = decode(ImageDecoder.createSource(picked)).bind()
-        val label = Bitmap.createBitmap(ArtImages.LARGEST, ArtImages.LARGEST, Bitmap.Config.ARGB_8888)
+        val shown = framing.framed(picture.width, picture.height)
+        val scale = ArtImages.LARGEST.toDouble() / maxOf(shown.width, shown.height)
+        val label =
+            Bitmap.createBitmap(
+                maxOf(1, (shown.width * scale).roundToInt()),
+                maxOf(1, (shown.height * scale).roundToInt()),
+                Bitmap.Config.ARGB_8888,
+            )
         try {
-            val square = framing.square(picture.width, picture.height)
-            val from = Rect(square.left, square.top, square.left + square.side, square.top + square.side)
+            val from = Rect(shown.left, shown.top, shown.right, shown.bottom)
             Canvas(label).drawBitmap(picture, from, Rect(0, 0, label.width, label.height), Paint(Paint.FILTER_BITMAP_FLAG))
             ArtImages.jpeg(label)
         } finally {

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "nes"
+version = &"nes-001"
+is_default = true
+name = "Nintendo Entertainment System"
+model_name = "NES-001"
+scene = "res://carousel/consoles/nes/nes.tscn"
+launch = "res://carousel/consoles/nes/launch.json"
+triangle_budget = 10000

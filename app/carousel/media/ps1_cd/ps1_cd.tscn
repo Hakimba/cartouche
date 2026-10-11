@@ -1,0 +1,58 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/media/ps1_cd/ps1_cd_shape.tres" id="2"]
+[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/disc_mirror.gdshader" id="4"]
+[ext_resource type="Shader" path="res://carousel/models/clear_plastic.gdshader" id="5"]
+
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
+
+[sub_resource type="ShaderMaterial" id="label_material"]
+shader = ExtResource("3")
+shader_parameter/silver = 0.8
+shader_parameter/grooves = 0.5
+
+[sub_resource type="PrimitiveMesh" id="mirror_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"mirror"
+
+[sub_resource type="ShaderMaterial" id="mirror_material"]
+shader = ExtResource("4")
+shader_parameter/mirror_color = Color(0.07, 0.05, 0.09, 1)
+shader_parameter/recorded_color = Color(0.06, 0.035, 0.075, 1)
+shader_parameter/roughness = 0.15
+shader_parameter/groove_spacing_nm = 1600.0
+shader_parameter/rainbow = 0.25
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+render_priority = 1
+shader = ExtResource("5")
+shader_parameter/tint = Color(0.06, 0.04, 0.07, 1)
+shader_parameter/edge_tint = Color(0.03, 0.02, 0.035, 1)
+shader_parameter/opacity = 1.0
+shader_parameter/edge_opacity = 1.0
+shader_parameter/roughness = 0.05
+
+[node name="Ps1Cd" type="Node3D"]
+
+[node name="Label" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_mesh")
+surface_material_override/0 = SubResource("label_material")
+
+[node name="Mirror" type="MeshInstance3D" parent="."]
+mesh = SubResource("mirror_mesh")
+surface_material_override/0 = SubResource("mirror_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")

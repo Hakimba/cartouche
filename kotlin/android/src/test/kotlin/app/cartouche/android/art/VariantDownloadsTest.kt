@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.art
 
+import android.graphics.BitmapFactory
 import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.ArtVariant
+import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LabelRegion
 import arrow.core.Either
@@ -48,14 +50,14 @@ class VariantDownloadsTest {
                 ),
                 answers = mapOf("https://art/Korea.png" to FetchFailure.Refused(429)),
             )
-        downloads(fetch).download(game, listOf("Europe", "Japan", "World", "Korea").map(::variant))
+        downloads(fetch).download(game, listOf("Europe", "Japan", "World", "Korea").map(::variant), PS2_DISC)
         scope.runCurrent()
         heard.getValue("Europe").shouldBeRight() shouldBe store.variant(variant("Europe").url).shouldBeSome()
         heard.getValue("Japan").shouldBeLeft(VariantFailure.UNREADABLE)
         heard.getValue("World").shouldBeLeft(VariantFailure.NOT_FOUND)
         heard.getValue("Korea").shouldBeLeft(VariantFailure.REFUSED)
         fetch.online = false
-        downloads(fetch).download(game, listOf(variant("Asia")))
+        downloads(fetch).download(game, listOf(variant("Asia")), PS2_DISC)
         scope.runCurrent()
         heard.getValue("Asia").shouldBeLeft(VariantFailure.OFFLINE)
         fetch.online = true
@@ -64,7 +66,7 @@ class VariantDownloadsTest {
         try {
             assumeFalse(variants.canWrite())
             fetch.images = mapOf("https://art/Brazil.png" to scan(diameter = 40, margin = 4))
-            downloads(fetch).download(game, listOf(variant("Brazil")))
+            downloads(fetch).download(game, listOf(variant("Brazil")), PS2_DISC)
             scope.runCurrent()
         } finally {
             variants.setWritable(true)
@@ -73,14 +75,22 @@ class VariantDownloadsTest {
     }
 
     @Test
+    fun `INV-E10-06 a cartridge's image by region is kept as its label alone, cut by its platform's rule`() {
+        downloads(FakeFetch(mapOf("https://art/Europe.png" to cartridgeFront()))).download(game, listOf(variant("Europe")), cartridgeLabel)
+        scope.runCurrent()
+        val label = BitmapFactory.decodeFile(heard.getValue("Europe").shouldBeRight().file.path)
+        (label.width to label.height) shouldBe (280 to 120)
+    }
+
+    @Test
     fun `an image under way is not asked for again, and is once it is over`() {
         val fetch = FakeFetch(mapOf("https://art/Europe.png" to scan(diameter = 40, margin = 4)))
         val downloads = downloads(fetch)
-        downloads.download(game, listOf(variant("Europe")))
-        downloads.download(game, listOf(variant("Europe")))
+        downloads.download(game, listOf(variant("Europe")), PS2_DISC)
+        downloads.download(game, listOf(variant("Europe")), PS2_DISC)
         scope.runCurrent()
         fetch.asked shouldBe listOf("https://art/Europe.png")
-        downloads.download(game, listOf(variant("Europe")))
+        downloads.download(game, listOf(variant("Europe")), PS2_DISC)
         scope.runCurrent()
         fetch.asked.size shouldBe 2
     }

@@ -164,8 +164,8 @@ func _add_first_console() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_show(_discovery)
-	var console_name: String = appearance.console_names.get(platform_id, _add_console.platform_name())
-	_discovery.play(console_name)
+	var manifest := appearance.console_of(platform_id)
+	_discovery.play(manifest.name if manifest else _add_console.platform_name())
 	# Once the sticker has settled: setting the carousel up behind it takes a few frames, which the
 	# burst must not miss.
 	await get_tree().create_timer(_LIBRARY_AFTER_S).timeout

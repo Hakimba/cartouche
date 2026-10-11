@@ -1,0 +1,453 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/gbc/gbc_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/gbc/gbc_shape.tres" id="2"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_logo.svg" id="logo_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_power_label.svg" id="power_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_comm_label.svg" id="comm_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_nintendo.svg" id="nintendo_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_select_label.svg" id="select_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_start_label.svg" id="start_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_a_label.svg" id="a_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_b_label.svg" id="b_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_power_waves.svg" id="power_waves_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_cover_mark.svg" id="cover_mark_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/gbc/gbc_sticker.svg" id="sticker_image"]
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.1, 0.46, 0.6, 1)
+shader_parameter/roughness = 0.45
+shader_parameter/clearcoat = 0.25
+shader_parameter/clearcoat_roughness = 0.35
+
+[sub_resource type="ShaderMaterial" id="bezel_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.15, 0.15, 0.17, 1)
+shader_parameter/roughness = 0.15
+shader_parameter/clearcoat = 0.6
+shader_parameter/clearcoat_roughness = 0.1
+
+[sub_resource type="ShaderMaterial" id="screen_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.46, 0.48, 0.42, 1)
+shader_parameter/roughness = 0.35
+shader_parameter/clearcoat = 0.8
+shader_parameter/clearcoat_roughness = 0.05
+
+[sub_resource type="ShaderMaterial" id="led_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.3, 0.03, 0.03, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/emission = Color(1, 0.12, 0.08, 1)
+shader_parameter/emission_energy = 0
+
+[sub_resource type="ShaderMaterial" id="button_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.17, 0.17, 0.19, 1)
+shader_parameter/roughness = 0.4
+shader_parameter/clearcoat = 0.3
+shader_parameter/clearcoat_roughness = 0.4
+
+[sub_resource type="ShaderMaterial" id="rubber_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.2, 0.21, 0.24, 1)
+shader_parameter/roughness = 0.75
+
+[sub_resource type="ShaderMaterial" id="dark_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.03, 0.03, 0.035, 1)
+shader_parameter/roughness = 0.9
+
+[sub_resource type="ShaderMaterial" id="infrared_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.22, 0.02, 0.03, 1)
+shader_parameter/roughness = 0.1
+shader_parameter/clearcoat = 0.8
+shader_parameter/clearcoat_roughness = 0.05
+
+[sub_resource type="ShaderMaterial" id="wheel_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.2, 0.2, 0.22, 1)
+shader_parameter/roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="metal_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.7, 0.7, 0.68, 1)
+shader_parameter/metallic = 0.9
+shader_parameter/roughness = 0.35
+
+[sub_resource type="ShaderMaterial" id="sticker_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("sticker_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.3
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="PrimitiveMesh" id="bezel_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"bezel"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="screen_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"screen"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="led_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"led"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="dpad_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"dpad"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="buttons_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"buttons"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="pills_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"pills"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="openings_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"openings"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="ir_window_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"ir_window"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="recesses_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"recesses"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="wheel_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"wheel"
+detail = 16
+
+[sub_resource type="ShaderMaterial" id="contacts_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.83, 0.69, 0.36, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/metallic = 1.0
+
+[sub_resource type="PrimitiveMesh" id="slot_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"slot"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="contacts_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"contacts"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="screws_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"screws"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="sticker_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sticker"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="power_knob_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_knob"
+detail = 16
+
+[sub_resource type="ShaderMaterial" id="logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("logo_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.15
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"logo"
+
+[sub_resource type="ShaderMaterial" id="power_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.15
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="power_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_label"
+
+[sub_resource type="ShaderMaterial" id="comm_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("comm_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.25
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="comm_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"comm_label"
+
+[sub_resource type="ShaderMaterial" id="nintendo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("nintendo_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.25
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="nintendo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"nintendo"
+
+[sub_resource type="ShaderMaterial" id="select_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("select_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.25
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="select_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"select_label"
+
+[sub_resource type="ShaderMaterial" id="start_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("start_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.25
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="start_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"start_label"
+
+[sub_resource type="ShaderMaterial" id="a_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("a_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.3
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="a_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"a_label"
+
+[sub_resource type="ShaderMaterial" id="b_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("b_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.3
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="b_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"b_label"
+
+[sub_resource type="ShaderMaterial" id="power_waves_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_waves_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.15
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="power_waves_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_waves"
+
+[sub_resource type="PrimitiveMesh" id="battery_cover_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"battery_cover"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="cover_gap_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"cover_gap"
+detail = 32
+
+[sub_resource type="ShaderMaterial" id="cover_mark_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("cover_mark_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.25
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="cover_mark_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"cover_mark"
+
+[node name="Gbc" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")
+
+[node name="Bezel" type="MeshInstance3D" parent="."]
+mesh = SubResource("bezel_mesh")
+surface_material_override/0 = SubResource("bezel_material")
+
+[node name="Screen" type="MeshInstance3D" parent="."]
+mesh = SubResource("screen_mesh")
+surface_material_override/0 = SubResource("screen_material")
+
+[node name="Light" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("led_mesh")
+surface_material_override/0 = SubResource("led_material")
+
+[node name="Dpad" type="MeshInstance3D" parent="."]
+mesh = SubResource("dpad_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="Buttons" type="MeshInstance3D" parent="."]
+mesh = SubResource("buttons_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="Pills" type="MeshInstance3D" parent="."]
+mesh = SubResource("pills_mesh")
+surface_material_override/0 = SubResource("rubber_material")
+
+[node name="Openings" type="MeshInstance3D" parent="."]
+mesh = SubResource("openings_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="InfraredWindow" type="MeshInstance3D" parent="."]
+mesh = SubResource("ir_window_mesh")
+surface_material_override/0 = SubResource("infrared_material")
+
+[node name="Recesses" type="MeshInstance3D" parent="."]
+mesh = SubResource("recesses_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Wheel" type="MeshInstance3D" parent="."]
+mesh = SubResource("wheel_mesh")
+surface_material_override/0 = SubResource("wheel_material")
+
+[node name="Screws" type="MeshInstance3D" parent="."]
+mesh = SubResource("screws_mesh")
+surface_material_override/0 = SubResource("metal_material")
+
+[node name="Sticker" type="MeshInstance3D" parent="."]
+mesh = SubResource("sticker_mesh")
+surface_material_override/0 = SubResource("sticker_material")
+
+[node name="BatteryCover" type="MeshInstance3D" parent="."]
+mesh = SubResource("battery_cover_mesh")
+surface_material_override/0 = SubResource("shell_material")
+
+[node name="CoverGap" type="MeshInstance3D" parent="."]
+mesh = SubResource("cover_gap_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Slot" type="MeshInstance3D" parent="."]
+mesh = SubResource("slot_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Contacts" type="MeshInstance3D" parent="."]
+mesh = SubResource("contacts_mesh")
+surface_material_override/0 = SubResource("contacts_material")
+
+[node name="Power" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Knob" type="MeshInstance3D" parent="Power"]
+mesh = SubResource("power_knob_mesh")
+surface_material_override/0 = SubResource("wheel_material")
+
+[node name="Logo" type="MeshInstance3D" parent="."]
+mesh = SubResource("logo_mesh")
+surface_material_override/0 = SubResource("logo_material")
+
+[node name="PowerLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("power_label_mesh")
+surface_material_override/0 = SubResource("power_label_material")
+
+[node name="CommLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("comm_label_mesh")
+surface_material_override/0 = SubResource("comm_label_material")
+
+[node name="Nintendo" type="MeshInstance3D" parent="."]
+mesh = SubResource("nintendo_mesh")
+surface_material_override/0 = SubResource("nintendo_material")
+
+[node name="SelectLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("select_label_mesh")
+surface_material_override/0 = SubResource("select_label_material")
+
+[node name="StartLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("start_label_mesh")
+surface_material_override/0 = SubResource("start_label_material")
+
+[node name="ALabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("a_label_mesh")
+surface_material_override/0 = SubResource("a_label_material")
+
+[node name="BLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("b_label_mesh")
+surface_material_override/0 = SubResource("b_label_material")
+
+[node name="PowerWaves" type="MeshInstance3D" parent="."]
+mesh = SubResource("power_waves_mesh")
+surface_material_override/0 = SubResource("power_waves_material")
+
+[node name="CoverMark" type="MeshInstance3D" parent="."]
+mesh = SubResource("cover_mark_mesh")
+surface_material_override/0 = SubResource("cover_mark_material")

@@ -53,11 +53,11 @@ class OwnPicturesTest {
     @Test
     fun `the label is the framed square of the picture, at the labels' size`() {
         pictures.keep(source(redThenBlue)).shouldBeRight()
-        val left = decoded(pictures.framed(LabelFraming(1.0, 0.0, 0.5)).shouldBeRight())
+        val left = decoded(pictures.framed(LabelFraming(1.0, 0.0, 0.5, 1.0)).shouldBeRight())
         (left.width to left.height) shouldBe (ArtImages.LARGEST to ArtImages.LARGEST)
         Color.red(left.getPixel(512, 512)) shouldBeGreaterThan 200
         Color.blue(left.getPixel(512, 512)) shouldBeLessThan 60
-        val right = decoded(pictures.framed(LabelFraming(1.0, 1.0, 0.5)).shouldBeRight())
+        val right = decoded(pictures.framed(LabelFraming(1.0, 1.0, 0.5, 1.0)).shouldBeRight())
         Color.blue(right.getPixel(512, 512)) shouldBeGreaterThan 200
     }
 
@@ -72,12 +72,25 @@ class OwnPicturesTest {
                 drawRect(200f, 200f, 400f, 400f, Paint().apply { color = Color.WHITE })
             }
         pictures.keep(source(quarters)).shouldBeRight()
-        val label = decoded(pictures.framed(LabelFraming(2.0, 0.75, 0.75)).shouldBeRight())
+        val label = decoded(pictures.framed(LabelFraming(2.0, 0.75, 0.75, 1.0)).shouldBeRight())
         val edge = ArtImages.LARGEST - 4
         for ((x, y) in listOf(4 to 4, edge to 4, 4 to edge, edge to edge, 512 to 512)) {
             val pixel = label.getPixel(x, y)
             (Color.red(pixel) > 200 && Color.green(pixel) > 200 && Color.blue(pixel) > 200) shouldBe true
         }
+    }
+
+    @Test
+    fun `on a cartridge the label is the framed rectangle of its label's proportions, its longer side at the labels' size`() {
+        pictures.keep(source(redThenBlue)).shouldBeRight()
+        // An NES label, taller than wide, on the left half: red; a Super Nintendo one, on the whole picture.
+        val tall = decoded(pictures.framed(LabelFraming(1.0, 0.0, 0.5, 0.62)).shouldBeRight())
+        (tall.width to tall.height) shouldBe (635 to ArtImages.LARGEST)
+        Color.red(tall.getPixel(317, 512)) shouldBeGreaterThan 200
+        val wide = decoded(pictures.framed(LabelFraming(1.0, 0.5, 0.5, 2.0)).shouldBeRight())
+        (wide.width to wide.height) shouldBe (ArtImages.LARGEST to ArtImages.LARGEST / 2)
+        Color.red(wide.getPixel(100, 256)) shouldBeGreaterThan 200
+        Color.blue(wide.getPixel(900, 256)) shouldBeGreaterThan 200
     }
 
     @Test
@@ -88,7 +101,7 @@ class OwnPicturesTest {
     @Test
     fun `nothing is framed before a picture is picked`() {
         OwnPictures(File(RuntimeEnvironment.getApplication().cacheDir, "never-picked"))
-            .framed(LabelFraming(1.0, 0.5, 0.5))
+            .framed(LabelFraming(1.0, 0.5, 0.5, 1.0))
             .shouldBeLeft(LabelFailure.NotPicked)
     }
 }

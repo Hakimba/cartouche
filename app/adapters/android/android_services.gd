@@ -24,9 +24,11 @@ signal _answered(payload: Dictionary)
 
 const _SINGLETON := &"CartoucheAndroid"
 const _PLATFORM_DEFINITIONS := "res://data/platforms/daijishou"
+## Cartouche's own definitions, for platforms Daijishō has none of.
+const _OWN_PLATFORM_DEFINITIONS := "res://data/platforms/cartouche"
 const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
 ## One reference list per platform, named after its id (`ps2.tsv`).
-const _TITLE_LISTS := "res://data/redump"
+const _TITLE_LISTS := "res://data/titles"
 const _DATA_FOLDERS := "res://data/scan/data_folders.json"
 const _CURTAINS := "res://data/launch/curtains.json"
 ## One art extract per platform, named after its id (`ps2.tsv`).
@@ -65,7 +67,7 @@ func is_available() -> bool:
 func _load_catalog() -> void:
 	var started := Time.get_ticks_usec()
 	var profiles := FileAccess.get_file_as_string(_PLATFORM_PROFILES)
-	var definitions := _files_in(_PLATFORM_DEFINITIONS, ".json")
+	var definitions := platform_definitions()
 	var titles := _files_in(_TITLE_LISTS, ".tsv", true)
 	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
 	var curtains := FileAccess.get_file_as_string(_CURTAINS)
@@ -295,28 +297,41 @@ func pick_label_picture() -> LabelPicture:
 	return LabelPicture.new(await _request(&"pickLabelPicture"))
 
 
-## Shows the picture picked last on [param game]'s label from now on, [param zoom] times closer than
-## the largest square that fits and centred at [param centre] (see [LabelFraming]).
-func keep_own_label(game: Game, zoom: float, centre: Vector2) -> ArtAnswer:
-	return ArtAnswer.new(await _request(&"keepOwnLabel", [game.id, zoom, centre.x, centre.y]))
+## Shows the picture picked last on [param game]'s label from now on, as [param framing] frames it.
+func keep_own_label(game: Game, framing: LabelFraming) -> ArtAnswer:
+	return ArtAnswer.new(await _request(&"keepOwnLabel", [game.id, framing.zoom, framing.centre.x, framing.centre.y,
+		framing.proportion]))
 
 
 ## Whether disc [param disc] of [param game] can launch (its emulator is installed, its file still
 ## there), with the failure [method launch_game] would give; starts and stops nothing. Without the
-## plugin, every game can: the insertion plays, then the launch fails.
+## plugin, or rehearsing (see [method launch_game]), every game can: the insertion plays.
 func check_launch(game: Game, disc: int) -> Result:
-	if not is_available():
+	if not is_available() or _rehearsing():
 		return Result.new({"ok": true})
 	return Result.new(await _request(&"checkLaunch", [{"game_id": game.id, "disc": disc}]))
 
 
 ## Launches disc [param disc] (an index into [member Game.discs]) of [param game], hiding the
-## emulator under a black curtain until its game shows when [method curtain_allowed].
+## emulator under a black curtain until its game shows when [method curtain_allowed]. Debug builds
+## started with `--launch=rehearse` start nothing and fail with `rehearsed`: the insertion plays
+## whether an emulator is installed or not, then the carousel shows again.
 func launch_game(game: Game, disc: int) -> Result:
+	if _rehearsing():
+		return Result.new({"ok": false, "code": &"rehearsed"})
 	return Result.new(await _request(&"launchGame", [{"game_id": game.id, "disc": disc}]))
 
 
 # Plumbing
+
+func _rehearsing() -> bool:
+	return Diagnostics.argument("launch") == "rehearse"
+
+
+## The definition files sent to the plugin, Daijishō's and Cartouche's own, by file name.
+static func platform_definitions() -> Dictionary:
+	return _files_in(_PLATFORM_DEFINITIONS, ".json").merged(_files_in(_OWN_PLATFORM_DEFINITIONS, ".json"))
+
 
 ## `{file name or base name: text}` for the files of [param folder] ending with [param extension].
 static func _files_in(folder: String, extension: String, by_base_name := false) -> Dictionary:
@@ -608,6 +623,9 @@ class Game:
 	var platform_id: String
 	var title: String
 	var regions := PackedStringArray()
+	## The medium its platform gives a game of its regions (`sfc_cart`); empty when the platform is
+	## unknown.
+	var medium: String
 	var languages := PackedStringArray()
 	var serials := PackedStringArray()
 	var has_version: bool
@@ -638,6 +656,7 @@ class Game:
 		platform_id = item["platform_id"]
 		title = item["title"]
 		regions = AndroidServices._strings(item, "regions")
+		medium = item.get("medium", "")
 		languages = AndroidServices._strings(item, "languages")
 		serials = AndroidServices._strings(item, "serials")
 		has_version = item.has("version")

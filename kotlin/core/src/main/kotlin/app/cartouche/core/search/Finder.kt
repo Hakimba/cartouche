@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.search
 
-import app.cartouche.core.art.Regions
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.Library
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.regions.Regions
 import app.cartouche.core.shelves.Shelves
 import arrow.core.Option
 import arrow.core.firstOrNone

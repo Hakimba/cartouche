@@ -25,7 +25,7 @@ static func profiles(shape: DiscShape, part: StringName) -> Array[PackedVector2A
 			var radii := PackedFloat32Array([
 				shape.mirror_outer, shape.data_outer, shape.data_inner, shape.mirror_inner])
 			var bands: Array[PackedVector2Array] = []
-			for i in 3:
+			for i in radii.size() - 1:
 				bands.append(PackedVector2Array([Vector2(radii[i], -top), Vector2(radii[i + 1], -top)]))
 			return bands
 		&"shell":
@@ -44,11 +44,10 @@ static func profiles(shape: DiscShape, part: StringName) -> Array[PackedVector2A
 	return []
 
 
-## The mesh arrays of [param part], turned in [param segments] steps; none when [param shape] has
-## [method DiscShape.problems], no such part, or fewer than 3 steps. The vertex colour's red is 1
-## on the recorded area, its green on the rim beyond the label, 0 elsewhere.
+## The mesh arrays of [param part], turned in [param segments] steps; none in fewer than 3. The
+## vertex colour's red is 1 on the recorded area, its green on the rim beyond the label, 0 elsewhere.
 static func arrays(shape: DiscShape, part: StringName, segments: int) -> Array:
-	if not shape.problems().is_empty() or part not in PARTS or segments < 3:
+	if segments < 3:
 		return []
 	var mesh := MeshBuilder.new()
 	for profile in profiles(shape, part):

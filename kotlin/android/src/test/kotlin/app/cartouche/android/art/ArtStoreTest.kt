@@ -5,6 +5,7 @@ import app.cartouche.android.storage.StorageFailure
 import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.ArtVersion
+import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.library.GameId
 import arrow.core.Either
 import arrow.core.None
@@ -37,7 +38,7 @@ class ArtStoreTest {
     private val newer = Some(ArtVersion("2026-10-01"))
 
     private fun request(game: GameId, version: Option<ArtVersion> = older) =
-        ArtRequest(game, "A", nonEmptyListOf(ArtUrl("https://a/a.png")), version)
+        ArtRequest(game, "A", nonEmptyListOf(ArtUrl("https://a/a.png")), version, PS2_DISC)
 
     @Test
     fun `INV-E4-06 an image's name is its game id's SHA-1 in lower-case hexadecimal, for any id`() = runBlocking<Unit> {

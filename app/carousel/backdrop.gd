@@ -12,6 +12,12 @@ var pace := 1.0:
 		pace = value
 		set_process(pace > 0.0)
 
+## How far the dots are blurred, in pixels of the 1280×960 design, as the consoles in front of them.
+var blur := 0.0:
+	set(value):
+		blur = value
+		_dots.set_shader_parameter(&"blur", blur)
+
 ## How far the dots have drifted, in tiles, from 0 to 1.
 var _drift := 0.0
 

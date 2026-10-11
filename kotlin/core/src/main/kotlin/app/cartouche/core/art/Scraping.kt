@@ -13,13 +13,14 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * A game whose art is looked for, and where to look, best first, in the sources of [version]; its
- * [title] names it in the traces.
+ * [title] names it in the traces; [cut] says what of a scan its label shows.
  */
 public data class ArtRequest(
     public val game: GameId,
     public val title: String,
     public val candidates: NonEmptyList<ArtUrl>,
     public val version: Option<ArtVersion>,
+    public val cut: LabelCut,
 )
 
 /** Why a scraping run waits: no network, a server refusing (a quota) or failing, or no room to store images. */

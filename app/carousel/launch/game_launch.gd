@@ -164,6 +164,7 @@ func launch(game: AndroidServices.Game, disc: int, insertion: Insertion) -> void
 	spindle.visible = insertion.spindle and not _into_console
 	_black.set_shader_parameter(&"opacity", 1.0)
 	_black.set_shader_parameter(&"radius", 0.0)
+	_black.set_shader_parameter(&"fade", 0.0)
 	blackout.visible = true
 	_enter(Stage.INSERTING)
 	await _inserted
@@ -206,10 +207,12 @@ func _give_up(code: StringName) -> void:
 func _insert(delta: float) -> void:
 	var t := _clock_s
 	var black: float
+	var fade := 0.0
 	var origin: Vector3
 	if _into_console:
 		sequence.launch_at(t, delta)
 		black = sequence.black
+		fade = sequence.fade
 		origin = sequence.black_origin()
 	else:
 		var stand := _insertion.stand_at(t, _start)
@@ -229,6 +232,7 @@ func _insert(delta: float) -> void:
 	_black.set_shader_parameter(&"centre", centre / size)
 	_black.set_shader_parameter(&"size", size)
 	_black.set_shader_parameter(&"radius", black * farthest)
+	_black.set_shader_parameter(&"fade", fade)
 	var cues := _insertion.sounds
 	var seated_s := sequence.seated_s() if _into_console else _insertion.seated_s()
 	while _cues_played < cues.size() and t >= seated_s + cues[_cues_played].delay_s:

@@ -3,7 +3,6 @@ extends GdUnitTestSuite
 
 const Fixtures := preload("res://test/carousel/fixtures.gd")
 const DEMO := "res://dev/demo/desktop.json"
-const PS2 := preload("res://carousel/consoles/ps2_slim.tscn")
 const MOVING: Array[Carousel.Screen] = [Carousel.Screen.ENTERING, Carousel.Screen.LEAVING]
 
 
@@ -145,8 +144,10 @@ func test_INV_E5_06_the_carousel_opens_on_the_consoles_screen_with_the_remembere
 		assert_float(carousel._consoles._scroll).is_equal(float(selected))
 		# The console opened is named over it, as the appearance names it.
 		var platform_id := carousel._shelves[selected].platform_id
+		var manifest := carousel._appearance.console_of(platform_id)
 		assert_str(carousel._console_name.text).is_equal(
-			carousel._appearance.console_names.get(platform_id, carousel._platforms[platform_id].name))
+			manifest.name if manifest else carousel._platforms[platform_id].name)
+		assert_str(carousel._console_model.text).is_equal(manifest.model_name if manifest else "")
 	# The consoles each library replaced are freed at the end of the frame.
 	await await_idle_frame()
 
@@ -231,23 +232,58 @@ func test_INV_E5_03_put_into_the_console_the_disc_leaves_from_where_it_stood_wit
 		# On its way, as far as the animation has it, from where it stood to over the spindle.
 		var tilt := Basis(Vector3.RIGHT, sequence.disc_tilt.x) * Basis(Vector3.UP, sequence.disc_tilt.y)
 		var above := Transform3D(tilt, Vector3(sequence.disc_offset.x, sequence.disc_offset.y, sequence.disc_lift))
-		var over := row.global_transform.affine_inverse() * console.seat() * above
+		var over := row.global_transform.affine_inverse() * console.global_transform * console.seat() * above
 		var expected := stood.interpolate_with(over, sequence.disc_away)
 		assert_vector(now.origin).is_equal_approx(expected.origin, Vector3.ONE * 0.0001)
 		assert_bool(now.basis.is_equal_approx(expected.basis)).is_true()
 	assert_bool(first).is_false()
-	var seat := row.global_transform.affine_inverse() * console.seat()
+	var seat := row.global_transform.affine_inverse() * console.global_transform * console.seat()
 	assert_vector(now.origin).is_equal_approx(seat.origin, Vector3.ONE * 0.0001)
+
+
+func test_every_console_of_the_demo_takes_its_medium_onto_its_seat_and_turns_it_on_its_spindle() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	var sequence := carousel._sequence
+	var row := carousel._row
+	var launched := 0
+	var spindles := 0
+	for index in carousel._consoles._items.size():
+		_select(carousel, index)
+		var console := carousel._consoles.selected().model as ConsoleModel
+		if not console:
+			continue
+		sequence.launch_at(sequence.seated_s() + 0.01, Fixtures.FRAME_S)
+		row._process(0.0)
+		var seat := row.global_transform.affine_inverse() * console.global_transform * console.seat()
+		assert_vector(row.selected_stand().origin).override_failure_message(console.name) \
+			.is_equal_approx(seat.origin, Vector3.ONE * 0.0001)
+		for spindle: Node in console.find_children("*", "Node3D", true, false).filter(func(node: Node) -> bool:
+				return node is Spindle):
+			console.hold(1.0)
+			assert_bool((spindle.get_node(^"Rotor") as Node3D).basis.is_equal_approx(Basis(Vector3.BACK, 1.0))) \
+				.override_failure_message("%s holds its disc still" % console.name).is_true()
+			spindles += 1
+		launched += 1
+	assert_int(launched).is_equal(ConsoleManifest.found().size())
+	assert_int(spindles).is_equal(3)
 
 
 func test_every_track_of_a_launch_animation_drives_a_property_of_the_carousel() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
-	for track in LaunchAnimation.TRACKS:
-		var path := NodePath(track)
-		var node := carousel.get_node_or_null(NodePath(path.get_concatenated_names()))
-		assert_object(node).override_failure_message("no node for %s" % track).is_not_null()
-		var value: Variant = node.get_indexed(NodePath(path.get_concatenated_subnames()))
-		assert_bool(value != null).override_failure_message("no property for %s" % track).is_true()
+	for index in carousel._consoles._items.size():
+		_select(carousel, index)
+		var animation := carousel._sequence._animation
+		# And one per moving part of its console.
+		var console := carousel._consoles.selected().model as ConsoleModel
+		assert_int(animation.get_track_count()).is_equal(LaunchAnimation.TRACKS.size()
+			+ (console.moving_parts().size() if console else 0))
+		for track in animation.get_track_count():
+			var path := animation.track_get_path(track)
+			var node := carousel.get_node_or_null(NodePath(path.get_concatenated_names()))
+			assert_object(node).override_failure_message("no node for %s" % path).is_not_null()
+			var value: Variant = node.get_indexed(NodePath(path.get_concatenated_subnames()))
+			assert_bool(value is float or value is Vector3 or value is Vector2) \
+				.override_failure_message("no property for %s" % path).is_true()
 
 
 func test_going_back_out_ends_as_soon_as_the_consoles_stand_as_they_rest() -> void:
@@ -286,8 +322,8 @@ func test_the_consoles_are_drawn_in_one_view_the_blurred_one_once_behind_the_gam
 				if carousel._screen not in MOVING:
 					break
 				Fixtures.step_frame(carousel)
-			assert_bool(layer.visible).is_equal(carousel._screen == Carousel.Screen.GAMES
-				and carousel._sequence.layer_opacity > 0.001)
+			# Once the games are shown, the consoles behind them are gone.
+			assert_bool(layer.visible).is_false()
 		_assert_drawn_in(carousel, ConsoleLayer.FRONT)
 	assert_int(blurred).is_greater(0)
 
@@ -335,36 +371,66 @@ func test_behind_the_games_the_consoles_stand_still_and_their_view_is_drawn_agai
 	assert_bool(selected.transform == stood).is_false()
 
 
-func test_on_the_games_screen_the_consoles_behind_fade_out_back_in_to_go_out_or_for_a_launch() -> void:
+func test_INV_E10_09_the_consoles_behind_leave_as_the_games_come_come_back_as_they_leave_and_for_a_launch() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	_select(carousel, carousel._platform_ids().find("ps2"))
 	var sequence := carousel._sequence
-	Fixtures.press(carousel, &"ui_accept")
-	for frame in 600:
-		# Going in, they show as the animation has them.
-		assert_float(sequence.behind_amount).is_equal(1.0)
-		Fixtures.step_frame(carousel)
-		if carousel._screen == Carousel.Screen.GAMES:
-			break
-	assert_bool(sequence.layer.visible).is_true()
-	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
-	assert_float(sequence.behind_amount).is_equal(0.0)
-	assert_bool(sequence.layer.visible).is_false()
-	# Going out, they come back as the animation brings them in front, in 0.3 s.
-	Fixtures.press(carousel, &"screen_back")
-	Fixtures.step_frame(carousel)
-	assert_float(sequence.behind_amount).is_equal_approx(Fixtures.FRAME_S / 0.3, 1e-6)
-	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
+	var row := carousel._row
+	var crossed := 0
+	for screen: Carousel.Screen in [Carousel.Screen.GAMES, Carousel.Screen.CONSOLES]:
+		Fixtures.press(carousel, &"ui_accept" if screen == Carousel.Screen.GAMES else &"screen_back")
+		for frame in 600:
+			Fixtures.step_frame(carousel)
+			assert_float(sequence.behind_amount).is_less_equal(1.0 - row.neighbours + 1e-6)
+			if row.neighbours > 0.0 and row.neighbours < 1.0:
+				crossed += 1
+			if carousel._screen == screen:
+				break
+		if screen == Carousel.Screen.GAMES:
+			assert_float(sequence.behind_amount).is_equal(0.0)
+			assert_bool(sequence.layer.visible).is_false()
+	assert_int(crossed).is_greater(0)
 	assert_float(sequence.behind_amount).is_equal(1.0)
-	_until(carousel, Carousel.Screen.CONSOLES)
-	# A launch brings them back too, the console taking the disc.
+	# A launch brings them back, the console taking the disc.
 	Fixtures.press(carousel, &"ui_accept")
 	_until(carousel, Carousel.Screen.GAMES)
-	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
 	Fixtures.press(carousel, &"ui_accept")
 	assert_bool(carousel._game_launch.is_busy()).is_true()
 	Fixtures.step_frames(carousel, ceili(Carousel._BEHIND_FADE_S / Fixtures.FRAME_S))
 	assert_float(sequence.behind_amount).is_equal(1.0)
+
+
+func test_INV_E10_09_the_dots_behind_the_consoles_are_blurred_as_much_as_them() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	_select(carousel, carousel._platform_ids().find("ps2"))
+	var sequence := carousel._sequence
+	var dots: ShaderMaterial = sequence.backdrop.material
+	var blurred := 0
+	for screen: Carousel.Screen in [Carousel.Screen.GAMES, Carousel.Screen.CONSOLES]:
+		Fixtures.press(carousel, &"ui_accept" if screen == Carousel.Screen.GAMES else &"screen_back")
+		for frame in 600:
+			Fixtures.step_frame(carousel)
+			assert_float(dots.get_shader_parameter(&"blur")).is_equal(sequence.blur)
+			blurred += int(sequence.blur > 0.0)
+			if carousel._screen == screen:
+				break
+	assert_int(blurred).is_greater(0)
+	assert_float(dots.get_shader_parameter(&"blur")).is_equal(0.0)
+
+
+func test_INV_E10_09_the_dots_are_sharp_behind_the_screens_covering_the_games() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	_select(carousel, carousel._platform_ids().find("ps2"))
+	Fixtures.press(carousel, &"ui_accept")
+	_until(carousel, Carousel.Screen.GAMES)
+	var sequence := carousel._sequence
+	var dots: ShaderMaterial = sequence.backdrop.material
+	assert_float(sequence.blur).is_greater(0.0)
+	# The settings, say, cover the carousel, then show it again as it was.
+	carousel._screens.covering.emit()
+	assert_float(dots.get_shader_parameter(&"blur")).is_equal(0.0)
+	carousel._show_front(false)
+	assert_float(dots.get_shader_parameter(&"blur")).is_equal(sequence.blur)
 
 
 func test_the_game_s_properties_keep_the_consoles_behind_away() -> void:
@@ -480,7 +546,7 @@ func test_behind_the_games_a_console_its_animation_moves_stands_each_frame_where
 	var carousel := await Fixtures.shown_carousel(self)
 	# Drawn by its medium, a console sways and floats as it fades behind the games, turning back too.
 	var medium := carousel._shelves.find_custom(func(shelf: AndroidServices.Shelf) -> bool:
-		return shelf.platform_id not in carousel._appearance.consoles)
+		return not carousel._appearance.console_of(shelf.platform_id))
 	assert_int(medium).is_not_negative()
 	_select(carousel, medium)
 	var consoles := carousel._consoles
@@ -549,29 +615,60 @@ func test_the_pill_names_the_game_over_the_games_and_never_shows_over_the_consol
 				assert_float(carousel._pill.modulate.a).is_equal(0.0)
 
 
-func test_the_consoles_stop_at_the_ends_of_the_row_and_a_single_one_stays() -> void:
+func test_INV_E10_08_the_consoles_row_has_no_end() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var consoles := carousel._consoles
-	var last := consoles._items.size() - 1
+	var count := consoles._items.size()
+	assert_int(count).is_greater(CarouselLayout.WHOLE_SHELF)
 	var changes: Array[int] = []
 	consoles.selection_changed.connect(func(index: int) -> void: changes.append(index))
-	for end: int in [0, last]:
-		_select(carousel, end)
-		changes.clear()
-		Fixtures.press(carousel, &"carousel_left" if end == 0 else &"carousel_right")
-		Fixtures.step_frames(carousel, 20)
-		assert_int(consoles.selected_index()).is_equal(end)
-		assert_array(changes).is_empty()
-	var alone: ConsoleRow = auto_free(ConsoleRow.new())
-	add_child(alone)
-	var console: ConsoleModel = PS2.instantiate()
-	var items: Array[ConsoleRow.Item] = [ConsoleRow.Item.new(console, ConsoleRow.Rest.new())]
-	alone.show_consoles(items, 0)
-	alone.selection_changed.connect(func(index: int) -> void: changes.append(index))
-	for direction: int in [-1, 1]:
-		alone.step(direction)
-		assert_int(alone.selected_index()).is_equal(0)
-	assert_array(changes).is_empty()
+	_select(carousel, count - 1)
+	changes.clear()
+	Fixtures.press(carousel, &"carousel_right")
+	Fixtures.press(carousel, &"carousel_left")
+	Fixtures.press(carousel, &"carousel_left")
+	assert_array(changes).is_equal([0, count - 1, count - 2])
+	var random := RandomNumberGenerator.new()
+	random.seed = 8
+	var walked := 0
+	for i: int in 3 * count:
+		var direction := 1 if random.randf() < 0.6 else -1
+		Fixtures.press(carousel, &"carousel_right" if direction > 0 else &"carousel_left")
+		walked += direction
+		assert_int(consoles.selected_index()).is_equal(posmod(count - 2 + walked, count))
+	Fixtures.step_frames(carousel, 60)
+	var selected := consoles.selected_index()
+	var shown := CarouselLayout.offsets(count, consoles._scroll)
+	for side: int in [-1, 0, 1]:
+		var index := posmod(selected + side, count)
+		assert_bool(consoles._items[index].model.visible).is_true()
+		assert_float(shown[index]).is_equal_approx(side, 0.001)
+	# As the wheel opens from the last console, the ones out of sight wait on its nearer side.
+	_select(carousel, count - 1)
+	Fixtures.step_frames(carousel, 60)
+	consoles.wheel = 0.001
+	consoles.arrange()
+	var middle := consoles._items[count - 1].model.position.x
+	for away: int in range(1, ceili(count / 2.0)):
+		assert_float(consoles._items[away - 1].model.position.x).is_greater(middle)
+		assert_float(consoles._items[count - 1 - away].model.position.x).is_less(middle)
+	consoles.wheel = 0.0
+
+
+func test_INV_E10_08_a_short_consoles_row_goes_round_and_a_single_console_stays() -> void:
+	for count: int in [1, 2, 3]:
+		var row: ConsoleRow = auto_free(ConsoleRow.new())
+		add_child(row)
+		var items: Array[ConsoleRow.Item] = []
+		for i: int in count:
+			items.append(ConsoleRow.Item.new(Fixtures.new_console(Fixtures.PS2_SLIM), ConsoleRow.Rest.new()))
+		row.show_consoles(items, count - 1)
+		var changes: Array[int] = []
+		row.selection_changed.connect(func(index: int) -> void: changes.append(index))
+		row.step(1)
+		row.step(-1)
+		assert_array(changes).is_equal([] if count == 1 else [0, count - 1])
+		assert_int(row.selected_index()).is_equal(count - 1)
 
 
 func test_INV_E5_01_a_console_chosen_as_the_row_still_moves_goes_in_from_the_middle() -> void:
@@ -618,7 +715,7 @@ func _until(carousel: Carousel, screen: Carousel.Screen) -> void:
 static func _stands(consoles: ConsoleRow) -> Dictionary[StringName, Variant]:
 	var found: Dictionary[StringName, Variant] = {}
 	for property: StringName in [&"console_position", &"console_rotation", &"console_scale", &"pose_amount",
-			&"sway_degrees", &"bob_height", &"others_opacity", &"lid_degrees"]:
+			&"sway_degrees", &"bob_height", &"others_opacity"]:
 		found[property] = consoles.get(property)
 	return found
 
@@ -633,7 +730,7 @@ static func _same(a: Variant, b: Variant) -> bool:
 	return is_equal_approx(number, other)
 
 
-## How faded each console is, and how far the selected one's lid is open.
+## How faded each console is, and where its parts stand.
 static func _looks(consoles: ConsoleRow) -> Array[float]:
 	var found: Array[float] = []
 	for item in consoles._items:
@@ -641,7 +738,8 @@ static func _looks(consoles: ConsoleRow) -> Array[float]:
 		found.append(fade.amount)
 		if item.model is ConsoleModel:
 			var console: ConsoleModel = item.model
-			found.append(console.lid_degrees)
+			for part in console.moving_parts():
+				found.append(console.get(part.property))
 	return found
 
 

@@ -1,0 +1,52 @@
+{
+  "databaseVersion": 14,
+  "revisionNumber": 1,
+  "platform": {
+    "name": "Microsoft Xbox 360",
+    "uniqueId": "xbox360",
+    "shortname": "xbox360",
+    "description": null,
+    "acceptedFilenameRegex": "^(?!(?:\\._|\\.).*).*$",
+    "scraperSourceList": [],
+    "boxArtAspectRatioId": 2,
+    "useCustomBoxArtAspectRatio": false,
+    "customBoxArtAspectRatio": null,
+    "screenAspectRatioId": 1,
+    "useCustomScreenAspectRatio": false,
+    "customScreenAspectRatio": null,
+    "retroAchievementsConsoleIdList": [],
+    "extra": ""
+  },
+  "playerList": [
+    {
+      "name": "xbox360 - aX360e",
+      "uniqueId": "xbox360.aenu.ax360e",
+      "description": "Supported extensions: iso, xex, zar.",
+      "acceptedFilenameRegex": "^(.*)\\.(?:iso|xex|zar)$",
+      "amStartArguments": "-n aenu.ax360e/aenu.ax360e.EmulatorActivity\n -a aenu.intent.action.AX360E\n --es game_uri {file.uri}",
+      "killPackageProcesses": false,
+      "killPackageProcessesWarning": true,
+      "extra": ""
+    },
+    {
+      "name": "xbox360 - aX360e (Free)",
+      "uniqueId": "xbox360.aenu.ax360e.free",
+      "description": "Supported extensions: iso, xex, zar.",
+      "acceptedFilenameRegex": "^(.*)\\.(?:iso|xex|zar)$",
+      "amStartArguments": "-n aenu.ax360e.free/aenu.ax360e.EmulatorActivity\n -a aenu.intent.action.AX360E\n --es game_uri {file.uri}",
+      "killPackageProcesses": false,
+      "killPackageProcessesWarning": true,
+      "extra": ""
+    },
+    {
+      "name": "xbox360 - XenDroid",
+      "uniqueId": "xbox360.xendroid.compose",
+      "description": "Supported extensions: iso, xex, zar.",
+      "acceptedFilenameRegex": "^(.*)\\.(?:iso|xex|zar)$",
+      "amStartArguments": "-n xendroid.compose/.EmulatorHostActivity\n -a android.intent.action.VIEW\n -d {file.uri}",
+      "killPackageProcesses": false,
+      "killPackageProcessesWarning": true,
+      "extra": ""
+    }
+  ]
+}

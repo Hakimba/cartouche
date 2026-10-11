@@ -9,7 +9,7 @@ extends RefCounted
 ## as their `fade` instance uniform; standard materials, as their albedo's alpha.
 
 ## The fading variant of each of our opaque shaders.
-const _FADING: Dictionary[Shader, Shader] = {
+const FADING: Dictionary[Shader, Shader] = {
 	preload("res://carousel/models/label.gdshader"): preload("res://carousel/models/label_fading.gdshader"),
 	preload("res://carousel/models/disc_mirror.gdshader"): preload("res://carousel/models/disc_mirror_fading.gdshader"),
 	preload("res://carousel/models/solid.gdshader"): preload("res://carousel/models/solid_fading.gdshader"),
@@ -50,9 +50,13 @@ func apply(to: float) -> void:
 		surface.show(to)
 
 
-## The copy [param material] fades through: the one to give the same parameters.
-func copy_of(material: Material) -> Material:
-	return _copies.get(material, material)
+## Sets the shader [param parameter] to [param value] on each material [param geometry] is drawn
+## with, its own and its fading copy.
+func set_shader_value(geometry: MeshInstance3D, parameter: StringName, value: Variant) -> void:
+	for surface in _surfaces:
+		if surface.geometry == geometry:
+			for material: ShaderMaterial in [surface.own, surface.fading]:
+				material.set_shader_parameter(parameter, value)
 
 
 static func _fading(material: Material) -> Material:
@@ -63,9 +67,9 @@ static func _fading(material: Material) -> Material:
 		return standard
 	if material is ShaderMaterial:
 		var shaded: ShaderMaterial = material
-		if shaded.shader in _FADING:
+		if shaded.shader in FADING:
 			var fading: ShaderMaterial = shaded.duplicate()
-			fading.shader = _FADING[shaded.shader]
+			fading.shader = FADING[shaded.shader]
 			return fading
 	# Transparent already, fading itself by its `fade` instance uniform: clear plastic.
 	return material

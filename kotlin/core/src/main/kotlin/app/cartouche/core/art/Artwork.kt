@@ -4,7 +4,7 @@ package app.cartouche.core.art
 import app.cartouche.core.library.LabelRegion
 import kotlinx.serialization.Serializable
 
-/** Where a source serves a scan of a game's medium, its printed face: an `https://` URL. */
+/** Where a source serves a scan of a game's medium (see [LabelCut]): an `https://` URL. */
 @JvmInline public value class ArtUrl(public val value: String)
 
 /**
@@ -14,5 +14,5 @@ import kotlinx.serialization.Serializable
 @Serializable @JvmInline
 public value class ArtVersion(public val date: String)
 
-/** The disc scan a source has for one [region] of a game. */
+/** The scan a source has for one [region] of a game. */
 public data class ArtVariant(public val region: LabelRegion, public val url: ArtUrl)

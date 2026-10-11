@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "gba"
+version = &"agb-001"
+is_default = true
+name = "Game Boy Advance"
+model_name = "AGB-001"
+scene = "res://carousel/consoles/gba/gba.tscn"
+launch = "res://carousel/consoles/gba/launch.json"
+triangle_budget = 11000

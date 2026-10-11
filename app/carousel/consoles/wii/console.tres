@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "wii"
+version = &"rvl-001"
+is_default = true
+name = "Wii"
+model_name = "RVL-001"
+scene = "res://carousel/consoles/wii/wii.tscn"
+launch = "res://carousel/consoles/wii/launch.json"
+triangle_budget = 10000

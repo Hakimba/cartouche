@@ -43,7 +43,7 @@ func test_INV_E6_07_A_on_the_button_adds_one_more_console_chosen_from_nothing_an
 	var device: Fixtures.NewDevice = shown[0]
 	var carousel: Carousel = shown[1]
 	# Only the media of the library's consoles are loaded: the PS2's disc.
-	assert_array(carousel._appearance._models.keys()).contains_exactly(["dvd"])
+	assert_array(carousel._appearance._models.keys()).contains_exactly(["ps2_dvd"])
 	await Fixtures.open_add_console(self, carousel)
 	var form: AddConsole = carousel.get_node("%Screens/AddConsole")
 	assert_str((form.get_node("%Title") as Label).text).is_equal("Add a console")
@@ -68,7 +68,7 @@ func test_INV_E6_07_A_on_the_button_adds_one_more_console_chosen_from_nothing_an
 	assert_bool((carousel.get_node("%Screens/Discovery") as Control).visible).is_false()
 	assert_bool(device.consoles.has(added)).is_true()
 	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal(added)
-	assert_array(carousel._appearance._models.keys()).contains_exactly_in_any_order(["dvd", "cartridge"])
+	assert_array(carousel._appearance._models.keys()).contains_exactly_in_any_order(["ps2_dvd", "gba_cart"])
 	assert_bool((carousel.get_node("%Consoles") as Node3D).visible).is_true()
 	assert_bool(_ball(carousel).is_open).is_false()
 	await Fixtures.joypad(self, JOY_BUTTON_A)

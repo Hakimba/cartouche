@@ -1,14 +1,8 @@
 {
-  "models": {
-    "dvd": "res://carousel/models/dvd.tscn",
-    "minidisc": "res://carousel/models/minidisc.tscn",
-    "cartridge": "res://carousel/models/cartridge.tscn"
-  },
-  "consoles": {
-    "ps2": {
-      "model": "res://carousel/consoles/ps2_slim.tscn", "steps": "res://data/launch/ps2_slim.json",
-      "name": "PlayStation 2", "model_name": "Slim"
-    }
+  "kind_media": {
+    "dvd": "ps2_dvd",
+    "minidisc": "gc_mini_dvd",
+    "cartridge": "gba_cart"
   },
   "media_steps": "res://data/launch/media.json",
   "colors": {
@@ -21,10 +15,11 @@
   },
   "default_color": "#5a6070",
   "pose": {
-    "tilt_degrees": 14,
-    "turn_degrees": 22,
-    "sway_degrees": 7,
-    "sway_period_s": 7
+    "tilt_degrees": 0,
+    "turn_degrees": 0,
+    "sway_degrees": 3.5,
+    "sway_period_s": 7,
+    "bob_height": 0.025
   },
   "insertions": {
     "dvd": {

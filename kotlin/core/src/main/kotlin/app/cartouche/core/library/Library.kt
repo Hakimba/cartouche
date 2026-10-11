@@ -6,6 +6,7 @@ package app.cartouche.core.library
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.ParsedSerializer
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
@@ -31,13 +32,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.UseSerializers
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.builtins.serializer
 
 @Serializable @JvmInline
 public value class GameId(public val value: String)
@@ -83,16 +79,12 @@ public value class DisplayName private constructor(public val text: String) {
 }
 
 /** Stored names are checked when read back, like any other: decoding fails on anything [DisplayName.of] would not give. */
-private object DisplayNameSerializer : KSerializer<DisplayName> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("app.cartouche.DisplayName", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: DisplayName): Unit = encoder.encodeString(value.text)
-
-    // The serialization library reports invalid input by exception; decoders catch it at their boundary.
-    override fun deserialize(decoder: Decoder): DisplayName = decoder.decodeString().let { text ->
-        DisplayName.of(text).filter { it.text == text }.getOrElse { throw SerializationException("Not a display name: $text") }
-    }
-}
+private object DisplayNameSerializer : KSerializer<DisplayName> by ParsedSerializer(
+    "display name",
+    String.serializer(),
+    { text -> DisplayName.of(text).filter { it.text == text } },
+    DisplayName::text,
+)
 
 /** Which image a game's label shows. */
 @Serializable
@@ -107,7 +99,7 @@ public sealed interface LabelChoice {
     @SerialName("region")
     public data class Region(public val region: LabelRegion) : LabelChoice
 
-    /** A picture of the user's own, framed by them ([app.cartouche.core.art.LabelFraming]); the app keeps the framed copy. */
+    /** A picture of the user's own, framed by them (`app.cartouche.core.art.LabelFraming`); the app keeps the framed copy. */
     @Serializable
     @SerialName("own")
     public data object Own : LabelChoice

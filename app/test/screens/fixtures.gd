@@ -3,6 +3,7 @@ extends RefCounted
 ## What the tests of the screens in front of the carousel share: a device as a first launch finds
 ## it, the presses the screens take, and where the flow stands.
 
+const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 const CAROUSEL := preload("res://carousel/carousel.tscn")
 const NAVIGATION: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_right"]
 
@@ -423,7 +424,7 @@ class NewDevice extends AndroidServices:
 	## Whether the picture answered is one the app then cannot read.
 	var picture_unreadable := false
 	var picture_path := "user://picked.png"
-	## The framings kept with [method keep_own_label], as `{"zoom", "centre"}`, in order.
+	## The framings kept with [method keep_own_label], as `{"zoom", "centre", "proportion"}`, in order.
 	var kept_framings: Array[Dictionary] = []
 
 	func pick_label_picture() -> AndroidServices.LabelPicture:
@@ -439,8 +440,8 @@ class NewDevice extends AndroidServices:
 		return AndroidServices.LabelPicture.new({"ok": true, "picture": {
 			"path": ProjectSettings.globalize_path(path), "width": picture_size.x, "height": picture_size.y}})
 
-	func keep_own_label(game: AndroidServices.Game, zoom: float, centre: Vector2) -> AndroidServices.ArtAnswer:
-		kept_framings.append({"zoom": zoom, "centre": centre})
+	func keep_own_label(game: AndroidServices.Game, framing: LabelFraming) -> AndroidServices.ArtAnswer:
+		kept_framings.append({"zoom": framing.zoom, "centre": framing.centre, "proportion": framing.proportion})
 		await _frames(3)
 		var answer := _payload(&"keep_own_label")
 		if answer["ok"]:
@@ -540,8 +541,8 @@ class NewDevice extends AndroidServices:
 			for i in consoles[platform_id]:
 				indices.append(listed.size())
 				listed.append({"id": "%s/%d" % [platform_id, i], "platform_id": platform_id, "title": "%s %d" % [platform_id, i],
-					"regions": [], "languages": [], "serials": [], "discs": [{"name": "%d.iso" % i}], "last_disc": 0,
-					"identified": false})
+					"regions": [], "medium": CarouselFixtures.media(platform_id)[0], "languages": [], "serials": [],
+					"discs": [{"name": "%d.iso" % i}], "last_disc": 0, "identified": false})
 			if not indices.is_empty():
 				shelves.append({"platform": platform_id, "games": indices, "selected": 0})
 		return JSON.stringify({"setups": sent, "games": listed, "shelves": {"shelves": shelves, "selected": 0},

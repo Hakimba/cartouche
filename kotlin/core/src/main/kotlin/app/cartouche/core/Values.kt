@@ -7,8 +7,7 @@ import arrow.core.getOrElse
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
@@ -44,12 +43,29 @@ public value class FileName(public val value: String) {
 }
 
 /** Stored URIs are checked when read back, like any other: decoding fails on anything else. */
-private object ContentUriSerializer : KSerializer<ContentUri> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("app.cartouche.ContentUri", PrimitiveKind.STRING)
+private object ContentUriSerializer : KSerializer<ContentUri> by ParsedSerializer(
+    "content URI",
+    String.serializer(),
+    ContentUri::parse,
+    ContentUri::value,
+)
 
-    override fun serialize(encoder: Encoder, value: ContentUri): Unit = encoder.encodeString(value.value)
+/**
+ * Values checked when read, like any other: [T] written as its [surrogate], and read back through
+ * [parse], decoding failing on anything it refuses ([what] names [T] in the failure).
+ */
+internal class ParsedSerializer<S, T>(
+    private val what: String,
+    private val surrogate: KSerializer<S>,
+    private val parse: (S) -> Option<T>,
+    private val written: (T) -> S,
+) : KSerializer<T> {
+    override val descriptor: SerialDescriptor get() = surrogate.descriptor
+
+    override fun serialize(encoder: Encoder, value: T): Unit = encoder.encodeSerializableValue(surrogate, written(value))
 
     // The serialization library reports invalid input by exception; decoders catch it at their boundary.
-    override fun deserialize(decoder: Decoder): ContentUri =
-        decoder.decodeString().let { text -> ContentUri.parse(text).getOrElse { throw SerializationException("Not a content URI: $text") } }
+    override fun deserialize(decoder: Decoder): T = decoder.decodeSerializableValue(surrogate).let { read ->
+        parse(read).getOrElse { throw SerializationException("Not a $what: $read") }
+    }
 }

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "psx"
+version = &"scph-1002"
+is_default = true
+name = "PlayStation"
+model_name = "Original"
+scene = "res://carousel/consoles/psx/psx.tscn"
+launch = "res://carousel/consoles/psx/launch.json"
+triangle_budget = 12000

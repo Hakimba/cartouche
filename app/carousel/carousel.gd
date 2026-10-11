@@ -34,6 +34,7 @@ extends Control
 ## In debug builds, holding Select opens the device check, and command-line arguments set up
 ## measurements: `--welcome=skip` goes past the welcome without a press, `--demo-games=N` shows a
 ## made-up library of N games (all on one console with `--demo-shelf=ps2`), `--bench=scroll`, `enter`, `turn` or `launch` runs [CarouselBench],
+## `--launch=rehearse` plays launches without starting anything (see [method AndroidServices.launch_game]),
 ## `--turntable=T` turns the selected game T times a second to show all its sides, `--shelf=gba`
 ## opens on that platform, `--shots=DIR` saves pictures at set frames ([FrameShots]). Without the
 ## Android plugin (the editor, a desktop run), the demo library is shown.
@@ -95,6 +96,8 @@ var _positions: Dictionary[String, int] = {}
 ## The names the user gave consoles, by platform id.
 var _console_names: Dictionary[String, String] = {}
 var _platforms: Dictionary[String, AndroidServices.Platform] = {}
+## The model of each medium each shelf's games come in, by platform id, then by medium.
+var _shelf_models: Dictionary[String, Dictionary] = {}
 var _appearance: Appearance
 ## Whether the library shown is made up: its labels get made-up artwork.
 var _demo := false
@@ -189,7 +192,7 @@ func _ready() -> void:
 	_search.changed.connect(_on_search_changed)
 	_search.opened.connect(_on_search_opened)
 	_screens.appearance = _appearance
-	_screens.console_of = func(platform_id: String) -> Node3D: return _console_item(platform_id).model
+	_screens.console_of = _console_shown
 	_row.pose = _appearance.pose
 	# The same pose, but for its sway, which each console's launch animation has.
 	_consoles.pose.tilt = _appearance.pose.tilt
@@ -286,6 +289,9 @@ func _process(delta: float) -> void:
 	# While a launch is checked, and as the black fades after the game, they stay away.
 	var behind := 0.0 if gone and _game_launch.is_busy() \
 		else move_toward(_sequence.behind_amount, 0.0 if gone else 1.0, delta / _BEHIND_FADE_S)
+	# Outside a launch, they leave as the games come, and come back as the games leave.
+	if not _game_launch.is_inserting():
+		behind = minf(behind, 1.0 - _row.neighbours)
 	if behind != _sequence.behind_amount:
 		_sequence.behind_amount = behind
 	var now: int = clock.call()
@@ -537,14 +543,16 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 			_shelf = i
 	if _shelves.is_empty():
 		return
-	# Only the media of the library's consoles: the others are never loaded.
+	# Only the media of the library's games: the others are never loaded.
+	_shelf_models.clear()
 	var models: Array[PackedScene] = []
 	var items: Array[ConsoleRow.Item] = []
 	for shelf in _shelves:
-		models.append(_appearance.model_of(_platforms[shelf.platform_id].media))
+		_shelf_models[shelf.platform_id] = _models_of(shelf)
+		models.append_array(_shelf_models[shelf.platform_id].values())
 		_positions[shelf.platform_id] = shelf.selected
-		items.append(_console_item(shelf.platform_id))
-	_row.prepare(models)
+		items.append(_console_item(shelf))
+	_row.keep_models(models)
 	_consoles.show_consoles(items, _shelf)
 	# A console alone has no order to be put in.
 	_arrange_hint.visible = _shelves.size() > 1
@@ -556,30 +564,51 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 			game.title, game.platform_id, (Time.get_ticks_usec() - started) / 1000.0])
 
 
-## The console of [param platform_id] as the consoles screen shows it: its model, or else its
-## medium, labelled with the platform's name.
-func _console_item(platform_id: String) -> ConsoleRow.Item:
+## The console of [param shelf]'s platform as the consoles screen shows it ([method _console_shown]),
+## resting as the launch animation of its selected game starts.
+func _console_item(shelf: AndroidServices.Shelf) -> ConsoleRow.Item:
+	var animation := _appearance.animation_of(_platforms[shelf.platform_id], shelf.games[shelf.selected].medium)
+	return ConsoleRow.Item.new(_console_shown(shelf.platform_id), ConsoleRow.Rest.of(animation))
+
+
+## The model of [param platform_id]'s console, or else its medium, labelled with the platform's name.
+func _console_shown(platform_id: String) -> Node3D:
+	if _appearance.console_of(platform_id):
+		return _appearance.console(platform_id)
 	var platform := _platforms[platform_id]
-	var rest := ConsoleRow.Rest.of(_appearance.animation_of(platform_id))
-	if platform_id in _appearance.consoles:
-		var console: ConsoleModel = _appearance.consoles[platform_id].instantiate()
-		return ConsoleRow.Item.new(console, rest)
-	var medium := ShelfRow.LabelledModel.new(_appearance.model_of(platform.media))
+	var medium := ShelfRow.LabelledModel.new(_appearance.model_of("", platform.media))
 	medium.draw_label(platform.name, _look(platform_id))
-	return ConsoleRow.Item.new(medium, rest)
+	return medium
 
 
 ## The platform selected on the consoles screen: its shelf behind, ready for the games screen, and
-## its launch animation.
+## the launch animation of each of its media made now rather than on A, its selected game's in use.
 func _show_platform() -> void:
+	var started := Time.get_ticks_usec()
 	var shelf := _shelves[_shelf]
 	var platform := _platforms[shelf.platform_id]
-	_row.show_shelf(shelf.games, _positions[shelf.platform_id], _appearance.model_of(platform.media),
-		_look(shelf.platform_id))
+	var models: Dictionary[String, PackedScene] = _shelf_models[shelf.platform_id]
+	for medium in models:
+		_appearance.animation_of(platform, medium)
+	_row.show_shelf(shelf.games, _positions[shelf.platform_id], models, _look(shelf.platform_id))
 	_search.use_shelf(shelf.platform_id, shelf.games)
-	_sequence.use(_appearance.animation_of(shelf.platform_id))
+	_sequence.use(_appearance.animation_of(platform, _row.selected_game().medium))
 	_console_name.text = _console_name_of(shelf.platform_id)
-	_console_model.text = _appearance.console_models.get(shelf.platform_id, "")
+	var console := _appearance.console_of(shelf.platform_id)
+	_console_model.text = console.model_name if console else ""
+	if Diagnostics.enabled:
+		Diagnostics.trace("carousel", "shelf %s prepared in %.1f ms, %d label viewports alive" % [shelf.platform_id,
+			(Time.get_ticks_usec() - started) / 1000.0, ShelfRow.LabelledModel.alive])
+
+
+## The model of each medium [param shelf]'s games come in, by medium.
+func _models_of(shelf: AndroidServices.Shelf) -> Dictionary[String, PackedScene]:
+	var media := _platforms[shelf.platform_id].media
+	var models: Dictionary[String, PackedScene] = {}
+	for game in shelf.games:
+		if game.medium not in models:
+			models[game.medium] = _appearance.model_of(game.medium, media)
+	return models
 
 
 ## How the labels of [param platform_id]'s games look.
@@ -648,8 +677,10 @@ func _launch() -> void:
 	# A press begun before A must not act once it is let go.
 	_hold_select.stop()
 	_remember()
-	var insertion := _appearance.insertions[_platforms[game.platform_id].media]
-	_game_launch.launch(game, game.last_disc, insertion)
+	var platform := _platforms[game.platform_id]
+	# The placeholder brings the game's own medium from its own length away.
+	_sequence.use(_appearance.animation_of(platform, game.medium), &"games")
+	_game_launch.launch(game, game.last_disc, _appearance.insertions[platform.media])
 
 
 ## Stores the selected game and its platform, for the next start.
@@ -719,6 +750,8 @@ func _on_game_launch_failed(code: StringName) -> void:
 			_show_message(tr("No {platform} emulator is installed.").format({"platform": platform}))
 		&"game_missing":
 			_show_message(tr("This game's file cannot be found: is its SD card or folder still there?"))
+		&"rehearsed":
+			pass
 		_:
 			_show_message(tr("The game could not be launched."))
 
@@ -732,6 +765,7 @@ func _show_front(front: bool) -> void:
 	_search.visible = not front
 	_pill.visible = not front and not _shelves.is_empty()
 	_games_hints.visible = not front
+	_sequence.blur_dots()
 	if front:
 		_sequence.behind_amount = 0.0
 		_art_progress.hide()
@@ -868,7 +902,8 @@ func _console_name_of(platform_id: String) -> String:
 
 ## A console's own name, as the consoles screen shows it.
 func _own_console_name(platform_id: String) -> String:
-	return _appearance.console_names.get(platform_id, _platforms[platform_id].name)
+	var console := _appearance.console_of(platform_id)
+	return console.name if console else _platforms[platform_id].name
 
 
 ## The selected game's properties, until they close.

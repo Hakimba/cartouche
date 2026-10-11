@@ -1,0 +1,115 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/media/n64_cart/n64_cart_shape.tres" id="2"]
+[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" uid="uid://dvke8qx3wtlbi" path="res://carousel/models/solid.gdshader" id="4"]
+[ext_resource type="Texture2D" path="res://carousel/media/n64_cart/n64_cart_sticker.svg" id="5"]
+[ext_resource type="Texture2D" path="res://carousel/media/n64_cart/n64_cart_oval.svg" id="6"]
+
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
+
+[sub_resource type="ShaderMaterial" id="label_material"]
+shader = ExtResource("3")
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.35
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.655, 0.659, 0.667, 1)
+shader_parameter/roughness = 0.62
+
+[sub_resource type="PrimitiveMesh" id="grooves_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"grooves"
+
+[sub_resource type="ShaderMaterial" id="grooves_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.46, 0.462, 0.468, 1)
+shader_parameter/roughness = 0.62
+
+[sub_resource type="PrimitiveMesh" id="screws_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"screws"
+
+[sub_resource type="ShaderMaterial" id="screws_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.36, 0.38, 0.43, 1)
+shader_parameter/roughness = 0.45
+
+[sub_resource type="PrimitiveMesh" id="sticker_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"sticker"
+
+[sub_resource type="ShaderMaterial" id="sticker_material"]
+shader = ExtResource("3")
+shader_parameter/label_texture = ExtResource("5")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.45
+shader_parameter/varnish = 0.2
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="lettering_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"lettering"
+
+[sub_resource type="ShaderMaterial" id="lettering_material"]
+shader = ExtResource("3")
+shader_parameter/label_texture = ExtResource("6")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.62
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="contacts_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"contacts"
+
+[sub_resource type="ShaderMaterial" id="contacts_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.85, 0.64, 0.3, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/metallic = 1.0
+
+[node name="N64Cart" type="Node3D"]
+
+[node name="Label" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_mesh")
+surface_material_override/0 = SubResource("label_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")
+
+[node name="Grooves" type="MeshInstance3D" parent="."]
+mesh = SubResource("grooves_mesh")
+surface_material_override/0 = SubResource("grooves_material")
+
+[node name="Screws" type="MeshInstance3D" parent="."]
+mesh = SubResource("screws_mesh")
+surface_material_override/0 = SubResource("screws_material")
+
+[node name="Sticker" type="MeshInstance3D" parent="."]
+mesh = SubResource("sticker_mesh")
+surface_material_override/0 = SubResource("sticker_material")
+
+[node name="Lettering" type="MeshInstance3D" parent="."]
+mesh = SubResource("lettering_mesh")
+surface_material_override/0 = SubResource("lettering_material")
+
+[node name="Contacts" type="MeshInstance3D" parent="."]
+mesh = SubResource("contacts_mesh")
+surface_material_override/0 = SubResource("contacts_material")

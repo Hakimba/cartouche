@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="MediumManifest" format=3]
+
+[ext_resource type="Script" path="res://carousel/media/medium_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+media = "cartridge"
+scene = "res://carousel/media/snes_us_cart/snes_us_cart.tscn"
+triangle_budget = 5000

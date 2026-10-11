@@ -1,0 +1,81 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/media/snes_pal_cart/snes_pal_cart_shape.tres" id="2"]
+[ext_resource type="Shader" uid="uid://cqg85n18b1bsl" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="4"]
+
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
+
+[sub_resource type="ShaderMaterial" id="label_material"]
+shader = ExtResource("3")
+shader_parameter/roughness = 0.5
+shader_parameter/varnish = 0.3
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.72, 0.73, 0.735, 1)
+shader_parameter/roughness = 0.62
+shader_parameter/clearcoat = 0.05
+shader_parameter/clearcoat_roughness = 0.6
+
+[sub_resource type="PrimitiveMesh" id="metal_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"metal"
+
+[sub_resource type="ShaderMaterial" id="metal_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.85, 0.72, 0.45, 1)
+shader_parameter/roughness = 0.35
+shader_parameter/metallic = 1.0
+
+[sub_resource type="PrimitiveMesh" id="dark_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"dark"
+
+[sub_resource type="ShaderMaterial" id="dark_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.16, 0.165, 0.17, 1)
+shader_parameter/roughness = 0.9
+
+[sub_resource type="PrimitiveMesh" id="board_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"board"
+
+[sub_resource type="ShaderMaterial" id="board_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.2, 0.42, 0.24, 1)
+shader_parameter/roughness = 0.45
+
+[node name="SnesPalCart" type="Node3D"]
+
+[node name="Label" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_mesh")
+surface_material_override/0 = SubResource("label_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")
+
+[node name="Metal" type="MeshInstance3D" parent="."]
+mesh = SubResource("metal_mesh")
+surface_material_override/0 = SubResource("metal_material")
+
+[node name="Dark" type="MeshInstance3D" parent="."]
+mesh = SubResource("dark_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Board" type="MeshInstance3D" parent="."]
+mesh = SubResource("board_mesh")
+surface_material_override/0 = SubResource("board_material")

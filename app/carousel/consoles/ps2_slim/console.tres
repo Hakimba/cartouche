@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "ps2"
+version = &"scph-70004"
+is_default = true
+name = "PlayStation 2"
+model_name = "Slim"
+scene = "res://carousel/consoles/ps2_slim/ps2_slim.tscn"
+launch = "res://carousel/consoles/ps2_slim/launch.json"
+triangle_budget = 9000

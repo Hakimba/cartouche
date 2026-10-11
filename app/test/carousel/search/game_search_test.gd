@@ -19,11 +19,13 @@ func _games_screen(titles: Array = TITLES, next_titles: Array = ["Rez", "Rygar",
 	for at: int in [carousel._shelf, (carousel._shelf + 1) % carousel._shelves.size()]:
 		var shelf := carousel._shelves[at]
 		var shown: Array = titles if at == carousel._shelf else next_titles
+		# On the medium the library showed the shelf's games in.
+		var medium := shelf.games[0].medium
 		shelf.games.clear()
 		for i in shown.size():
 			shelf.games.append(AndroidServices.Game.new({
 				"id": "%s/%d" % [shelf.platform_id, i], "platform_id": shelf.platform_id, "title": shown[i], "identified": false,
-				"regions": [REGIONS[i % 3]], "discs": [{"name": "%s.iso" % shown[i]}], "last_disc": 0,
+				"regions": [REGIONS[i % 3]], "medium": medium, "discs": [{"name": "%s.iso" % shown[i]}], "last_disc": 0,
 			}))
 		search.shelves[shelf.platform_id] = shelf.games
 		carousel._positions[shelf.platform_id] = 0

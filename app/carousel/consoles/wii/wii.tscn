@@ -1,0 +1,401 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/wii/wii_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/wii/wii_shape.tres" id="2"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Shader" path="res://carousel/models/clear_plastic.gdshader" id="clear"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_logo.svg" id="logo_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_power_label.svg" id="power_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_reset_label.svg" id="reset_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_eject_label.svg" id="eject_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_sync_label.svg" id="sync_label_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_ati_logo.svg" id="ati_logo_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_maker_logo.svg" id="maker_logo_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_power_sign.svg" id="power_sign_image"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/wii/wii_eject_sign.svg" id="eject_sign_image"]
+
+[sub_resource type="ShaderMaterial" id="white_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.95, 0.95, 0.94, 1)
+shader_parameter/roughness = 0.28
+shader_parameter/clearcoat = 0.6
+shader_parameter/clearcoat_roughness = 0.15
+
+[sub_resource type="ShaderMaterial" id="button_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.92, 0.92, 0.91, 1)
+shader_parameter/roughness = 0.35
+shader_parameter/clearcoat = 0.3
+shader_parameter/clearcoat_roughness = 0.3
+
+[sub_resource type="ShaderMaterial" id="dark_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.035, 0.035, 0.04, 1)
+shader_parameter/roughness = 0.6
+
+[sub_resource type="ShaderMaterial" id="glow_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.02, 0.025, 0.035, 1)
+shader_parameter/roughness = 0.4
+shader_parameter/emission = Color(0.25, 0.62, 1, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="ShaderMaterial" id="sync_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.72, 0.22, 0.17, 1)
+shader_parameter/roughness = 0.4
+
+[sub_resource type="ShaderMaterial" id="sensor_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.85, 0.33, 0.14, 1)
+shader_parameter/roughness = 0.45
+
+[sub_resource type="ShaderMaterial" id="stand_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.66, 0.67, 0.69, 1)
+shader_parameter/metallic = 0.35
+shader_parameter/roughness = 0.45
+
+[sub_resource type="ShaderMaterial" id="plate_material"]
+shader = ExtResource("clear")
+shader_parameter/tint = Color(0.72, 0.74, 0.77, 1)
+shader_parameter/edge_tint = Color(0.6, 0.62, 0.65, 1)
+shader_parameter/opacity = 0.25
+shader_parameter/edge_opacity = 0.45
+
+[sub_resource type="PrimitiveMesh" id="front_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"front"
+
+[sub_resource type="PrimitiveMesh" id="body_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"body"
+
+[sub_resource type="PrimitiveMesh" id="back_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"back"
+
+[sub_resource type="PrimitiveMesh" id="sides_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sides"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="flaps_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"flaps"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="rim_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"rim"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="gap_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"gap"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="well_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"well"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="sync_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sync"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="reset_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="ports_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"ports"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="sensor_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sensor"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="stand_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"stand"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="plate_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"plate"
+detail = 256
+
+[sub_resource type="PrimitiveMesh" id="power_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="eject_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"eject"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="door_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"door"
+detail = 32
+
+[sub_resource type="ShaderMaterial" id="logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("logo_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.28
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="power_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.28
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="reset_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("reset_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.28
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="eject_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("eject_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.28
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="sync_label_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("sync_label_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="ati_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("ati_logo_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.28
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="maker_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("maker_logo_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.28
+shader_parameter/varnish = 0.6
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="power_sign_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_sign_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.35
+shader_parameter/varnish = 0.3
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="eject_sign_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("eject_sign_image")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.35
+shader_parameter/varnish = 0.3
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"logo"
+
+[sub_resource type="PrimitiveMesh" id="power_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_label"
+
+[sub_resource type="PrimitiveMesh" id="reset_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset_label"
+
+[sub_resource type="PrimitiveMesh" id="eject_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"eject_label"
+
+[sub_resource type="PrimitiveMesh" id="sync_label_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sync_label"
+
+[sub_resource type="PrimitiveMesh" id="ati_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"ati_logo"
+
+[sub_resource type="PrimitiveMesh" id="maker_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"maker_logo"
+
+[sub_resource type="PrimitiveMesh" id="power_sign_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_sign"
+
+[sub_resource type="PrimitiveMesh" id="eject_sign_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"eject_sign"
+
+[node name="Wii" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Front" type="MeshInstance3D" parent="."]
+mesh = SubResource("front_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("body_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Back" type="MeshInstance3D" parent="."]
+mesh = SubResource("back_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Sides" type="MeshInstance3D" parent="."]
+mesh = SubResource("sides_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Flaps" type="MeshInstance3D" parent="."]
+mesh = SubResource("flaps_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Rim" type="MeshInstance3D" parent="."]
+mesh = SubResource("rim_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Light" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("gap_mesh")
+surface_material_override/0 = SubResource("glow_material")
+
+[node name="Well" type="MeshInstance3D" parent="."]
+mesh = SubResource("well_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Sync" type="MeshInstance3D" parent="."]
+mesh = SubResource("sync_mesh")
+surface_material_override/0 = SubResource("sync_material")
+
+[node name="Reset" type="MeshInstance3D" parent="."]
+mesh = SubResource("reset_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="Ports" type="MeshInstance3D" parent="."]
+mesh = SubResource("ports_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Sensor" type="MeshInstance3D" parent="."]
+mesh = SubResource("sensor_mesh")
+surface_material_override/0 = SubResource("sensor_material")
+
+[node name="Stand" type="MeshInstance3D" parent="."]
+mesh = SubResource("stand_mesh")
+surface_material_override/0 = SubResource("stand_material")
+
+[node name="Plate" type="MeshInstance3D" parent="."]
+mesh = SubResource("plate_mesh")
+surface_material_override/0 = SubResource("plate_material")
+
+[node name="Power" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cap" type="MeshInstance3D" parent="Power"]
+mesh = SubResource("power_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="Eject" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cap" type="MeshInstance3D" parent="Eject"]
+mesh = SubResource("eject_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="Door" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Panel" type="MeshInstance3D" parent="Door"]
+mesh = SubResource("door_mesh")
+surface_material_override/0 = SubResource("white_material")
+
+[node name="Logo" type="MeshInstance3D" parent="."]
+mesh = SubResource("logo_mesh")
+surface_material_override/0 = SubResource("logo_material")
+
+[node name="PowerLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("power_label_mesh")
+surface_material_override/0 = SubResource("power_label_material")
+
+[node name="ResetLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("reset_label_mesh")
+surface_material_override/0 = SubResource("reset_label_material")
+
+[node name="EjectLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("eject_label_mesh")
+surface_material_override/0 = SubResource("eject_label_material")
+
+[node name="SyncLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("sync_label_mesh")
+surface_material_override/0 = SubResource("sync_label_material")
+
+[node name="AtiLogo" type="MeshInstance3D" parent="."]
+mesh = SubResource("ati_logo_mesh")
+surface_material_override/0 = SubResource("ati_logo_material")
+
+[node name="MakerLogo" type="MeshInstance3D" parent="."]
+mesh = SubResource("maker_logo_mesh")
+surface_material_override/0 = SubResource("maker_logo_material")
+
+[node name="Sign" type="MeshInstance3D" parent="Power"]
+mesh = SubResource("power_sign_mesh")
+surface_material_override/0 = SubResource("power_sign_material")
+
+[node name="Sign" type="MeshInstance3D" parent="Eject"]
+mesh = SubResource("eject_sign_mesh")
+surface_material_override/0 = SubResource("eject_sign_material")

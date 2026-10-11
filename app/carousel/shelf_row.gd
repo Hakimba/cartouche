@@ -40,6 +40,8 @@ var stage := 0.0
 var staged := Transform3D.IDENTITY
 
 var _games: Array[AndroidServices.Game] = []
+## The model of each of the shelf's games' media, by medium.
+var _models: Dictionary[String, PackedScene] = {}
 var _look := LabelLook.new()
 ## The selected game's position on the endless row (see [CarouselLayout]); the scroll follows it.
 var _position := 0
@@ -104,23 +106,26 @@ func _process(delta: float) -> void:
 				place.shown.draw_label(game.title, _look)
 
 
-## Makes every place's model of each of [param models] now, rather than when a shelf of that media
-## is first shown: making one takes about 2 ms on a handheld, its first one 10 to 30 ms.
-func prepare(models: Array[PackedScene]) -> void:
+## Frees every place's model of a medium not among [param models]: no game of the library comes in
+## it any more.
+func keep_models(models: Array[PackedScene]) -> void:
 	for place in _places:
-		for model in models:
-			place.use_model(model)
-		place.visible = false
+		place.keep_models(models)
 
 
-## Shows [param games] (in shelf order) from index [param selected], on models of [param model]
-## with labels of [param look].
-func show_shelf(games: Array[AndroidServices.Game], selected: int, model: PackedScene, look: LabelLook) -> void:
+## Shows [param games] (in shelf order) from index [param selected], each on the model of its medium
+## in [param models] (by [member AndroidServices.Game.medium]), with labels of [param look]. Every
+## place's model of each of them is made now, if not yet, rather than as a game of it comes into
+## view: making one takes about 2 ms on a handheld, its first one 10 to 30 ms.
+func show_shelf(games: Array[AndroidServices.Game], selected: int, models: Dictionary[String, PackedScene],
+		look: LabelLook) -> void:
+	_models = models
 	_look = look
+	for place in _places:
+		for model: PackedScene in models.values():
+			place.use_model(model)
 	# Another shelf, or the same one again after a change: no label is kept.
 	_placed.clear()
-	for place in _places:
-		place.use_model(model)
 	set_process(true)
 	show_games(games, selected)
 
@@ -243,6 +248,19 @@ func preview_label(label: Texture2D, window := WHOLE) -> void:
 		place.shown.show_label(label, true, window)
 
 
+## How the selected game's model is brought from its size in the row to its real size, in its own
+## frame: as it stands on a console's seat.
+func selected_real_size() -> Transform3D:
+	var place: Place = _placed.get(selected_index())
+	return place.shown.to_real_size if place else Transform3D.IDENTITY
+
+
+## The width of the selected game's label over its height: of the model of its medium.
+func selected_label_proportion() -> float:
+	var place: Place = _placed.get(selected_index())
+	return place.shown.label_proportion if place else 1.0
+
+
 ## The selected game shows its own label again, after [method preview_label].
 func show_own_label() -> void:
 	_previewing = false
@@ -291,6 +309,7 @@ func _arrange() -> void:
 		if game not in _placed:
 			var place := _free_place()
 			place.game = game
+			place.use_model(_models[_games[game].medium])
 			place.shown.clear_label()
 			_placed[game] = place
 			if place not in _unlabelled:
@@ -311,7 +330,7 @@ func _arrange() -> void:
 			var centred := CarouselLayout.centred(offset)
 			var posed_part := centred * pose_amount
 			var stand := CarouselLayout.place(offset)
-			stand.origin.y += CarouselLayout.float_height(_pose_s, CarouselLayout.BOB_HEIGHT, posed_part)
+			stand.origin.y += CarouselLayout.float_height(_pose_s, pose.bob, posed_part)
 			var spun := Basis(Vector3.UP, TAU * turntable * _clock_s * centred)
 			var turn := spun * _turn.of(place.game)
 			var stretched := Basis.from_scale(Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0))
@@ -336,13 +355,14 @@ func _free_place() -> Place:
 	return _places[0]
 
 
-## How the selected game is shown: leaning back and turned a little, it sways slowly so that the
-## light moves over it. Angles in degrees.
+## How the selected game is shown: leaning back and turned as told, it sways slowly so that the
+## light moves over it, and floats [member bob] high (world units). Angles in degrees.
 class Pose:
 	var tilt := 0.0
 	var turn := 0.0
 	var sway := 0.0
 	var sway_period_s := 6.0
+	var bob := CarouselLayout.BOB_HEIGHT
 
 	## The pose at [param clock_s], [param centred] from 0 (beside the centre, not posed) to 1.
 	func at(clock_s: float, centred: float) -> Basis:
@@ -363,23 +383,30 @@ class LabelLook:
 	var demo_art := false
 
 
-## One game's place in the row, showing the model of the shelf's media. Each media's model is kept
-## once made, so that changing shelf only shows another one.
+## One game's place in the row, showing the model of its game's medium. Each medium's model is kept
+## once made, until the library has no game of it, so that another game or shelf only shows another
+## one.
 class Place extends Node3D:
 	## Index of the game shown here, -1 when the place is free.
 	var game := -1
 	var shown: LabelledModel
 	var _models: Dictionary[PackedScene, LabelledModel] = {}
 
+	## Frees its models of the media not among [param models].
+	func keep_models(models: Array[PackedScene]) -> void:
+		for model: PackedScene in _models.keys():
+			if model not in models:
+				_models[model].free()
+				_models.erase(model)
+
 	## Shows [param model], made the first time it is used here.
 	func use_model(model: PackedScene) -> void:
-		if shown:
-			shown.visible = false
 		if model not in _models:
 			_models[model] = LabelledModel.new(model)
 			add_child(_models[model])
 		shown = _models[model]
-		shown.visible = true
+		for made: LabelledModel in _models.values():
+			made.visible = made == shown
 
 
 ## A model and the label drawn for it, in its own small viewport shaped like the model's `Label`
@@ -395,9 +422,18 @@ class LabelledModel extends Node3D:
 	## How far above the platform's name the band starts, as a fraction of the label.
 	const _BAND_ABOVE := 0.02
 
+	## How many are alive, each with its label's viewport, for the traces.
+	static var alive := 0
+
+	## The width of the model's label face over its height.
+	var label_proportion := 1.0
+	## Brings the model from its size in the row to its real size, in its own frame: its root's
+	## transform undone.
+	var to_real_size := Transform3D.IDENTITY
+
 	var _fade: ModelFade
-	## The label's material, and the copy it fades through: both drawn the same label.
-	var _materials: Array[ShaderMaterial] = []
+	## The model's label, drawn with a material of its own.
+	var _label_mesh: MeshInstance3D
 	var _view: SubViewport = _LABEL_VIEW.instantiate()
 	var _background: ColorRect = _view.get_node("Background")
 	var _title: Label = _view.get_node("Title")
@@ -406,16 +442,20 @@ class LabelledModel extends Node3D:
 	var _demo_art := ShaderMaterial.new()
 
 	func _init(model: PackedScene) -> void:
+		alive += 1
 		var instance: Node3D = model.instantiate()
 		add_child(instance)
+		to_real_size = instance.transform.affine_inverse()
 		add_child(_view)
 		var label: MeshInstance3D = instance.get_node("Label")
 		var material: ShaderMaterial = label.get_surface_override_material(0).duplicate()
 		label.set_surface_override_material(0, material)
+		_label_mesh = label
 		_fade = ModelFade.new(instance)
-		_materials.assign([material, _fade.copy_of(material)])
 		var face := label.get_aabb().size
-		_view.size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH * face.y / face.x))
+		# To a ten-thousandth: a disc's face, built round, is square.
+		label_proportion = snappedf(face.x / face.y, 0.0001)
+		_view.size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH / label_proportion))
 		# Where the title and the platform go is the shape's: round a disc's hub, for one.
 		var title := ModelShape.TITLE_AREA
 		var platform := ModelShape.PLATFORM_AREA
@@ -435,6 +475,10 @@ class LabelledModel extends Node3D:
 		_band.position = Vector2(0.0, _platform.position.y - size.y * _BAND_ABOVE)
 		_band.size = Vector2(size.x, size.y - _band.position.y)
 		_demo_art.shader = _DEMO_ART
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_PREDELETE:
+			alive -= 1
 
 	func clear_label() -> void:
 		_label(&"has_label", false)
@@ -460,10 +504,18 @@ class LabelledModel extends Node3D:
 		show_label(_view.get_texture(), false)
 
 	## Shows [param label] as the model's label, an image of a real one when [param scanned]; only
-	## its [param window] when given, as fractions of it.
+	## its [param window] when given, as fractions of it, and of that, the middle of the label's
+	## proportions: an image of another shape (a Famicom's label on an NES cartridge) covers the
+	## label, cut, never stretched.
 	func show_label(label: Texture2D, scanned: bool, window := WHOLE) -> void:
+		var pixels := Vector2(label.get_size()) * window.size
+		var cover := window.size
+		if pixels.x > 0.0 and pixels.y > 0.0:
+			var wider := pixels.x / pixels.y / label_proportion
+			cover *= Vector2(minf(1.0, 1.0 / wider), minf(1.0, wider))
+		var shown := Rect2(window.get_center() - cover / 2.0, cover)
 		_label(&"label_texture", label)
-		_label(&"label_window", Vector4(window.position.x, window.position.y, window.size.x, window.size.y))
+		_label(&"label_window", Vector4(shown.position.x, shown.position.y, shown.size.x, shown.size.y))
 		_label(&"scanned", scanned)
 		_label(&"has_label", true)
 
@@ -478,5 +530,4 @@ class LabelledModel extends Node3D:
 		_fade.apply(amount)
 
 	func _label(parameter: StringName, value: Variant) -> void:
-		for material in _materials:
-			material.set_shader_parameter(parameter, value)
+		_fade.set_shader_value(_label_mesh, parameter, value)

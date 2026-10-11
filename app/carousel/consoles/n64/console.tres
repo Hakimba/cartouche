@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "n64"
+version = &"nus-001"
+is_default = true
+name = "Nintendo 64"
+model_name = "NUS-001"
+scene = "res://carousel/consoles/n64/n64.tscn"
+launch = "res://carousel/consoles/n64/launch.json"
+triangle_budget = 10000

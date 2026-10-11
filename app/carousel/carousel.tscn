@@ -143,7 +143,7 @@ script = ExtResource("9")
 [node name="Player" type="AnimationPlayer" parent="."]
 callback_mode_process = 2
 
-[node name="Sequence" type="Node" parent="." node_paths=PackedStringArray("player", "row", "consoles", "layer")]
+[node name="Sequence" type="Node" parent="." node_paths=PackedStringArray("player", "row", "consoles", "layer", "backdrop")]
 unique_name_in_owner = true
 process_priority = -1
 script = ExtResource("10")
@@ -151,6 +151,7 @@ player = NodePath("../Player")
 row = NodePath("../Row")
 consoles = NodePath("../Consoles")
 layer = NodePath("../Backdrop/ConsoleView")
+backdrop = NodePath("../Backdrop/Gradient")
 
 [node name="ConsoleTitle" type="Control" parent="."]
 unique_name_in_owner = true

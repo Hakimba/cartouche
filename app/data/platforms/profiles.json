@@ -1,27 +1,75 @@
 {
   "ps2": {
     "media": "dvd",
+    "medium": {"default": "ps2_dvd"},
     "minimumGameBytes": 16000000,
-    "scansBySerial": "https://psxdatacenter.com/psx2/images2/covers/{serial}/{serial}-D-ALL.jpg"
+    "art": {"kind": "disc"},
+    "scansBySerial": {"url": "https://psxdatacenter.com/psx2/images2/covers/{serial}/{serial}-D-ALL.jpg", "serial": "[A-Z]{4}-\\d{5}"}
   },
-  "gc": {"media": "minidisc", "minimumGameBytes": 16000000},
-  "gba": {"media": "cartridge", "minimumGameBytes": 8192},
-  "nes": {"media": "cartridge", "minimumGameBytes": 8192},
-  "snes": {"media": "cartridge", "minimumGameBytes": 65536},
-  "n64": {"media": "cartridge", "minimumGameBytes": 262144},
-  "gb": {"media": "cartridge", "minimumGameBytes": 16384},
-  "gbc": {"media": "cartridge", "minimumGameBytes": 16384},
-  "nds": {"media": "cartridge", "minimumGameBytes": 131072},
-  "3ds": {"media": "cartridge", "minimumGameBytes": 1048576},
-  "genesis": {"media": "cartridge", "minimumGameBytes": 65536},
-  "master": {"media": "cartridge", "minimumGameBytes": 8192},
-  "gamegear": {"media": "cartridge", "minimumGameBytes": 8192},
-  "tg16": {"media": "cartridge", "minimumGameBytes": 8192},
-  "atari2600": {"media": "cartridge", "minimumGameBytes": 1024},
-  "psx": {"media": "dvd", "minimumGameBytes": 0},
-  "psp": {"media": "dvd", "minimumGameBytes": 1048576},
-  "wii": {"media": "dvd", "minimumGameBytes": 16000000},
-  "saturn": {"media": "dvd", "minimumGameBytes": 0},
-  "dreamcast": {"media": "dvd", "minimumGameBytes": 0},
-  "segacd": {"media": "dvd", "minimumGameBytes": 0}
+  "gc": {"media": "minidisc", "medium": {"default": "gc_mini_dvd"}, "minimumGameBytes": 16000000, "art": {"kind": "disc"}},
+  "gba": {
+    "media": "cartridge",
+    "medium": {"default": "gba_cart"},
+    "minimumGameBytes": 8192,
+    "art": {"kind": "cartridge_front", "fronts": {
+      "gba_cart": {"proportion": 1.74, "label": {"left": 0.147, "top": 0.218, "width": 0.706, "height": 0.628}}
+    }}
+  },
+  "nes": {
+    "media": "cartridge",
+    "medium": {"default": "nes_cart"},
+    "minimumGameBytes": 8192,
+    "art": {"kind": "cartridge_front", "fronts": {
+      "nes_cart": {"proportion": 0.895, "label": {"left": 0.397, "top": 0.0, "width": 0.472, "height": 0.68}},
+      "famicom_cart": {"proportion": 1.545, "label": {"left": 0.074, "top": 0.104, "width": 0.852, "height": 0.634}}
+    }}
+  },
+  "snes": {
+    "media": "cartridge",
+    "medium": {"default": "snes_pal_cart"},
+    "minimumGameBytes": 65536,
+    "art": {"kind": "cartridge_front", "fronts": {
+      "snes_pal_cart": {"proportion": 1.41, "label": {"left": 0.09, "top": 0.06, "width": 0.82, "height": 0.4}},
+      "snes_us_cart": {"proportion": 1.57, "label": {"left": 0.177, "top": 0.017, "width": 0.647, "height": 0.432}}
+    }}
+  },
+  "n64": {
+    "media": "cartridge",
+    "medium": {"default": "n64_cart"},
+    "minimumGameBytes": 262144,
+    "art": {"kind": "cartridge_front", "fronts": {
+      "n64_cart": {"proportion": 1.514, "label": {"left": 0.249, "top": 0.089, "width": 0.503, "height": 0.841}}
+    }}
+  },
+  "gb": {
+    "media": "cartridge",
+    "medium": {"default": "gb_cart"},
+    "minimumGameBytes": 16384,
+    "art": {"kind": "cartridge_front", "fronts": {
+      "gb_cart": {"proportion": 0.885, "label": {"left": 0.124, "top": 0.285, "width": 0.752, "height": 0.577}}
+    }}
+  },
+  "gbc": {
+    "media": "cartridge",
+    "medium": {"default": "gbc_cart"},
+    "minimumGameBytes": 16384,
+    "art": {"kind": "cartridge_front", "fronts": {
+      "gbc_cart": {"proportion": 0.885, "label": {"left": 0.124, "top": 0.285, "width": 0.752, "height": 0.577}}
+    }}
+  },
+  "nds": {"media": "cartridge", "medium": {"default": "nds_card"}, "minimumGameBytes": 131072},
+  "3ds": {"media": "cartridge", "medium": {"default": "3ds_card"}, "minimumGameBytes": 1048576},
+  "genesis": {"media": "cartridge", "medium": {"default": "genesis_cart"}, "minimumGameBytes": 65536},
+  "master": {"media": "cartridge", "medium": {"default": "master_cart"}, "minimumGameBytes": 8192},
+  "gamegear": {"media": "cartridge", "medium": {"default": "gamegear_cart"}, "minimumGameBytes": 8192},
+  "tg16": {"media": "cartridge", "medium": {"default": "tg16_card"}, "minimumGameBytes": 8192},
+  "atari2600": {"media": "cartridge", "medium": {"default": "atari2600_cart"}, "minimumGameBytes": 1024},
+  "psx": {"media": "dvd", "medium": {"default": "ps1_cd"}, "minimumGameBytes": 0, "art": {"kind": "disc"}},
+  "psp": {"media": "dvd", "medium": {"default": "psp_umd"}, "minimumGameBytes": 1048576},
+  "wii": {"media": "dvd", "medium": {"default": "wii_dvd"}, "minimumGameBytes": 16000000, "art": {"kind": "disc"}},
+  "saturn": {"media": "dvd", "medium": {"default": "saturn_cd"}, "minimumGameBytes": 0},
+  "dreamcast": {"media": "dvd", "medium": {"default": "dreamcast_gd"}, "minimumGameBytes": 0},
+  "segacd": {"media": "dvd", "medium": {"default": "segacd_cd"}, "minimumGameBytes": 0},
+  "xbox": {"media": "dvd", "medium": {"default": "xbox_dvd"}, "minimumGameBytes": 16000000, "art": {"kind": "disc"}},
+  "xbox360": {"media": "dvd", "medium": {"default": "xbox360_dvd"}, "minimumGameBytes": 1048576, "art": {"kind": "disc"}}
 }

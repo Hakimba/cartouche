@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "xbox"
+version = &"original"
+is_default = true
+name = "Xbox"
+model_name = "Original"
+scene = "res://carousel/consoles/xbox/xbox.tscn"
+launch = "res://carousel/consoles/xbox/launch.json"
+triangle_budget = 11000

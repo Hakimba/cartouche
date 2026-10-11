@@ -2,6 +2,8 @@
 package app.cartouche.core.art
 
 import app.cartouche.core.Shipped
+import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.regions.Regions
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -9,6 +11,7 @@ import arrow.core.firstOrNone
 import arrow.core.getOrElse
 import arrow.core.singleOrNone
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
@@ -190,12 +193,16 @@ class ArtIndexTest {
     }
 
     @Test
-    fun `the shipped PS2 extract is dated and reads whole`() {
-        val text = Shipped.text("art/ps2.tsv")
-        val index = ArtIndex.parse(text)
-        index.version shouldBe Some(ArtVersion(text.lines().first().removePrefix("# ")))
-        index.size shouldBe text.lines().count { it.isNotBlank() && !it.startsWith("#") }
-        index.size shouldBeGreaterThan 4000
+    fun `every shipped extract is dated and reads whole`() {
+        val extracts = Shipped.lists("art")
+        extracts.keys shouldContainAll listOf(PlatformId("ps2"), PlatformId("gba"))
+        extracts.values.forEach { text ->
+            val index = ArtIndex.parse(text)
+            index.version shouldBe Some(ArtVersion(text.lines().first().removePrefix("# ")))
+            index.size shouldBe text.lines().count { it.isNotBlank() && !it.startsWith("#") }
+            // The smallest complete extract, the GameCube's, has about 800 games: the floor only catches a truncated file.
+            index.size shouldBeGreaterThan 500
+        }
     }
 
     /** What an extract's reader must find for [title]: the one game named so, else the one whose alternate name it is. */

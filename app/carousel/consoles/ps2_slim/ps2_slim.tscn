@@ -1,0 +1,395 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/ps2_slim/ps2_slim_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/ps2_slim/ps2_slim_shape.tres" id="2"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
+[ext_resource type="PackedScene" path="res://carousel/models/spindle.tscn" id="4"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_strip_logo.svg" id="strip_logo_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_sony.svg" id="sony_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_disc_marks.svg" id="disc_marks_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_badge.svg" id="badge_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_open_key.svg" id="open_key_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_reset_key.svg" id="reset_key_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_port_marks.svg" id="port_marks_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_usb_mark.svg" id="usb_mark_logo"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/ps2_slim/ps2_slim_laser_label.svg" id="laser_label_logo"]
+
+[sub_resource type="ShaderMaterial" id="body_material"]
+shader = ExtResource("label")
+shader_parameter/blank_color = Color(0.17, 0.172, 0.18, 1)
+shader_parameter/roughness = 0.85
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.7
+
+[sub_resource type="ShaderMaterial" id="shade_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.035, 0.036, 0.04, 1)
+shader_parameter/roughness = 0.6
+shader_parameter/clearcoat = 0.15
+
+[sub_resource type="ShaderMaterial" id="metal_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.62, 0.6, 0.55, 1)
+shader_parameter/metallic = 0.8
+shader_parameter/roughness = 0.35
+
+[sub_resource type="ShaderMaterial" id="well_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.045, 0.046, 0.05, 1)
+shader_parameter/roughness = 0.55
+shader_parameter/clearcoat = 0.25
+
+[sub_resource type="ShaderMaterial" id="dark_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.012, 0.012, 0.014, 1)
+shader_parameter/roughness = 0.9
+
+[sub_resource type="ShaderMaterial" id="button_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.1, 0.102, 0.11, 1)
+shader_parameter/roughness = 0.4
+shader_parameter/clearcoat = 0.3
+
+[sub_resource type="ShaderMaterial" id="lens_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.03, 0.03, 0.035, 1)
+shader_parameter/roughness = 0.08
+shader_parameter/clearcoat = 0.8
+shader_parameter/clearcoat_roughness = 0.05
+
+[sub_resource type="ShaderMaterial" id="badge_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.06, 0.06, 0.065, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/clearcoat = 0.5
+
+[sub_resource type="ShaderMaterial" id="yellow_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.85, 0.72, 0.08, 1)
+shader_parameter/roughness = 0.45
+
+[sub_resource type="ShaderMaterial" id="flex_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.62, 0.32, 0.06, 1)
+shader_parameter/roughness = 0.35
+shader_parameter/clearcoat = 0.4
+
+[sub_resource type="ShaderMaterial" id="sled_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.3, 0.3, 0.31, 1)
+shader_parameter/metallic = 0.7
+shader_parameter/roughness = 0.35
+
+[sub_resource type="PrimitiveMesh" id="lid_ribs_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lid_ribs"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="sled_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sled"
+
+[sub_resource type="PrimitiveMesh" id="lens_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lens"
+
+[sub_resource type="PrimitiveMesh" id="flex_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"flex"
+
+[sub_resource type="PrimitiveMesh" id="label_plate_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"label_plate"
+
+[sub_resource type="ShaderMaterial" id="laser_label_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("laser_label_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.3
+shader_parameter/varnish = 0.5
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="laser_label_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"laser_label"
+detail = 8
+
+[sub_resource type="PrimitiveMesh" id="slabs_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"slabs"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="dark_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"dark"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="well_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"well"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="lid_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lid"
+detail = 32
+
+[sub_resource type="ShaderMaterial" id="strip_logo_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("strip_logo_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.6
+shader_parameter/varnish = 0.15
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="strip_logo_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"strip_logo"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="sony_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("sony_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.85
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="sony_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"sony"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="disc_marks_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("disc_marks_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.85
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="disc_marks_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"disc_marks"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="badge_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("badge_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.3
+shader_parameter/varnish = 0.5
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="badge_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"badge"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="open_key_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("open_key_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.3
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="open_key_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"open_key"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="reset_key_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("reset_key_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.3
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="reset_key_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset_key"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="port_marks_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("port_marks_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.85
+shader_parameter/varnish = 0.0
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="port_marks_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"port_marks"
+detail = 8
+
+[sub_resource type="ShaderMaterial" id="usb_mark_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("usb_mark_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.6
+shader_parameter/varnish = 0.15
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="usb_mark_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"usb_mark"
+detail = 8
+
+[sub_resource type="PrimitiveMesh" id="details_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"details"
+
+[sub_resource type="PrimitiveMesh" id="keys_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"keys"
+
+[sub_resource type="PrimitiveMesh" id="tongues_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"tongues"
+
+[sub_resource type="PrimitiveMesh" id="receiver_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"receiver"
+
+[sub_resource type="PrimitiveMesh" id="badge_plate_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"badge_plate"
+
+[sub_resource type="PrimitiveMesh" id="power_ring_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_ring"
+
+[node name="Ps2Slim" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Slabs" type="MeshInstance3D" parent="."]
+mesh = SubResource("slabs_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Dark" type="MeshInstance3D" parent="."]
+mesh = SubResource("dark_mesh")
+surface_material_override/0 = SubResource("shade_material")
+
+[node name="Well" type="MeshInstance3D" parent="."]
+mesh = SubResource("well_mesh")
+surface_material_override/0 = SubResource("well_material")
+
+[node name="Spindle" parent="." instance=ExtResource("4")]
+unique_name_in_owner = true
+
+[node name="Lid" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Cover" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("lid_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Ribs" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("lid_ribs_mesh")
+surface_material_override/0 = SubResource("body_material")
+
+[node name="Sled" type="MeshInstance3D" parent="."]
+mesh = SubResource("sled_mesh")
+surface_material_override/0 = SubResource("sled_material")
+
+[node name="Lens" type="MeshInstance3D" parent="."]
+mesh = SubResource("lens_mesh")
+surface_material_override/0 = SubResource("lens_material")
+
+[node name="Flex" type="MeshInstance3D" parent="."]
+mesh = SubResource("flex_mesh")
+surface_material_override/0 = SubResource("flex_material")
+
+[node name="LabelPlate" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_plate_mesh")
+surface_material_override/0 = SubResource("badge_material")
+
+[node name="LaserLabel" type="MeshInstance3D" parent="."]
+mesh = SubResource("laser_label_logo_mesh")
+surface_material_override/0 = SubResource("laser_label_logo_material")
+
+[node name="Details" type="MeshInstance3D" parent="."]
+mesh = SubResource("details_mesh")
+surface_material_override/0 = SubResource("dark_material")
+
+[node name="Keys" type="MeshInstance3D" parent="."]
+mesh = SubResource("keys_mesh")
+surface_material_override/0 = SubResource("button_material")
+
+[node name="Tongues" type="MeshInstance3D" parent="."]
+mesh = SubResource("tongues_mesh")
+surface_material_override/0 = SubResource("metal_material")
+
+[node name="Receiver" type="MeshInstance3D" parent="."]
+mesh = SubResource("receiver_mesh")
+surface_material_override/0 = SubResource("lens_material")
+
+[node name="BadgePlate" type="MeshInstance3D" parent="."]
+mesh = SubResource("badge_plate_mesh")
+surface_material_override/0 = SubResource("badge_material")
+
+[node name="PowerRing" type="MeshInstance3D" parent="."]
+mesh = SubResource("power_ring_mesh")
+surface_material_override/0 = SubResource("yellow_material")
+
+[node name="StripLogo" type="MeshInstance3D" parent="."]
+mesh = SubResource("strip_logo_logo_mesh")
+surface_material_override/0 = SubResource("strip_logo_logo_material")
+
+[node name="Sony" type="MeshInstance3D" parent="."]
+mesh = SubResource("sony_logo_mesh")
+surface_material_override/0 = SubResource("sony_logo_material")
+
+[node name="DiscMarks" type="MeshInstance3D" parent="Lid"]
+mesh = SubResource("disc_marks_logo_mesh")
+surface_material_override/0 = SubResource("disc_marks_logo_material")
+
+[node name="BadgeLogo" type="MeshInstance3D" parent="."]
+mesh = SubResource("badge_logo_mesh")
+surface_material_override/0 = SubResource("badge_logo_material")
+
+[node name="OpenKey" type="MeshInstance3D" parent="."]
+mesh = SubResource("open_key_logo_mesh")
+surface_material_override/0 = SubResource("open_key_logo_material")
+
+[node name="ResetKey" type="MeshInstance3D" parent="."]
+mesh = SubResource("reset_key_logo_mesh")
+surface_material_override/0 = SubResource("reset_key_logo_material")
+
+[node name="PortMarks" type="MeshInstance3D" parent="."]
+mesh = SubResource("port_marks_logo_mesh")
+surface_material_override/0 = SubResource("port_marks_logo_material")
+
+[node name="UsbMark" type="MeshInstance3D" parent="."]
+mesh = SubResource("usb_mark_logo_mesh")
+surface_material_override/0 = SubResource("usb_mark_logo_material")

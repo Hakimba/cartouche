@@ -1,0 +1,234 @@
+[gd_scene load_steps=40 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/nes/nes_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/nes/nes_shape.tres" id="2"]
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
+[ext_resource type="Texture2D" uid="uid://bavx8tjvtrj0r" path="res://carousel/consoles/nes/nes_door.svg" id="door_logo"]
+[ext_resource type="Texture2D" uid="uid://dsrobwmyu0lva" path="res://carousel/consoles/nes/nes_power.svg" id="power_logo"]
+[ext_resource type="Texture2D" uid="uid://bxcoejalbk1bq" path="res://carousel/consoles/nes/nes_reset.svg" id="reset_logo"]
+[ext_resource type="Texture2D" uid="uid://dfx4nguxvug47" path="res://carousel/consoles/nes/nes_ports.svg" id="ports_logo"]
+
+[sub_resource type="ShaderMaterial" id="upper_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.74, 0.74, 0.72, 1)
+shader_parameter/roughness = 0.6
+shader_parameter/clearcoat = 0.1
+shader_parameter/clearcoat_roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="lower_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.48, 0.47, 0.47, 1)
+shader_parameter/roughness = 0.6
+shader_parameter/clearcoat = 0.1
+shader_parameter/clearcoat_roughness = 0.5
+
+[sub_resource type="ShaderMaterial" id="stripe_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.1, 0.1, 0.105, 1)
+shader_parameter/roughness = 0.4
+shader_parameter/clearcoat = 0.25
+shader_parameter/clearcoat_roughness = 0.35
+
+[sub_resource type="ShaderMaterial" id="throat_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.02, 0.02, 0.022, 1)
+
+[sub_resource type="ShaderMaterial" id="tray_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.04, 0.04, 0.045, 1)
+shader_parameter/roughness = 0.6
+
+[sub_resource type="ShaderMaterial" id="bar_material"]
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.75, 0.76, 0.78, 1)
+shader_parameter/metallic = 0.5
+shader_parameter/roughness = 0.35
+
+[sub_resource type="ShaderMaterial" id="diode_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.3, 0.05, 0.04, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/emission = Color(1, 0.12, 0.08, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="PrimitiveMesh" id="lower_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"lower"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="upper_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"upper"
+detail = 64
+
+[sub_resource type="PrimitiveMesh" id="stripe_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"stripe"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="throat_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"throat"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="door_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"door"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="tray_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"tray"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="bar_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"bar"
+detail = 16
+
+[sub_resource type="PrimitiveMesh" id="power_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="reset_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset"
+detail = 32
+
+[sub_resource type="PrimitiveMesh" id="diode_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"diode"
+detail = 16
+
+[sub_resource type="ShaderMaterial" id="door_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("door_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.6
+shader_parameter/varnish = 0.1
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="power_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("power_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.6
+shader_parameter/varnish = 0.1
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="reset_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("reset_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.6
+shader_parameter/varnish = 0.1
+shader_parameter/grain = 0.0
+
+[sub_resource type="ShaderMaterial" id="ports_logo_material"]
+shader = ExtResource("label")
+shader_parameter/label_texture = ExtResource("ports_logo")
+shader_parameter/has_label = true
+shader_parameter/roughness = 0.4
+shader_parameter/varnish = 0.25
+shader_parameter/grain = 0.0
+
+[sub_resource type="PrimitiveMesh" id="door_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"door_logo"
+
+[sub_resource type="PrimitiveMesh" id="power_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"power_logo"
+
+[sub_resource type="PrimitiveMesh" id="reset_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"reset_logo"
+
+[sub_resource type="PrimitiveMesh" id="ports_logo_mesh"]
+script = ExtResource("3")
+shape = ExtResource("2")
+part = &"ports_logo"
+
+[node name="Nes" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Lower" type="MeshInstance3D" parent="."]
+mesh = SubResource("lower_mesh")
+surface_material_override/0 = SubResource("lower_material")
+
+[node name="Upper" type="MeshInstance3D" parent="."]
+mesh = SubResource("upper_mesh")
+surface_material_override/0 = SubResource("upper_material")
+
+[node name="Stripe" type="MeshInstance3D" parent="."]
+mesh = SubResource("stripe_mesh")
+surface_material_override/0 = SubResource("stripe_material")
+
+[node name="Throat" type="MeshInstance3D" parent="."]
+mesh = SubResource("throat_mesh")
+surface_material_override/0 = SubResource("throat_material")
+
+[node name="Door" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("door_mesh")
+surface_material_override/0 = SubResource("upper_material")
+
+[node name="Tray" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="Rails" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("tray_mesh")
+surface_material_override/0 = SubResource("tray_material")
+
+[node name="Bar" type="MeshInstance3D" parent="Tray"]
+mesh = SubResource("bar_mesh")
+surface_material_override/0 = SubResource("bar_material")
+
+[node name="Power" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("power_mesh")
+surface_material_override/0 = SubResource("lower_material")
+
+[node name="Reset" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("reset_mesh")
+surface_material_override/0 = SubResource("lower_material")
+
+[node name="Light" type="MeshInstance3D" parent="."]
+unique_name_in_owner = true
+mesh = SubResource("diode_mesh")
+surface_material_override/0 = SubResource("diode_material")
+
+[node name="Logo" type="MeshInstance3D" parent="Door"]
+mesh = SubResource("door_logo_mesh")
+surface_material_override/0 = SubResource("door_logo_material")
+
+[node name="Logo" type="MeshInstance3D" parent="Power"]
+mesh = SubResource("power_logo_mesh")
+surface_material_override/0 = SubResource("power_logo_material")
+
+[node name="Logo" type="MeshInstance3D" parent="Reset"]
+mesh = SubResource("reset_logo_mesh")
+surface_material_override/0 = SubResource("reset_logo_material")
+
+[node name="PortNumbers" type="MeshInstance3D" parent="."]
+mesh = SubResource("ports_logo_mesh")
+surface_material_override/0 = SubResource("ports_logo_material")

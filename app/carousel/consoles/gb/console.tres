@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "gb"
+version = &"dmg-01"
+is_default = true
+name = "Game Boy"
+model_name = "DMG-01"
+scene = "res://carousel/consoles/gb/gb.tscn"
+launch = "res://carousel/consoles/gb/launch.json"
+triangle_budget = 10000

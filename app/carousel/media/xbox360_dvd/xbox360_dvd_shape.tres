@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DiscShape" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/models/disc_shape.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ring = 10.5
+ring_width = 1.0
+ring_height = 0.1
+label_inner = 17.0
+mirror_inner = 11.85
+data_inner = 22.2
+data_outer = 58.4

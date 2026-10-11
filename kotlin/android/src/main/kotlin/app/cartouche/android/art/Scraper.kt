@@ -133,7 +133,10 @@ internal class Scraper(
         run.take().filter { !stopped }.map { (request, next) -> request.also { run = next } }.onNone { working-- }
     }
 
-    /** The first of [candidates] that downloads, stored; the next is tried when one is not found or not an image. */
+    /**
+     * The first of [candidates] that downloads, stored; the next is tried when one is not found, not
+     * an image, or a scan of no shape its label can be cut from (see [ArtImages.label]).
+     */
     private fun lookUp(request: ArtRequest, candidates: List<ArtUrl>): Outcome = if (stopped) {
         Outcome.SetAside
     } else {
@@ -141,8 +144,8 @@ internal class Scraper(
     }
 
     /**
-     * The scan at [url] stored, or why the run stalls; none when it is not found or not an image. Anything
-     * unexpected (a bug, a broken image) only skips this image: the worker goes on.
+     * The scan at [url] stored, or why the run stalls; none when it is not found, not an image or of
+     * no known shape. Anything unexpected (a bug, a broken image) only skips this image: the worker goes on.
      */
     private fun attempt(request: ArtRequest, url: ArtUrl): Option<Outcome> = Either
         .catch {
@@ -155,7 +158,7 @@ internal class Scraper(
                     is FetchFailure.Refused -> Some(Outcome.Stalled(Stall.REFUSED))
                 }
             }) { image ->
-                ArtImages.label(image).map { label ->
+                ArtImages.label(image, request.cut).map { label ->
                     // An image chosen by the user meanwhile stays.
                     store.saveIfAbsent(request.game, label).fold({ Outcome.Stalled(Stall.STORAGE) }) { art ->
                         trace("art") {

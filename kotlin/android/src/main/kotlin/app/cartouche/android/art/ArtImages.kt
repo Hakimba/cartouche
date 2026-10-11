@@ -7,15 +7,18 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import app.cartouche.core.art.LabelCut
+import app.cartouche.core.platforms.ArtKind
 import arrow.core.Option
 import arrow.core.toOption
 import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
 /**
- * Turns a downloaded disc scan into what a model's label shows: a square JPEG of at most [LARGEST]
- * pixels covering the disc's whole face, cut to the disc (the transparent margin round it removed).
- * What was transparent becomes black.
+ * Turns a downloaded scan into what a model's label shows, a JPEG of at most [LARGEST] pixels on its
+ * longer side, the scan first cut to the medium (the transparent margin round it removed): of a disc,
+ * a square covering its whole face, what was transparent turned black; of a cartridge's front, its
+ * label alone, cut by the front of the scan's shape ([LabelCut]), at its own proportions.
  */
 internal object ArtImages {
     const val LARGEST = 1024
@@ -25,29 +28,40 @@ internal object ArtImages {
     /** An alpha under this is taken for the margin round a scan. */
     private const val MARGIN_ALPHA = 32
 
-    /** The label for the scan [image]; none when it is not an image Android can read. */
-    fun label(image: ByteArray): Option<ByteArray> = decoded(image).map { bitmap ->
+    /**
+     * The label [cut] gives of the scan [image]; none when it is not an image Android can read, or a
+     * scan of no shape [cut] knows.
+     */
+    fun label(image: ByteArray, cut: LabelCut): Option<ByteArray> = decoded(image).flatMap { bitmap ->
         try {
-            val part = opaquePart(bitmap)
-            val longest = maxOf(part.width(), part.height())
-            val scale = minOf(1f, LARGEST.toFloat() / longest)
-            val side = maxOf(1, (longest * scale).roundToInt())
-            val width = (part.width() * scale).roundToInt()
-            val height = (part.height() * scale).roundToInt()
-            val square = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
-            try {
-                Canvas(square).apply {
-                    drawColor(Color.BLACK)
-                    val left = (side - width) / 2
-                    val top = (side - height) / 2
-                    drawBitmap(bitmap, part, Rect(left, top, left + width, top + height), Paint(Paint.FILTER_BITMAP_FLAG))
-                }
-                jpeg(square)
-            } finally {
-                square.recycle()
+            val medium = opaquePart(bitmap)
+            cut.on(medium.width(), medium.height()).map { label ->
+                drawn(bitmap, Rect(label.left, label.top, label.right, label.bottom).apply { offset(medium.left, medium.top) }, cut.kind)
             }
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    /** The [part] of [bitmap] drawn as a label of a medium of [kind], as a JPEG. */
+    private fun drawn(bitmap: Bitmap, part: Rect, kind: ArtKind): ByteArray {
+        val longest = maxOf(part.width(), part.height())
+        val scale = minOf(1f, LARGEST.toFloat() / longest)
+        val width = maxOf(1, (part.width() * scale).roundToInt())
+        val height = maxOf(1, (part.height() * scale).roundToInt())
+        // A disc's face is shown on a square; a cartridge's label fills its own rectangle.
+        val (labelWidth, labelHeight) = if (kind == ArtKind.Disc) maxOf(width, height).let { it to it } else width to height
+        val label = Bitmap.createBitmap(labelWidth, labelHeight, Bitmap.Config.ARGB_8888)
+        try {
+            Canvas(label).apply {
+                drawColor(Color.BLACK)
+                val left = (labelWidth - width) / 2
+                val top = (labelHeight - height) / 2
+                drawBitmap(bitmap, part, Rect(left, top, left + width, top + height), Paint(Paint.FILTER_BITMAP_FLAG))
+            }
+            return jpeg(label)
+        } finally {
+            label.recycle()
         }
     }
 

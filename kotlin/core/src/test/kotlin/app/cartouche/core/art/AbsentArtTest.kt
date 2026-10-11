@@ -20,7 +20,7 @@ import org.junit.Test
 
 class AbsentArtTest {
     private fun request(game: String, version: Option<String>) =
-        ArtRequest(GameId("ps2/$game"), game, nonEmptyListOf(ArtUrl("https://a/$game.png")), version.map(::ArtVersion))
+        ArtRequest(GameId("ps2/$game"), game, nonEmptyListOf(ArtUrl("https://a/$game.png")), version.map(::ArtVersion), PS2_DISC)
 
     private fun AbsentArt.coversGameOf(request: ArtRequest): Boolean = covers(request.game, request.version)
 

@@ -6,8 +6,13 @@ extends RefCounted
 ## Cases each property checks.
 const CASES := 2000
 const FRAME_S := 1.0 / 60.0
-const DVD := preload("res://carousel/models/dvd.tscn")
+const DVD := preload("res://carousel/media/ps2_dvd/ps2_dvd.tscn")
+## The games of [method games], which have no medium, on [constant DVD].
+const DVDS: Dictionary[String, PackedScene] = {"": DVD}
 const CAROUSEL := preload("res://carousel/carousel.tscn")
+## Loaded, never preloaded: a script holding a console's scene keeps it cached, and INV-E10-04 tells
+## which consoles were loaded by the cache.
+const PS2_SLIM := "res://carousel/consoles/ps2_slim/ps2_slim.tscn"
 
 
 ## A generator of cases, seeded by the test so that a failure always comes back.
@@ -56,57 +61,11 @@ static func disc(random: RandomNumberGenerator) -> DiscShape:
 	return shape
 
 
-## A cartridge [param random] draws that [method CartridgeShape.problems] accepts: each part from
-## roomy to just inside its rules' limits, the label anywhere on the body's front, into its
-## corners, the plate anywhere on the upper part's, below the ridge.
-static func cartridge(random: RandomNumberGenerator) -> CartridgeShape:
-	var shape := CartridgeShape.new()
-	shape.width = random.randf_range(40.0, 80.0)
-	shape.height = random.randf_range(25.0, 60.0)
-	shape.depth = random.randf_range(4.0, 10.0)
-	shape.bevel = random.randf_range(0.3, 1.0)
-	shape.bottom_corner = random.randf_range(shape.bevel + 0.2, 3.0)
-	shape.top_corner = random.randf_range(shape.bevel + 0.2, 5.0)
-	shape.notch = _or_zero(random, random.randf_range(0.05, 1.2))
-	shape.ledge = _or_zero(random, random.randf_range(0.0, 2.0))
-	shape.recess_slope = _or_zero(random, random.randf_range(0.0, 1.5))
-	# From just above its corners (with room for the ridge and the plate) to just below the body's
-	# (with room for a label).
-	var lowest := maxf(shape.top_corner + shape.hidden_corner(), 4.0 * shape.bevel + 0.3)
-	var highest := minf(shape.height - shape.bottom_corner - shape.hidden_corner(),
-		shape.height - 2.0 * (shape.bevel + shape.recess_slope) - 2.0)
-	shape.upper_height = _near_limits(random, lowest + 0.01, highest - 0.01)
-	var deepest := minf(minf(3.0, (shape.upper_height - 2.0 * shape.bevel) * 0.99), shape.depth + shape.ledge - 0.01)
-	shape.ridge_height = _near_limits(random, 2.0 * shape.bevel + 0.01, deepest)
-	shape.ridge_raise = random.randf_range(0.01, 1.0)
-	shape.recess = random.randf_range(0.1, minf(1.0, shape.depth - 2.0 * shape.bevel - 0.1))
-	var room := shape.body().grow(-shape.bevel - shape.recess_slope - 0.1)
-	shape.label_size = room.size * Vector2(random.randf_range(0.05, 0.9), random.randf_range(0.1, 0.8))
-	shape.label_corner = random.randf_range(0.05, minf(shape.label_size.x, shape.label_size.y) / 2.0 - 0.05)
-	shape.label_centre = _somewhere(random, room, shape.label_size)
-	# Over the straight part of the body's edges, up to its very end.
-	var straight := shape.body().end.x - maxf(shape.bottom_corner, shape.hidden_corner()) - 0.01
-	shape.label_centre.x = clampf(shape.label_centre.x, -straight, straight)
-	_back_off(shape, &"label_on_body", func() -> void:
-		shape.label_centre = shape.label_centre.move_toward(room.get_center(), 0.05)
-		shape.label_size *= 0.995
-		shape.label_corner *= 0.995)
-	var band := Rect2(-shape.width / 2.0 + shape.bevel, shape.step() + shape.bevel,
-		shape.width - 2.0 * shape.bevel, shape.upper_height - shape.ridge_height - shape.bevel)
-	shape.plate_size = band.size * Vector2(random.randf_range(0.02, 0.9), random.randf_range(0.3, 0.8))
-	shape.plate_centre = _somewhere(random, band, shape.plate_size)
-	_back_off(shape, &"plate_on_upper_part", func() -> void:
-		shape.plate_centre = shape.plate_centre.move_toward(band.get_center(), 0.05)
-		shape.plate_size *= 0.995)
-	shape.plate_raise = random.randf_range(0.01, 0.5)
-	return shape
-
-
-## A top-loading console [param random] draws that [method ConsoleShape.problems] accepts: from a
+## A PS2 slim [param random] draws that [method Ps2SlimShape.problems] accepts: from a
 ## thin one for small discs to a thick one, its lid anywhere on the top, near its rounded corners,
-## the ribs beside it or none.
-static func console(random: RandomNumberGenerator) -> ConsoleShape:
-	var shape := ConsoleShape.new()
+## the strip beside it.
+static func ps2_slim(random: RandomNumberGenerator) -> Ps2SlimShape:
+	var shape := Ps2SlimShape.new()
 	shape.bevel = random.randf_range(0.3, 2.0)
 	shape.seam = random.randf_range(2.0 * shape.bevel + 0.2, 15.0)
 	shape.lid_thickness = random.randf_range(0.5, 5.0)
@@ -118,23 +77,21 @@ static func console(random: RandomNumberGenerator) -> ConsoleShape:
 	var side := 2.0 * shape.disc_radius + 2.2
 	shape.lid_size = Vector2(side + random.randf_range(0.0, 30.0), side + random.randf_range(0.0, 30.0))
 	shape.lid_corner = _near_limits(random, 0.2, minf(shape.lid_size.x, shape.lid_size.y) / 2.0 - 0.2)
-	shape.rib_count = random.randi_range(0, 16)
-	shape.rib_width = random.randf_range(0.2, 2.0)
-	shape.rib_pitch = shape.rib_width + random.randf_range(0.1, 5.0)
-	shape.rib_raise = random.randf_range(0.05, 1.0)
+	shape.strip_width = random.randf_range(0.2, 20.0)
+	shape.strip_raise = random.randf_range(0.05, 1.0)
 	var margin := shape.bevel + 1.0 + shape.lid_gap
-	var ribs_room := shape.rib_count * shape.rib_pitch + 1.0
-	shape.width = shape.lid_size.x + ribs_room + 2.0 * margin + random.randf_range(0.5, 40.0)
+	var strip_room := shape.strip_width + 1.0
+	shape.width = shape.lid_size.x + strip_room + 2.0 * margin + random.randf_range(0.5, 40.0)
 	shape.depth = shape.lid_size.y + 2.0 * margin + random.randf_range(0.5, 40.0)
 	shape.corner = _near_limits(random, shape.bevel + 0.2, minf(shape.width, shape.depth) / 2.0 - 0.2)
 	var room := shape.body().grow(-margin)
-	room.size.x -= ribs_room
+	room.size.x -= strip_room
 	shape.lid_centre = _somewhere(random, room, shape.lid_size)
-	shape.rib_start = shape.opening().end.x + 0.6 + shape.rib_width / 2.0
-	shape.rib_length = random.randf_range(1.0, shape.depth - 2.0 * margin)
+	shape.strip_x = shape.opening().end.x + 0.6 + shape.strip_width / 2.0
+	shape.strip_length = random.randf_range(1.0, shape.depth - 2.0 * margin)
 	# Rounder corners than the lid's place leaves room for are rounded less.
 	_back_off(shape, &"lid_inside_the_top", func() -> void: shape.corner = maxf(shape.bevel + 0.2, shape.corner * 0.97))
-	_back_off(shape, &"ribs_on_the_top_beside_the_lid", func() -> void: shape.rib_length *= 0.97)
+	_back_off(shape, &"strip_on_the_top_beside_the_lid", func() -> void: shape.strip_length *= 0.97)
 	return shape
 
 
@@ -154,7 +111,7 @@ static func launch_steps(random: RandomNumberGenerator) -> Dictionary:
 				"rx": _anywhere(random, 180.0), "ry": _anywhere(random, 180.0), "rz": _anywhere(random, 180.0),
 				"scale": random.randf_range(0.1, 2.0), "pose": random.randf(), "sway": random.randf_range(0.0, 10.0),
 				"bob": random.randf()},
-			"lid": {"angle": random.randf_range(0.0, 130.0)},
+			"parts": {"lid_degrees": random.randf_range(0.0, 130.0), "flap_cm": _anywhere(random, 5.0)},
 			"disc": {"visible": random.randf(), "inRow": float(random.randi_range(0, 1)),
 				"lift": _or_zero(random, _anywhere(random, 10.0)), "dx": _anywhere(random, 5.0),
 				"dy": _anywhere(random, 5.0), "rx": _anywhere(random, 40.0), "ry": _anywhere(random, 40.0),
@@ -164,7 +121,8 @@ static func launch_steps(random: RandomNumberGenerator) -> Dictionary:
 			"consoles": {"show": random.randf()},
 			"look": {"blur": random.randf_range(0.0, 20.0), "opacity": random.randf(), "sat": random.randf_range(0.0, 2.0)},
 			"ui": {"bar": random.randf(), "tabs": random.randf(), "pill": random.randf()},
-			"fx": {"black": [0.0, 1.0, random.randf()][random.randi_range(0, 2)]},
+			"fx": {"black": [0.0, 1.0, random.randf()][random.randi_range(0, 2)],
+				"fade": [0.0, 1.0, random.randf()][random.randi_range(0, 2)]},
 		}
 		for key: String in step.keys():
 			var roll := random.randf()
@@ -279,6 +237,230 @@ static func button(action: StringName, pressed: bool) -> InputEventAction:
 	return event
 
 
+## The parts [param random] draws for a console: none to five, each of any role, at rest and moved
+## anywhere, a door, a light, a hinge…
+static func moving_parts(random: RandomNumberGenerator) -> Array[MovingPart]:
+	var found: Array[MovingPart] = []
+	for i in random.randi_range(0, 5):
+		var role := random.randi_range(0, MovingPart.Role.size() - 1) as MovingPart.Role
+		found.append(MovingPart.new(StringName("part_%d" % i), role, _anywhere(random, 100.0), _anywhere(random, 100.0)))
+	return found
+
+
+## A new console of [param scene], not in the tree.
+static func new_console(scene: String) -> ConsoleModel:
+	return (load(scene) as PackedScene).instantiate()
+
+
+## How far [param console]'s part [param property] goes, fully moved; NaN for a part it lacks.
+static func open_of(console: ConsoleModel, property: StringName) -> float:
+	for part in console.moving_parts():
+		if part.property == property:
+			return part.open
+	return NAN
+
+
+## A console of [param scene] built from [param shape] rather than its own, in [param suite]'s tree.
+static func built(suite: GdUnitTestSuite, scene: String, shape: ModelShape) -> ConsoleModel:
+	var model: ConsoleModel = suite.auto_free(new_console(scene))
+	var own := model.shape
+	model.shape = shape
+	for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		if geometry.mesh is ShapedMesh and (geometry.mesh as ShapedMesh).shape == own:
+			var copy: ShapedMesh = geometry.mesh.duplicate()
+			copy.shape = shape
+			geometry.mesh = copy
+	suite.add_child(model)
+	return model
+
+
+## [param count] shapes [param draw] gives, a generator of shapes their rules accept: each accepted,
+## and nine in ten of them at least different from one another, or the generator is stuck.
+static func accepted(suite: GdUnitTestSuite, count: int, draw: Callable) -> Array[ModelShape]:
+	var shapes: Array[ModelShape] = []
+	var seen := {}
+	for i in count:
+		var shape: ModelShape = draw.call()
+		suite.assert_array(shape.problems()).override_failure_message("drawn though %s" % [shape.problems()]) \
+			.is_empty()
+		seen[var_to_str(shape.dimensions())] = true
+		shapes.append(shape)
+	suite.assert_int(seen.size()).override_failure_message("%d shapes of %d alike" % [count - seen.size(), count]) \
+		.is_greater_equal(ceili(count * 0.9))
+	return shapes
+
+
+## [param shape], which its rules accept, refused by the rule [param broken] names (`[name, breaking]`)
+## once its Callable has broken it, and built into nothing.
+static func assert_refused(suite: GdUnitTestSuite, shape: ModelShape, broken: Array) -> void:
+	suite.assert_array(shape.problems()).is_empty()
+	var breaking: Callable = broken[1]
+	breaking.call(shape)
+	suite.assert_array(shape.problems()).override_failure_message("%s not refused: %s" % [broken[0],
+		shape.problems()]).contains([broken[0]])
+	for part in shape.parts():
+		suite.assert_array(shape.mesh_arrays(part, 32)).is_empty()
+
+
+## [param shipped]'s dimensions changed to each of [param found] (shapes a property once found built
+## wrong), refused by [param rule].
+static func assert_found_refused(suite: GdUnitTestSuite, shipped: ModelShape, rule: StringName,
+		found: Array[Dictionary]) -> void:
+	for dimensions in found:
+		assert_refused(suite, shipped.duplicate() as ModelShape, [rule, func(shape: ModelShape) -> void:
+			for dimension: StringName in dimensions:
+				shape.set(dimension, dimensions[dimension])])
+
+
+## [param shipped]'s dimensions drawn again by [param random] until its rules accept them, a thousand
+## times at most (the last one drawn then, which [method accepted] refuses): [param share] of them each
+## time, each number from [param spread].x to [param spread].y times itself, each count up to
+## [param counts] more or fewer.
+static func drawn_around(shipped: ModelShape, random: RandomNumberGenerator, spread: Vector2, counts := 0,
+		share := 1.0) -> ModelShape:
+	var shape: ModelShape
+	for attempt in 1000:
+		shape = shipped.duplicate()
+		for dimension in shape.dimensions():
+			var value: Variant = shape.get(dimension)
+			if random.randf() >= share:
+				continue
+			if value is int:
+				var count: int = value
+				shape.set(dimension, maxi(0, count + random.randi_range(-counts, counts)))
+			elif value is float:
+				var number: float = value
+				shape.set(dimension, number * random.randf_range(spread.x, spread.y))
+			elif value is Vector2:
+				var vector: Vector2 = value
+				shape.set(dimension, vector * Vector2(random.randf_range(spread.x, spread.y),
+					random.randf_range(spread.x, spread.y)))
+			elif value is Vector3:
+				var vector: Vector3 = value
+				shape.set(dimension, vector * Vector3(random.randf_range(spread.x, spread.y),
+					random.randf_range(spread.x, spread.y), random.randf_range(spread.x, spread.y)))
+		if shape.problems().is_empty():
+			break
+	return shape
+
+
+## Where [param part]'s mesh stands in [param console].
+static func box_of(console: Node3D, part: MeshInstance3D) -> AABB:
+	return console.global_transform.affine_inverse() * part.global_transform * part.get_aabb()
+
+
+## The smallest box around [param found].
+static func bounds(found: PackedVector3Array) -> AABB:
+	var box := AABB(found[0], Vector3.ZERO)
+	for point in found:
+		box = box.expand(point)
+	return box
+
+
+## Asserts that a cartridge filling [param seated] (in millimetres, in the console's space) stands in
+## the slot of [param shape]: nothing of the console in its way, down to the connector it rests on,
+## and half a millimetre past the slot's [param play] on any side but the top (each side's and the
+## front's or the back's, the larger; none below), it meets the slot's walls or the connector.
+static func assert_in_slot(suite: GdUnitTestSuite, shape: ModelShape, seated: AABB, play: Vector2,
+		detail: int) -> void:
+	var walls := PackedVector3Array()
+	for part in shape.parts():
+		for corners in triangles(shape.mesh_arrays(part, detail)):
+			walls.append_array(Transform3D.IDENTITY.scaled(Vector3.ONE / MeshBuilder.UNITS_PER_MM) * corners)
+	suite.assert_bool(meets(walls, seated.grow(-0.05))).override_failure_message(
+		"the console is in the cartridge's way").is_false()
+	for side: Vector3 in [Vector3.LEFT, Vector3.RIGHT, Vector3.DOWN, Vector3.FORWARD, Vector3.BACK]:
+		var reach := 0.5 + absf(side.x) * play.x + absf(side.z) * play.y
+		var grown := seated.merge(AABB(seated.position + side * reach, seated.size)).grow(-0.05)
+		suite.assert_bool(meets(walls, grown)).override_failure_message("room beyond the cartridge %s" % side) \
+			.is_true()
+
+
+## Whether a triangle of [param corners] (three by three) meets [param box]: one of its edges goes
+## through the box, or one of the box's edges through it.
+static func meets(corners: PackedVector3Array, box: AABB) -> bool:
+	for i in range(0, corners.size(), 3):
+		for side in 3:
+			if box.intersects_segment(corners[i + side], corners[i + (side + 1) % 3]):
+				return true
+		for corner in 8:
+			for axis: int in [1, 2, 4]:
+				if (corner & axis) == 0 and Geometry3D.segment_intersects_triangle(box.get_endpoint(corner),
+						box.get_endpoint(corner | axis), corners[i], corners[i + 1], corners[i + 2]) != null:
+					return true
+	return false
+
+
+## The shape of [param medium]'s model, its label's.
+static func medium_shape(medium: String) -> ModelShape:
+	var model: Node3D = (load(MediumManifest.found()[medium].scene) as PackedScene).instantiate()
+	var shape := ((model.get_node(^"Label") as MeshInstance3D).mesh as ShapedMesh).shape
+	model.free()
+	return shape
+
+
+## The platform [param id] as the catalog sends it, its media its profile's.
+static func platform(id: String) -> AndroidServices.Platform:
+	return AndroidServices.Platform.new({"id": id, "name": id, "media": _profile(id)["media"]})
+
+
+## The media [param id]'s profile declares, its default first.
+static func media(id: String) -> Array[String]:
+	var declared: Dictionary = _profile(id)["medium"]
+	var found: Array[String] = [declared["default"]]
+	for group: String in declared:
+		if declared[group] not in found:
+			found.append(declared[group])
+	return found
+
+
+## [param shape]'s dimensions drawn again around the shipped ones by [param random]: one in four of
+## them, four times in five near the shipped one, else far from it (see [method _redrawn]); a count a
+## few more or fewer, now and then none or one. Whether one was drawn far.
+static func disturb(shape: ModelShape, random: RandomNumberGenerator) -> bool:
+	var far := false
+	var dimensions := shape.dimensions()
+	for dimension in dimensions:
+		var value: Variant = dimensions[dimension]
+		if random.randf() < 0.75:
+			continue
+		var drawn_far := random.randf() < 0.2
+		far = far or drawn_far
+		if value is float:
+			var number: float = value
+			shape.set(dimension, _redrawn(number, drawn_far, random))
+		elif value is Vector2:
+			var vector: Vector2 = value
+			shape.set(dimension, Vector2(_redrawn(vector.x, drawn_far, random), _redrawn(vector.y, drawn_far, random)))
+		elif value is Vector3:
+			var vector: Vector3 = value
+			shape.set(dimension, Vector3(_redrawn(vector.x, drawn_far, random), _redrawn(vector.y, drawn_far, random),
+				_redrawn(vector.z, drawn_far, random)))
+		elif value is int:
+			var count: int = value
+			shape.set(dimension, random.randi_range(0, 1) if drawn_far else maxi(0, count + random.randi_range(-3, 3)))
+		elif value is bool:
+			shape.set(dimension, not value)
+	return far
+
+
+## A console with no shape nor mesh, made of what the launch knows of one: its [member moving]
+## parts, its seat and its way in.
+class Console extends ConsoleModel:
+	var moving: Array[MovingPart] = []
+	var seated := Transform3D.IDENTITY
+	var way_in := Vector3.BACK
+
+	func moving_parts() -> Array[MovingPart]:
+		return moving
+
+	func seat() -> Transform3D:
+		return seated
+
+	func approach() -> Vector3:
+		return way_in
+
+
 ## Disc scans kept in memory by title, ready at once; none unless given.
 class FakeArt extends GameArt:
 	var _images: Dictionary[String, Texture2D]
@@ -352,6 +534,23 @@ class TransformProbe extends Node3D:
 			heard += 1
 
 
+## The profile `data/platforms/profiles.json` gives [param id].
+static func _profile(id: String) -> Dictionary:
+	var profiles: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/platforms/profiles.json"))
+	return profiles[id]
+
+
+## [param number] drawn again by [param random], as a size and as a place: near it, a tenth larger
+## or smaller and a millimetre either way at most; [param far] from it, from a twentieth to four
+## times as large and ten millimetres either way; one time in twenty nought.
+static func _redrawn(number: float, far: bool, random: RandomNumberGenerator) -> float:
+	if random.randf() < 0.05:
+		return 0.0
+	if far:
+		return number * random.randf_range(0.05, 4.0) + random.randf_range(-10.0, 10.0)
+	return number * random.randf_range(0.9, 1.1) + random.randf_range(-1.0, 1.0)
+
+
 ## The centre of a box of [param size] that [param random] puts anywhere within [param room], a
 ## quarter of the times in one of its corners.
 static func _somewhere(random: RandomNumberGenerator, room: Rect2, size: Vector2) -> Vector2:
@@ -413,54 +612,86 @@ static func points(arrays: Array) -> PackedVector3Array:
 	return arrays[Mesh.ARRAY_VERTEX]
 
 
+## The nearest point where the ray from [param origin] (in millimetres) along [param ray] meets
+## [param arrays]' faces, in millimetres; infinite where it meets none.
+static func hit(arrays: Array, origin: Vector3, ray: Vector3) -> Vector3:
+	var corners := Transform3D.IDENTITY.scaled(Vector3.ONE / MeshBuilder.UNITS_PER_MM) * points(arrays)
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var nearest := Vector3.INF
+	for t in range(0, indices.size(), 3):
+		var met: Variant = Geometry3D.ray_intersects_triangle(origin, ray, corners[indices[t]], corners[indices[t + 1]],
+			corners[indices[t + 2]])
+		if met is Vector3:
+			var at: Vector3 = met
+			nearest = at if origin.distance_to(at) < origin.distance_to(nearest) else nearest
+	return nearest
+
+
 ## The edges of [param meshes]' faces, as their two ends, that no face goes back along: none on a
 ## closed surface whose faces are all turned the same way. Points are joined to the micrometre.
 static func open_edges(meshes: Array[Array]) -> Array[PackedVector3Array]:
-	var counts: Dictionary[String, int] = {}
-	var ends: Dictionary[String, PackedVector3Array] = {}
-	for triangle in all_triangles(meshes):
+	var joined := _joined(meshes)
+	var corners: PackedInt32Array = joined[0]
+	var spots: PackedVector3Array = joined[1]
+	# Each edge by its two ends' spots, the first in the high bits.
+	var counts: Dictionary[int, int] = {}
+	for t in range(0, corners.size(), 3):
 		for k in 3:
-			var from := _micrometres(triangle[k])
-			var to := _micrometres(triangle[(k + 1) % 3])
-			if from == to:
-				continue
-			counts[from + ">" + to] = counts.get(from + ">" + to, 0) + 1
-			counts[to + ">" + from] = counts.get(to + ">" + from, 0) - 1
-			ends[from + ">" + to] = PackedVector3Array([triangle[k], triangle[(k + 1) % 3]])
+			var from := corners[t + k]
+			var to := corners[t + (k + 1) % 3]
+			if from != to:
+				counts[(from << 32) | to] = counts.get((from << 32) | to, 0) + 1
+				counts[(to << 32) | from] = counts.get((to << 32) | from, 0) - 1
 	var found: Array[PackedVector3Array] = []
 	for edge in counts:
 		if counts[edge] > 0:
-			found.append(ends[edge])
+			found.append(PackedVector3Array([spots[edge >> 32], spots[edge & 0xFFFFFFFF]]))
 	return found
 
 
 ## The volume each separate piece of [param meshes] encloses (pieces share no point): positive
 ## when its faces are turned outwards.
 static func volumes(meshes: Array[Array]) -> PackedFloat32Array:
-	var found_triangles := all_triangles(meshes)
+	var joined := _joined(meshes)
+	var corners: PackedInt32Array = joined[0]
+	var spots: PackedVector3Array = joined[1]
 	# Each point's piece, pieces merged as faces join them.
-	var piece: Dictionary[String, String] = {}
-	var root := func(at: String) -> String:
-		while piece[at] != at:
-			at = piece[at]
-		return at
-	for triangle in found_triangles:
-		var keys: Array[String] = []
-		for corner in triangle:
-			var key := _micrometres(corner)
-			if key not in piece:
-				piece[key] = key
-			keys.append(key)
-		for key: String in keys.slice(1):
-			piece[root.call(key)] = root.call(keys[0])
-	var sums: Dictionary[String, float] = {}
-	for triangle in found_triangles:
-		var at: String = root.call(_micrometres(triangle[0]))
+	var piece: Array[int] = []
+	piece.assign(range(spots.size()))
+	for t in range(0, corners.size(), 3):
+		for k: int in [1, 2]:
+			piece[_root(piece, corners[t + k])] = _root(piece, corners[t])
+	var sums: Dictionary[int, float] = {}
+	for t in range(0, corners.size(), 3):
+		var at := _root(piece, corners[t])
+		var corner := spots[corners[t]]
 		# Godot's front faces are clockwise seen from the side they face.
-		sums[at] = sums.get(at, 0.0) - triangle[0].dot(triangle[1].cross(triangle[2])) / 6.0
+		sums[at] = sums.get(at, 0.0) - corner.dot(spots[corners[t + 1]].cross(spots[corners[t + 2]])) / 6.0
 	return PackedFloat32Array(sums.values())
 
 
-static func _micrometres(point: Vector3) -> String:
-	var at := Vector3i((point / MeshBuilder.UNITS_PER_MM * 1000.0).round())
-	return "%d %d %d" % [at.x, at.y, at.z]
+## The corners of [param meshes]' triangles, three by three, each as the point it stands at (spots
+## within a micrometre are one), then those points.
+static func _joined(meshes: Array[Array]) -> Array:
+	var ids: Dictionary[Vector3i, int] = {}
+	var spots := PackedVector3Array()
+	var corners := PackedInt32Array()
+	for arrays in meshes:
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var at := PackedInt32Array()
+		for vertex in vertices:
+			var key := Vector3i((vertex / MeshBuilder.UNITS_PER_MM * 1000.0).round())
+			if key not in ids:
+				ids[key] = spots.size()
+				spots.append(vertex)
+			at.append(ids[key])
+		for index in indices:
+			corners.append(at[index])
+	return [corners, spots]
+
+
+static func _root(piece: Array[int], at: int) -> int:
+	while piece[at] != at:
+		at = piece[at]
+	return at
