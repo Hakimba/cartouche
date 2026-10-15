@@ -28,6 +28,9 @@ android {
 
     // Robolectric runs the Android-bound code (intents, URI grants) in JVM tests.
     testOptions.unitTests.isIncludeAndroidResources = true
+
+    // The core's disc images, read here through a documents provider.
+    sourceSets["test"].resources.srcDir("../core/src/test/resources")
 }
 
 base { archivesName = "cartouche-android" }

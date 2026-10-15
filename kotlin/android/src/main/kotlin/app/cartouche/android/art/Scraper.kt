@@ -18,6 +18,8 @@ import arrow.core.getOrElse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -64,18 +66,29 @@ internal class Scraper(
 
     private var began = TimeSource.Monotonic.markNow()
 
-    /** Looks for the art of [requests]' games that have none stored, and none known to be absent from their sources. */
-    fun lookFor(requests: List<ArtRequest>) {
-        scope.launch {
-            // Under the lock: a game a worker stores meanwhile is either stored or still under way.
-            update(None) {
-                if (run.isOver) began = TimeSource.Monotonic.markNow()
-                val missing = requests.filter { store.wants(it.game, it.version) }
-                trace("art") { "${missing.size} of ${requests.size} games to look for" }
-                run.with(missing)
-            }
-            startWorkers()
+    /** Whether the run is over, as of its last change. */
+    private val over = MutableStateFlow(true)
+
+    /**
+     * Makes the run look for the art of [requests]' games that want it (see [ArtStore.wants]), in
+     * place of what it looked for; returns once they are in the run. Calls made in turn, on one
+     * thread, change the run in that order (the lock is fair): a later plan always replaces an
+     * earlier one.
+     */
+    suspend fun lookFor(requests: List<ArtRequest>) {
+        // Under the lock: a game a worker stores meanwhile is either stored or still under way.
+        update(None) {
+            if (run.isOver) began = TimeSource.Monotonic.markNow()
+            val missing = requests.filter { store.wants(it.game, it.version) }
+            trace("art") { "${missing.size} of ${requests.size} games to look for" }
+            run.with(missing)
         }
+        startWorkers()
+    }
+
+    /** Waits until the run is over: every game in it looked for, its art found or not. */
+    suspend fun awaitOver() {
+        over.first { it }
     }
 
     /** Tries again at once if the run stalled for want of a network. */
@@ -191,6 +204,7 @@ internal class Scraper(
     /** Applies [change] and tells [changed], in the order changes are made. */
     private suspend fun update(found: Option<FoundArt>, change: () -> Scraping) = lock.withLock {
         run = change()
+        over.value = run.isOver
         changed(run, found)
         if (run.isOver && run.done > 0) trace("art") { "run over: ${run.done} games in ${began.elapsedNow().inWholeSeconds} s" }
     }

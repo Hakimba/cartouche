@@ -16,6 +16,7 @@ dependencies {
     api(libs.arrow.core)
     implementation(libs.serialization.json)
     implementation(libs.arrow.serialization)
+    implementation(libs.xz)
     testImplementation(libs.bundles.test)
     // Generators, fixtures and fakes shared by the tests of both modules.
     testFixturesImplementation(libs.kotest.property)

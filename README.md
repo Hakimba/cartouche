@@ -71,12 +71,13 @@ Cartouche builds on these projects, and thanks their authors.
 | Project | Used for | License |
 |---|---|---|
 | [Daijishō](https://github.com/TapiocaFox/Daijishou) | Platform and emulator definitions (`app/data/platforms/daijishou/`) | MIT |
-| [libretro-database](https://github.com/libretro/libretro-database) | Redump and No-Intro game titles and serials (`app/data/titles/`) | CC BY-SA 4.0 |
+| [libretro-database](https://github.com/libretro/libretro-database) | Redump and No-Intro game titles and serials (`app/data/titles/`), cartridge ROMs' CRC32 (`app/data/prints/`) | CC BY-SA 4.0 |
 | [LaunchBox Games Database](https://gamesdb.launchbox-app.com) | Which disc and cartridge scans each game has (`app/data/art/`), and the scans, downloaded on the device | Used with the database's public dump; images stay their owners' |
 | [PlayStation DataCenter](https://psxdatacenter.com) | PS2 disc scans by serial, downloaded on the device | Images stay their owners' |
 | [Fredoka](https://github.com/hafontia/Fredoka-One) | The app's font (`app/fonts/`) | SIL Open Font License 1.1 |
 | [Godot Engine](https://godotengine.org) | Engine, and the Android plugin template the plugin started from | MIT |
 | [Arrow](https://arrow-kt.io) | Typed functional programming in Kotlin | Apache 2.0 |
+| [XZ for Java](https://tukaani.org/xz/java.html) | LZMA decoding of CHD disc images | 0BSD |
 | [kotlinx.serialization, kotlinx.coroutines](https://github.com/Kotlin) | JSON storage, background work, and its tests | Apache 2.0 |
 | [Kotest](https://kotest.io) | Property-based tests | Apache 2.0 |
 | [JUnit 4](https://junit.org/junit4/) | Test runner | EPL 1.0 |

@@ -62,6 +62,34 @@ func test_INV_E2_5_01_without_the_plugin_the_catalog_and_the_demo_library_are_th
 	assert_array(answer.library.shelves.map(func(shelf: AndroidServices.Shelf) -> String: return shelf.platform_id)).is_equal(ids)
 
 
+func test_without_the_plugin_scraping_again_answers_the_desktop_demo_s_games_none_with_a_label() -> void:
+	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(AndroidServices.DESKTOP_DEMO))
+	var games: Array = demo["library"]["games"]
+	var answer := await Android.rescrape()
+	assert_bool(answer.ok).is_true()
+	assert_int(answer.games).is_equal(games.size())
+	assert_int(answer.library.games.size()).is_equal(games.size())
+	assert_int(answer.labels).is_equal(0)
+	assert_array(answer.failures).is_empty()
+
+
+func test_scraping_again_is_read_with_its_games_its_labels_found_and_the_consoles_not_scanned() -> void:
+	var answer := AndroidServices.RescrapeAnswer.new({
+		"ok": true, "library": "{}", "games": 57, "labels": 50, "failures": PackedStringArray(["gc: no folder"]),
+	})
+	assert_int(answer.games).is_equal(57)
+	assert_int(answer.labels).is_equal(50)
+	assert_array(answer.failures).is_equal(PackedStringArray(["gc: no folder"]))
+	assert_array(AndroidServices.RescrapeAnswer.new({"ok": true, "library": "{}"}).failures).is_empty()
+
+
+func test_the_cartridge_prints_loaded_with_the_catalog_are_those_of_the_six_cartridge_consoles() -> void:
+	var lists := Array(DirAccess.get_files_at("res://data/prints")).filter(
+		func(file_name: String) -> bool: return file_name.ends_with(".tsv"))
+	lists.sort()
+	assert_array(lists).is_equal(["gb.tsv", "gba.tsv", "gbc.tsv", "n64.tsv", "nes.tsv", "snes.tsv"])
+
+
 func test_the_plugin_gets_daijisho_s_definitions_and_cartouche_s_own() -> void:
 	assert_array(AndroidServices.platform_definitions().keys()).contains(
 		["SonyPlayStation2.json", "MicrosoftXbox.json", "MicrosoftXbox360.json"])

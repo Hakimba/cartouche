@@ -5,6 +5,7 @@ import app.cartouche.android.storage.StorageFailure
 import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.ArtVersion
+import app.cartouche.core.art.LookAgain
 import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.library.GameId
 import arrow.core.Either
@@ -202,5 +203,56 @@ class ArtStoreTest {
         store.saveIfAbsent(game, byteArrayOf(9)).shouldBeRight() shouldBe chosen
         chosen.file.readBytes() shouldBe image
         store.saveIfAbsent(GameId("ps2/other"), byteArrayOf(9)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
+    }
+
+    @Test
+    fun `looking labels up again forgets the games without art, replaces an image found, and removes one none is found for`() {
+        val store = ArtStore(folder)
+        val (found, missed, unfound, kept, absent) = listOf("found", "missed", "unfound", "kept", "absent").map { GameId("ps2/$it") }
+        listOf(found, missed, unfound, kept).forEach { store.save(it, image).shouldBeRight() }
+        store.markAbsent(request(absent)).shouldBeRight()
+        store.lookAgain(LookAgain(setOf(found, missed, absent), setOf(unfound))).shouldBeRight()
+        // Every game asked, and the one known to have none, want art again; the others do not.
+        listOf(found, missed, absent, unfound).forEach { store.wants(it, older) shouldBe true }
+        store.wants(kept, older) shouldBe false
+        store.stored(unfound).shouldBeNone()
+        // Until looked up, the images asked for stay.
+        store.stored(missed).shouldBeSome().file.readBytes() shouldBe image
+        store.saveIfAbsent(found, byteArrayOf(9)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
+        store.markAbsent(request(missed)).shouldBeRight()
+        store.stored(missed).shouldBeNone()
+        // A game not asked keeps its image, whatever a scan brings.
+        store.saveIfAbsent(kept, byteArrayOf(9)).shouldBeRight().file.readBytes() shouldBe image
+        listOf(found, missed, kept).forEach { store.wants(it, older) shouldBe false }
+        ArtStore(folder).isAbsent(absent, older) shouldBe false
+    }
+
+    @Test
+    fun `looking labels up again changes nothing when the games without art cannot be forgotten`() {
+        val store = ArtStore(folder)
+        val (asked, unfound, absent) = listOf("asked", "unfound", "absent").map { GameId("ps2/$it") }
+        listOf(asked, unfound).forEach { store.save(it, image).shouldBeRight() }
+        store.markAbsent(request(absent)).shouldBeRight()
+        folder.setWritable(false)
+        try {
+            store.lookAgain(LookAgain(setOf(asked, absent), setOf(unfound))).shouldBeLeft()
+        } finally {
+            folder.setWritable(true)
+        }
+        store.stored(unfound).shouldBeSome()
+        store.wants(asked, older) shouldBe false
+        store.isAbsent(absent, older) shouldBe true
+        store.saveIfAbsent(asked, byteArrayOf(9)).shouldBeRight().file.readBytes() shouldBe image
+    }
+
+    @Test
+    fun `a label chosen or of the user's own while it is looked up again is not replaced by a scan`() {
+        val store = ArtStore(folder)
+        store.save(game, image).shouldBeRight()
+        store.lookAgain(LookAgain(setOf(game), emptySet())).shouldBeRight()
+        store.save(game, byteArrayOf(7)).shouldBeRight()
+        store.saveIfAbsent(game, byteArrayOf(9)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(7)
+        store.markAbsent(request(game)).shouldBeRight()
+        store.stored(game).shouldBeSome()
     }
 }

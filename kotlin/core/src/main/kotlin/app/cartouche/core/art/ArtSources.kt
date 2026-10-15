@@ -85,8 +85,22 @@ public class ArtSources(
             versionOf: (PlatformId) -> Option<ArtVersion>,
             sources: (PlatformId) -> ArtSources,
         ): List<ArtRequest> = games.filter { wants(it.id, versionOf(it.platform)) }.flatMap { sources(it.platform).requestFor(it).toList() }
+
+        /**
+         * Which automatic labels of [games] are looked up again from scratch: those a source of their
+         * platform's [sources] may have art for, and those none can, whose image goes; a label the user
+         * chose, their own picture or a region's image, is neither, and stays.
+         */
+        public fun lookAgain(games: List<Game>, sources: (PlatformId) -> ArtSources): LookAgain {
+            val automatic = games.filter { it.label == LabelChoice.Automatic }
+            val (asked, unfound) = automatic.partition { sources(it.platform).requestFor(it).isSome() }
+            return LookAgain(asked.mapTo(HashSet()) { it.id }, unfound.mapTo(HashSet()) { it.id })
+        }
     }
 }
+
+/** The games whose label is looked up again ([asked]), and those no source can have art for ([unfound]). */
+public data class LookAgain(public val asked: Set<GameId>, public val unfound: Set<GameId>)
 
 /** The scans of [serials] (`SLPM-65688`) at this source, in order; serials of another form, as some lists hold, are left out. */
 internal fun SerialScans.scansOf(serials: List<String>): List<ArtUrl> =

@@ -7,6 +7,7 @@ import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.ParsedSerializer
+import app.cartouche.core.files.FileFacts
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
@@ -111,7 +112,8 @@ public data class Disc(public val number: Option<Int>, public val file: ListedFi
 
 /**
  * A game of the library. [redumpName] is the reference-list disc it is exactly, if any; its
- * regions, languages and version are what its file name states.
+ * regions, languages and version are that disc's, else what its file name states (its regions
+ * those its possible versions share, when known by its content).
  */
 @Serializable
 public data class Game(
@@ -227,11 +229,19 @@ public data class Scan(
          * Sorts the files of [folder] into games and ignored files, and keeps its skipped sub-folders.
          * A file is a game when a player of [platform] accepts it, unless it looks like a BIOS, or is
          * unknown to [titles] and smaller than any game of the platform. With [DiscGrouping.GROUPED],
-         * `Game (Disc 1)` and `Game (Disc 2)` make one game. Pure and total; the result does not
-         * depend on the order of the files.
+         * `Game (Disc 1)` and `Game (Disc 2)` make one game. A game is identified by what its first
+         * file holds ([facts], by the file's URI) when that names a game, each disc then giving its
+         * own serials by what it holds; otherwise by its files' names. Pure and total; the result
+         * does not depend on the order of the files.
          */
-        public fun of(platform: Platform, folder: FolderContents, titles: TitleIndex, discs: DiscGrouping): Scan {
-            val (ignored, kept) = folder.files.sortedWith(FILE_ORDER).separateEither { classify(platform, titles, it) }
+        public fun of(
+            platform: Platform,
+            folder: FolderContents,
+            titles: TitleIndex,
+            discs: DiscGrouping,
+            facts: Map<ContentUri, FileFacts> = emptyMap(),
+        ): Scan {
+            val (ignored, kept) = folder.files.sortedWith(FILE_ORDER).separateEither { classify(platform, titles, facts, it) }
             val groups =
                 when (discs) {
                     DiscGrouping.GROUPED -> kept.groupBy { it.name.copy(disc = None) }.values.flatMap(::asDiscs)
@@ -244,7 +254,12 @@ public data class Scan(
             )
         }
 
-        private data class Candidate(val file: ListedFile, val name: GameName, val known: Option<Identification>)
+        private data class Candidate(
+            val file: ListedFile,
+            val name: GameName,
+            val byContent: Option<Identification>,
+            val byName: Option<Identification>,
+        )
 
         private val FILE_ORDER = compareBy<ListedFile>({ it.name.value }, { it.uri.value })
         private val DISC_ORDER = compareBy<Candidate> { it.name.disc.getOrElse { 0 } }.thenBy { it.file.uri.value }
@@ -257,33 +272,45 @@ public data class Scan(
 
         private val BIOS = Regex("""(?i)(?<![a-z0-9])(bios|scph-?\d+)(?![a-z0-9])""")
 
-        private fun classify(platform: Platform, titles: TitleIndex, file: ListedFile): Either<IgnoredFile, Candidate> = either {
+        private fun classify(
+            platform: Platform,
+            titles: TitleIndex,
+            facts: Map<ContentUri, FileFacts>,
+            file: ListedFile,
+        ): Either<IgnoredFile, Candidate> = either {
             ensure(!file.name.isHidden) { IgnoredFile(file, IgnoreReason.HIDDEN) }
             val accepted = platform.accepts.matches(file.name) && platform.players.any { it.accepts.matches(file.name) }
             ensure(accepted) { IgnoredFile(file, IgnoreReason.UNSUPPORTED) }
-            val name = GameName.parse(file.name.value.substringBeforeLast('.'))
-            val known = titles.identify(name)
+            val stem = file.name.value.substringBeforeLast('.')
+            val name = GameName.parse(stem)
+            val byContent = facts.getOrNone(file.uri).flatMap { titles.identifyByContent(it, name) }
+            val byName = titles.identifyByName(stem)
+            val known = byContent.isSome() || byName.isSome()
             val tooSmall = file.sizeBytes.isSome { it < platform.profile.minimumGameBytes }
             // A known game is kept whatever its name or size (a Redump title may mention a SCPH accessory).
-            ensure(known.isSome() || !(tooSmall || BIOS.containsMatchIn(file.name.value))) { IgnoredFile(file, IgnoreReason.NOT_A_GAME) }
-            Candidate(file, name, known)
+            ensure(known || !(tooSmall || BIOS.containsMatchIn(file.name.value))) { IgnoredFile(file, IgnoreReason.NOT_A_GAME) }
+            Candidate(file, name, byContent, byName)
         }
 
         /**
-         * The game made of [discs]. Regions, languages and version are what its first file name
-         * states; the title is the reference one when the game is identified.
+         * The game made of [discs], identified by their content when the first one's names a game (a
+         * disc 2 that tells nothing then gives no serial), else by their names. The title is the
+         * reference one when the game is identified.
          */
         private fun game(platform: PlatformId, discs: NonEmptyList<Candidate>): Game {
             val first = discs.head
+            val known = discs.map(if (first.byContent.isSome()) Candidate::byContent else Candidate::byName)
+            val exact = known.head.flatMap { if (it is Identification.Disc) Some(it.disc) else None }
+            val named = exact.fold({ first.name }, KnownTitle::name)
             return Game(
                 id = GameId("${platform.value}/${first.file.uri.value}"),
                 platform = platform,
-                title = first.known.fold({ first.name }) { it.title }.displayTitle,
-                regions = first.name.regions,
-                languages = first.name.languages,
-                version = first.name.version,
-                serials = discs.toList().flatMap { disc -> disc.known.fold({ emptyList() }) { it.serials } }.distinct(),
-                redumpName = first.known.flatMap { known -> if (known is Identification.Disc) Some(known.disc.text) else None },
+                title = known.head.fold({ first.name }, Identification::title).displayTitle,
+                regions = known.head.fold({ first.name.regions }, Identification::regions),
+                languages = named.languages,
+                version = named.version,
+                serials = known.toList().flatMap { disc -> disc.fold({ emptyList() }, Identification::serials) }.distinct(),
+                redumpName = exact.map(KnownTitle::text),
                 discs = discs.map { Disc(it.name.disc, it.file) },
             )
         }

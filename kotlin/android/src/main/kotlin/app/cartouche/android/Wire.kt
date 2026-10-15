@@ -404,6 +404,11 @@ internal fun ScanReport.toWire(): Dictionary = dictionary(
     "milliseconds" to milliseconds,
 )
 
+/** How scraping again went: the games of the library, how many of the labels looked for were found, the consoles not scanned and why. */
+internal data class Rescraped(val games: Int, val labels: Int, val failures: List<String>)
+
+internal fun Rescraped.toWire(): Dictionary = dictionary("games" to games, "labels" to labels, "failures" to failures.toTypedArray())
+
 internal fun Catalog.toWire(): Dictionary = dictionary(
     "platforms" to platforms.toWireArray { dictionary("id" to it.id.value, "name" to it.name, "media" to it.profile.media.wire) },
     "rejected" to rejected.toWireArray { dictionary("source" to it.source, "detail" to it.message) },

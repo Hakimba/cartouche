@@ -2,6 +2,7 @@
 package app.cartouche.android.art
 
 import app.cartouche.android.library.LibraryService
+import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.storage.SelectionStore
@@ -35,8 +36,12 @@ class LabelChoicesTest {
     private val own = byteArrayOf(1, 1)
     private val japanese = byteArrayOf(2, 2, 2)
 
-    private fun library() =
-        LibraryService(LibraryStore(libraryFile), SelectionStore(File(context.filesDir, "selection.json")), Folders(context))
+    private fun library() = LibraryService(
+        LibraryStore(libraryFile),
+        SelectionStore(File(context.filesDir, "selection.json")),
+        Folders(context),
+        FactsStore(File(context.filesDir, "facts")),
+    )
 
     private fun label() = library().library().game(okage.id).shouldBeSome().label
 

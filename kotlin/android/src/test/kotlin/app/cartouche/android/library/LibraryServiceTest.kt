@@ -2,17 +2,26 @@
 package app.cartouche.android.library
 
 import android.net.Uri
+import android.os.ParcelFileDescriptor
+import app.cartouche.android.storage.FactsStore
+import app.cartouche.android.storage.FakeDocuments
+import app.cartouche.android.storage.FileStamp
 import app.cartouche.android.storage.Folders
+import app.cartouche.android.storage.KnownFacts
 import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.storage.SelectionStore
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.android.storage.TREE
 import app.cartouche.android.storage.cardTree
+import app.cartouche.android.storage.discImage
+import app.cartouche.android.storage.documentFile
 import app.cartouche.android.storage.fileRow
 import app.cartouche.android.storage.folderRow
 import app.cartouche.android.storage.installDocuments
 import app.cartouche.android.storage.rows
+import app.cartouche.android.storage.serving
 import app.cartouche.android.storage.setAside
+import app.cartouche.core.files.FileFacts
 import app.cartouche.core.library.CountedReason
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DiscGrouping
@@ -59,6 +68,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.io.File
+import java.io.FileNotFoundException
 
 @RunWith(RobolectricTestRunner::class)
 class LibraryServiceTest {
@@ -71,7 +81,10 @@ class LibraryServiceTest {
             minimumGameBytes = 0,
         ).platforms.single()
 
-    private fun service(selection: File = selectionFile) = LibraryService(LibraryStore(file), SelectionStore(selection), Folders(context))
+    private val factsFolder = File(context.filesDir, "facts")
+
+    private fun service(selection: File = selectionFile) =
+        LibraryService(LibraryStore(file), SelectionStore(selection), Folders(context), FactsStore(factsFolder))
 
     private fun LibraryService.scan() = scan(platform, TitleIndex.EMPTY, DataFolders.NONE)
 
@@ -289,7 +302,9 @@ class LibraryServiceTest {
         service().setUp(other, PlatformSetup(Some(otherFolder))).shouldBeRight()
         val service = scanned("A", "B")
         service.select("B")
+        FactsStore(factsFolder).save(platform.id, mapOf(TREE to KnownFacts(FileStamp(None, None), FileFacts.Silent))).shouldBeRight()
         service.remove(platform.id).shouldBeRight()
+        File(factsFolder, "${platform.id.value}.tsv").exists() shouldBe false
         listOf(service, service()).forEach { again ->
             again.library() shouldBe Library(setups = mapOf(other to PlatformSetup(Some(otherFolder))))
             again.selection() shouldBe Selection()
@@ -372,7 +387,8 @@ class LibraryServiceTest {
     @Test
     fun `the finders are made anew, and prepared once, only when what is searched changes`() {
         val prepared = mutableListOf<Finders>()
-        val service = LibraryService(LibraryStore(file), SelectionStore(selectionFile), Folders(context), prepared::add)
+        val service =
+            LibraryService(LibraryStore(file), SelectionStore(selectionFile), Folders(context), FactsStore(factsFolder), prepared::add)
         service.setUp(platform.id, PlatformSetup(Some(TREE))).shouldBeRight()
         installDocuments { rows(fileRow("root/Okage (Disc 1).iso"), fileRow("root/Okage (Disc 2).iso"), fileRow("root/Ico.iso")) }
         service.scan().shouldBeRight()
@@ -434,5 +450,139 @@ class LibraryServiceTest {
         service().library().consoleOrder shouldBe listOf(other, platform.id)
         service.remove(other).shouldBeRight()
         service().library().consoleOrder shouldBe listOf(platform.id)
+    }
+
+    private val ps2 = catalog(definition(playerJson("test.x", pattern = ".*\\\\.(chd|iso)")), minimumGameBytes = 0).platforms.single()
+
+    private val bujingai = TitleIndex.parse("Bujingai - The Forsaken City (Europe)\tSLES-52495")
+
+    /**
+     * A service whose PS2 folder holds [files] (by document id), each listed with its size, or the
+     * one [size] gives, and as last changed at [modified].
+     */
+    private fun ps2Folder(
+        files: Map<String, ByteArray>,
+        size: (String) -> Long = { files.getValue(it).size.toLong() },
+        modified: (String) -> Long = { 0L },
+    ): Pair<LibraryService, FakeDocuments> {
+        val service = service().apply { setUp(ps2.id, PlatformSetup(Some(TREE))).shouldBeRight() }
+        val provider =
+            installDocuments { rows(*files.keys.map { fileRow(it, size(it), modified(it)) }.toTypedArray()) }
+                .serving(files.mapValues { (id, bytes) -> documentFile(id, bytes) })
+        return service to provider
+    }
+
+    private fun LibraryService.scanPs2() = scan(ps2, bujingai, DataFolders.NONE).shouldBeRight()
+
+    private fun LibraryService.identified(): Int = library().games.count { it.identified }
+
+    @Test
+    fun `INV-E11-01 a game whose file is named otherwise is identified by the serial its disc holds`() {
+        val (service, _) = ps2Folder(mapOf("root/Mystery Game 1.chd" to discImage("cd-cdlz.chd"), "root/Other.iso" to ByteArray(4096)))
+        service.scanPs2()
+        val (identified, unknown) = service.library().games.partition { it.identified }
+        identified.map { it.serials } shouldBe listOf(listOf("SLES-52495"))
+        unknown.map { it.title } shouldBe listOf("Other")
+    }
+
+    @Test
+    fun `a file unchanged since the last scan is not read again, one whose size or date changed or that could not be opened is`() {
+        var date = 0L
+        var size = 0L
+        val files = mapOf("root/a.chd" to discImage("cd-cdlz.chd"), "root/b.iso" to discImage("disc.iso"))
+        val (service, provider) =
+            ps2Folder(
+                files,
+                size = { files.getValue(it).size + if (it == "root/b.iso") size else 0L },
+                modified = { if (it == "root/b.iso") date else 0L },
+            )
+        service.scanPs2()
+        provider.opened.size shouldBe 2
+        // A restart reads what the files told from the store.
+        service().scanPs2()
+        provider.opened.size shouldBe 2
+        date = 1L
+        service.scanPs2()
+        provider.opened.size shouldBe 3
+        size = 1L
+        service.scanPs2()
+        provider.opened.size shouldBe 4
+        // Storage gone: the file is identified by its name meanwhile, and read at the next scan.
+        val serving = provider.open
+        provider.open = { id, _ -> throw FileNotFoundException(id) }
+        date = 2L
+        service.scanPs2()
+        service.identified() shouldBe 1
+        provider.open = serving
+        service.scanPs2()
+        provider.opened.size shouldBe 6
+        service.identified() shouldBe 2
+        service.scanPs2()
+        provider.opened.size shouldBe 6
+    }
+
+    @Test
+    fun `INV-E11-03 a file that opens but cannot be read is identified by its name, nothing kept, and opened again at the next scan`() {
+        val files = mapOf("root/a.chd" to discImage("cd-cdlz.chd"))
+        val (service, provider) = ps2Folder(files)
+        val serving = provider.open
+        // Opened, then every read fails: an interrupted thread's file channels refuse to read.
+        provider.open = { id, mode -> serving(id, mode).also { Thread.currentThread().interrupt() } }
+        service.scanPs2()
+        Thread.interrupted() shouldBe true
+        service.identified() shouldBe 0
+        FactsStore(factsFolder).load(ps2.id) shouldBe emptyMap()
+        provider.open = serving
+        service.scanPs2()
+        provider.opened.size shouldBe 2
+        service.identified() shouldBe 1
+    }
+
+    @Test
+    fun `a document that is no file, as a pipe a provider hands out, tells nothing, and is not opened again while unchanged`() {
+        val (service, provider) = ps2Folder(mapOf("root/a.chd" to discImage("cd-cdlz.chd")))
+        provider.open = { _, _ -> ParcelFileDescriptor.createPipe().also { it[1].close() }[0] }
+        service.scanPs2()
+        service.identified() shouldBe 0
+        FactsStore(factsFolder).load(ps2.id).values.map { it.facts } shouldBe listOf(FileFacts.Silent)
+        service.scanPs2()
+        provider.opened.size shouldBe 1
+    }
+
+    @Test
+    fun `a count reads no game file and keeps nothing, its files known by what they told at the last scan`() {
+        val (service, provider) = ps2Folder(mapOf("root/Mystery Game 1.chd" to discImage("cd-cdlz.chd")))
+
+        fun preview() = service.preview(ps2, PlatformSetup(Some(TREE)), bujingai, DataFolders.NONE).shouldBeRight().identified
+        preview() shouldBe 0
+        provider.opened shouldBe emptyList()
+        FactsStore(factsFolder).load(ps2.id) shouldBe emptyMap()
+        service.scanPs2()
+        preview() shouldBe 1
+        provider.opened.size shouldBe 1
+    }
+
+    @Test
+    fun `forgetting what the files told opens every one again at the next scan`() {
+        val (service, provider) = ps2Folder(mapOf("root/a.chd" to discImage("cd-cdlz.chd"), "root/b.iso" to discImage("disc.iso")))
+        service.scanPs2()
+        service.forgetFacts().shouldBeRight()
+        service.scanPs2()
+        provider.opened.size shouldBe 4
+        service.identified() shouldBe 2
+    }
+
+    @Test
+    fun `INV-E11-03 a scan opens game files read-only, closes each, and leaves their bytes and date as they were`() {
+        val files = mapOf("root/a.chd" to discImage("cd-cdlz.chd"), "root/b.iso" to discImage("disc.iso"), "root/c.iso" to ByteArray(4096))
+        val (service, provider) = ps2Folder(files)
+        val stored = files.mapValues { (id, _) -> File(context.cacheDir, "documents/$id").apply { setLastModified(1_000_000_000L) } }
+        service.scanPs2()
+        provider.opened shouldBe listOf("r", "r", "r")
+        provider.descriptors.map { it.fileDescriptor.valid() } shouldBe listOf(false, false, false)
+        stored.forEach { (id, file) ->
+            file.readBytes() shouldBe files.getValue(id)
+            file.lastModified() shouldBe 1_000_000_000L
+        }
     }
 }

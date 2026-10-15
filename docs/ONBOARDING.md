@@ -14,6 +14,7 @@ code: it only describes what exists.
 │  data/platforms/          platform and emulator definitions (Daijishō, MIT)         │
 │                           and Cartouche's own definitions and platform profiles     │
 │  data/titles/             game titles and serials (libretro-database, CC BY-SA 4.0) │
+│  data/prints/             cartridge ROMs' CRC32 (libretro-database, CC BY-SA 4.0)   │
 │  data/carousel/           each kind's medium, label colours, the selected game's pose│
 │  dev/demo/                the catalog and a demo library, to run without Android    │
 │  test/                    GDScript tests (GdUnit4, fetched by dev/test_godot.sh)    │
@@ -44,7 +45,13 @@ The same words are used in the code, the tests and this document.
 - **Player**: one way to run a platform's games, an emulator or a RetroArch core, with its launch
   **template** (`am start` arguments). The **catalog** holds every platform and player.
 - **Game**: one entry of the library, made of one or more **discs** (files). It is **identified**
-  when the platform's **reference list** (Redump's or No-Intro's titles and serials) knows it.
+  when the platform's **reference list** (Redump's or No-Intro's titles and serials) knows it: by
+  what its file holds first (its **file facts**: a disc's **serial**, a cartridge's **print**, the
+  CRC32 of its ROM), else by its name.
+- **Facts** of a file: what its bytes say about which game it is, **read** by the core through a
+  `ByteSource`: a disc's **serial** (`SLES_524.95` in its SYSTEM.CNF; a GameCube or Wii disc's
+  game code, `GKYP` of the ID `GKYP01`), a cartridge's **print** (its ROM's CRC32 as No-Intro
+  counts it), or nothing (`Silent`).
 - **Scan**: listing a platform's folder (the **walk**), then sorting its files into games and
   **ignored files**. A file a player opens that is not taken for a game (a BIOS, too small) is kept
   as a **not-game**; hidden and unsupported files are only counted. A sub-folder the walk does not
@@ -142,7 +149,9 @@ The same words are used in the code, the tests and this document.
   passed over); a
   game without one is drawn as a **blank** of its console (for the PS2, a silver disc with a dark
   band) with its title. The **art extract** (`app/data/art/<platform>.tsv`) lists, per game of the
-  LaunchBox Games Database, its scans by region; a platform's **serial source** (`scansBySerial` in
+  LaunchBox Games Database, its name, alternate names and scans by region; several games a title
+  finds alike are told apart by the **ladder** (its punctuation, accents, then exact text put back
+  one at a time), a title still naming none or several giving no image; a platform's **serial source** (`scansBySerial` in
   its profile, psxdatacenter for the PS2, with the form of the platform's serials) names scans
   after a game's serial.
 - **Label choice**: which image a game's label shows: **automatic** (the closest region's, as
@@ -207,10 +216,11 @@ The same words are used in the code, the tests and this document.
   now each console shows its own cartridge alone (`{"default": "nes_cart"}`): the regional ones
   (Famicom, Super Famicom, North American Super Nintendo) come with the consoles' variants.
   Adding a platform takes data only: a definition, a profile and, to identify its games, a
-  reference list `data/titles/<platform id>.tsv` (made with `dev/dat_titles.py`); for its art, an
-  extract `data/art/<platform id>.tsv` and the profile's `art`: `{"kind": "disc"}`, or
-  `{"kind": "cartridge_front", "fronts": {medium: {"proportion", "label": {"left", "top",
-  "width", "height"}}}}`: for each shape of cartridge its scans show (every medium of the platform,
+  reference list `data/titles/<platform id>.tsv` (made with `dev/dat_titles.py`), for a
+  cartridge platform its prints `data/prints/<platform id>.tsv` (`dev/dat_titles.py --prints`);
+  for its art, an extract `data/art/<platform id>.tsv` and the profile's `art`:
+  `{"kind": "disc"}`, or `{"kind": "cartridge_front", "fronts": {medium: {"proportion", "label":
+  {"left", "top", "width", "height"}}}}`: for each shape of cartridge its scans show (every medium of the platform,
   and the regional ones its scans may be of), the front's width over its height as the scans show
   it, and where the label sits on it, in fractions of it; the label's proportions are the model's
   label face's (a test holds them within 2 %). A platform without `art` has no art looked for.
@@ -221,10 +231,15 @@ The same words are used in the code, the tests and this document.
   content URI they can hand over is the game's.
 - **`library/`** is the game library:
   - `GameName` reads names the Redump and No-Intro way (`Title (Region) (Languages) (Disc 2)`);
-  - `TitleIndex` identifies a file by its name alone: as an exact reference disc, or as one disc of
-    a release known by the serials all its versions share, or not at all (never a wrong serial). It
-    files each reference disc by its title alone (`GameName.filing`) and reads a disc's whole name
-    only when a file could be that disc;
+  - `TitleIndex` identifies a file by what it holds (`FileFacts`): the versions with its serial
+    (compared on letters and digits; a GameCube or Wii disc by its game code) or its print, told
+    apart by the one written like the file's name, then the name's countries; several versions of
+    one game left are a release with what they all share, several games nothing. By its name: the
+    entry written exactly so, else as an exact reference disc (disc number included), or as one
+    disc of a release known by the serials all its versions share, or not at all (never a wrong
+    serial). It files each reference disc by its title alone (`GameName.filing`) and reads a disc's
+    whole name only when a file could be that disc. A scan identifies a game by what its first file
+    holds when that names a game, each disc then giving its own serials, else by its files' names;
   - `FolderWalk` lists a folder's files, and its sub-folders' when asked, through any `children`
     function: the Android plugin passes the documents provider, tests an in-memory tree. Hidden,
     too deep and unreadable sub-folders, and those named like emulator data
@@ -235,6 +250,27 @@ The same words are used in the code, the tests and this document.
     without losing them. Hidden and unsupported files are only counted, so its size follows the
     games; `LibraryFormat` stores it as versioned JSON and reads earlier formats, which the plugin
     then saves again, upgraded.
+- **`files/`** reads what a game file itself tells about which game it is (`FileFacts`: a serial, a
+  print, or `Silent`). `FileReading.facts` picks the decoder by platform and extension, and every
+  decoder reads through the `ByteSource` port (the file's size and positional reads, no way to
+  write): the Android plugin opens the file, tests hold bytes in memory (`InMemoryBytes`, which can
+  also stand for a file of gigabytes). Whatever the bytes, the answer is a `FileFacts`; only the
+  port failing to read is a `ReadFailure`, raised through `Raise<ReadFailure>` by every decoder that
+  reads. `ChdImage` decodes CHD version 5 images on demand (the header, the map of hunks, then only
+  the sectors asked: `cdlz` and `cdzl` for CDs, MODE1, MODE2 and MODE2_FORM_MIX tracks cooked or
+  raw, `lzma` and `zlib` for DVDs, hunks stored as they are or repeating a stored or compressed one;
+  any other codec, a parent image or an uncompressed image reads nothing). What a file claims never
+  sets what is read: the map's size, a compressed hunk's length and a metadata entry's text are
+  bounded, and a hunk repeating a repetition reads nothing rather than following a chain.
+  `Iso9660` finds SYSTEM.CNF at the root of a PlayStation 2 disc (`.chd`, `.iso`, raw `.bin`) or a
+  PlayStation disc (`.chd`, `.iso`: the PlayStation's profile does not take a `.bin` as a game, so
+  a `.cue`/`.bin` pair is not read) and the serial it boots; a GameCube or Wii disc (`.iso`, `.gcm`,
+  `.rvz`, `.wia`) gives the game code of its ID; `Cartridges` counts a ROM's CRC32 as No-Intro does
+  (the iNES header and a Super Nintendo copier header left out, a Nintendo 64 ROM in big-endian
+  order, a zip's entry as the archive records it, which the prints list in each form a ROM is
+  shared in). The disc images the tests decode are in `kotlin/core/src/test/resources/files`, made
+  by `dev/file_fixtures.py` (genisoimage, chdman); `hostileChds` (the package's `Generators.kt`)
+  writes CHDs no tool writes, whose map or metadata claims anything.
 - **`shelves/`** turns the library into what the carousel shows: `Shelves.of` makes one shelf per
   platform with games, in title order (a collator's order, then ids, so the same library always
   gives the same shelves), and restores the `Selection` on them; `SelectionFormat` stores the
@@ -254,9 +290,10 @@ The same words are used in the code, the tests and this document.
   its own screens (splash, game list) take to give way to the game, measured on a device by
   recording the screen through a launch (`adb shell screenrecord`).
 - **`art/`** decides where a game's art comes from: `ArtIndex` reads an art extract and finds a
-  game by title (case, accents, punctuation and spaces aside; a title naming several games finds
-  none), `regions/Regions` orders scans by how close their region is to the game's (NTSC-U, PAL,
-  NTSC-J groups), `scansOf` names a serial source's scans (only serials of its platform's form),
+  game by title (an alternate name written `<title> (<the game's country>)` first, then main names
+  and alternate names, words kept apart before joined, case, accents and punctuation aside; several
+  games found go through the ladder), `regions/Regions` orders scans by how close their region is to
+  the game's (NTSC-U, PAL, NTSC-J groups; at equal rank a zone's own name before its other countries), `scansOf` names a serial source's scans (only serials of its platform's form),
   `LabelCut.on` cuts a game's label out of a scan: its disc's whole face, or on a cartridge's front
   the label of the front of the scan's shape (the scan's proportion within 6 % of the front's, the
   game's own medium's first), in whole pixels inside it, none for a scan of no front's shape;
@@ -283,8 +320,14 @@ The same words are used in the code, the tests and this document.
   Getters answer at once; operations answer later through the `answered` signal (threading is
   described in its header). `PendingPick` tracks the folder pick awaiting its activity result.
   In debug builds, `launchArguments` hands GDScript the `arguments` extra of the launch intent
-  (`--demo-games=N`, `--bench=scroll`), and `useDemoLibrary` swaps the library for a demo one,
-  stored apart from the user's.
+  (`--demo-games=N`, `--bench=scroll`), `useDemoLibrary` swaps the library for a demo one,
+  stored apart from the user's, and `rescrape` scans every console again, reading all of their game
+  files anew, and looks every automatic label up again, never one the user chose, their own picture
+  or a region's image (`ArtSources.lookAgain`, `ArtStore.lookAgain`): an image found replaces the
+  one stored, none found removes it. It answers once the scraping run is over
+  (`Scraper.awaitOver`), so never while the network is down or a game is played. The images it
+  removes are not told through `art_changed`: it is asked from the device check, and the carousel
+  reads the stored images anew when it comes back.
 - **`Battery.kt`**: `BatteryWatch` follows the system's battery broadcast from each resume to the
   next pause and tells each new state (level, plugged in) through `battery_changed`, on Godot's
   render thread, where the plugin's signals are registered; `BatteryState.now` answers `battery()`.
@@ -302,13 +345,22 @@ The same words are used in the code, the tests and this document.
   - `Curtain` is the black window over the emulator; it needs the "display over other apps"
     permission, granted from the device check.
 - **`storage/Folders.kt`** covers folders picked with the system picker: keeping read access (and
-  nothing more), and listing a folder level from the documents provider for `FolderWalk`. Its
-  tests run it against a fake `DocumentsProvider`. `LibraryStore` writes the library file
+  nothing more), listing a folder level from the documents provider for `FolderWalk` (with each
+  file's date, `FolderListing`), and reading a game file's facts (`facts`: the file opened
+  read-only, read through `DocumentBytes`, positional reads on its descriptor's channel, closed
+  once read; a file that cannot be opened or read is a failure, not `Silent`; a document that is
+  not a file, such as a pipe, has no size, so nothing is read of it and it is `Silent`). Its tests run it
+  against a fake `DocumentsProvider`, which serves real files for the reading tests (the core's disc
+  images, `kotlin/core/src/test/resources/files`). `FactsStore` keeps what each platform's files
+  told, by file, with the size and date they had then (`FileStamp`), one file per platform under
+  `files/facts`, deleted with its platform. `LibraryStore` writes the library file
   atomically and sets an unreadable one aside; `SelectionStore` and `SettingsStore` do the same
   for the selection and the settings, whose unreadable files are only replaced.
-- **`library/LibraryService.kt`** runs scans, counts (`preview`: the scan's own walk and sorting,
-  nothing saved), choices, removals, selections and library launches on one thread, in the order
-  they arrive. Setting a platform up or removing one gives up the access to folders no platform
+- **`library/LibraryService.kt`** runs scans (each reads the facts of the files new or changed
+  since the last reading, those `FileReading.reads`, keeps them in `FactsStore` and hands them to
+  `Scan.of`), counts (`preview`: the scan's own walk and sorting with the facts kept, no file read
+  and nothing saved), choices, removals, selections and library launches on one thread, in the
+  order they arrive. Setting a platform up or removing one gives up the access to folders no platform
   uses any more. Each library it keeps is published with its `Finders` (`@Volatile`), made in the
   background once the call that kept it is over, on a thread of low priority; the plugin's `browse`
   and `titleMarks` read them at once from Godot's thread: a key typed is answered
@@ -473,7 +525,8 @@ The same words are used in the code, the tests and this document.
   an optimisation must leave every picture of both identical.
 - **The device check** opens from the carousel by holding Select for 2 s, in debug builds; back at
   its root returns to the carousel. It has a Library tab (folder, emulator, scan, games, ignored
-  files, launch), and is built from one scene per tab over a shared `DeviceCheckPage` base, with
+  files, launch, and **Scrape again**, the plugin's `rescrape`, which tells the labels' progress,
+  then how many games and labels found), and is built from one scene per tab over a shared `DeviceCheckPage` base, with
   signals wired in the scene files wherever they exist before `_ready`. The root forwards resume
   and back events to the visible page. Back is the `app_back` action or Android's back request:
   some handhelds send their back button as a joypad button only, the same one as Select.
@@ -522,7 +575,9 @@ The same words are used in the code, the tests and this document.
 - **Art data**: `dev/launchbox_art.py` makes a platform's extract from the LaunchBox Games
   Database dump (`Metadata.zip`, published daily), of disc scans by default, of cartridge fronts
   with `--type "Cart - Front"`; `dev/dat_titles.py` does the same for the reference lists, from
-  libretro-database's Redump and No-Intro DATs. Images are never part of the repository: they are downloaded on the device.
+  libretro-database's Redump and No-Intro DATs, and with `--prints` for the cartridges' prints (the
+  CRC32 of the ROM without an iNES header, in the N64's big-endian order). Images are never part
+  of the repository: they are downloaded on the device.
 - **Without the plugin**, A goes into a console, then plays the launch, which then fails: launch
   animations and insertions are tuned on a computer too. A launch animation's steps can be tuned
   apart from the app and exported as they are; `dev/launch_steps.py` keeps what the app plays.

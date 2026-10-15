@@ -29,6 +29,7 @@ import app.cartouche.android.launch.Launcher
 import app.cartouche.android.library.LaunchChoice
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.LibraryService
+import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.storage.SelectionStore
@@ -88,6 +89,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
@@ -151,6 +153,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Reference lists by platform, as loaded; each is indexed on first use, or ahead by [prepareTitles]. */
     @Volatile private var titleLists: Map<PlatformId, String> = emptyMap()
+
+    /** The prints of cartridge platforms' games, as loaded, indexed with their reference lists. */
+    @Volatile private var printLists: Map<PlatformId, String> = emptyMap()
 
     @Volatile private var titleIndexes = ConcurrentHashMap<PlatformId, TitleIndex>()
 
@@ -226,8 +231,8 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /**
      * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
      * profiles file's text, the reference lists as `{platform id: text}`, the emulator data folder
-     * names (`data_folders.json`), the curtain times (`curtains.json`) and the art extracts as
-     * `{platform id: text}`; returns the catalog summary.
+     * names (`data_folders.json`), the curtain times (`curtains.json`), the art extracts and the
+     * cartridge prints, each as `{platform id: text}`; returns the catalog summary.
      */
     @UsedByGodot
     public fun loadCatalog(
@@ -237,12 +242,14 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         dataFolderNames: String,
         curtains: String,
         art: Dictionary,
+        prints: Dictionary,
     ): Dictionary {
         val (notText, sources) =
             definitions.keys.sorted().separateEither { name ->
                 definitions.text(name).map { DefinitionSource(name, it) }.toEither { CatalogError.InvalidJson(name, "not text") }
             }
         titleLists = titles.textsByPlatform()
+        printLists = prints.textsByPlatform()
         titleIndexes = ConcurrentHashMap()
         artLists = art.textsByPlatform()
         artSources = ConcurrentHashMap()
@@ -499,8 +506,11 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     /**
-     * Scans the folder of the choices [setup] (as [setUpPlatform] takes them) for [platformId] without
-     * saving anything; answers with `{"report"}`, whose `games` the scan after saving them finds too.
+     * Scans the folder of the choices [setup] (as [setUpPlatform] takes them) for [platformId]
+     * without reading a game file or saving anything; answers with `{"report"}`. Its files are known
+     * by what they told at the last scan ([LibraryService.preview]): the scan after saving the choices
+     * finds the same games but for files it reads for the first time, which their content may group
+     * or name otherwise.
      */
     @UsedByGodot
     public fun previewPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = answering(requestId, libraryThread) {
@@ -579,8 +589,43 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         }
         library = lazyOf(libraryIn(folder))
         demo = true
-        scraper.lookFor(emptyList())
+        withContext(artPlanning) { scraper.lookFor(emptyList()) }
         success("library" to wire(library.value))
+    }
+
+    /**
+     * Debug builds only: scans every console with a folder again, reading all of their game files
+     * anew, forgets which games no source had art for, and looks every automatic label up again: the
+     * image found replaces the one stored, none found removes it. A label the user chose, their own
+     * picture or a region's image, is never touched. Answers once every label was looked for, so
+     * never while the network is down or a game is played (the run waits for them), with
+     * `{"library", "games", "labels", "failures"}`: how many games the library holds, how many of
+     * those looked for have a label, and why the consoles that could not be scanned were not. The
+     * images it removes are not told through [ART_SIGNAL]: it is asked from the device check, and
+     * the carousel reads the stored images anew when it comes back.
+     */
+    @UsedByGodot
+    public fun rescrape(requestId: Int): Unit = answering(requestId, libraryThread) {
+        ensure(BuildConfig.DEBUG) { invalid("Scraping again only exists in debug builds") }
+        ensure(!demo) { invalid("The demo library is shown: it has no folders to scan") }
+        val service = library.value
+        service.forgetFacts().mapLeft { it.toWire() }.bind()
+        val failures =
+            service.library().setups.filterValues { it.folder.isSome() }.keys.flatMap { id ->
+                catalog
+                    .platform(id)
+                    .toEither { LibraryFailure.UnknownPlatform(id) }
+                    .flatMap { service.scan(it, titles(id), dataFolders) }
+                    .fold({ listOf("${id.value}: ${it.message}") }) { emptyList() }
+            }
+        val again = ArtSources.lookAgain(service.library().games, ::sources)
+        artStore.lookAgain(again).mapLeft { it.toWire() }.bind()
+        trace("art") { "${again.asked.size} labels looked up again, ${again.unfound.size} that no source can have removed" }
+        lookForArt().join()
+        scraper.awaitOver()
+        val labels = again.asked.count { artStore.stored(it).isSome() }
+        trace("art") { "scraped again: $labels labels found of ${again.asked.size}" }
+        success("library" to wire(service)).apply { putAll(Rescraped(service.library().games.size, labels, failures).toWire()) }
     }
 
     /**
@@ -708,24 +753,24 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /**
      * Deletes the art of games no longer in the library, on [libraryThread] after the calls already
      * there, then looks for the art of its games that have none, in library order, planned on
-     * [artPlanning]: an answer never waits for it, and its failure fails no answer.
+     * [artPlanning]: an answer never waits for it, and its failure fails no answer. Done once the
+     * scraper has the games to look for.
      */
-    private fun lookForArt() {
-        scope.launch(libraryThread) {
-            if (demo) return@launch
-            library.value.gamesWithArt().onSome { kept ->
-                artStore
-                    .keepOnly(kept)
-                    .onRight { deleted -> if (deleted > 0) trace("art") { "$deleted images of games no longer in the library deleted" } }
-                    .onLeft { trace("art") { "images of games no longer in the library not deleted: ${it.message}" } }
-            }
-            val games = library.value.library().games
-            scope.launch(artPlanning) {
-                val versionOf = { platform: PlatformId -> artLists.getOrNone(platform).flatMap(ArtIndex::versionOf) }
-                scraper.lookFor(ArtSources.requests(games, artStore::wants, versionOf, ::sources))
-            }
-            if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
+    private fun lookForArt(): Job = scope.launch(libraryThread) {
+        if (demo) return@launch
+        library.value.gamesWithArt().onSome { kept ->
+            artStore
+                .keepOnly(kept)
+                .onRight { deleted -> if (deleted > 0) trace("art") { "$deleted images of games no longer in the library deleted" } }
+                .onLeft { trace("art") { "images of games no longer in the library not deleted: ${it.message}" } }
         }
+        val games = library.value.library().games
+        // A child: the look is over once the scraper has its requests, but this thread is free at once.
+        launch(artPlanning) {
+            val versionOf = { platform: PlatformId -> artLists.getOrNone(platform).flatMap(ArtIndex::versionOf) }
+            scraper.lookFor(ArtSources.requests(games, artStore::wants, versionOf, ::sources))
+        }
+        if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
     }
 
     private fun variantDownloaded(game: GameId, variant: ArtVariant, kept: Either<VariantFailure, StoredArt>) {
@@ -749,8 +794,13 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private fun artFetch(): Fetch =
         if ("--art-refused" in launchArguments()) Fetch { FetchFailure.Refused(503).left() } else HttpFetch("Cartouche")
 
-    private fun libraryIn(folder: File): LibraryService =
-        LibraryService(LibraryStore(File(folder, LIBRARY_FILE)), SelectionStore(File(folder, "selection.json")), folders, ::prepare)
+    private fun libraryIn(folder: File): LibraryService = LibraryService(
+        LibraryStore(File(folder, LIBRARY_FILE)),
+        SelectionStore(File(folder, "selection.json")),
+        folders,
+        FactsStore(File(folder, "facts")),
+        ::prepare,
+    )
 
     /**
      * Makes [finders] in the background, once the library call that kept them is over (its answer
@@ -836,7 +886,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     private fun titles(platform: PlatformId): TitleIndex = titleIndexes.computeIfAbsent(platform) {
         val started = TimeSource.Monotonic.markNow()
-        titleLists.getOrNone(platform).fold({ TitleIndex.EMPTY }, TitleIndex::parse).also {
+        titleLists.getOrNone(platform).fold({ TitleIndex.EMPTY }) { TitleIndex.parse(it, printLists.getOrElse(platform) { "" }) }.also {
             trace("titles") { "${platform.value}: ${it.size} indexed in ${started.elapsedNow().inWholeMilliseconds} ms" }
         }
     }

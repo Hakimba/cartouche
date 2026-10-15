@@ -110,7 +110,7 @@ class WireTest {
     fun `INV-E0-16 everything sent to Godot is a value its bridge converts`() {
         val uri = uri("content://p/tree/t")
         val folder = Folder(uri, "ps2", Some(FilePath("/storage/x")))
-        val entry = DocumentEntry(FileName("g.chd"), EntryKind.FILE, DocumentId("x:g.chd"), uri, None, None)
+        val entry = DocumentEntry(FileName("g.chd"), EntryKind.FILE, DocumentId("x:g.chd"), uri, None, None, None)
         val broken = Catalog.parse(listOf(DefinitionSource("broken.json", "{")), DefinitionSource("profiles.json", "{}"))
         listOf(
             success("library" to library.toWireJson(None, ps2)),
@@ -125,6 +125,7 @@ class WireTest {
             success("folder" to placed.toWire()),
             BatteryState(Some(57), plugged = true).toWire(),
             BatteryState.NONE.toWire(),
+            Rescraped(57, 50, listOf("gc: the folder cannot be read")).toWire(),
         ).forEach { it.isGodotValue() shouldBe true }
         arrayOf("a").isGodotValue() shouldBe true
         listOf("a").toTypedArray<Any>().isGodotValue() shouldBe false

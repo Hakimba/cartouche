@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.library
 
-import java.text.Normalizer
 import java.util.concurrent.ConcurrentHashMap
 
 /** Text as titles are filed and searched: lowercase Latin letters and digits, accents left out. */
@@ -20,8 +19,8 @@ internal object Folding {
         else ->
             folds.getOrPut(codePoint) {
                 LETTERS.getOrElse(codePoint) {
-                    MARK
-                        .replace(Normalizer.normalize(String(Character.toChars(codePoint)), Normalizer.Form.NFKD), "")
+                    TitleKey
+                        .unaccented(String(Character.toChars(codePoint)))
                         .lowercase()
                         .filter { it in 'a'..'z' || it in '0'..'9' }
                 }

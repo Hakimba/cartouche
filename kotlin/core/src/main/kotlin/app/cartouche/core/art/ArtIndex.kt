@@ -8,21 +8,27 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.filterOption
+import arrow.core.firstOrNone
 import arrow.core.getOrElse
 import arrow.core.raise.ensure
 import arrow.core.raise.option
 import arrow.core.singleOrNone
+import arrow.core.toOption
 
 /**
  * One platform's extract of the LaunchBox Games Database (`app/data/art`, written by
- * `dev/launchbox_art.py`): each game's scans, by region, found by title, all of the type of image
- * its platform's profile names (`ArtKind`: a disc's face, a cartridge's front).
+ * `dev/launchbox_art.py`): each game's names and scans, by region, all of the type of image its
+ * platform's profile names (`ArtKind`: a disc's face, a cartridge's front).
  */
 public class ArtIndex private constructor(
     /** None when the file does not name the database's date on its first line. */
     public val version: Option<ArtVersion>,
-    private val byName: Map<String, List<List<Image>>>,
-    private val byAlternateName: Map<String, List<List<Image>>>,
+    /** The games by their name's [joined] key. */
+    private val byName: Map<String, List<Match>>,
+    /** The games by their alternate names' [joined] keys. */
+    private val byAlternateName: Map<String, List<Match>>,
+    /** The games an alternate name written `<title> (<Country>)` names, by the title's [dashed] key and the country. */
+    private val regional: Map<Pair<String, String>, List<Match>>,
     /** How many games the extract knows. */
     public val size: Int,
 ) {
@@ -30,44 +36,91 @@ public class ArtIndex private constructor(
         val url: ArtUrl = ArtUrl(IMAGES + file)
     }
 
+    /** Compared by identity: two lines of the extract are two games, whatever they hold. */
+    private class Game(val name: String, val alternates: List<String>, val images: List<Image>)
+
+    /** A [game] found by one of its names. */
+    private class Match(val game: Game, val name: String)
+
     /**
-     * The scans of the game titled [title], closest to [regions] first (see [Regions]). The title
-     * is the game's name, or else one of its alternate names, whatever their case, accents,
-     * punctuation and spaces; a title that names several games names none, as it could be any of them.
+     * The scans of the game titled [title], closest to [regions] first (see [Regions.closestTo]),
+     * equally close ones in the extract's order. The game is the one an alternate name written
+     * `<title> (<one of regions>)` names; else those whose name is the title, else those of whom an
+     * alternate name is, whatever their case, accents, punctuation and spaces (LaunchBox sometimes
+     * joins words, `ChainDive`). Several games found are told apart by putting back what reducing
+     * took away, one step at a time (the spaces between words, punctuation with `: ` and ` - ` alike,
+     * accents, then the exact text), keeping those still named as the title; none or several left
+     * name none, as the title could be any of them.
      */
     public fun scansOf(title: String, regions: List<String>): List<ArtUrl> =
-        imagesOf(title).sortedBy { Regions.rank(regions, it.region) }.map { it.url }
+        imagesOf(title, regions).sortedWith(compareBy(Regions.closestTo(regions), Image::region)).map { it.url }
 
     /**
      * The scan of each region the extract has for the game titled [title] (found as by
      * [scansOf]), closest to [regions] first: one per region, the first the extract lists for it,
      * whichever name a source gives the region (`USA` and `North America` are one).
      */
-    public fun variantsOf(title: String, regions: List<String>): List<ArtVariant> = imagesOf(title)
+    public fun variantsOf(title: String, regions: List<String>): List<ArtVariant> = imagesOf(title, regions)
         .map { ArtVariant(LabelRegion(Regions.same(it.region)), it.url) }
         .distinctBy { it.region }
-        .sortedBy { Regions.rank(regions, it.region.name) }
+        .sortedWith(compareBy(Regions.closestTo(regions)) { it.region.name })
 
-    /** The scans of the one game titled [title], in the extract's order; none when no game or several are. */
-    private fun imagesOf(title: String): List<Image> = key(title)
-        .let { key -> byName.getOrElse(key) { byAlternateName.getOrElse(key) { emptyList() } } }
-        .singleOrNone()
-        .getOrElse { emptyList() }
+    private fun imagesOf(title: String, regions: List<String>): List<Image> {
+        val found =
+            regions
+                .flatMap { regional.getOrElse(dashed(title) to Regions.same(it)) { emptyList() } }
+                .ifEmpty { byName.getOrElse(joined(title)) { emptyList() } }
+                .ifEmpty { byAlternateName.getOrElse(joined(title)) { emptyList() } }
+        return LADDER
+            .runningFold(found) { kept, reduce -> kept.filter { reduce(it.name) == reduce(title) } }
+            .map { kept -> kept.map(Match::game).distinct() }
+            .firstOrNone { it.size <= 1 }
+            .flatMap { it.singleOrNone() }
+            .fold({ emptyList() }, Game::images)
+    }
 
     public companion object {
-        public val EMPTY: ArtIndex = ArtIndex(None, emptyMap(), emptyMap(), 0)
+        public val EMPTY: ArtIndex = ArtIndex(None, emptyMap(), emptyMap(), emptyMap(), 0)
 
         private const val IMAGES = "https://images.launchbox-app.com/"
 
+        private val REGIONAL_NAME = Regex("""(.*) \(([^()]+)\)""")
+        private val SPACES = Regex("""\s+""")
+
+        /**
+         * The title reduced for matching ([TitleKey]), its words kept apart; its bracketed tags stay
+         * (`Final Fantasy XII [Demo]` is another game).
+         */
+        private fun dashed(title: String): String = TitleKey.of(title).value
+
+        private fun joined(title: String): String = dashed(title).replace(" ", "")
+
+        private fun accented(title: String): String = title.lowercase().replace(": ", " - ").replace(SPACES, " ").trim()
+
+        private fun punctuated(title: String): String = accented(TitleKey.unaccented(title))
+
+        private val LADDER: List<(String) -> String> = listOf(::dashed, ::punctuated, ::accented, String::trim)
+
         /** Reads an extract; lines that are not `name<TAB>alternate names<TAB>scans` are skipped. */
         public fun parse(text: String): ArtIndex {
-            val version = versionOf(text)
             val games = text.lines().map(::parseLine).filterOption()
-            val byAlternateName = games.flatMap { (_, alternates, entry) -> alternates.map { it to entry } }
+
+            // A name of no Latin letter or digit, such as a Japanese one, reduces to nothing: it finds no
+            // game, but its romanised alternate names still do.
+            fun byKey(names: (Game) -> List<String>) =
+                games.flatMap { game -> names(game).map { Match(game, it) } }.groupBy { joined(it.name) } - ""
+            val regional =
+                games.flatMap { game ->
+                    game.alternates.map { REGIONAL_NAME.matchEntire(it).toOption() }.filterOption().map { written ->
+                        val (title, country) = written.destructured
+                        (dashed(title) to Regions.same(country)) to Match(game, title)
+                    }
+                }
             return ArtIndex(
-                version,
-                games.filter { it.first.isNotEmpty() }.groupBy({ it.first }, { it.third }),
-                byAlternateName.groupBy({ it.first }, { it.second }),
+                versionOf(text),
+                byKey { listOf(it.name) },
+                byKey(Game::alternates),
+                regional.filter { it.first.first.isNotEmpty() }.groupBy({ it.first }, { it.second }),
                 games.size,
             )
         }
@@ -76,14 +129,10 @@ public class ArtIndex private constructor(
         public fun versionOf(text: String): Option<ArtVersion> =
             Some(text.takeWhile { it != '\n' && it != '\r' }).filter { it.startsWith("#") }.map { ArtVersion(it.removePrefix("#").trim()) }
 
-        private fun parseLine(line: String): Option<Triple<String, Set<String>, List<Image>>> = option {
+        private fun parseLine(line: String): Option<Game> = option {
             val fields = line.split('\t')
             ensure(fields.size == 3 && !line.startsWith("#") && fields[0].isNotBlank())
-            // A name of no Latin letter or digit, such as a Japanese one, reduces to nothing: it finds no
-            // game, but its romanised alternate names still do.
-            val name = key(fields[0])
-            val alternates = fields[1].split('|').map(::key).filter(String::isNotEmpty).toSet() - name
-            Triple(name, alternates, images(fields[2]))
+            Game(fields[0], fields[1].split('|').filter(String::isNotEmpty), images(fields[2]))
         }
 
         private fun images(field: String): List<Image> = field
@@ -95,11 +144,5 @@ public class ArtIndex private constructor(
                     Image(parts[0], parts[1])
                 }
             }.filterOption()
-
-        /**
-         * A title reduced for matching ([TitleKey]) without its spaces, as LaunchBox sometimes joins
-         * words (`ChainDive`). Its bracketed tags stay: `Final Fantasy XII [Demo]` is another game.
-         */
-        private fun key(title: String): String = TitleKey.of(title).value.replace(" ", "")
     }
 }

@@ -4,18 +4,24 @@ package app.cartouche.core.library
 import app.cartouche.core.Shipped
 import app.cartouche.core.Shipped.ps2
 import app.cartouche.core.Shipped.ps2Titles
+import app.cartouche.core.files.FileFacts
 import arrow.core.None
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.Codepoint
+import io.kotest.property.arbitrary.alphanumeric
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.enum
+import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
+import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -32,6 +38,43 @@ class ScanTest {
         game.regions shouldBe listOf("Europe")
         game.serials shouldBe listOf("SLES-53047")
         game.redumpName shouldBe Some("Punisher, The (Europe) (En,Fr)")
+    }
+
+    /** A scan of [files], each holding what it is paired with. */
+    private fun read(vararg files: Pair<ListedFile, FileFacts>) =
+        Scan.of(ps2, contents(files.map { it.first }), ps2Titles, DiscGrouping.GROUPED, files.associate { it.first.uri to it.second })
+
+    @Test
+    fun `a file holding a known disc is that disc whatever its name, with that disc's regions, languages and version`() {
+        // Small: kept for a game since what it holds is one.
+        val game = read(listed("unknown game 1.chd", size = Some(20_000)) to FileFacts.Serial("SLES_524.95")).games.single()
+        listOf(game.title, game.regions, game.languages, game.version, game.serials, game.redumpName) shouldBe
+            listOf(
+                "Bujingai - Swordmaster",
+                listOf("Europe"),
+                listOf("En", "Fr", "De", "Es", "It"),
+                None,
+                listOf("SLES-52495"),
+                Some("Bujingai - Swordmaster (Europe) (En,Fr,De,Es,It)"),
+            )
+    }
+
+    @Test
+    fun `a game known by its content without its version takes the countries its versions share`() {
+        val game = read(listed("Avatar.chd") to FileFacts.Serial("SLES_541.88")).games.single()
+        listOf(game.title, game.regions, game.serials, game.redumpName) shouldBe
+            listOf("Nickelodeon Avatar - The Legend of Aang", listOf("Europe"), listOf("SLES-54188"), None)
+    }
+
+    @Test
+    fun `each disc gives its own serials by what it holds, a disc 2 that tells nothing none`() {
+        val one = listed("0 Story (Japan) (Disc 1).chd")
+        val two = listed("0 Story (Japan) (Disc 2).chd")
+        read(one to FileFacts.Serial("SLPM_650.02"), two to FileFacts.Silent).games.single().serials shouldBe listOf("SLPM-65002")
+        read(one to FileFacts.Serial("SLPM_650.02"), two to FileFacts.Serial("SLPM_650.03")).games.single().serials shouldBe
+            listOf("SLPM-65002", "SLPM-65003")
+        // The first disc telling nothing, both discs are found by their names.
+        read(one to FileFacts.Silent, two to FileFacts.Silent).games.single().serials shouldBe listOf("SLPM-65002", "SLPM-65003")
     }
 
     @Test
@@ -97,7 +140,7 @@ class ScanTest {
             val fileNames =
                 Arb.choice(
                     Arb.element(names),
-                    Arb.bind(Arb.element(names), Arb.element("", " (Beta)", " (v9.99)", " (En)", " (Korea)")) { name, tag ->
+                    Arb.bind(Arb.element(names), Arb.element("", " (Beta)", " (v9.99)", " (En)", " (Korea)", " (Disc 2)")) { name, tag ->
                         name.substringBefore(" (") + tag
                     },
                 )
@@ -106,12 +149,57 @@ class ScanTest {
                 Scan.of(ps2, contents(listOf(listed("$fileName.iso"))), ps2Titles, DiscGrouping.GROUPED).games.forEach { game ->
                     listOf(game.regions, game.languages, game.version) shouldBe listOf(stated.regions, stated.languages, stated.version)
                     game.redumpName.onSome { reference ->
-                        GameName.parse(reference).let { listOf(it.regions, it.languages, it.version, it.otherTags) } shouldBe
-                            listOf(stated.regions, stated.languages, stated.version, stated.otherTags)
+                        GameName.parse(reference).let { listOf(it.regions, it.languages, it.version, it.disc, it.otherTags) } shouldBe
+                            listOf(stated.regions, stated.languages, stated.version, stated.disc, stated.otherTags)
                     }
                 }
             }
         }
+
+    @Test
+    fun `INV-E11-01 a file whose content names one game is given that game, whatever its name says`() = runBlocking<Unit> {
+        // Each entry's serials, and the list's serials as discs write them (`SLES_524.95`) with the entries having each: read
+        // from the list, not the index.
+        val serialsOf =
+            Shipped.text("titles/ps2.tsv").lines().filter(String::isNotBlank).associate { line ->
+                line.substringBefore('\t') to line.substringAfter('\t').split(',').filter(String::isNotBlank)
+            }
+        val oneGame =
+            serialsOf.entries
+                .flatMap { (name, serials) -> serials.map { it.replace('-', '_') to name } }
+                .groupBy { FileFacts.Serial(it.first).key }
+                .values
+                .map { pairs -> pairs.first().first to pairs.map { it.second }.distinct() }
+                .filter { (_, names) -> names.map { GameName.parse(it).displayTitle }.distinct().size == 1 }
+        val fileNames = Arb.choice(Arb.element(Shipped.ps2Names), Arb.string(1..20, Codepoint.alphanumeric()))
+        var shared = 0
+        // As often a serial several versions share.
+        val serials = Arb.choice(Arb.element(oneGame), Arb.element(oneGame.filter { it.second.size > 1 }))
+        checkAll(serials, fileNames) { (serial, names), fileName ->
+            val game = read(listed("$fileName.iso") to FileFacts.Serial(serial)).games.single()
+            game.title shouldBe GameName.parse(names.first()).displayTitle
+            val versions = names.map { serialsOf.getValue(it).toSet() }
+            when {
+                names.size == 1 -> game.redumpName shouldBe Some(names.single())
+                // A name of no tag tells no version apart: the game keeps the serials all its versions share.
+                fileName !in serialsOf -> game.serials.toSet() shouldBe versions.reduce(Set<String>::intersect).also { shared++ }
+                else -> (game.serials.toSet() in versions + setOf(versions.reduce(Set<String>::intersect))) shouldBe true
+            }
+        }
+        shared shouldBeGreaterThan 100
+    }
+
+    @Test
+    fun `INV-E11-03 a file that tells nothing, or nothing the list knows, is identified by its name as before`() = runBlocking<Unit> {
+        // Crazy Taxi and an Xploder disc share SLES-50215: a serial naming two games names none.
+        val untold =
+            Arb.element(FileFacts.Silent, FileFacts.Serial("XXXX_999.99"), FileFacts.Print(0x03048DE6u), FileFacts.Serial("SLES_502.15"))
+        checkAll(folderFiles, Arb.list(untold, 12..12)) { files, facts ->
+            val read = files.zip(facts) { file, told -> file.uri to told }.toMap()
+            Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED, read) shouldBe
+                Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED)
+        }
+    }
 
     @Test
     fun `INV-E1-01 every file ends up in exactly one game or among the ignored files`() = runBlocking<Unit> {

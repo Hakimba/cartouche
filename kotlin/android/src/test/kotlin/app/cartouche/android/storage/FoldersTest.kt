@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.BadParcelableException
 import android.os.OperationCanceledException
 import android.provider.DocumentsContract.Document
+import app.cartouche.core.files.FileFacts
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.FolderDepth
 import app.cartouche.core.library.FolderPath
@@ -16,6 +17,7 @@ import app.cartouche.core.library.SkipReason
 import app.cartouche.core.library.SkippedFolder
 import app.cartouche.core.library.WalkFailure
 import app.cartouche.core.library.testDataFolders
+import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
@@ -41,6 +43,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import java.util.zip.CRC32
 import kotlin.reflect.KClass
 
 @RunWith(RobolectricTestRunner::class)
@@ -67,23 +70,24 @@ class FoldersTest {
     }
 
     @Test
-    fun `rows become files with their name, or the id's last segment, and their size when known`() {
+    fun `rows become files with their name, or the id's last segment, and their size and date when known`() {
         installDocuments { folder ->
             when (folder) {
                 "root" ->
                     rows(
-                        listOf("root/a.iso", "a.iso", "application/x-iso", 7L),
+                        listOf("root/a.iso", "a.iso", "application/x-iso", 7L, 1234L),
                         listOf("root/sub", "Sub", Document.MIME_TYPE_DIR, null),
                     )
                 else -> rows(listOf("root/sub/b.chd", null, null, null))
             }
         }
-        val contents = Folders(context).files(tree, FolderDepth.SUBFOLDERS, DataFolders.NONE).shouldBeRight()
+        val (contents, modified) = Folders(context).files(tree, FolderDepth.SUBFOLDERS, DataFolders.NONE).shouldBeRight()
         contents.files.map { Triple(it.name.value, it.uri.value, it.sizeBytes) } shouldBe
             listOf(
                 Triple("a.iso", "content://$AUTHORITY/tree/root/document/root%2Fa.iso", Some(7L)),
                 Triple("b.chd", "content://$AUTHORITY/tree/root/document/root%2Fsub%2Fb.chd", None),
             )
+        modified shouldBe mapOf(contents.files[0].uri to 1234L)
         // Only the external storage provider's documents have a filesystem path.
         contents.files.map { it.path } shouldBe listOf(None, None)
         contents.skipped shouldBe emptyList()
@@ -119,7 +123,7 @@ class FoldersTest {
                     fail()
                 }
             }
-            Folders(context).files(tree, FolderDepth.SUBFOLDERS, DataFolders.NONE).shouldBeRight().skipped shouldBe
+            Folders(context).files(tree, FolderDepth.SUBFOLDERS, DataFolders.NONE).shouldBeRight().contents.skipped shouldBe
                 listOf(SkippedFolder(FolderPath("s"), SkipReason.UNREADABLE))
         }
     }
@@ -163,7 +167,7 @@ class FoldersTest {
     fun `INV-E1-15 an emulator data folder is reported, never listed`() {
         val listed = mutableListOf<String>()
         installDocuments { folder -> rows(folderRow("root/MemCards"), fileRow("root/g.iso")).also { listed += folder } }
-        val contents = Folders(context).files(tree, FolderDepth.SUBFOLDERS, testDataFolders).shouldBeRight()
+        val contents = Folders(context).files(tree, FolderDepth.SUBFOLDERS, testDataFolders).shouldBeRight().contents
         contents.skipped shouldBe listOf(SkippedFolder(FolderPath("MemCards"), SkipReason.EMULATOR_DATA))
         listed shouldBe listOf("root")
     }
@@ -212,5 +216,35 @@ class FoldersTest {
         folders.keepOnly(setOf(kept[1])).shouldBeRight() shouldBe 2
         context.contentResolver.persistedUriPermissions.map { it.uri } shouldBe listOf(trees[1])
         folders.keepOnly(setOf(kept[1])).shouldBeRight() shouldBe 0
+    }
+
+    @Test
+    fun `a game file tells its disc's serial or its cartridge's print, read through its documents provider`() {
+        val rom = ByteArray(40_000) { (it * 31).toByte() }
+        val files =
+            mapOf(
+                "root/a.chd" to discImage("cd-cdlz.chd"),
+                "root/a.iso" to discImage("disc.iso"),
+                "root/b.iso" to gameCubeDisc,
+                "root/c.nes" to INES_HEADER + rom,
+                "root/d.iso" to ByteArray(4096),
+            )
+        installDocuments { rows() }.serving(files.mapValues { (id, bytes) -> documentFile(id, bytes) })
+
+        fun facts(platform: String, id: String) =
+            Folders(context).facts(PlatformId(platform), listedDocument(id, files.getValue(id).size.toLong())).shouldBeRight()
+        facts("ps2", "root/a.chd") shouldBe FileFacts.Serial(DISC_SERIAL)
+        facts("ps2", "root/a.iso") shouldBe FileFacts.Serial(DISC_SERIAL)
+        facts("gc", "root/b.iso") shouldBe FileFacts.Serial("GKYP")
+        facts("nes", "root/c.nes") shouldBe FileFacts.Print(CRC32().apply { update(rom) }.value.toUInt())
+        facts("ps2", "root/d.iso") shouldBe FileFacts.Silent
+    }
+
+    @Test
+    fun `a game file the provider cannot open is a failure, not a file that tells nothing`() {
+        installDocuments { rows() }
+        Folders(
+            context,
+        ).facts(PlatformId("ps2"), listedDocument("root/gone.iso", 4096)).shouldBeLeft().shouldBeInstanceOf<StorageFailure.Unavailable>()
     }
 }

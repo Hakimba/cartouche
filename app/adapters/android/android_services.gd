@@ -33,6 +33,8 @@ const _DATA_FOLDERS := "res://data/scan/data_folders.json"
 const _CURTAINS := "res://data/launch/curtains.json"
 ## One art extract per platform, named after its id (`ps2.tsv`).
 const _ART := "res://data/art"
+## The prints of each cartridge platform's games, named after its id (`nes.tsv`).
+const _PRINTS := "res://data/prints"
 ## The catalog and a demo library as the plugin sends them, for running without it: see
 ## `DesktopDemoTest.kt`, which keeps it up to date.
 const DESKTOP_DEMO := "res://dev/demo/desktop.json"
@@ -63,7 +65,8 @@ func is_available() -> bool:
 
 # Getters
 
-## Loads the bundled platform definitions, profiles and reference lists into the plugin, once.
+## Loads the bundled platform definitions, profiles, reference lists, art extracts and cartridge
+## prints into the plugin, once.
 func _load_catalog() -> void:
 	var started := Time.get_ticks_usec()
 	var profiles := FileAccess.get_file_as_string(_PLATFORM_PROFILES)
@@ -72,8 +75,9 @@ func _load_catalog() -> void:
 	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
 	var curtains := FileAccess.get_file_as_string(_CURTAINS)
 	var art := _files_in(_ART, ".tsv", true)
+	var cartridge_prints := _files_in(_PRINTS, ".tsv", true)
 	var read := Time.get_ticks_usec()
-	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders, curtains, art],
+	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders, curtains, art, cartridge_prints],
 		_desktop_demo("catalog"))
 	catalog = CatalogSummary.new(summary)
 	if Diagnostics.enabled:
@@ -259,6 +263,18 @@ func use_demo_library(games: int, platform_id := "") -> LibraryAnswer:
 	if not is_available():
 		return LibraryAnswer.new({"ok": true, "library": JSON.stringify(_desktop_demo("library"))})
 	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games, platform_id]))
+
+
+## Debug builds only: scans every console again, reading all of their game files anew, and looks
+## every automatic label up again (never one the user chose: their own picture or a region's
+## image); answers once every label was looked for, so not while offline or while a game is played.
+## Without the plugin, the desktop demo's library, none of whose games has a label.
+func rescrape() -> RescrapeAnswer:
+	if not is_available():
+		var demo := _desktop_demo("library")
+		var games: Array = demo.get("games", [])
+		return RescrapeAnswer.new({"ok": true, "library": JSON.stringify(demo), "games": games.size(), "labels": 0})
+	return RescrapeAnswer.new(await _request(&"rescrape"))
 
 
 ## The images the art sources have for [param game]'s label, one per region, closest to the
@@ -888,6 +904,21 @@ class ScanAnswer extends LibraryAnswer:
 		super(payload)
 		var item: Dictionary = payload.get("report", {})
 		report = ScanReport.new(item)
+
+
+class RescrapeAnswer extends LibraryAnswer:
+	## How many games the library holds.
+	var games: int
+	## How many of the labels looked for were found.
+	var labels: int
+	## Why each console that could not be scanned was not.
+	var failures: PackedStringArray
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		games = payload.get("games", 0)
+		labels = payload.get("labels", 0)
+		failures = payload.get("failures", PackedStringArray())
 
 
 ## A game's disc scan, as the plugin stored it.

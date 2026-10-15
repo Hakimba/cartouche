@@ -168,4 +168,29 @@ class ArtSourcesTest {
         // Mostly games the sources do have scans for, which an automatic label would get.
         withScans shouldBeGreaterThan 500
     }
+
+    @Test
+    fun `INV-E7-04 looking labels up again asks for each game a source may have art for, and never touches a label the user chose`() =
+        runBlocking<Unit> {
+            val sources = ArtSources(ArtKind.Disc, PS2_MEDIA, index, None)
+            val labels = Arb.element(LabelChoice.Automatic, LabelChoice.Own, LabelChoice.Region(LabelRegion("Japan")))
+            var own = 0
+            var region = 0
+            checkAll(Arb.list(Arb.pair(Arb.element("Okage", "Ico", "Unknown"), labels), 0..6)) { picked ->
+                val games = picked.mapIndexed { i, (title, label) -> game(title).copy(id = GameId("$i"), label = label) }
+                val again = ArtSources.lookAgain(games) { sources }
+                games.forEach { game ->
+                    val expected =
+                        when {
+                            game.label == LabelChoice.Own -> (false to false).also { own++ }
+                            game.label is LabelChoice.Region -> (false to false).also { region++ }
+                            game.title == "Okage" -> true to false
+                            else -> false to true
+                        }
+                    ((game.id in again.asked) to (game.id in again.unfound)) shouldBe expected
+                }
+            }
+            own shouldBeGreaterThan 100
+            region shouldBeGreaterThan 100
+        }
 }

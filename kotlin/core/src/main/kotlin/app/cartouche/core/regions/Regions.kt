@@ -53,6 +53,12 @@ internal object Regions {
         }
     }
 
+    /**
+     * Regions closest to [game]'s first ([rank]); at equal rank a zone's own name (an umbrella) before
+     * its other countries, so that a game of the world shows North America's scan before Brazil's.
+     */
+    fun closestTo(game: List<String>): Comparator<String> = compareBy({ rank(game, it) }, { same(it) !in umbrellas })
+
     /** The groups of [game]'s regions that this table knows. */
     fun groupsOf(game: List<String>): List<Group> = game.flatMap { GROUPS.getOrNone(same(it)).toList() }
 

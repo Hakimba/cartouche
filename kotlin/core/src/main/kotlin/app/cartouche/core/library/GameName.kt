@@ -119,7 +119,9 @@ public data class GameName(
         private val NON_ALPHANUMERIC = Regex("""[^a-z0-9]+""")
         private val MARKS = Regex("""\p{M}+""")
 
-        public fun of(title: String): TitleKey =
-            TitleKey(MARKS.replace(Normalizer.normalize(title, Normalizer.Form.NFKD), "").lowercase().replace(NON_ALPHANUMERIC, " ").trim())
+        public fun of(title: String): TitleKey = TitleKey(unaccented(title).lowercase().replace(NON_ALPHANUMERIC, " ").trim())
+
+        /** [text] without its accents and other marks, its letters decomposed (`é` is `e`, `ﬁ` is `fi`), its case and punctuation kept. */
+        internal fun unaccented(text: String): String = MARKS.replace(Normalizer.normalize(text, Normalizer.Form.NFKD), "")
     }
 }

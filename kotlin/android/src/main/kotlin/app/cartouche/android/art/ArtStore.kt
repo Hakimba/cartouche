@@ -7,8 +7,10 @@ import app.cartouche.android.storage.read
 import app.cartouche.android.storage.write
 import app.cartouche.core.art.AbsentArt
 import app.cartouche.core.art.ArtRequest
+import app.cartouche.core.art.ArtSources
 import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.ArtVersion
+import app.cartouche.core.art.LookAgain
 import app.cartouche.core.library.GameId
 import arrow.core.Either
 import arrow.core.None
@@ -41,6 +43,9 @@ internal class ArtStore(private val folder: File) {
 
     private val variants = File(folder, "variants")
 
+    /** The games, by stem, whose stored image is looked up again ([lookAgain]). */
+    private val lookedUpAgain = ConcurrentHashMap.newKeySet<String>()
+
     /** The stored images by file name stem (the hash), read from [folder] on first use. */
     private val stored: ConcurrentHashMap<String, StoredArt> by lazy {
         ConcurrentHashMap(
@@ -61,13 +66,37 @@ internal class ArtStore(private val folder: File) {
         folder.mkdirs()
         val stem = sha1(game.value)
         val art = StoredArt(File(folder, "$stem.jpg"))
-        return AtomicFile(art.file).write(image).map { art.also { stored[stem] = it } }
+        return AtomicFile(art.file).write(image).map {
+            lookedUpAgain.remove(stem)
+            art.also { stored[stem] = it }
+        }
     }
 
-    /** Stores [image] as [game]'s disc scan unless it has one, chosen by the user meanwhile; answers the one it has then. */
+    /**
+     * Stores [image] as [game]'s disc scan unless it has one, chosen by the user meanwhile, or one
+     * looked up again; answers the one it has then.
+     */
     @Synchronized
     fun saveIfAbsent(game: GameId, image: ByteArray): Either<StorageFailure, StoredArt> =
-        stored(game).fold({ save(game, image) }) { it.right() }
+        stored(game).filter { sha1(game.value) !in lookedUpAgain }.fold({ save(game, image) }) { it.right() }
+
+    /**
+     * Looks labels up again ([ArtSources.lookAgain]): no game is known to have none any more, the
+     * image stored for each game asked stays until the next one found replaces it (see
+     * [saveIfAbsent]), or goes when none is found (see [markAbsent]); those of the games no source
+     * can have art for go now. When the absences cannot be forgotten, nothing changes.
+     */
+    @Synchronized
+    fun lookAgain(again: LookAgain): Either<StorageFailure, Unit> = writeAbsent(AbsentArt()).map {
+        again.asked.mapTo(lookedUpAgain) { sha1(it.value) }
+        again.unfound.forEach { discard(sha1(it.value)) }
+    }
+
+    /** Deletes the image of the game of [stem]; a file that cannot be deleted is listed again at the next start, and goes then. */
+    private fun discard(stem: String) {
+        lookedUpAgain.remove(stem)
+        stored.remove(stem).toOption().onSome { it.file.delete() }
+    }
 
     /** Stores the scan of [url] kept by [saveVariant] as [game]'s disc scan; fails when it is gone or cannot be read. */
     @Synchronized
@@ -111,8 +140,8 @@ internal class ArtStore(private val folder: File) {
     fun keepOnly(kept: Set<GameId>): Either<StorageFailure, Int> {
         val stems = kept.mapTo(HashSet()) { sha1(it.value) }
         val gone = stored.keys.filter { it !in stems }
-        // A file that cannot be deleted is listed again at the next start, and goes then.
-        gone.forEach { stem -> stored.remove(stem).toOption().onSome { it.file.delete() } }
+        gone.forEach(::discard)
+        lookedUpAgain.retainAll(stems)
         val absentKept = absent().keeping(kept)
         return (if (absentKept == absent()) Unit.right() else writeAbsent(absentKept)).map { gone.size }
     }
@@ -121,12 +150,18 @@ internal class ArtStore(private val folder: File) {
     @Synchronized
     fun isAbsent(game: GameId, version: Option<ArtVersion>): Boolean = absent().covers(game, version)
 
-    /** Whether [game]'s art is still to be looked for in sources of [version]: none is stored, nor known to be missing there. */
-    fun wants(game: GameId, version: Option<ArtVersion>): Boolean = stored(game).isNone() && !isAbsent(game, version)
+    /**
+     * Whether [game]'s art is still to be looked for in sources of [version]: none is stored, or it
+     * is looked up again, and none is known to be missing there.
+     */
+    fun wants(game: GameId, version: Option<ArtVersion>): Boolean =
+        (stored(game).isNone() || sha1(game.value) in lookedUpAgain) && !isAbsent(game, version)
 
-    /** Remembers that no source of [request] has art for its game. */
+    /** Remembers that no source of [request] has art for its game; an image looked up again goes. */
     @Synchronized
     fun markAbsent(request: ArtRequest): Either<StorageFailure, Unit> {
+        val stem = sha1(request.game.value)
+        if (stem in lookedUpAgain) discard(stem)
         folder.mkdirs()
         return writeAbsent(absent().with(request))
     }

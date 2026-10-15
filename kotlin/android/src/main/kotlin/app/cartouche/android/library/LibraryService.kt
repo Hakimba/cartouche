@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.library
 
+import app.cartouche.android.storage.FactsStore
+import app.cartouche.android.storage.FileStamp
+import app.cartouche.android.storage.FolderListing
 import app.cartouche.android.storage.Folders
+import app.cartouche.android.storage.KnownFacts
 import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.storage.SelectionStore
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.android.trace
+import app.cartouche.core.ContentUri
+import app.cartouche.core.files.FileFacts
+import app.cartouche.core.files.FileReading
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderPath
@@ -33,6 +40,7 @@ import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.raise.either
 import arrow.core.raise.ensure
+import arrow.core.recover
 import arrow.core.right
 import kotlin.time.TimeSource
 
@@ -87,6 +95,7 @@ internal class LibraryService(
     private val store: LibraryStore,
     private val selections: SelectionStore,
     private val folders: Folders,
+    private val facts: FactsStore,
     /** Given new [finders] to make, as soon as possible but not on the caller's thread. */
     private val prepare: (Finders) -> Unit = {},
 ) {
@@ -161,7 +170,7 @@ internal class LibraryService(
     fun remove(platform: PlatformId): Either<LibraryFailure, Library> = either {
         // The selection first: one left remembering a platform that stayed only starts it from its first game.
         remember(selection().without(platform)).bind()
-        save(library().without(platform)).bind().also(::keepFoldersOf)
+        save(library().without(platform)).bind().also(::keepFoldersOf).also { facts.forget(platform) }
     }
 
     /**
@@ -198,29 +207,38 @@ internal class LibraryService(
             .onLeft { trace("library") { "folder access not given up: ${it.message}" } }
     }
 
-    /** Lists [platform]'s folder and replaces its games with what the scan finds. */
+    /**
+     * Lists [platform]'s folder, reads its game files new or changed since the last scan (see
+     * [factsOf]) and replaces its games with what the scan finds.
+     */
     fun scan(platform: Platform, titles: TitleIndex, dataFolders: DataFolders): Either<LibraryFailure, Pair<Library, ScanReport>> = either {
-        val (scan, report) = found(platform, library().setup(platform.id), titles, dataFolders).bind()
+        val (scan, report) = found(platform, library().setup(platform.id), titles, dataFolders) { factsOf(platform.id, it) }.bind()
         save(library().withScan(platform.id, scan)).bind() to report
     }
 
-    /** How many games a scan of [platform] with [setup] would find; nothing is saved. */
+    /**
+     * How many games a scan of [platform] with [setup] would find, its files identified by what they
+     * told at the last scan: no file is read, nothing is saved.
+     */
     fun preview(
         platform: Platform,
         setup: PlatformSetup,
         titles: TitleIndex,
         dataFolders: DataFolders,
-    ): Either<LibraryFailure, ScanReport> = found(platform, setup, titles, dataFolders).map { it.second }
+    ): Either<LibraryFailure, ScanReport> =
+        found(platform, setup, titles, dataFolders) { facts.load(platform.id).mapValues { it.value.facts } }.map { it.second }
 
+    /** The scan of [setup]'s folder, its files' facts as [told] gives them for its listing. */
     private fun found(
         platform: Platform,
         setup: PlatformSetup,
         titles: TitleIndex,
         dataFolders: DataFolders,
+        told: (FolderListing) -> Map<ContentUri, FileFacts>,
     ): Either<LibraryFailure, Pair<Scan, ScanReport>> = either {
         val folder = setup.folder.getOrElse { raise(LibraryFailure.NoFolder(platform.id)) }
         val started = TimeSource.Monotonic.markNow()
-        val contents =
+        val listing =
             folders
                 .files(folder, setup.depth, dataFolders)
                 .mapLeft { failure ->
@@ -230,7 +248,10 @@ internal class LibraryService(
                     }
                 }.bind()
         val listed = started.elapsedNow().inWholeMilliseconds
-        val scan = Scan.of(platform, contents, titles, setup.discs)
+        val contents = listing.contents
+        val known = told(listing)
+        val read = started.elapsedNow().inWholeMilliseconds - listed
+        val scan = Scan.of(platform, contents, titles, setup.discs, known)
         val report =
             ScanReport(
                 files = contents.files.size,
@@ -240,7 +261,7 @@ internal class LibraryService(
                 skippedFolders = scan.skippedFolders.size,
                 milliseconds = started.elapsedNow().inWholeMilliseconds,
             )
-        trace("scan") { "${platform.id.value}: $report, of which listing $listed ms" }
+        trace("scan") { "${platform.id.value}: $report, of which listing $listed ms, facts of ${known.size} files $read ms" }
         // A folder may hold thousands of files that are not games: the log shows how many, and the first ones.
         scan.ignored.groupBy { it.reason }.forEach { (reason, files) ->
             trace("scan") {
@@ -250,6 +271,32 @@ internal class LibraryService(
         scan.skippedFolders.forEach { trace("scan") { "skipped folder ${it.path.value}: ${it.reason}" } }
         scan to report
     }
+
+    /**
+     * What [listing]'s files tell of themselves, those [FileReading] reads for [platform]: as kept
+     * for a file of the same stamp, read now for the others, then kept for the next scan. A file that
+     * cannot be opened or read tells nothing, and is read again at the next scan.
+     */
+    private fun factsOf(platform: PlatformId, listing: FolderListing): Map<ContentUri, FileFacts> {
+        val kept = facts.load(platform)
+        val known =
+            listing.contents.files
+                .filter { !it.name.isHidden && FileReading.reads(platform, it.name) }
+                .flatMap { file ->
+                    val stamp = FileStamp(file.sizeBytes, listing.modified.getOrNone(file.uri))
+                    val unchanged = kept.getOrNone(file.uri).filter { it.stamp == stamp }
+                    val told = unchanged.map { it.facts }.recover { read(platform, file).bind() }
+                    told.map { file.uri to KnownFacts(stamp, it) }.toList()
+                }.toMap()
+        if (known != kept) facts.save(platform, known).onLeft { trace("files") { "what the files told not kept: ${it.message}" } }
+        return known.mapValues { it.value.facts }
+    }
+
+    private fun read(platform: PlatformId, file: ListedFile): Option<FileFacts> =
+        folders.facts(platform, file).onLeft { trace("files") { "${file.name.value} not read: ${it.message}" } }.getOrNone()
+
+    /** Forgets what the game files told: every one is read again at its platform's next scan. */
+    fun forgetFacts(): Either<StorageFailure, Unit> = facts.forget()
 
     /** What launching game [id] takes: [disc] (an index) if given, else the disc launched last, and its platform's choices. */
     fun launchChoice(id: GameId, disc: Option<Int>): Either<LibraryFailure, LaunchChoice> = either {

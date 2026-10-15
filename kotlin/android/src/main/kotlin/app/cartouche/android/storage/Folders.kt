@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.BadParcelableException
 import android.os.Bundle
 import android.os.OperationCanceledException
+import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
@@ -18,6 +19,8 @@ import app.cartouche.android.trace
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.files.FileFacts
+import app.cartouche.core.files.FileReading
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.FolderContents
 import app.cartouche.core.library.FolderDepth
@@ -25,6 +28,7 @@ import app.cartouche.core.library.FolderEntry
 import app.cartouche.core.library.FolderWalk
 import app.cartouche.core.library.ListedFile
 import app.cartouche.core.library.WalkFailure
+import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.storage.DocumentId
 import app.cartouche.core.storage.DocumentPaths
 import app.cartouche.core.storage.FolderPlace
@@ -43,6 +47,8 @@ import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
 import arrow.core.raise.option
 import arrow.core.toOption
+import java.io.IOException
+import kotlin.time.TimeSource
 
 /**
  * A folder the user granted through the system picker; [path] is none when it has no filesystem path,
@@ -58,7 +64,12 @@ internal data class DocumentEntry(
     val path: Option<FilePath>,
     /** None when the provider does not report it. */
     val sizeBytes: Option<Long>,
+    /** When the file last changed, in milliseconds since 1970; none when the provider does not report it. */
+    val modified: Option<Long>,
 )
+
+/** The files [FolderWalk] found, and when each last changed, as far as the provider reports it. */
+internal data class FolderListing(val contents: FolderContents, val modified: Map<ContentUri, Long>)
 
 internal enum class EntryKind { DIRECTORY, FILE }
 
@@ -116,15 +127,46 @@ internal class Folders(private val context: Context) {
     }
 
     /** The files of [tree] and, with [FolderDepth.SUBFOLDERS], of its sub-folders, as [FolderWalk] finds them. */
-    fun files(tree: ContentUri, depth: FolderDepth, dataFolders: DataFolders): Either<WalkFailure<StorageFailure>, FolderContents> =
+    fun files(tree: ContentUri, depth: FolderDepth, dataFolders: DataFolders): Either<WalkFailure<StorageFailure>, FolderListing> =
         guard { volumeRoots() }.mapLeft { WalkFailure.Unlisted(it) }.flatMap { roots ->
-            FolderWalk.files(depth, dataFolders) { folder, atMost ->
-                // The walk reports a sub-folder it cannot list without its reason: the log keeps it.
-                guard { entries(tree, folder, roots, atMost).map(DocumentEntry::asFolderEntry) }.onLeft { failure ->
-                    folder.onSome { trace("scan") { "cannot list ${it.value}: ${failure.message}" } }
+            // Filled as the walk lists, read once it is over.
+            val modified = HashMap<ContentUri, Long>()
+            FolderWalk
+                .files(depth, dataFolders) { folder, atMost ->
+                    // The walk reports a sub-folder it cannot list without its reason: the log keeps it.
+                    guard {
+                        entries(tree, folder, roots, atMost).map { entry ->
+                            entry.modified.onSome { modified[entry.uri] = it }
+                            entry.asFolderEntry
+                        }
+                    }.onLeft { failure -> folder.onSome { trace("scan") { "cannot list ${it.value}: ${failure.message}" } } }
+                }.map { FolderListing(it, modified) }
+        }
+
+    /**
+     * What [file] tells of itself, as [FileReading] reads it for [platform]: the file is opened
+     * read-only, through its documents provider, and closed once read. A file that cannot be opened
+     * or read (storage removed, access revoked) is a failure; one that tells nothing is
+     * [FileFacts.Silent].
+     */
+    fun facts(platform: PlatformId, file: ListedFile): Either<StorageFailure, FileFacts> = guard {
+        val started = TimeSource.Monotonic.markNow()
+        catch({
+            val descriptor =
+                context.contentResolver.openFileDescriptor(Uri.parse(file.uri.value), "r").toOption().getOrElse {
+                    raise(StorageFailure.Unavailable("the documents provider opened nothing"))
+                }
+            ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { stream ->
+                val source = DocumentBytes(stream.channel::read, descriptor.statSize)
+                FileReading.facts(platform, file.name, source).mapLeft { StorageFailure.Unavailable(it.detail) }.bind().also {
+                    trace("files") {
+                        "${file.name.value}: ${it.described}, ${source.bytesRead / 1024} kB read in " +
+                            "${started.elapsedNow().inWholeMilliseconds} ms"
+                    }
                 }
             }
-        }
+        }) { e: IOException -> raise(StorageFailure.Unavailable(e.toString())) }
+    }
 
     /** Whether [document] is still there: providers answer a document that is gone, or on removed storage, with no row. */
     fun exists(document: ContentUri): Either<StorageFailure, Boolean> = guard {
@@ -159,7 +201,7 @@ internal class Folders(private val context: Context) {
         treeUri: Uri,
         roots: Map<VolumeId, FilePath>,
     ): DocumentEntry {
-        val (idColumn, nameColumn, mimeColumn, sizeColumn) = columns
+        val (idColumn, nameColumn, mimeColumn, sizeColumn, modifiedColumn) = columns
         val id = DocumentId(ensureNotNull(cursor.getString(idColumn)) { StorageFailure.Unavailable("a document has no id") })
         return DocumentEntry(
             name = FileName(cursor.getString(nameColumn).toOption().getOrElse { DocumentPaths.fallbackName(id) }),
@@ -167,9 +209,12 @@ internal class Folders(private val context: Context) {
             documentId = id,
             uri = contentUri(DocumentsContract.buildDocumentUriUsingTree(treeUri, id.value)),
             path = DocumentPaths.pathOf(treeUri.authority.orEmpty(), id, roots),
-            sizeBytes = if (cursor.isNull(sizeColumn)) None else Some(cursor.getLong(sizeColumn)),
+            sizeBytes = cursor.long(sizeColumn),
+            modified = cursor.long(modifiedColumn),
         )
     }
+
+    private fun Cursor.long(column: Int): Option<Long> = if (isNull(column)) None else Some(getLong(column))
 
     private fun Raise<StorageFailure>.describe(treeUri: Uri, roots: Map<VolumeId, FilePath>): Folder {
         val rootId = DocumentId(DocumentsContract.getTreeDocumentId(treeUri))
@@ -228,6 +273,12 @@ internal class Folders(private val context: Context) {
 
     private companion object {
         val CHILD_COLUMNS =
-            arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE, Document.COLUMN_SIZE)
+            arrayOf(
+                Document.COLUMN_DOCUMENT_ID,
+                Document.COLUMN_DISPLAY_NAME,
+                Document.COLUMN_MIME_TYPE,
+                Document.COLUMN_SIZE,
+                Document.COLUMN_LAST_MODIFIED,
+            )
     }
 }

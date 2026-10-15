@@ -23,6 +23,7 @@ var _problem_reported := false
 @onready var _group_discs: CheckBox = %GroupDiscs
 @onready var _subfolders: CheckBox = %Subfolders
 @onready var _scan: Button = %Scan
+@onready var _rescrape: Button = %Rescrape
 @onready var _status: Label = %Status
 @onready var _games: ItemList = %Games
 @onready var _details: Label = %Details
@@ -95,6 +96,27 @@ func _on_scan_pressed() -> void:
 		report.games, report.identified, report.ignored, report.skipped_folders, report.files,
 		report.milliseconds]
 	logged.emit("Scan: " + _status.text)
+	_show_games()
+
+
+func _on_rescrape_pressed() -> void:
+	_rescrape.disabled = true
+	_status.text = "Scanning every console again and looking every label up again…"
+	var progress := func(change: AndroidServices.ArtChange) -> void:
+		var waiting := " (waiting: %s)" % change.progress.stall if not change.progress.stall.is_empty() else ""
+		_status.text = "Labels looked up: %d of %d%s" % [change.progress.done, change.progress.total, waiting]
+	Android.art_changed.connect(progress)
+	var answer := await Android.rescrape()
+	Android.art_changed.disconnect(progress)
+	_rescrape.disabled = false
+	if not answer.ok:
+		_status.text = "Scraping again failed (%s): %s" % [answer.code, answer.detail]
+		return
+	_library = answer.library
+	_status.text = "Scraped again: %d games, %d labels found" % [answer.games, answer.labels]
+	logged.emit(_status.text)
+	for failure in answer.failures:
+		logged.emit("[color=salmon]Not scanned: %s[/color]" % plain(failure))
 	_show_games()
 
 

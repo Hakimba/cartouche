@@ -28,6 +28,8 @@ import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
 import io.kotest.property.checkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -120,7 +122,7 @@ class ScraperTest {
                 script.forEach { step ->
                     val before = fetch.asked.size
                     when (step) {
-                        is Step.LookFor -> scraper.lookFor(requests(held, step.games))
+                        is Step.LookFor -> scope.launch { scraper.lookFor(requests(held, step.games)) }
                         is Step.Network -> {
                             fetch.online = step.online
                             if (step.online) scraper.networkBack()
@@ -132,7 +134,7 @@ class ScraperTest {
                         }
                         is Step.LookForThenStop -> {
                             if (!stopped) going = last.underWay.map { it.game.value.substringAfter('/') }.toSet()
-                            scraper.lookFor(requests(held, step.games))
+                            scope.launch { scraper.lookFor(requests(held, step.games)) }
                             scraper.stop()
                             stopped = true
                         }
@@ -150,7 +152,7 @@ class ScraperTest {
                 // Then the network is up and the app on screen, for as long as it takes.
                 fetch.online = true
                 scraper.start()
-                scraper.lookFor(requests(held, held.size))
+                scope.launch { scraper.lookFor(requests(held, held.size)) }
                 // A server that keeps refusing is asked again for ever: time is let pass, not until nothing is left to do.
                 scope.advanceTimeBy(3 * 60 * 60_000L)
                 scope.runCurrent()
@@ -163,7 +165,8 @@ class ScraperTest {
                 val absent = all.filter { store.isAbsent(it.game, it.version) }.map { it.game }.toSet()
                 // At the next start, only the games neither stored nor absent are looked for.
                 val restarted = FakeFetch(emptyMap())
-                Scraper(ArtStore(folder), restarted, scope) { _, _ -> }.lookFor(all)
+                val again = Scraper(ArtStore(folder), restarted, scope) { _, _ -> }
+                scope.launch { again.lookFor(all) }
                 scope.runCurrent()
                 restarted.asked
                     .map { GameId("ps2/" + it.substringAfter("art/").substringBefore('/')) }
@@ -192,7 +195,8 @@ class ScraperTest {
         val scope = TestScope(StandardTestDispatcher())
         val fetch = FakeFetch(emptyMap()).apply { online = false }
         val changes = mutableListOf<Scraping>()
-        Scraper(store, fetch, scope) { run, _ -> changes += run }.lookFor(requests(listOf(listOf(Held.IMAGE), listOf(Held.IMAGE)), 2))
+        val scraper = Scraper(store, fetch, scope) { run, _ -> changes += run }
+        scope.launch { scraper.lookFor(requests(listOf(listOf(Held.IMAGE), listOf(Held.IMAGE)), 2)) }
         scope.runCurrent()
         store.stored(GameId("ps2/0")) shouldBe Some(art)
         ArtStore(folder).stored(GameId("ps2/0")) shouldBe Some(art)
@@ -205,6 +209,8 @@ class ScraperTest {
         val scope = TestScope(StandardTestDispatcher())
         var last = Scraping.NONE
         val scraper = Scraper(store, fetch, scope) { run, _ -> last = run }
+
+        fun lookFor(requests: List<ArtRequest>) = scope.launch { scraper.lookFor(requests) }
     }
 
     private fun url(game: Int, candidate: Int) = "https://art/$game/$candidate.png"
@@ -215,7 +221,7 @@ class ScraperTest {
         val fetch = FakeFetch(mapOf(url(0, 1) to image))
         val harness = Harness(store, fetch)
         fetch.during = { if (it.value == url(0, 0)) harness.scraper.stop() }
-        harness.scraper.lookFor(requests(listOf(listOf(Held.NOTHING, Held.IMAGE), listOf(Held.IMAGE)), 2))
+        harness.lookFor(requests(listOf(listOf(Held.NOTHING, Held.IMAGE), listOf(Held.IMAGE)), 2))
         harness.scope.runCurrent()
         fetch.asked shouldBe listOf(url(0, 0))
         harness.last.waiting.map { it.game } shouldBe listOf(GameId("ps2/0"), GameId("ps2/1"))
@@ -232,7 +238,7 @@ class ScraperTest {
         val store = ArtStore(folder)
         val fetch = FakeFetch(mapOf(url(0, 0) to image)).apply { online = false }
         val harness = Harness(store, fetch)
-        harness.scraper.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
+        harness.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
         harness.scope.runCurrent()
         harness.last.stall shouldBe Some(Stall.OFFLINE)
         fetch.online = true
@@ -246,7 +252,7 @@ class ScraperTest {
         val store = ArtStore(folder)
         val fetch = FakeFetch(emptyMap(), mapOf(url(0, 0) to FetchFailure.Refused(429)))
         val harness = Harness(store, fetch)
-        harness.scraper.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
+        harness.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
         harness.scope.runCurrent()
         harness.last.stall shouldBe Some(Stall.REFUSED)
         fetch.images = mapOf(url(0, 0) to image)
@@ -268,7 +274,7 @@ class ScraperTest {
         val fetch = FakeFetch(mapOf(url(0, 0) to image))
         val harness = Harness(store, fetch)
         val request = requests(listOf(listOf(Held.IMAGE)), 1)
-        harness.scraper.lookFor(request)
+        harness.lookFor(request)
         harness.scope.runCurrent()
         harness.last.stall shouldBe Some(Stall.STORAGE)
         request.single().let { store.isAbsent(it.game, it.version) } shouldBe false
@@ -281,7 +287,8 @@ class ScraperTest {
         val cartridge = requests(listOf(listOf(Held.IMAGE, Held.IMAGE)), 1).map { it.copy(cut = cartridgeLabel) }
         // A square photo first, of no shape the cartridge's front has.
         val fetch = FakeFetch(mapOf(url(0, 0) to png(300, 300), url(0, 1) to cartridgeFront()))
-        Scraper(store, fetch, scope) { _, _ -> }.lookFor(cartridge)
+        val scraper = Scraper(store, fetch, scope) { _, _ -> }
+        scope.launch { scraper.lookFor(cartridge) }
         scope.runCurrent()
         val label = BitmapFactory.decodeFile(store.stored(GameId("ps2/0")).shouldBeSome().file.path)
         (label.width to label.height) shouldBe (280 to 120)
@@ -296,10 +303,27 @@ class ScraperTest {
         val found = mutableListOf<FoundArt>()
         val scope = TestScope(StandardTestDispatcher())
         val scraper = Scraper(store, fetch, scope) { _, art -> found += art.toList() }
-        scraper.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
+        scope.launch { scraper.lookFor(requests(listOf(listOf(Held.IMAGE)), 1)) }
         scope.runCurrent()
         val kept = store.stored(GameId("ps2/0")).shouldBeSome()
         kept.file.readBytes() shouldBe chosen
         found shouldBe listOf(FoundArt(GameId("ps2/0"), kept))
+    }
+
+    @Test
+    fun `waiting for the run to be over ends once every game was looked for, not while one waits for the network`() {
+        val held = listOf(listOf(Held.IMAGE), listOf(Held.NOTHING))
+        val scope = TestScope(StandardTestDispatcher())
+        val fetch = server(held).apply { online = false }
+        val scraper = Scraper(ArtStore(folder), fetch, scope) { _, _ -> }
+        scope.launch { scraper.lookFor(requests(held, 2)) }
+        scope.runCurrent()
+        val waiting = scope.async { scraper.awaitOver() }
+        scope.runCurrent()
+        waiting.isCompleted shouldBe false
+        fetch.online = true
+        scraper.networkBack()
+        scope.runCurrent()
+        waiting.isCompleted shouldBe true
     }
 }

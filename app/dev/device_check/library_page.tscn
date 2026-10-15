@@ -47,6 +47,12 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Scan"
 
+[node name="Rescrape" type="Button" parent="Options"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Scans every console again, reading every game file, and looks every label up again but the user's own pictures"
+text = "Scrape again"
+
 [node name="Status" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 2
@@ -97,6 +103,7 @@ size_flags_vertical = 3
 [connection signal="toggled" from="Options/GroupDiscs" to="." method="_on_setup_changed" unbinds=1]
 [connection signal="toggled" from="Options/Subfolders" to="." method="_on_setup_changed" unbinds=1]
 [connection signal="pressed" from="Options/Scan" to="." method="_on_scan_pressed"]
+[connection signal="pressed" from="Options/Rescrape" to="." method="_on_rescrape_pressed"]
 [connection signal="item_selected" from="Columns/Games" to="." method="_on_game_selected"]
 [connection signal="item_activated" from="Columns/Games" to="." method="_on_launch_pressed" unbinds=1]
 [connection signal="pressed" from="Columns/Side/LaunchButton" to="." method="_on_launch_pressed"]
