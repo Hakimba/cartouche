@@ -16,7 +16,7 @@ internal class FakeHttp(private val latency: Long = 1_000, var answer: (String) 
     var underWay = 0
     var mostAtOnce = 0
 
-    override suspend fun get(url: String): Either<Unanswered, Answer> {
+    override suspend fun get(url: String, progress: Progress): Either<Unanswered, Answer> {
         asked += url
         startedAt += now()
         underWay++

@@ -6,7 +6,6 @@ import app.cartouche.android.storage.StorageFailure
 import app.cartouche.android.storage.read
 import app.cartouche.android.storage.write
 import app.cartouche.core.art.Absences
-import app.cartouche.core.art.ArtRequest
 import app.cartouche.core.art.ArtSources
 import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.art.Candidate
@@ -23,6 +22,7 @@ import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.right
 import arrow.core.toOption
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
@@ -31,11 +31,16 @@ import java.util.concurrent.ConcurrentHashMap
 @JvmInline
 internal value class StoredArt(val file: File)
 
+/** One time labels were asked again ([ArtStore.retry], [ArtStore.lookAgain]), later ones numbered higher. */
+@JvmInline
+internal value class Ask(val number: Long)
+
 /**
  * The label images found for games, one file each in [folder] (the app's private storage), named
  * after a hash of the game's id, and what is remembered beside them: the games no source has art
  * for and the textures ScreenScraper has none of ([Absences], so that neither is asked at every
- * start), and the labels shown for want of a skipped ScreenScraper texture ([ProvisionalArt]).
+ * start), the labels shown for want of a skipped ScreenScraper texture ([ProvisionalArt]), and the
+ * labels asked again, so that a look stopped with the app still ends at the next start.
  * Images are written atomically: a file there is always a whole image. Safe to use from several
  * threads.
  */
@@ -54,8 +59,17 @@ internal class ArtStore(private val folder: File) {
 
     private val variants = File(folder, "variants")
 
-    /** The games, by stem, whose stored image is looked up again ([lookAgain]). */
-    private val lookedUpAgain = ConcurrentHashMap.newKeySet<String>()
+    /**
+     * The games, by stem, whose label is looked up again ([retry], [lookAgain]), each with the
+     * [Ask] that asked it: only a look taken under that ask settles it (see [asked]).
+     */
+    private val lookedUpAgain =
+        Remembered(folder, "again.json", emptyMap<String, Long>(), { Option.catch { Json.decodeFromString<Map<String, Long>>(it) } }) {
+            Json.encodeToString(it)
+        }
+
+    /** The latest [Ask]'s number; above every remembered one once [asking] ran. */
+    private var asks = 0L
 
     /** The stored images by file name stem (the hash), read from [folder] on first use. */
     private val stored: ConcurrentHashMap<String, StoredArt> by lazy {
@@ -73,27 +87,48 @@ internal class ArtStore(private val folder: File) {
 
     /** Stores [image] as [game]'s label, settled: the user chose it, no better one is to come. */
     @Synchronized
-    fun save(game: GameId, image: ByteArray): Either<StorageFailure, StoredArt> = saving(game, image, None)
+    fun save(game: GameId, image: ByteArray): Either<StorageFailure, StoredArt> = saving(game, image, None, asked(game))
 
     /**
      * Stores [image] as [game]'s label unless it has one, chosen by the user meanwhile, or one
      * looked up again, and answers the one it has then. Stored, the label is remembered as
      * provisional when it shows [shownFor] for want of a skipped texture, else settled; the mark
      * goes with the image, under the one lock, so that it never lands on a label the user chose.
+     * Asked again since [seen], the ask its look was taken under, it is still looked up again.
      */
     @Synchronized
-    fun saveIfAbsent(game: GameId, image: ByteArray, shownFor: Option<Identity>): Either<StorageFailure, StoredArt> =
-        stored(game).filter { sha1(game.value) !in lookedUpAgain }.fold({ saving(game, image, shownFor) }) { it.right() }
+    fun saveIfAbsent(game: GameId, image: ByteArray, shownFor: Option<Identity>, seen: Option<Ask>): Either<StorageFailure, StoredArt> =
+        stored(game).filter { asked(game).isNone() }.fold({ saving(game, image, shownFor, seen) }) { it.right() }
 
-    private fun saving(game: GameId, image: ByteArray, shownFor: Option<Identity>): Either<StorageFailure, StoredArt> {
+    private fun saving(game: GameId, image: ByteArray, shownFor: Option<Identity>, seen: Option<Ask>): Either<StorageFailure, StoredArt> {
         folder.mkdirs()
         val stem = sha1(game.value)
         val art = StoredArt(File(folder, "$stem.jpg"))
         return AtomicFile(art.file).write(image).flatMap {
-            lookedUpAgain.remove(stem)
             stored[stem] = art
-            marking(game, shownFor).map { art }
+            answered(stem, seen).flatMap { marking(game, shownFor) }.map { art }
         }
+    }
+
+    /** The [Ask] [game]'s label is looked up again under, if it is. */
+    @Synchronized
+    fun asked(game: GameId): Option<Ask> = lookedUpAgain.get().getOrNone(sha1(game.value)).map(::Ask)
+
+    /** Whether [game]'s label was asked again since [seen], the [Ask] its look was taken under. */
+    @Synchronized
+    fun askedSince(game: GameId, seen: Option<Ask>): Boolean = asked(game).isSome { Some(it) != seen }
+
+    /** The game of [stem] no longer looked up again, unless asked again since [seen]. */
+    private fun answered(stem: String, seen: Option<Ask>): Either<StorageFailure, Unit> {
+        val asked = lookedUpAgain.get()
+        return if (asked.getOrNone(stem).map(::Ask) == seen) lookedUpAgain.set(asked - stem) else Unit.right()
+    }
+
+    /** [stems] looked up again under a new [Ask]. */
+    private fun asking(stems: Collection<String>): Either<StorageFailure, Unit> {
+        val asked = lookedUpAgain.get()
+        asks = maxOf(asks, asked.values.maxOrNull() ?: 0) + 1
+        return lookedUpAgain.set(asked + stems.associateWith { asks })
     }
 
     /** [game]'s label remembered as showing [shownFor] for want of a better image, or settled when none. */
@@ -111,10 +146,8 @@ internal class ArtStore(private val folder: File) {
         .set(Absences())
         .flatMap { missingTextures.set(Absences()) }
         .flatMap { provisionalLabels.set(ProvisionalArt()) }
-        .map {
-            again.asked.mapTo(lookedUpAgain) { sha1(it.value) }
-            again.unfound.forEach { discard(sha1(it.value)) }
-        }
+        .flatMap { asking(again.asked.map { sha1(it.value) }) }
+        .flatMap { discard(again.unfound.map { sha1(it.value) }) }
 
     /** The identity of the image [game]'s label shows for want of a skipped ScreenScraper texture, if so. */
     @Synchronized
@@ -134,29 +167,33 @@ internal class ArtStore(private val folder: File) {
         is Candidate.Web -> Unit.right()
     }
 
-    /** [game]'s label is settled: no better image is to come. */
+    /** [game]'s label is settled: no better image is to come, unless asked again since [seen] (see [saveIfAbsent]). */
     @Synchronized
-    fun settle(game: GameId): Either<StorageFailure, Unit> {
-        lookedUpAgain.remove(sha1(game.value))
-        return marking(game, None)
-    }
+    fun settle(game: GameId, seen: Option<Ask>): Either<StorageFailure, Unit> =
+        answered(sha1(game.value), seen).flatMap { marking(game, None) }
 
-    /** [game]'s provisional label stays so, and is not looked up again until ScreenScraper is open at a run. */
+    /**
+     * [game]'s provisional label stays so, and is not looked up again until ScreenScraper is open
+     * at a run, unless asked again since [seen] (see [saveIfAbsent]).
+     */
     @Synchronized
-    fun keepProvisional(game: GameId) {
-        lookedUpAgain.remove(sha1(game.value))
-    }
+    fun keepProvisional(game: GameId, seen: Option<Ask>): Either<StorageFailure, Unit> = answered(sha1(game.value), seen)
 
-    /** Looks [games]' labels up again: each stored image stays until a better one replaces it (see [saveIfAbsent]). */
+    /**
+     * Looks [games]' labels up again, under a new [Ask]: each stored image stays until a better one
+     * replaces it (see [saveIfAbsent]); remembered across restarts.
+     */
     @Synchronized
-    fun retry(games: Set<GameId>) {
-        games.mapTo(lookedUpAgain) { sha1(it.value) }
-    }
+    fun retry(games: Set<GameId>): Either<StorageFailure, Unit> =
+        if (games.isEmpty()) Unit.right() else asking(games.map { sha1(it.value) })
 
-    /** Deletes the image of the game of [stem]; a file that cannot be deleted is listed again at the next start, and goes then. */
-    private fun discard(stem: String) {
-        lookedUpAgain.remove(stem)
-        stored.remove(stem).toOption().onSome { it.file.delete() }
+    /**
+     * Deletes the images of the games of [stems], no longer looked up again; a file that cannot be
+     * deleted is listed again at the next start, and goes then.
+     */
+    private fun discard(stems: Collection<String>): Either<StorageFailure, Unit> {
+        stems.forEach { stem -> stored.remove(stem).toOption().onSome { it.file.delete() } }
+        return lookedUpAgain.set(lookedUpAgain.get() - stems.toSet())
     }
 
     /** Stores the image of [candidate] kept by [saveVariant] as [game]'s label; fails when it is gone or cannot be read. */
@@ -201,10 +238,9 @@ internal class ArtStore(private val folder: File) {
     fun keepOnly(kept: Set<GameId>): Either<StorageFailure, Int> {
         val stems = kept.mapTo(HashSet()) { sha1(it.value) }
         val gone = stored.keys.filter { it !in stems }
-        gone.forEach(::discard)
-        lookedUpAgain.retainAll(stems)
-        return absentGames
-            .set(absentGames.get().keeping(kept))
+        return discard(gone)
+            .flatMap { lookedUpAgain.set(lookedUpAgain.get().filterKeys { it in stems }) }
+            .flatMap { absentGames.set(absentGames.get().keeping(kept)) }
             .flatMap { provisionalLabels.set(provisionalLabels.get().keeping(kept)) }
             .map { gone.size }
     }
@@ -217,16 +253,21 @@ internal class ArtStore(private val folder: File) {
      * Whether [game]'s art is still to be looked for in sources of [version]: none is stored, or it
      * is looked up again, and none is known to be missing there.
      */
-    fun wants(game: GameId, version: Option<ArtVersion>): Boolean =
-        (stored(game).isNone() || sha1(game.value) in lookedUpAgain) && !isAbsent(game, version)
-
-    /** Remembers that no source of [request] has art for its game; an image looked up again goes, a provisional label is settled. */
     @Synchronized
-    fun markAbsent(request: ArtRequest): Either<StorageFailure, Unit> {
-        val stem = sha1(request.game.value)
-        if (stem in lookedUpAgain) discard(stem)
-        return absentGames.set(absentGames.get().with(request.game, request.version)).flatMap { settle(request.game) }
-    }
+    fun wants(game: GameId, version: Option<ArtVersion>): Boolean =
+        (stored(game).isNone() || asked(game).isSome()) && !isAbsent(game, version)
+
+    /**
+     * Remembers that no source of [version] has art for [game]; an image looked up again goes, a
+     * provisional label is settled. Answers whether a label is stored then (one the user chose
+     * meanwhile), under the one lock: only a game without one shows that none was found.
+     */
+    @Synchronized
+    fun markAbsent(game: GameId, version: Option<ArtVersion>): Either<StorageFailure, Boolean> = asked(game)
+        .fold({ Unit.right() }) { discard(listOf(sha1(game.value))) }
+        .flatMap { absentGames.set(absentGames.get().with(game, version)) }
+        .flatMap { marking(game, None) }
+        .map { stored(game).isSome() }
 
     companion object {
         private val NAME = Regex("""([0-9a-f]{40})\.jpg""")

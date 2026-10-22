@@ -109,3 +109,17 @@ func test_art_added_with_its_image_is_ready_at_once_and_an_older_read_of_the_sam
 	assert_object(_art.texture(game)).is_same(chosen)
 	await _settled()
 	assert_object(_art.texture(game)).is_same(chosen)
+
+
+func test_INV_E11_09_a_game_found_to_have_no_image_drops_what_it_had_until_an_image_comes_and_goes_with_its_game() -> void:
+	var games := Fixtures.games(2)
+	_art.add(_stored(games[0]))
+	_art.mark_absent(games[0].id)
+	assert_bool(_art.is_absent(games[0])).is_true()
+	assert_bool(_art.has_art(games[0])).is_false()
+	assert_bool(_art.is_absent(games[1])).is_false()
+	_art.add(_stored(games[0]))
+	assert_bool(_art.is_absent(games[0])).is_false()
+	_art.mark_absent(games[1].id)
+	_art.keep_only([games[0]])
+	assert_bool(_art.is_absent(games[1])).is_false()

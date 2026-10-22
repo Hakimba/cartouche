@@ -175,6 +175,7 @@ func _ready() -> void:
 	# Asked first, its art looked for as soon as it is sent: the plugin reads the library while the
 	# scene sets itself up.
 	android.art_changed.connect(_on_art_changed)
+	android.art_progress.connect(_on_art_progress)
 	var demo_games := Diagnostics.argument("demo-games").to_int()
 	_demo = demo_games > 0 or not android.is_available()
 	var asked_library := AndroidServices.Asked.new(
@@ -242,6 +243,8 @@ func _ready() -> void:
 	get_viewport().msaa_3d = EdgeSmoothingScreen.MSAA[settings.edge_smoothing]
 	for art in answer.art:
 		_art.add(art)
+	for game_id in answer.absent:
+		_art.mark_absent(game_id)
 	_show_library(answer.library)
 	var library_shown_ms := Time.get_ticks_msec()
 	_screens.library = answer.library
@@ -710,7 +713,17 @@ func _on_art_changed(change: AndroidServices.ArtChange) -> void:
 	if change.has_found:
 		_art.add(change.found)
 		_row.refresh_label(change.found.game_id)
+	for game_id in change.absent:
+		_art.mark_absent(game_id)
+		_row.refresh_label(game_id)
 	_show_art_progress(progress)
+
+
+func _on_art_progress(download: AndroidServices.LabelDownload) -> void:
+	if download.running:
+		_row.downloading(download.game_id, download.fraction)
+	else:
+		_row.downloaded(download.game_id)
 
 
 func _on_row_selection_changed(_game: AndroidServices.Game) -> void:

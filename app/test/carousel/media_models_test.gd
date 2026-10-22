@@ -108,12 +108,13 @@ func test_a_game_without_a_scan_is_drawn_as_a_blank_of_its_console_its_band_read
 	assert_float(band.position.y + band.size.y).is_equal_approx(view.size.y, 0.01)
 
 
-func test_INV_E2_5_05_a_game_with_a_label_image_shows_it_and_the_others_their_title() -> void:
+func test_INV_E2_5_05_a_game_with_a_label_image_shows_it_and_the_others_their_title_once_found_to_have_none() -> void:
 	var games := Fixtures.games(3)
 	var image := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGBA8))
 	var images: Dictionary[String, Texture2D] = {games[1].title: image}
 	var row: ShelfRow = auto_free(ShelfRow.new())
 	row.label_images = auto_free(Fixtures.FakeArt.new(images))
+	row.label_images.mark_absent(games[2].id)
 	add_child(row)
 	row.show_shelf(games, 0, Fixtures.DVDS, ShelfRow.LabelLook.new())
 	row.set_process(false)
@@ -130,7 +131,7 @@ func test_INV_E2_5_05_a_game_with_a_label_image_shows_it_and_the_others_their_ti
 				assert_object(material.get_shader_parameter(&"label_texture")).is_equal(image)
 				assert_bool(material.get_shader_parameter(&"scanned")).is_true()
 			else:
-				assert_str(title_drawn.text).is_equal(title)
+				assert_str(title_drawn.text).is_equal(title if place.game == 2 else "")
 				assert_bool(material.get_shader_parameter(&"scanned")).is_false()
 	assert_int(seen).is_equal(1)
 

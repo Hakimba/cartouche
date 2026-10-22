@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android
 
+import app.cartouche.android.art.AbsentArt
 import app.cartouche.android.art.FoundArt
+import app.cartouche.android.art.LabelDownload
 import app.cartouche.android.art.OwnPicture
 import app.cartouche.android.art.StoredArt
 import app.cartouche.android.art.VariantFailure
@@ -43,6 +45,7 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.platforms.catalog
 import app.cartouche.core.platforms.definition
+import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.search.Group
 import app.cartouche.core.search.Mark
 import app.cartouche.core.search.View
@@ -120,8 +123,10 @@ class WireTest {
             success("entries" to listOf(entry).toWireArray { it.toWire() }),
             broken.toWire(),
             failure(ErrorCode.CANCELLED, "x"),
-            Scraping.NONE.toWire().putSome("found", Some(found.toWire())),
-            success("library" to library.toWireJson(None, ps2), "art" to listOf(found).artWireJson()),
+            Scraping.NONE.toWire(Some(found)),
+            Scraping.NONE.toWire(Some(AbsentArt(listOf(GameId("ps2/b"))))),
+            LabelDownload.Running(Some(0.5)).toWire(GameId("ps2/b")),
+            success("library" to library.toWireJson(None, ps2), "art" to listOf(found).artWireJson(), "absent" to arrayOf("ps2/b")),
             AppSettings(Some(ButtonStyle.NINTENDO)).toWire(false),
             success("folder" to placed.toWire()),
             BatteryState(Some(57), plugged = true).toWire(),
@@ -137,10 +142,12 @@ class WireTest {
 
     @Test
     fun `the settings and a folder's place reach Godot with the keys the GDScript adapter reads`() {
-        AppSettings().toWire(true) shouldBe dictionary("first_launch" to true, "edge_smoothing" to "4x")
-        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) shouldBe
+        AppSettings().toWire(true) - "preferred_regions" shouldBe dictionary("first_launch" to true, "edge_smoothing" to "4x")
+        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) - "preferred_regions" shouldBe
             dictionary("first_launch" to false, "button_style" to "playstation", "edge_smoothing" to "2x")
         AppSettings(edgeSmoothing = EdgeSmoothing.OFF).toWire(false)["edge_smoothing"] shouldBe "off"
+        AppSettings(preferredRegion = Some(PreferredRegion.NORTH_AMERICA)).toWire(false)["preferred_region"] shouldBe "North America"
+        (AppSettings().toWire(false)["preferred_regions"] as Array<*>).toList() shouldBe PreferredRegion.entries.map { it.region }
         val place = placed.toWire()["place"] as Dictionary
         place["volume"] shouldBe "card"
         (place["folders"] as Array<*>).toList() shouldBe listOf("ROMs", "ps2")
@@ -150,8 +157,14 @@ class WireTest {
     fun `a run's progress and the art found reach Godot with the keys and codes the GDScript adapter reads`() {
         val request = ArtRequest(GameId("ps2/a"), "A", nonEmptyListOf(web("https://a/a.png")), None, PS2_DISC)
         val (_, underWay) = Scraping.NONE.with(listOf(request)).take().shouldBeSome()
-        underWay.toWire() shouldBe dictionary("done" to 0, "total" to 1)
-        Stall.entries.map { underWay.stalled(request.game, it).toWire()["stall"] } shouldBe listOf("offline", "refused", "storage")
+        underWay.toWire(None) shouldBe dictionary("done" to 0, "total" to 1)
+        Stall.entries.map { underWay.stalled(request.game, it).toWire(None)["stall"] } shouldBe listOf("offline", "refused", "storage")
+        underWay.toWire(Some(found)) shouldBe dictionary("done" to 0, "total" to 1, "found" to found.toWire())
+        (underWay.toWire(Some(AbsentArt(listOf(GameId("ps2/a"), GameId("ps2/b")))))["absent"] as Array<*>).toList() shouldBe
+            listOf("ps2/a", "ps2/b")
+        LabelDownload.Running(Some(0.25)).toWire(GameId("ps2/b")) shouldBe dictionary("game_id" to "ps2/b", "fraction" to 0.25)
+        LabelDownload.Running(None).toWire(GameId("ps2/b")) shouldBe dictionary("game_id" to "ps2/b", "fraction" to -1.0)
+        LabelDownload.Over.toWire(GameId("ps2/b")) shouldBe dictionary("game_id" to "ps2/b")
         found.toWire() shouldBe dictionary("game_id" to "ps2/a", "path" to "/data/art/a.jpg")
         Json.parseToJsonElement(listOf(found).artWireJson()) shouldBe
             Json.parseToJsonElement("""[{"game_id": "ps2/a", "path": "/data/art/a.jpg"}]""")

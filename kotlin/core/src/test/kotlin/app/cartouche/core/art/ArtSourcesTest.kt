@@ -16,6 +16,8 @@ import app.cartouche.core.platforms.ScreenScraperSystem
 import app.cartouche.core.platforms.SerialScans
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.mediumId
+import app.cartouche.core.regions.PreferredRegion
+import app.cartouche.core.regions.Regions
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -32,6 +34,7 @@ import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.boolean
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
+import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.flatMap
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
@@ -146,12 +149,13 @@ class ArtSourcesTest {
                 val wants = { id: GameId, version: Option<ArtVersion> -> done.none { (game, v) -> game.id == id && v == version } }
                 val read = mutableSetOf<PlatformId>()
                 val planned =
-                    ArtSources.requests(games, wants, { false }, ::versionOf) { platform ->
-                        sources(platform).also {
-                            read +=
-                                platform
-                        }
-                    }
+                    ArtSources
+                        .requests(games, wants, { false }, ::versionOf) { platform ->
+                            sources(platform).also {
+                                read +=
+                                    platform
+                            }
+                        }.requests
                 // Every game's plan, as the scraper keeps it.
                 planned shouldBe games.flatMap { sources(it.platform).requestFor(it).toList() }.filter { wants(it.game, it.version) }
                 read shouldBe games.filter { wants(it.id, versionOf(it.platform)) }.map { it.platform }.toSet()
@@ -160,7 +164,8 @@ class ArtSourcesTest {
             val missing = { id: GameId, version: Option<ArtVersion> ->
                 !(id == game("Okage").id && version == Some(ArtVersion("2026-09-28")))
             }
-            ArtSources.requests(listOf(game("Okage")), missing, { false }, ::versionOf, ::sources).map { it.version } shouldBe listOf(newer)
+            ArtSources.requests(listOf(game("Okage")), missing, { false }, ::versionOf, ::sources).requests.map { it.version } shouldBe
+                listOf(newer)
         }
 
     @Test
@@ -169,8 +174,26 @@ class ArtSourcesTest {
         val labels = listOf(LabelChoice.Automatic, LabelChoice.Region(LabelRegion("Japan")), LabelChoice.Own)
         val games = labels.mapIndexed { i, label -> okage.copy(id = GameId("$i"), label = label) }
         val stored = { _: GameId, _: Option<ArtVersion> -> false }
-        ArtSources.requests(games, stored, { true }, { sources.version }) { sources }.map { it.game } shouldBe listOf(GameId("0"))
-        ArtSources.requests(games, stored, { false }, { sources.version }) { sources }.shouldBeEmpty()
+        ArtSources.requests(games, stored, { true }, { sources.version }) { sources }.requests.map { it.game } shouldBe listOf(GameId("0"))
+        ArtSources.requests(games, stored, { false }, { sources.version }) { sources }.requests.shouldBeEmpty()
+    }
+
+    @Test
+    fun `INV-E11-09 the automatic labels wanting art that no source can have are planned unfound, with their sources' version`() {
+        val sources = sources(textures = table)
+        val unknown = game("Unknown")
+        val games =
+            listOf(
+                okage,
+                unknown,
+                unknown.copy(id = GameId("chosen"), label = LabelChoice.Region(LabelRegion("Japan"))),
+                unknown.copy(id = GameId("own"), label = LabelChoice.Own),
+                unknown.copy(id = GameId("stored")),
+            )
+        val wants = { id: GameId, _: Option<ArtVersion> -> id != GameId("stored") }
+        val plan = ArtSources.requests(games, wants, { false }, { sources.version }) { sources }
+        plan.requests.map { it.game } shouldBe listOf(okage.id)
+        plan.unfound shouldBe mapOf(unknown.id to sources.version)
     }
 
     @Test
@@ -511,5 +534,105 @@ class ArtSourcesTest {
             ) shouldBe
                 expected
         }
+    }
+
+    @Test
+    fun `INV-E11-08 a preferred region orders the rest only when no single region is surely the game's, case by case`() {
+        val na = web("https://lb/na.png", "North America")
+        val us = web("https://lb/us.png", "USA")
+        val eu = web("https://lb/eu.png", "Europe")
+        val jp = web("https://lb/jp.png", "Japan")
+        val br = web("https://lb/br.png", "Brazil")
+        val fr = web("https://lb/fr.png", "France")
+        val de = web("https://lb/de.png", "Germany")
+        val disc = ArtKind.Disc
+
+        fun order(regions: List<String>, scans: List<Candidate.Web>, preferred: PreferredRegion) =
+            ArtSources.order(disc, regions, scans, emptyList(), emptyList(), Some(preferred))
+        // No region of its own: France's zone first, then the others ranked.
+        order(emptyList(), listOf(na, eu, jp), PreferredRegion.FRANCE) shouldBe listOf(eu, na, jp)
+        ArtSources.order(disc, emptyList(), listOf(na, eu, jp), emptyList(), emptyList()) shouldBe listOf(na, eu, jp)
+        // Two regions surely its own: its own images first, then the preferred one before a closer one.
+        order(listOf("USA", "Europe"), listOf(us, eu), PreferredRegion.JAPAN) shouldBe listOf(us, eu)
+        order(listOf("USA", "Europe"), listOf(us, eu, jp, br), PreferredRegion.JAPAN) shouldBe listOf(us, eu, jp, br)
+        ArtSources.order(disc, listOf("USA", "Europe"), listOf(us, eu, jp, br), emptyList(), emptyList()) shouldBe listOf(us, eu, br, jp)
+        // One region surely its own: the preference changes nothing.
+        order(listOf("France"), listOf(fr, de, us, jp), PreferredRegion.JAPAN) shouldBe listOf(fr, de, us, jp)
+        // The world or no region before any other region, after the preferred one and its zone.
+        order(emptyList(), listOf(jp, web("https://lb/any.png"), eu, fr), PreferredRegion.FRANCE) shouldBe
+            listOf(fr, eu, web("https://lb/any.png"), jp)
+    }
+
+    @Test
+    fun `INV-E11-08 a preferred region moves only the images not of the game's region, and only when no single region is surely its own`() =
+        runBlocking<Unit> {
+            val regions = Arb.element(ownImages.keys.toList() + "")
+            val images =
+                Arb.bind(Arb.list(regions, 0..2), Arb.list(regions, 0..5), Arb.list(regions, 0..5)) { game, scans, textures ->
+                    Triple(game, scans.mapIndexed { i, region -> web("https://lb/$i.png", region) }, textures.mapIndexed(::texture))
+                }
+            val serials = Arb.list(Arb.element("SCUS-97129", "SLPS-25358"), 0..1).map { it.map { s -> web("https://serial/$s.jpg") } }
+            var applied = 0
+            checkAll(
+                Arb.element(ArtKind.Disc, gba),
+                images,
+                serials,
+                Arb.enum<PreferredRegion>(),
+            ) { kind, (game, lb, ss), serial, preferred ->
+                val plain = ArtSources.order(kind, game, lb, ss, serial)
+                val ordered = ArtSources.order(kind, game, lb, ss, serial, Some(preferred))
+                val restSize = (lb + ss).count { !Regions.isOwn(game, it.region) }
+                val head = plain.size - restSize
+                ordered.take(head) shouldBe plain.take(head)
+                val rest = ordered.drop(head)
+                rest shouldContainExactlyInAnyOrder plain.drop(head)
+                val certain = (lb + ss).filter { Regions.rank(game, it.region) <= 1 }.map { Regions.same(it.region) }.toSet()
+                if (certain.size == 1) {
+                    ordered shouldBe plain
+                } else {
+                    val places = rest.map { Regions.preferredFirst(preferred, it.region) }
+                    places shouldBe places.sorted()
+                    // Within one place, the order without a preference.
+                    places.distinct().forEach { place ->
+                        rest.filterIndexed { i, _ -> places[i] == place } shouldBe
+                            plain.drop(head).filter { Regions.preferredFirst(preferred, it.region) == place }
+                    }
+                    if (places.distinct().size > 1) applied++
+                }
+            }
+            applied shouldBeGreaterThan 100
+        }
+
+    @Test
+    fun `INV-E11-08 a chosen region stays first and an own picture is never asked, whatever the preferred region`() {
+        val japan = sources(textures = table).preferring(Some(PreferredRegion.JAPAN))
+        val anywhere = okage.copy(regions = emptyList())
+        names(japan.requestFor(anywhere).shouldBeSome().candidates) shouldBe
+            listOf("jp.png", "ss:58:1234:support-texture(jp)", "na.png", "ss:58:1234:support-texture(us)")
+        names(sources(textures = table).requestFor(anywhere).shouldBeSome().candidates) shouldBe
+            listOf("na.png", "ss:58:1234:support-texture(us)", "jp.png", "ss:58:1234:support-texture(jp)")
+        val chosen = anywhere.copy(label = LabelChoice.Region(LabelRegion("North America"), ArtSource.LAUNCHBOX))
+        names(japan.requestFor(chosen).shouldBeSome().candidates).first() shouldBe "na.png"
+        japan.requestFor(anywhere.copy(label = LabelChoice.Own)).shouldBeNone()
+    }
+
+    @Test
+    fun `INV-E11-08 a change of the preferred region looks up again only the automatic labels whose first image changes`() {
+        val plain = sources(textures = table)
+        val japan = plain.preferring(Some(PreferredRegion.JAPAN))
+        val anywhere = okage.copy(id = GameId("anywhere"), regions = emptyList())
+        val games =
+            listOf(
+                anywhere,
+                okage,
+                anywhere.copy(id = GameId("chosen"), label = LabelChoice.Region(LabelRegion("North America"), ArtSource.LAUNCHBOX)),
+                anywhere.copy(id = GameId("own"), label = LabelChoice.Own),
+            )
+        val any = { _: Candidate, _: Option<ArtVersion> -> true }
+        ArtSources.reordered(games, { plain }, { japan }, any) shouldBe setOf(GameId("anywhere"))
+        ArtSources.reordered(games, { japan }, { japan }, any).shouldBeEmpty()
+        // Japan's images first change nothing when neither is ever tried (a texture remembered missing, the scan too here).
+        val notJapan = { candidate: Candidate, _: Option<ArtVersion> -> candidate.region != "Japan" }
+        ArtSources.reordered(games, { plain }, { japan }, notJapan).shouldBeEmpty()
     }
 }

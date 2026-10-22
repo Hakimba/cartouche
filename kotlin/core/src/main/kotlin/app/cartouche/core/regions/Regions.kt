@@ -83,6 +83,20 @@ internal object Regions {
      */
     fun closestTo(game: List<String>): Comparator<String> = compareBy({ rank(game, it) }, { same(it) !in umbrellas })
 
+    /**
+     * Where [image]'s region comes for a user who prefers [preferred]'s images: 0 that region, 1 the
+     * zone holding it (Europe for France), 2 the world or no region named, 3 any other.
+     */
+    fun preferredFirst(preferred: PreferredRegion, image: String): Int {
+        val region = same(image)
+        return when {
+            region == preferred.region -> 0
+            ZONES.getOrNone(preferred.region).isSome { it == region } -> 1
+            region in WORLD -> 2
+            else -> 3
+        }
+    }
+
     /** The groups of [game]'s regions that this table knows. */
     fun groupsOf(game: List<String>): List<Group> = game.flatMap { GROUPS.getOrNone(same(it)).toList() }
 

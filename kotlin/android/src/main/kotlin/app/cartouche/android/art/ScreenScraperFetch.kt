@@ -140,8 +140,11 @@ internal class ScreenScraperFetch(
         }
     }
 
-    /** [texture]'s image; skipped at once while ScreenScraper is not open, not found when the game has no such image. */
-    suspend fun get(texture: Candidate.Texture): Either<FetchFailure, ByteArray> {
+    /**
+     * [texture]'s image, [progress] told as it downloads; skipped at once while ScreenScraper is not
+     * open, not found when the game has no such image.
+     */
+    suspend fun get(texture: Candidate.Texture, progress: Progress): Either<FetchFailure, ByteArray> {
         checkAccount()
         val sent = admitted().getOrElse { return it.left() }
         val url =
@@ -154,7 +157,7 @@ internal class ScreenScraperFetch(
                 "maxheight" to "$SIZE",
             )
         return try {
-            val result = http.get(url)
+            val result = http.get(url, progress)
             answered(answerOf(result), result.getOrNone().flatMap { it.body }, sent)
         } finally {
             release()
@@ -240,7 +243,7 @@ internal class ScreenScraperFetch(
         val sent = admitted().getOrElse { return@withLock }
         val result =
             try {
-                http.get(url(USER, "output" to "json"))
+                http.get(url(USER, "output" to "json"), Progress.NONE)
             } finally {
                 release()
             }

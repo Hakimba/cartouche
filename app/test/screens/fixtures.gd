@@ -269,8 +269,11 @@ class NewDevice extends AndroidServices:
 	signal released
 
 	var first_launch := true
-	## The button style stored, as the settings send it; none when empty.
+	## The button style and the preferred region stored, as the settings send them; none when empty.
 	var button_style := ""
+	var preferred_region := ""
+	## The regions the plugin takes, as the settings send them.
+	var preferred_regions := PackedStringArray(["Europe", "North America", "Japan"])
 	## Whether the library already has games (the desktop demo's, set up nowhere).
 	var has_games := false
 	## The platforms set up, by id, with how many games each has.
@@ -289,6 +292,7 @@ class NewDevice extends AndroidServices:
 	var failing: Array[StringName] = []
 	var saved_styles: Array[StringName] = []
 	var saved_smoothings: Array[StringName] = []
+	var saved_regions: Array[String] = []
 	var previews: Array[AndroidServices.PlatformSetup] = []
 	var previewed_platforms: Array[String] = []
 	var set_up: Array[AndroidServices.PlatformSetup] = []
@@ -315,9 +319,11 @@ class NewDevice extends AndroidServices:
 	## A frame after it is asked for, as the plugin answers: after the scene's first frame.
 	func settings() -> AndroidServices.SettingsAnswer:
 		await _frames(1)
-		var answer := {"ok": true, "first_launch": first_launch}
+		var answer := {"ok": true, "first_launch": first_launch, "preferred_regions": preferred_regions}
 		if button_style:
 			answer["button_style"] = button_style
+		if preferred_region:
+			answer["preferred_region"] = preferred_region
 		return AndroidServices.SettingsAnswer.new(answer)
 
 	func library() -> AndroidServices.LibraryAnswer:
@@ -340,6 +346,10 @@ class NewDevice extends AndroidServices:
 	func save_edge_smoothing(smoothing: StringName) -> AndroidServices.Result:
 		saved_smoothings.append(smoothing)
 		return AndroidServices.Result.new({"ok": true})
+
+	func save_preferred_region(region: String) -> AndroidServices.Result:
+		saved_regions.append(region)
+		return AndroidServices.Result.new(_payload(&"save_preferred_region"))
 
 	func installed_players(platform_id: String) -> Array[AndroidServices.Player]:
 		var found: Array[AndroidServices.Player] = []

@@ -353,6 +353,71 @@ func test_the_button_style_changes_from_the_settings_and_B_there_keeps_it() -> v
 	assert_str(_focused()).is_equal("ButtonStyle")
 
 
+func test_the_preferred_region_is_chosen_in_a_list_from_the_settings_saved_once_changed_and_B_there_keeps_it() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	device.preferred_region = "Japan"
+	var carousel := await _shown(device)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_str(_text(carousel, "Settings/%Region/%Value")).is_equal("Japan")
+	for step in 3:
+		await Fixtures.action(self, &"ui_down")
+	assert_str(_focused()).is_equal("Region")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	var choice: ChoiceList = carousel.get_node("%Screens/Settings/%Choice")
+	assert_bool(choice.visible).is_true()
+	var items := PackedStringArray()
+	for item: Button in choice.get_node("%Items").get_children():
+		items.append(item.text)
+	assert_array(items).is_equal(PackedStringArray(["None", "Europe", "North America", "Japan"]))
+	await await_idle_frame()
+	assert_str((Fixtures.focus(self) as Button).text).is_equal("Japan")
+	# B gives the list up: nothing saved, the settings still open on the line.
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(choice.visible).is_false()
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_str(_focused()).is_equal("Region")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await await_idle_frame()
+	for step in 3:
+		await Fixtures.action(self, &"ui_up")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_regions.size() == 1)).is_true()
+	assert_array(device.saved_regions).is_equal([""])
+	assert_str(_text(carousel, "Settings/%Region/%Value")).is_equal("None")
+	assert_str(_focused()).is_equal("Region")
+	# The same region again saves nothing.
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await await_idle_frame()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_array(device.saved_regions).is_equal([""])
+
+
+func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_not_shown_chosen() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	device.preferred_regions = PackedStringArray(["Japan", "Korea"])
+	device.failing = [&"save_preferred_region"]
+	var carousel := await _shown(device)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	for step in 3:
+		await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	var choice: ChoiceList = carousel.get_node("%Screens/Settings/%Choice")
+	var items := PackedStringArray()
+	for item: Button in choice.get_node("%Items").get_children():
+		items.append(item.text)
+	assert_array(items).is_equal(PackedStringArray(["None", "Japan", "Korea"]))
+	await await_idle_frame()
+	await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_regions.size() == 1)).is_true()
+	assert_array(device.saved_regions).is_equal(["Japan"])
+	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_str(_text(carousel, "Settings/%Region/%Value")).is_equal("None")
+
+
 func test_Y_opens_the_settings_from_the_games_screen_too_and_B_goes_back_to_it() -> void:
 	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3}))
 	await Fixtures.joypad(self, JOY_BUTTON_A)

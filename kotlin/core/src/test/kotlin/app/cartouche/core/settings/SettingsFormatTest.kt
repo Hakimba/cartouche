@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.settings
 
+import app.cartouche.core.regions.PreferredRegion
 import arrow.core.None
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeLeft
@@ -29,6 +30,7 @@ class SettingsFormatTest {
             """{"version":3,"settings":{}}""",
             """{"version":2,"settings":{"buttonStyle":"sega"}}""",
             """{"version":2,"settings":{"edgeSmoothing":"8x"}}""",
+            """{"version":2,"settings":{"preferredRegion":"Atlantis"}}""",
         ).forEach { SettingsFormat.decode(it).shouldBeLeft() }
     }
 
@@ -45,6 +47,15 @@ class SettingsFormatTest {
         mapOf(EdgeSmoothing.FOUR_TIMES to "4x", EdgeSmoothing.TWICE to "2x", EdgeSmoothing.OFF to "off").forEach { (smoothing, name) ->
             SettingsFormat.encode(Settings(edgeSmoothing = smoothing)) shouldContain """"edgeSmoothing":"$name""""
         }
+    }
+
+    @Test
+    fun `INV-E11-08 settings stored before the preferred region existed read with none, and each region is stored under its name`() {
+        SettingsFormat
+            .decode("""{"version":2,"settings":{"buttonStyle":"xbox","edgeSmoothing":"2x"}}""")
+            .shouldBeRight(Settings(Some(ButtonStyle.XBOX), EdgeSmoothing.TWICE, None))
+        SettingsFormat.encode(Settings(preferredRegion = Some(PreferredRegion.UNITED_KINGDOM))) shouldContain
+            """"preferredRegion":"United Kingdom""""
     }
 
     @Test

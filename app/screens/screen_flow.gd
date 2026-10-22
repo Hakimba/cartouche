@@ -5,7 +5,8 @@ extends Control
 ## library loads, until a button is pressed; on a first launch the button style, then the curtain
 ## permission when Android does not allow it yet; while no console has games, "No console" and the
 ## form adding one, then the discovery of the console added. Later, the settings (Y): the platforms
-## set up, each to change or remove, the button style and the edges' smoothing; and the form adding
+## set up, each to change or remove, the button style, the edges' smoothing and the region labels'
+## images prefer; and the form adding
 ## one more console (the "+" above the consoles). One screen shows at a time, with the focus on it.
 ## Closes once the carousel can be used.
 
@@ -44,6 +45,9 @@ var library: AndroidServices.Library
 
 ## Whether the settings open now left no console with games at some point.
 var _emptied := false
+## The region labels' images prefer, as stored (empty for none), and those the plugin takes.
+var _preferred_region := ""
+var _preferred_regions: PackedStringArray
 
 @onready var _welcome: Welcome = %Welcome
 @onready var _button_style: ButtonStyleScreen = %ButtonStyle
@@ -60,6 +64,8 @@ var _emptied := false
 ## Goes on from the welcome as [param settings] and [member library] say; returns once the
 ## carousel can be used.
 func run(settings: AndroidServices.SettingsAnswer) -> void:
+	_preferred_region = settings.preferred_region
+	_preferred_regions = settings.preferred_regions
 	if welcome_waits:
 		await _welcome.passed()
 	# Shown once per start: what it holds (its worm, its large glyphs) is let go.
@@ -141,6 +147,19 @@ func _choose_edge_smoothing() -> void:
 		Diagnostics.trace("screens", "edge smoothing not saved (%s): %s" % [saved.code, saved.detail])
 
 
+## The region labels' images prefer, saved once another is chosen, and shown once saved: the plugin
+## looks again for the labels it changes.
+func _choose_preferred_region() -> void:
+	var region := await _settings.choose_region(_preferred_region, _preferred_regions)
+	if region == _preferred_region:
+		return
+	var saved := await android.save_preferred_region(region)
+	if saved.ok:
+		_preferred_region = region
+	else:
+		Diagnostics.trace("screens", "preferred region not saved (%s): %s" % [saved.code, saved.detail])
+
+
 ## "No console" until the form adds one, then its discovery. Returns at once when a console of
 ## the settings finds games.
 func _add_first_console() -> void:
@@ -181,7 +200,7 @@ func _settings_menu() -> void:
 	var focus := &"platforms"
 	while true:
 		_show(_settings)
-		_settings.open(_platforms_set_up().size(), focus)
+		_settings.open(_platforms_set_up().size(), focus, _preferred_region)
 		focus = await _settings.chosen
 		match focus:
 			&"close":
@@ -190,6 +209,8 @@ func _settings_menu() -> void:
 				await _choose_button_style(true)
 			&"graphics":
 				await _choose_edge_smoothing()
+			&"region":
+				await _choose_preferred_region()
 			&"platforms":
 				await _platform_menu()
 				if library.set_up_platforms().is_empty():

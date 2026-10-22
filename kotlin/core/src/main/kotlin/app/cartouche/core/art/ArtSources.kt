@@ -14,9 +14,11 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlatformProfile
 import app.cartouche.core.platforms.ScreenScraperSystem
 import app.cartouche.core.platforms.SerialScans
+import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.regions.Regions
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.firstOrNone
 import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.toNonEmptyListOrNone
@@ -25,7 +27,7 @@ import arrow.core.toNonEmptyListOrNone
  * Where one platform's images are looked for: its LaunchBox extract by title, ScreenScraper's
  * texture table by reference name, and its [bySerial] source; each image shows a medium of its
  * [kind], read for a game of the medium its [media] give it (see [cutOf]), and they are tried in
- * the order of [order].
+ * the order of [order], for a user who prefers [preferred]'s images.
  */
 public class ArtSources(
     private val kind: ArtKind,
@@ -33,6 +35,7 @@ public class ArtSources(
     private val index: ArtIndex,
     private val bySerial: Option<SerialScans>,
     private val textures: TextureTable,
+    private val preferred: Option<PreferredRegion> = None,
 ) {
     /** The sources' version, which each request carries: the extract's and the table's dates. */
     public val version: Option<ArtVersion> get() = ArtVersion.of(index.version, textures.version)
@@ -58,6 +61,9 @@ public class ArtSources(
             .map { ArtRequest(game.id, game.title, it, version, cutOf(game)) }
     }
 
+    /** The same sources, for a user who prefers [region]'s images: nothing is indexed again. */
+    public fun preferring(region: Option<PreferredRegion>): ArtSources = ArtSources(kind, media, index, bySerial, textures, region)
+
     /** How [game]'s label is cut from a scan. */
     public fun cutOf(game: Game): LabelCut = LabelCut(kind, media.of(game.regions))
 
@@ -78,6 +84,7 @@ public class ArtSources(
         index.scansOf(game.title, game.regions),
         game.redumpName.fold({ emptyList() }, textures::texturesOf),
         serial,
+        preferred,
     )
 
     private fun chosen(game: Game): List<Candidate> = when (val label = game.label) {
@@ -147,7 +154,9 @@ public class ArtSources(
          * other image closest first ([Regions.closestTo]), a texture before a scan when equally close; a disc
          * takes the scans of its region first, then the textures of its region, then its serial
          * scans, then the rest, a scan before a texture. A game of no region has no image of its
-         * region: its serial scans, then the ranked list.
+         * region: its serial scans, then the ranked list. INV-E11-08: with a [preferred] region, when
+         * the images hold no or several regions surely the game's ([Regions.rank] 0 or 1), the rest
+         * comes by [Regions.preferredFirst] before it is ranked.
          */
         public fun order(
             kind: ArtKind,
@@ -155,6 +164,7 @@ public class ArtSources(
             scans: List<Candidate.Web>,
             textures: List<Candidate.Texture>,
             bySerial: List<Candidate.Web>,
+            preferred: Option<PreferredRegion> = None,
         ): List<Candidate> {
             val (first, second) =
                 when (kind) {
@@ -163,8 +173,13 @@ public class ArtSources(
                 }
             val own = { candidate: Candidate -> Regions.isOwn(regions, candidate.region) }
             val closest = compareBy<Candidate, String>(Regions.closestTo(regions)) { it.region }
+            val certain = (first + second).filter { Regions.rank(regions, it.region) <= 1 }.map { Regions.same(it.region) }.toSet()
+            val rest =
+                preferred.filter { certain.size != 1 }.fold({ closest }) { region ->
+                    compareBy<Candidate> { Regions.preferredFirst(region, it.region) }.then(closest)
+                }
             return first.filter(own).sortedWith(closest) + second.filter(own).sortedWith(closest) + bySerial +
-                (first + second).filterNot(own).sortedWith(closest)
+                (first + second).filterNot(own).sortedWith(rest)
         }
 
         /**
@@ -172,7 +187,8 @@ public class ArtSources(
          * told what [versionOf] their platform's sources state), and of those whose label is
          * [provisional] while still automatic (a region the user chose or their own picture is never
          * asked again), in their order, each from its platform's [sources], asked for only for those
-         * games: when none wants art, as at most starts, no extract or table is indexed.
+         * games: when none wants art, as at most starts, no extract or table is indexed. The
+         * automatic labels among them that no source can have art for are [ArtPlan.unfound].
          */
         public fun requests(
             games: List<Game>,
@@ -180,9 +196,37 @@ public class ArtSources(
             provisional: (GameId) -> Boolean,
             versionOf: (PlatformId) -> Option<ArtVersion>,
             sources: (PlatformId) -> ArtSources,
-        ): List<ArtRequest> = games
-            .filter { wants(it.id, versionOf(it.platform)) || it.label == LabelChoice.Automatic && provisional(it.id) }
-            .flatMap { sources(it.platform).requestFor(it).toList() }
+        ): ArtPlan {
+            val planned =
+                games
+                    .filter { wants(it.id, versionOf(it.platform)) || it.label == LabelChoice.Automatic && provisional(it.id) }
+                    .map { it to sources(it.platform).requestFor(it) }
+            return ArtPlan(
+                planned.flatMap { it.second.toList() },
+                planned
+                    .filter { (game, request) -> request.isNone() && game.label == LabelChoice.Automatic }
+                    .associate { (game, _) -> game.id to versionOf(game.platform) },
+            )
+        }
+
+        /**
+         * The automatic labels of [games] whose first image [tried] (not a texture remembered
+         * missing in the request's version) is another in [after] than in [before] (their platforms'
+         * sources for one preferred region and another): those a change of the preference looks up
+         * again; a label the user chose, or their own picture, is never one.
+         */
+        public fun reordered(
+            games: List<Game>,
+            before: (PlatformId) -> ArtSources,
+            after: (PlatformId) -> ArtSources,
+            tried: (Candidate, Option<ArtVersion>) -> Boolean,
+        ): Set<GameId> {
+            fun first(sources: ArtSources, game: Game) =
+                sources.requestFor(game).flatMap { request -> request.candidates.firstOrNone { tried(it, request.version) } }
+            return games
+                .filter { it.label == LabelChoice.Automatic && first(before(it.platform), it) != first(after(it.platform), it) }
+                .mapTo(HashSet()) { it.id }
+        }
 
         /**
          * Which automatic labels of [games] are looked up again from scratch: those a source of their
@@ -196,6 +240,12 @@ public class ArtSources(
         }
     }
 }
+
+/**
+ * A look's [requests], and the games of an automatic label wanting art that no source can have any
+ * for ([unfound]), with their sources' version: known absent at once, they show their title.
+ */
+public data class ArtPlan(public val requests: List<ArtRequest>, public val unfound: Map<GameId, Option<ArtVersion>>)
 
 /** The games whose label is looked up again ([asked]), and those no source can have art for ([unfound]). */
 public data class LookAgain(public val asked: Set<GameId>, public val unfound: Set<GameId>)

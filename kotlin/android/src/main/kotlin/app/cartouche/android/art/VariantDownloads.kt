@@ -54,7 +54,7 @@ internal class VariantDownloads(
 
     /** The image, cut and kept; a texture ScreenScraper has none of is remembered so (INV-E11-04). */
     private suspend fun kept(variant: ArtVariant, cut: LabelCut, version: Option<ArtVersion>): Either<VariantFailure, StoredArt> = fetch
-        .get(variant.candidate)
+        .get(variant.candidate, Progress.NONE)
         .mapLeft { failure ->
             when (failure) {
                 FetchFailure.NotFound -> {

@@ -74,6 +74,12 @@ func platform_area() -> Rect2:
 	return PLATFORM_AREA
 
 
+## The radius of the ring a blank label shows while its image downloads, centred on it, as a
+## fraction of its image's smaller side.
+func progress_ring_radius() -> float:
+	return 0.2
+
+
 func _forget_problems() -> void:
 	_checked = false
 

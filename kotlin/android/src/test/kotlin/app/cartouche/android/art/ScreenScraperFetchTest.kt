@@ -124,7 +124,7 @@ class ScreenScraperFetchTest {
                 // Several games' textures asked for together, a run a day for three days, the answers consumed in the script's order.
                 repeat(3) { day ->
                     scope.launch { harness.fetch.newRun() }
-                    repeat(requests) { i -> scope.launch { harness.fetch.get(texture(i)) } }
+                    repeat(requests) { i -> scope.launch { harness.fetch.get(texture(i), Progress.NONE) } }
                     scope.advanceUntilIdle()
                     if (day == 0) {
                         // Restarted the same day: a closure until a day and an off state are remembered, and still answer
@@ -136,7 +136,7 @@ class ScreenScraperFetchTest {
                             }
                         again.fetch.open shouldBe !closed
                         restartFrom = http.asked.size
-                        scope.launch { again.fetch.get(texture(9)) }
+                        scope.launch { again.fetch.get(texture(9), Progress.NONE) }
                         scope.advanceUntilIdle()
                         restartTo = http.asked.size
                         (restartTo - restartFrom) shouldBe (
@@ -202,7 +202,7 @@ class ScreenScraperFetchTest {
         val scope = TestScope(StandardTestDispatcher())
         val http = FakeHttp { url -> if ("ssuserInfos" in url) limits(6, 7168) else ok(png) }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        val got = scope.async { harness.fetch.get(texture(195388, "support-texture(jp)[2]")) }
+        val got = scope.async { harness.fetch.get(texture(195388, "support-texture(jp)[2]"), Progress.NONE) }
         scope.advanceUntilIdle()
         got.getCompleted().shouldBeRight() shouldBe png
         val (account, image) = http.asked
@@ -239,7 +239,7 @@ class ScreenScraperFetchTest {
         val scope = TestScope(StandardTestDispatcher())
         val http = FakeHttp { url -> if ("ssuserInfos" in url) status(HttpURLConnection.HTTP_FORBIDDEN) else ok(png) }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i)) } }
+        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i), Progress.NONE) } }
         scope.advanceUntilIdle()
         http.asked.count { "ssuserInfos" in it } shouldBe 1
         http.asked.filter { "mediaJeu" in it }.forEach { it shouldNotContain "ssid=" }
@@ -254,13 +254,13 @@ class ScreenScraperFetchTest {
         var checks = 0
         val http = FakeHttp { url -> if ("ssuserInfos" in url) (if (checks++ == 0) status(500) else limits(3, 100)) else ok(png) }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        scope.launch { harness.fetch.get(texture(1)) }
+        scope.launch { harness.fetch.get(texture(1), Progress.NONE) }
         scope.advanceUntilIdle()
         // The failing server closes the run as any request's would: the texture is skipped without a request.
         harness.states.map { it.second } shouldBe listOf(ScreenScraperState.ClosedForRun(Closure.UNREADABLE))
         http.asked.count { "mediaJeu" in it } shouldBe 0
         scope.launch { harness.fetch.newRun() }
-        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i)) } }
+        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i), Progress.NONE) } }
         scope.advanceUntilIdle()
         http.asked.count { "ssuserInfos" in it } shouldBe 2
         http.asked.filter { "mediaJeu" in it }.forEach { it shouldContain "ssid=someone" }
@@ -272,7 +272,7 @@ class ScreenScraperFetchTest {
         val scope = TestScope(StandardTestDispatcher())
         val wrongKey = FakeHttp { url -> if ("ssuserInfos" in url) ok(ScreenScraperFetch.LOGIN_REFUSED.encodeToByteArray()) else ok(png) }
         val off = Harness(folder, key.copy(member = Some(member)), wrongKey, scope)
-        val got = scope.async { off.fetch.get(texture(1)) }
+        val got = scope.async { off.fetch.get(texture(1), Progress.NONE) }
         scope.advanceUntilIdle()
         got.getCompleted().shouldBeLeft(FetchFailure.Skipped(ScreenScraperState.Off(Refusal.WRONG_KEY)))
         wrongKey.asked.size shouldBe 1
@@ -280,7 +280,7 @@ class ScreenScraperFetchTest {
         val level0 = """{"response":{"ssuser":{"maxthreads":"6","maxrequestspermin":"7168","niveau":"0"}}}"""
         val refused = FakeHttp { url -> if ("ssuserInfos" in url) ok(level0.encodeToByteArray()) else ok(png) }
         val keyAlone = Harness(folder, key.copy(member = Some(member)), refused, scope)
-        repeat(3) { i -> scope.launch { keyAlone.fetch.get(texture(i)) } }
+        repeat(3) { i -> scope.launch { keyAlone.fetch.get(texture(i), Progress.NONE) } }
         scope.advanceUntilIdle()
         refused.asked.count { "ssuserInfos" in it } shouldBe 1
         refused.asked.filter { "mediaJeu" in it }.forEach { it shouldNotContain "ssid=" }
@@ -296,7 +296,7 @@ class ScreenScraperFetchTest {
 
         fun got(answer: Either<Unanswered, Answer>): Either<FetchFailure, ByteArray> {
             body = answer
-            val got = scope.async { harness.fetch.get(texture(1)) }
+            val got = scope.async { harness.fetch.get(texture(1), Progress.NONE) }
             scope.advanceUntilIdle()
             return got.getCompleted()
         }
@@ -327,7 +327,7 @@ class ScreenScraperFetchTest {
         val http = FakeHttp { ok(ScreenScraperFetch.LOGIN_REFUSED.encodeToByteArray()) }
         val harness = Harness(folder, key, http, scope)
         val got = mutableListOf<Either<FetchFailure, ByteArray>>()
-        repeat(3) { i -> scope.launch { got += harness.fetch.get(texture(i)) } }
+        repeat(3) { i -> scope.launch { got += harness.fetch.get(texture(i), Progress.NONE) } }
         scope.advanceUntilIdle()
         got.forEach { it.shouldBeLeft(FetchFailure.Skipped(ScreenScraperState.Off(Refusal.WRONG_KEY))) }
         http.asked.size shouldBe 1
@@ -337,7 +337,7 @@ class ScreenScraperFetchTest {
         stateFile.readText() shouldNotContain "cartouche-dev"
         val again = Harness(folder, key, http, scope)
         again.fetch.open shouldBe false
-        scope.launch { again.fetch.get(texture(9)) }
+        scope.launch { again.fetch.get(texture(9), Progress.NONE) }
         scope.advanceUntilIdle()
         http.asked.size shouldBe 1
         Harness(folder, key.copy(devPassword = "NEWSECRET"), http, scope).fetch.open shouldBe true
@@ -349,10 +349,10 @@ class ScreenScraperFetchTest {
         var body: Either<Unanswered, Answer> = status(429)
         val http = FakeHttp { body }
         val harness = Harness(folder, key, http, scope)
-        scope.launch { harness.fetch.get(texture(1)) }
+        scope.launch { harness.fetch.get(texture(1), Progress.NONE) }
         scope.advanceUntilIdle()
         body = ok(png)
-        scope.launch { harness.fetch.get(texture(2)) }
+        scope.launch { harness.fetch.get(texture(2), Progress.NONE) }
         // The back-off runs from the 429's arrival, a second after the request was sent.
         scope.advanceTimeBy(9_999)
         scope.runCurrent()
@@ -362,7 +362,7 @@ class ScreenScraperFetchTest {
         http.asked.size shouldBe 2
         body = Unanswered.Offline("UnknownHostException").left()
         val got = mutableListOf<Either<FetchFailure, ByteArray>>()
-        scope.launch { got += harness.fetch.get(texture(3)) }
+        scope.launch { got += harness.fetch.get(texture(3), Progress.NONE) }
         scope.advanceUntilIdle()
         got shouldBe listOf(FetchFailure.Skipped(ScreenScraperState.ClosedForRun(Closure.UNREACHABLE)).left())
         harness.fetch.open shouldBe false
@@ -376,13 +376,13 @@ class ScreenScraperFetchTest {
         val scope = TestScope(StandardTestDispatcher())
         val http = FakeHttp { url -> if ("ssuserInfos" in url) limits(3, 100) else status(429) }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i)) } }
+        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i), Progress.NONE) } }
         scope.advanceUntilIdle()
         // The account read first, then the three textures sent together and answered together.
         http.startedAt shouldBe listOf(0L, 1_000L, 1_000L, 1_000L)
         harness.states.map { it.second } shouldBe listOf(ScreenScraperState.Open(Some(Moment(2_000))))
         harness.fetch.open shouldBe true
-        scope.launch { harness.fetch.get(texture(3)) }
+        scope.launch { harness.fetch.get(texture(3), Progress.NONE) }
         scope.advanceUntilIdle()
         http.startedAt.last() shouldBe 12_000L
         harness.states.last().second shouldBe ScreenScraperState.ClosedForRun(Closure.BUSY)
@@ -403,10 +403,10 @@ class ScreenScraperFetchTest {
                 }
             }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        repeat(2) { i -> scope.launch { harness.fetch.get(texture(i)) } }
+        repeat(2) { i -> scope.launch { harness.fetch.get(texture(i), Progress.NONE) } }
         scope.advanceUntilIdle()
         harness.states.map { it.second } shouldBe listOf(ScreenScraperState.Open(Some(Moment(2_000))))
-        scope.launch { harness.fetch.get(texture(2)) }
+        scope.launch { harness.fetch.get(texture(2), Progress.NONE) }
         scope.advanceUntilIdle()
         http.startedAt.last() shouldBe 12_000L
         harness.states.last().second shouldBe ScreenScraperState.Open()
@@ -417,7 +417,7 @@ class ScreenScraperFetchTest {
         val scope = TestScope(StandardTestDispatcher())
         val http = FakeHttp { url -> if ("ssuserInfos" in url) limits(1, 1) else ok(png) }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        val got = scope.async { harness.fetch.get(texture(1)) }
+        val got = scope.async { harness.fetch.get(texture(1), Progress.NONE) }
         scope.advanceTimeBy(59_999)
         scope.runCurrent()
         http.startedAt shouldBe listOf(0L)
@@ -434,7 +434,7 @@ class ScreenScraperFetchTest {
         var nextDay = false
         val http = FakeHttp { url -> if ("ssuserInfos" in url) limits(if (nextDay) 1 else 3, 100) else ok(png) }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i)) } }
+        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i), Progress.NONE) } }
         scope.advanceUntilIdle()
         http.asked.count { "ssuserInfos" in it } shouldBe 1
         http.mostAtOnce shouldBe 3
@@ -442,13 +442,13 @@ class ScreenScraperFetchTest {
         nextDay = true
         val before = http.asked.size
         http.mostAtOnce = 0
-        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i + 3)) } }
+        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i + 3), Progress.NONE) } }
         scope.advanceUntilIdle()
         http.asked.count { "ssuserInfos" in it } shouldBe 2
         http.asked.drop(before).first() shouldContain "ssuserInfos.php"
         http.asked.drop(before).count { "mediaJeu" in it } shouldBe 3
         http.mostAtOnce shouldBe 1
-        scope.launch { harness.fetch.get(texture(9)) }
+        scope.launch { harness.fetch.get(texture(9), Progress.NONE) }
         scope.advanceUntilIdle()
         http.asked.count { "ssuserInfos" in it } shouldBe 2
     }
@@ -468,12 +468,12 @@ class ScreenScraperFetchTest {
                 }
             }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        scope.launch { harness.fetch.get(texture(1)) }
+        scope.launch { harness.fetch.get(texture(1), Progress.NONE) }
         scope.advanceUntilIdle()
         scope.advanceTimeBy(86_400_000 - scope.testScheduler.currentTime)
         nextDay = true
         val before = http.asked.size
-        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i + 2)) } }
+        repeat(3) { i -> scope.launch { harness.fetch.get(texture(i + 2), Progress.NONE) } }
         scope.advanceUntilIdle()
         http.asked.count { "ssuserInfos" in it } shouldBe 2
         val following = http.asked.drop(before)
@@ -490,14 +490,14 @@ class ScreenScraperFetchTest {
         val scope = TestScope(StandardTestDispatcher())
         val http = FakeHttp { ok(png) }
         val harness = Harness(folder, key, http, scope)
-        val cancelled = scope.launch { harness.fetch.get(texture(1)) }
+        val cancelled = scope.launch { harness.fetch.get(texture(1), Progress.NONE) }
         scope.runCurrent()
         http.asked.size shouldBe 1
         val stopped = scope.launch { cancelled.cancelAndJoin() }
         scope.runCurrent()
         stopped.isCompleted shouldBe true
         http.underWay shouldBe 0
-        val later = scope.async { harness.fetch.get(texture(2)) }
+        val later = scope.async { harness.fetch.get(texture(2), Progress.NONE) }
         scope.advanceTimeBy(2_000)
         scope.runCurrent()
         later.isCompleted shouldBe true
@@ -511,14 +511,14 @@ class ScreenScraperFetchTest {
         val scope = TestScope(StandardTestDispatcher())
         val http = FakeHttp { url -> if ("ssuserInfos" in url) limits(1, 100) else ok(png) }
         val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
-        val cancelled = scope.launch { harness.fetch.get(texture(1)) }
+        val cancelled = scope.launch { harness.fetch.get(texture(1), Progress.NONE) }
         scope.runCurrent()
         http.asked.size shouldBe 1
         val stopped = scope.launch { cancelled.cancelAndJoin() }
         scope.runCurrent()
         stopped.isCompleted shouldBe true
         http.underWay shouldBe 0
-        val later = scope.async { harness.fetch.get(texture(2)) }
+        val later = scope.async { harness.fetch.get(texture(2), Progress.NONE) }
         scope.advanceTimeBy(3_000)
         scope.runCurrent()
         later.isCompleted shouldBe true

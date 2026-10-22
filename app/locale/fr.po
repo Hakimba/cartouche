@@ -330,6 +330,15 @@ msgstr "Cet ordre n’a pas pu être gardé."
 msgid "Graphics"
 msgstr "Graphismes"
 
+msgid "Preferred region of images"
+msgstr "Région préférée des images"
+
+msgid "None"
+msgstr "Aucune"
+
+msgid "Taiwan"
+msgstr "Taïwan"
+
 msgid "Which edge smoothing?"
 msgstr "Quel lissage des bords ?"
 

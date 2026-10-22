@@ -90,3 +90,8 @@ func title_area() -> Rect2:
 
 func platform_area() -> Rect2:
 	return Rect2(0.2, 0.5 + label_inner / radius / 2.0 + 0.09, 0.6, 0.18)
+
+
+## Halfway between the hub and the label's edge.
+func progress_ring_radius() -> float:
+	return (label_inner + label_outer) / radius / 4.0

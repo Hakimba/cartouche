@@ -180,3 +180,17 @@ func test_the_selection_priority_timer_sends_nothing_for_an_empty_row() -> void:
 	carousel._art_focus.start()
 	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._art_focus.is_stopped())).is_true()
 	assert_array(device.art_focus_calls).is_empty()
+
+
+func test_INV_E11_09_the_games_told_absent_are_known_so_and_a_download_told_rings_until_it_is_over() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	var games: Array[AndroidServices.Game] = carousel._row._games
+	# A game of another shelf too.
+	var absent := PackedStringArray([games[0].id, "gba/other"])
+	carousel._on_art_changed(AndroidServices.ArtChange.new({"done": 1, "total": 3, "absent": absent}))
+	assert_dict(carousel._art._absent).is_equal({games[0].id: true, "gba/other": true})
+	assert_bool(carousel._art.is_absent(games[1])).is_false()
+	carousel._on_art_progress(AndroidServices.LabelDownload.new({"game_id": games[1].id, "fraction": 0.5}))
+	assert_dict(carousel._row._downloads).is_equal({games[1].id: 0.5})
+	carousel._on_art_progress(AndroidServices.LabelDownload.new({"game_id": games[1].id}))
+	assert_dict(carousel._row._downloads).is_empty()

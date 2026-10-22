@@ -188,6 +188,78 @@ func test_the_games_around_the_selected_one_are_it_then_its_neighbours_nearest_f
 	assert_array(ids.call(_row(1, 0).games_around(2))).is_equal(["test/0"])
 
 
+func test_INV_E11_09_a_blank_shows_no_title_nor_platform_until_a_try_found_no_image_then_both() -> void:
+	var row := _row(3, 1)
+	row._look.platform_name = "PlayStation 2"
+	_frames(row, ShelfRow._PLACES, 0.016)
+	var titles := func() -> Dictionary:
+		var shown := {}
+		for place: ShelfRow.Place in row.get_children():
+			if place.visible:
+				shown[row._games[place.game].id] = [place.shown._title.text, place.shown._platform.text]
+		return shown
+	assert_dict(titles.call()).is_equal({"test/0": ["", ""], "test/1": ["", ""], "test/2": ["", ""]})
+	row.label_images.mark_absent("test/2")
+	row.refresh_label("test/2")
+	assert_dict(titles.call()).is_equal({"test/0": ["", ""], "test/1": ["", ""], "test/2": [row._games[2].title, "PlayStation 2"]})
+	# Shown again, a game found to have none is titled at once, the others plain.
+	row.label_images.mark_absent("test/0")
+	row.show_shelf(row._games, 1, Fixtures.DVDS, row._look)
+	_frames(row, ShelfRow._PLACES, 0.016)
+	assert_str(titles.call()["test/0"][0]).is_equal(row._games[0].title)
+	assert_str(titles.call()["test/1"][0]).is_empty()
+
+
+func test_INV_E11_09_a_ring_fills_on_the_blank_of_a_game_in_view_while_its_label_downloads_and_goes_once_it_is_over() -> void:
+	var row := _row(3, 1)
+	_frames(row, ShelfRow._PLACES, 0.016)
+	assert_bool(_ring_of(row, "test/1").visible).is_false()
+	row.downloading("test/1", 0.25)
+	row.downloading("test/1", 0.5)
+	assert_bool(_ring_of(row, "test/1").visible).is_true()
+	assert_float(_ring_of(row, "test/1").fraction).is_equal(0.5)
+	assert_bool(_ring_of(row, "test/0").visible).is_false()
+	var view := _place_of(row, "test/1").shown._view
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	# Drawn again, its blank keeps the ring; once over, the ring goes.
+	row.show_own_label()
+	assert_bool(_ring_of(row, "test/1").visible).is_true()
+	row.downloaded("test/1")
+	assert_bool(_ring_of(row, "test/1").visible).is_false()
+	# A size unknown: a quarter turns, frame after frame, and stops turning once over.
+	row.downloading("test/2", -1.0)
+	var unknown := _ring_of(row, "test/2")
+	_frames(row, 3, 0.1)
+	assert_float(unknown.turn).is_equal_approx(0.3 * TAU, 0.001)
+	row.downloaded("test/2")
+	_frames(row, 3, 0.1)
+	assert_float(unknown.turn).is_equal_approx(0.3 * TAU, 0.001)
+	assert_bool(row._downloads.is_empty()).is_true()
+
+
+func _place_of(row: ShelfRow, game_id: String) -> ShelfRow.Place:
+	for place: ShelfRow.Place in row.get_children():
+		if place.visible and row._games[place.game].id == game_id:
+			return place
+	return null
+
+
+func _ring_of(row: ShelfRow, game_id: String) -> ProgressRing:
+	return _place_of(row, game_id).shown._ring
+
+
+func test_INV_E11_09_a_ring_shows_only_on_a_blank_never_over_an_image() -> void:
+	var image := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGB8))
+	var row := _row(3, 1)
+	(row.label_images as Fixtures.FakeArt).arrive(row._games[1], image)
+	_frames(row, ShelfRow._PLACES, 0.016)
+	var selected: ShelfRow.Place = row._placed[1]
+	assert_bool(selected.shown._blank).is_false()
+	selected.shown._view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	row.downloading("test/1", 0.5)
+	assert_int(selected.shown._view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
+
+
 ## A row showing [param count] test games from [param selected], moved only by the test, with no
 ## label images whatever the developer's own folder holds.
 func _row(count: int, selected: int, pose := ShelfRow.Pose.new()) -> ShelfRow:
@@ -226,7 +298,8 @@ func _assert_places(row: ShelfRow, count: int) -> void:
 			assert_float(place.transform.origin.x).is_equal_approx(CarouselLayout.place(offsets[place.game]).origin.x, 0.0001)
 			var label: ShaderMaterial = place.shown._label_mesh.get_active_material(0)
 			if label.get_shader_parameter(&"has_label"):
-				assert_str(place.shown._title.text).is_equal(row._games[place.game].title)
+				var game := row._games[place.game]
+				assert_str(place.shown._title.text).is_equal(game.title if row.label_images.is_absent(game) else "")
 	shown.sort()
 	var in_view := offsets.keys()
 	in_view.sort()

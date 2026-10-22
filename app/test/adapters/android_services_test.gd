@@ -103,12 +103,16 @@ func test_the_plugin_gets_daijisho_s_definitions_and_cartouche_s_own() -> void:
 		["SonyPlayStation2.json", "MicrosoftXbox.json", "MicrosoftXbox360.json"])
 
 
-func test_the_library_answer_carries_the_scans_stored_for_its_games() -> void:
+func test_the_library_answer_carries_the_scans_stored_for_its_games_and_those_found_to_have_none() -> void:
 	var answer := AndroidServices.LibraryAnswer.new({
 		"ok": true, "library": "{}", "art": JSON.stringify([{"game_id": "ps2/a", "path": "/art/a.jpg"}]),
+		"absent": PackedStringArray(["ps2/b"]),
 	})
 	assert_array(answer.art.map(func(art: AndroidServices.Art) -> Array: return [art.game_id, art.path])).is_equal([["ps2/a", "/art/a.jpg"]])
-	assert_array(AndroidServices.LibraryAnswer.new({"ok": true, "library": "{}"}).art).is_empty()
+	assert_array(answer.absent).is_equal(PackedStringArray(["ps2/b"]))
+	var bare := AndroidServices.LibraryAnswer.new({"ok": true, "library": "{}"})
+	assert_array(bare.art).is_empty()
+	assert_array(bare.absent).is_empty()
 
 
 func test_an_art_change_tells_the_progress_its_stall_and_the_scan_found() -> void:
@@ -121,6 +125,28 @@ func test_an_art_change_tells_the_progress_its_stall_and_the_scan_found() -> voi
 	var stalled := AndroidServices.ArtChange.new({"done": 3, "total": 55, "stall": "offline"})
 	assert_str(stalled.progress.stall).is_equal("offline")
 	assert_bool(stalled.has_found).is_false()
+	assert_array(stalled.absent).is_empty()
+	var absent := AndroidServices.ArtChange.new({"done": 4, "total": 55, "absent": PackedStringArray(["ps2/b", "ps2/c"])})
+	assert_array(absent.absent).is_equal(PackedStringArray(["ps2/b", "ps2/c"]))
+
+
+func test_the_settings_answer_carries_the_regions_the_plugin_takes_and_the_one_preferred() -> void:
+	var answer := AndroidServices.SettingsAnswer.new({"ok": true, "first_launch": false,
+		"preferred_region": "Japan", "preferred_regions": PackedStringArray(["Europe", "Japan"])})
+	assert_str(answer.preferred_region).is_equal("Japan")
+	assert_array(answer.preferred_regions).is_equal(PackedStringArray(["Europe", "Japan"]))
+	var bare := AndroidServices.SettingsAnswer.new({"ok": true, "first_launch": false})
+	assert_str(bare.preferred_region).is_empty()
+	assert_array(bare.preferred_regions).is_empty()
+
+
+func test_a_label_download_tells_how_far_it_has_come_an_unknown_size_and_its_end() -> void:
+	var half := AndroidServices.LabelDownload.new({"game_id": "ps2/a", "fraction": 0.5})
+	assert_str(half.game_id).is_equal("ps2/a")
+	assert_bool(half.running).is_true()
+	assert_float(half.fraction).is_equal(0.5)
+	assert_float(AndroidServices.LabelDownload.new({"game_id": "ps2/a", "fraction": -1.0}).fraction).is_equal(-1.0)
+	assert_bool(AndroidServices.LabelDownload.new({"game_id": "ps2/a"}).running).is_false()
 
 
 func test_a_picture_picked_is_read_with_its_path_and_size_and_a_label_of_one_s_own_as_such() -> void:

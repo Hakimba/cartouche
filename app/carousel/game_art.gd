@@ -6,6 +6,7 @@ extends Node
 ## the oldest dropped; an image that cannot be read is not read again.
 
 ## [method request]ed art of [param game_id] is ready: [method has_texture] is now true.
+## Games no source had an image of when last looked for are [method is_absent].
 signal loaded(game_id: String)
 
 const _KEPT := 24
@@ -15,6 +16,7 @@ var _art: Dictionary[String, AndroidServices.Art] = {}
 ## Textures made, by game id, the latest last.
 var _textures: Dictionary[String, Texture2D] = {}
 var _unreadable: Dictionary[String, bool] = {}
+var _absent: Dictionary[String, bool] = {}
 var _reader := ImageReader.new()
 
 
@@ -28,10 +30,8 @@ func _init() -> void:
 ## being read, is dropped. With [param image], the image already read: [signal loaded] tells it is
 ## ready at once.
 func add(art: AndroidServices.Art, image: Texture2D = null) -> void:
+	_forget(art.game_id)
 	_art[art.game_id] = art
-	_textures.erase(art.game_id)
-	_reader.cancel(art.game_id)
-	_unreadable.erase(art.game_id)
 	if image:
 		_keep(art.game_id, image)
 
@@ -41,11 +41,22 @@ func keep_only(games: Array[AndroidServices.Game]) -> void:
 	var kept: Dictionary[String, bool] = {}
 	for game in games:
 		kept[game.id] = true
-	for known: Dictionary in [_art, _textures, _unreadable]:
+	for known: Dictionary in [_art, _textures, _unreadable, _absent]:
 		for game_id: String in known.keys():
 			if game_id not in kept:
 				known.erase(game_id)
 				_reader.cancel(game_id)
+
+
+## No source has an image of [param game_id], looked for: what it had is dropped.
+func mark_absent(game_id: String) -> void:
+	_forget(game_id)
+	_absent[game_id] = true
+
+
+## Whether no source had an image of [param game] when it was last looked for.
+func is_absent(game: AndroidServices.Game) -> bool:
+	return game.id in _absent
 
 
 ## Whether [param game] has a stored image.
@@ -76,6 +87,12 @@ func _on_read(game_id: String, read: Texture2D) -> void:
 		_unreadable[game_id] = true
 		return
 	_keep(game_id, read)
+
+
+func _forget(game_id: String) -> void:
+	for known: Dictionary in [_art, _textures, _unreadable, _absent]:
+		known.erase(game_id)
+	_reader.cancel(game_id)
 
 
 func _keep(game_id: String, kept: Texture2D) -> void:

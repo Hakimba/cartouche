@@ -18,8 +18,8 @@ const _MAX_STRETCH := 0.1
 
 ## Debug builds: turns per second of the selected game around its vertical axis, to see every side.
 var turntable := 0.0
-## Where label images come from; a game gets its title drawn until its image is ready, or for good
-## without one.
+## Where label images come from; a game shows a plain blank until its image is ready, and its title
+## on the blank once no source had one (INV-E11-09).
 var label_images: GameArt:
 	set(art):
 		label_images = art
@@ -69,6 +69,9 @@ var _launch_blur := 0.0
 ## Whether the selected game shows another label than its own (see [method preview_label]): its own
 ## image arriving meanwhile waits.
 var _previewing := false
+## The games whose label downloads, by id: how much of it is read, from 0 to 1, or below 0 when its
+## size is unknown (see [method downloading]).
+var _downloads: Dictionary[String, float] = {}
 
 
 func _ready() -> void:
@@ -103,7 +106,9 @@ func _process(delta: float) -> void:
 		if place.game >= 0:
 			var game := _games[place.game]
 			if not _show_image(place, game):
-				place.shown.draw_label(game.title, _look)
+				_draw_blank(place, game)
+	if not _downloads.is_empty():
+		_turn_rings(delta)
 
 
 ## Frees every place's model of a medium not among [param models]: no game of the library comes in
@@ -124,8 +129,10 @@ func show_shelf(games: Array[AndroidServices.Game], selected: int, models: Dicti
 	for place in _places:
 		for model: PackedScene in models.values():
 			place.use_model(model)
-	# Another shelf, or the same one again after a change: no label is kept.
+	# Another shelf, or the same one again after a change: no label is kept, and the downloads under
+	# way tell themselves again at their next progress.
 	_placed.clear()
+	_downloads.clear()
 	set_process(true)
 	show_games(games, selected)
 
@@ -277,17 +284,33 @@ func show_own_label() -> void:
 	_previewing = false
 	var place: Place = _placed.get(selected_index())
 	if place and not _show_image(place, selected_game()):
-		place.shown.draw_label(selected_game().title, _look)
+		_draw_blank(place, selected_game())
+
+
+## [param game_id]'s label downloads, [param fraction] of it read (below 0 when its size is
+## unknown): while the game is in view on its blank, a ring fills there, until [method downloaded].
+func downloading(game_id: String, fraction: float) -> void:
+	_downloads[game_id] = fraction
+	_show_ring(game_id)
+
+
+## [param game_id]'s download is over: its ring goes.
+func downloaded(game_id: String) -> void:
+	if _downloads.erase(game_id):
+		_show_ring(game_id)
 
 
 ## Shows [param game_id]'s image on its place, once read, if the game is in view: it replaces the
-## title drawn there.
+## blank drawn there; without one, once no source had one, its title is written on the blank.
 func refresh_label(game_id: String) -> void:
 	for place: Place in _placed.values():
 		if _previewing and place.game == selected_index():
 			continue
-		if _games[place.game].id == game_id and place not in _unlabelled:
-			_show_image(place, _games[place.game])
+		var game := _games[place.game]
+		if game.id != game_id or place in _unlabelled:
+			continue
+		if not _show_image(place, game) and label_images.is_absent(game):
+			_draw_blank(place, game)
 
 
 ## Shows [param game]'s image on [param place] when it is read; otherwise asks for it and is false.
@@ -297,6 +320,33 @@ func _show_image(place: Place, game: AndroidServices.Game) -> bool:
 		return true
 	label_images.request(game)
 	return false
+
+
+## Draws [param game]'s blank on [param place]: plain until no source had an image of it, then
+## with its title; made-up artwork, never looked for, always has it. Its download's ring shows on it.
+func _draw_blank(place: Place, game: AndroidServices.Game) -> void:
+	place.shown.ring(_download(game.id))
+	place.shown.draw_label(game.title if _look.demo_art or label_images.is_absent(game) else "", _look)
+
+
+## Shows the ring of [param game_id]'s download, or none, on its place once its label is drawn.
+func _show_ring(game_id: String) -> void:
+	for place: Place in _placed.values():
+		if _games[place.game].id == game_id and place not in _unlabelled:
+			place.shown.ring(_download(game_id))
+
+
+## Turns the rings of downloads of unknown size, on the places in view.
+func _turn_rings(delta: float) -> void:
+	for place: Place in _placed.values():
+		if _download(_games[place.game].id) < 0.0 and place not in _unlabelled:
+			place.shown.turn_ring(delta)
+
+
+## How much of [param game_id]'s label is read, as [method downloading] was told; NAN when none
+## downloads.
+func _download(game_id: String) -> float:
+	return _downloads.get(game_id, NAN)
 
 
 ## One step towards [param direction] (-1 or 1); a direction held stays held.
@@ -450,7 +500,10 @@ class LabelledModel extends Node3D:
 	var _title: Label = _view.get_node("Title")
 	var _platform: Label = _view.get_node("Platform")
 	var _band: ColorRect = _view.get_node("Band")
+	var _ring := ProgressRing.new()
 	var _demo_art := ShaderMaterial.new()
+	## Whether its label shows the blank drawn in its viewport, not an image.
+	var _blank := false
 
 	func _init(model: PackedScene) -> void:
 		alive += 1
@@ -474,6 +527,7 @@ class LabelledModel extends Node3D:
 			var shape := (label.mesh as ShapedMesh).shape
 			title = shape.title_area()
 			platform = shape.platform_area()
+			_ring.radius = shape.progress_ring_radius()
 		var size := Vector2(_view.size)
 		_title.position = size * title.position
 		_title.size = size * title.size
@@ -485,6 +539,9 @@ class LabelledModel extends Node3D:
 		# From just above the platform's name to the bottom, where the label's edge rounds it.
 		_band.position = Vector2(0.0, _platform.position.y - size.y * _BAND_ABOVE)
 		_band.size = Vector2(size.x, size.y - _band.position.y)
+		_ring.size = size
+		_ring.hide()
+		_view.add_child(_ring)
 		_demo_art.shader = _DEMO_ART
 
 	func _notification(what: int) -> void:
@@ -493,7 +550,10 @@ class LabelledModel extends Node3D:
 
 	func clear_label() -> void:
 		_label(&"has_label", false)
+		_blank = false
 
+	## Draws a blank of [param look] with [param title] and the platform's name; plain, with
+	## neither, nor the band holding it, when [param title] is empty.
 	func draw_label(title: String, look: LabelLook) -> void:
 		_background.color = look.color
 		_background.material = _demo_art if look.demo_art else null
@@ -505,14 +565,34 @@ class LabelledModel extends Node3D:
 		for text: Label in [_title, _platform]:
 			text.add_theme_color_override(&"font_color", Color(ink, 1.0 if text == _title else 0.7))
 			text.add_theme_constant_override(&"outline_size", 10 if look.demo_art else 0)
-		_band.visible = look.band.a > 0.0 and not look.demo_art
+		# The band carries the platform's name: a plain blank has none, its ring takes the band's colour.
+		var banded := look.band.a > 0.0 and not look.demo_art
+		_band.visible = banded and not title.is_empty()
 		_band.color = look.band
 		if _band.visible:
 			_platform.add_theme_color_override(&"font_color", Color.WHITE)
 		_title.text = title
-		_platform.text = look.band_text if _band.visible else look.platform_name
+		_platform.text = "" if title.is_empty() else look.band_text if _band.visible else look.platform_name
+		_ring.color = look.band if banded else ink
 		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 		show_label(_view.get_texture(), false)
+
+	## Shows on the blank the ring of a download [param fraction] read (below 0 when its size is
+	## unknown), or none when NAN; the blank shown is drawn again.
+	func ring(fraction: float) -> void:
+		_ring.visible = not is_nan(fraction)
+		_ring.fraction = fraction
+		_redraw_ring()
+
+	## Turns the ring of a download of unknown size by [param delta] seconds.
+	func turn_ring(delta: float) -> void:
+		_ring.turn = fposmod(_ring.turn + delta * TAU, TAU)
+		_redraw_ring()
+
+	func _redraw_ring() -> void:
+		_ring.queue_redraw()
+		if _blank:
+			_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 	## Shows [param label] as the model's label, an image of a real one when [param scanned]; only
 	## its [param window] when given, as fractions of it, and of that, the middle of the label's
@@ -529,6 +609,7 @@ class LabelledModel extends Node3D:
 		_label(&"label_window", Vector4(shown.position.x, shown.position.y, shown.size.x, shown.size.y))
 		_label(&"scanned", scanned)
 		_label(&"has_label", true)
+		_blank = not scanned
 
 	## Turns the model [param angle] radians about its own axis, its label blurred over
 	## [param blur] radians as when it spins fast.

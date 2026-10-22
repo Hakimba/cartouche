@@ -12,11 +12,14 @@ extends Node
 ## values, except the catalog and the demo library, read from [constant DESKTOP_DEMO], and the
 ## launch check, which lets every game's insertion play.
 
-## Looking for the games' art went on: [param change] tells how, and the art just found, if any.
+## Looking for the games' art went on: [param change] tells how, and the art just found or the
+## game just found to have none, if any.
 signal art_changed(change: ArtChange)
 ## One of the images [method label_variants] listed, not downloaded then, was downloaded or could
 ## not be.
 signal label_variant_downloaded(variant: LabelVariant)
+## The label of a game on screen downloads, or is done downloading: [param download] tells how far.
+signal art_progress(download: LabelDownload)
 ## The battery's level, or whether the device is plugged in, changed.
 signal battery_changed(battery: Battery)
 ## Every operation's answer; callers await the one carrying their request id.
@@ -53,6 +56,7 @@ func _ready() -> void:
 		_plugin = Engine.get_singleton(_SINGLETON)
 		_plugin.connect(&"answered", _answered.emit)
 		_plugin.connect(&"art_changed", func(payload: Dictionary) -> void: art_changed.emit(ArtChange.new(payload)))
+		_plugin.connect(&"art_progress", func(payload: Dictionary) -> void: art_progress.emit(LabelDownload.new(payload)))
 		_plugin.connect(&"label_variant_downloaded", func(payload: Dictionary) -> void:
 			label_variant_downloaded.emit(LabelVariant.new(payload)))
 		_plugin.connect(&"battery_changed", func(payload: Dictionary) -> void: battery_changed.emit(Battery.new(payload)))
@@ -249,6 +253,13 @@ func save_button_style(style: StringName) -> Result:
 ## Stores the edge smoothing the user chose, [param smoothing] as [SettingsAnswer] names it.
 func save_edge_smoothing(smoothing: StringName) -> Result:
 	return Result.new(await _request(&"saveEdgeSmoothing", [smoothing]))
+
+
+## Stores the region labels' images prefer, [param region] one of
+## [member SettingsAnswer.preferred_regions] (empty for none); the labels it changes are looked for
+## again, as [signal art_changed] tells.
+func save_preferred_region(region: String) -> Result:
+	return Result.new(await _request(&"savePreferredRegion", [region]))
 
 
 ## Scans the folder of [param platform_id] and replaces its games.
@@ -845,8 +856,10 @@ class Library:
 
 class LibraryAnswer extends Result:
 	var library: Library
-	## The art stored for its games (sent by [method AndroidServices.library] only).
+	## The art stored for its games, and the ids of those no source had an image of when last
+	## looked for (sent by [method AndroidServices.library] only).
 	var art: Array[Art] = []
+	var absent: PackedStringArray
 	## Why the stored library could not be read, when it could not: it then started empty.
 	var has_load_problem: bool
 	var load_problem: String
@@ -867,6 +880,7 @@ class LibraryAnswer extends Result:
 		var stored: Array = JSON.parse_string(art_text)
 		for found: Dictionary in stored:
 			art.append(Art.new(found))
+		absent = payload.get("absent", PackedStringArray())
 
 
 class ScanReport:
@@ -903,6 +917,10 @@ class SettingsAnswer extends Result:
 	var button_style: StringName
 	## `4x`, `2x` or `off`: how smooth the 3D's edges are drawn.
 	var edge_smoothing: StringName
+	## The region labels' images prefer, one of [member preferred_regions]; empty for none.
+	var preferred_region: String
+	## The regions labels' images can prefer, as the plugin names them, the only ones it saves.
+	var preferred_regions: PackedStringArray
 
 	func _init(payload: Dictionary) -> void:
 		super(payload)
@@ -910,6 +928,8 @@ class SettingsAnswer extends Result:
 		has_button_style = payload.has("button_style")
 		button_style = payload.get("button_style", &"")
 		edge_smoothing = payload.get("edge_smoothing", &"4x")
+		preferred_region = payload.get("preferred_region", "")
+		preferred_regions = payload.get("preferred_regions", PackedStringArray())
 
 
 class ScanAnswer extends LibraryAnswer:
@@ -966,6 +986,8 @@ class ArtChange:
 	var progress: ArtProgress
 	var has_found: bool
 	var found: Art
+	## The ids of games no source has an image of, just looked for.
+	var absent: PackedStringArray
 
 	func _init(payload: Dictionary) -> void:
 		progress = ArtProgress.new(payload)
@@ -973,6 +995,21 @@ class ArtChange:
 		if has_found:
 			var item: Dictionary = payload["found"]
 			found = Art.new(item)
+		absent = payload.get("absent", PackedStringArray())
+
+
+## How far the download of a game's label has come, as `art_progress` tells it.
+class LabelDownload:
+	var game_id: String
+	## Whether it goes on; once over, found or not, it does not.
+	var running: bool
+	## How much of the image is read, from 0 to 1; -1 when its size is unknown.
+	var fraction: float
+
+	func _init(item: Dictionary) -> void:
+		game_id = item["game_id"]
+		running = item.has("fraction")
+		fraction = item.get("fraction", -1.0)
 
 
 ## One image a game's label can show: [member source]'s for [member region] (as the sources name

@@ -4,6 +4,7 @@
 package app.cartouche.core.settings
 
 import app.cartouche.core.library.Library
+import app.cartouche.core.regions.PreferredRegion
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.serialization.OptionSerializer
@@ -41,11 +42,12 @@ public enum class EdgeSmoothing {
     OFF,
 }
 
-/** The app's own settings, apart from the library. */
+/** The app's own settings, apart from the library; [preferredRegion], none until the user chooses one, orders labels' images. */
 @Serializable
 public data class Settings(
     public val buttonStyle: Option<ButtonStyle> = None,
     public val edgeSmoothing: EdgeSmoothing = EdgeSmoothing.FOUR_TIMES,
+    public val preferredRegion: Option<PreferredRegion> = None,
 ) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An

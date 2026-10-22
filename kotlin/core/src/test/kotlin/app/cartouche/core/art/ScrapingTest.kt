@@ -47,8 +47,9 @@ class ScrapingTest {
         data class Focus(val games: List<Int>) : Step
     }
 
-    private fun request(game: Int) =
-        ArtRequest(GameId("ps2/$game"), "Game $game", nonEmptyListOf(web("https://a/$game.png")), None, PS2_DISC)
+    /** [game]'s request, as the scan numbered [scan] plans it. */
+    private fun request(game: Int, scan: Int = 0) =
+        ArtRequest(GameId("ps2/$game"), "Game $game, scan $scan", nonEmptyListOf(web("https://a/$game.png")), None, PS2_DISC)
 
     private val steps: Arb<Step> =
         Arb.choice(
@@ -68,15 +69,17 @@ class ScrapingTest {
             var finished = 0
             checkAll(Arb.list(steps, 1..40)) { script ->
                 var run = Scraping.NONE
-                // The model: the games whose art was found, which no scan asks for again, and the last scan.
+                // The model: the games whose art was found, which no scan asks for again, and the last scan's requests.
                 val found = mutableSetOf<GameId>()
-                var scanned = emptyList<GameId>()
+                var scans = 0
+                var planned = emptyList<ArtRequest>()
+                val scanned = { planned.map { it.game } }
                 script.forEach { step ->
                     when (step) {
                         is Step.Rescan -> {
-                            val requests = step.games.map(::request).filter { it.game !in found }
-                            scanned = requests.map { it.game }
-                            run = run.with(requests)
+                            scans++
+                            planned = step.games.map { request(it, scans) }.filter { it.game !in found }
+                            run = run.with(planned)
                         }
                         Step.Take -> {
                             val taken = run.take()
@@ -95,9 +98,9 @@ class ScrapingTest {
                         is Step.Halt ->
                             run.underWay.getOrNone(step.pick).onSome {
                                 run = run.stalled(it.game, step.why)
-                                // It waits again, last, unless the last scan no longer asks for it.
-                                (it in run.waiting) shouldBe (it.game in scanned)
-                                if (it.game in scanned) run.waiting.last() shouldBe it
+                                // It waits again, last, as the last scan asks for it, unless that scan no longer does.
+                                (it.game in run.waiting.map { w -> w.game }) shouldBe (it.game in scanned())
+                                if (it.game in scanned()) run.waiting.last() shouldBe planned.first { p -> p.game == it.game }
                                 run.stall shouldBe Some(step.why)
                             }
                         Step.Resume -> run = run.resumed()
@@ -105,8 +108,8 @@ class ScrapingTest {
                             run.underWay.getOrNone(step.pick).onSome {
                                 val stall = run.stall
                                 run = run.returned(it.game)
-                                (it in run.waiting) shouldBe (it.game in scanned)
-                                if (it.game in scanned) run.waiting.first() shouldBe it
+                                (it.game in run.waiting.map { w -> w.game }) shouldBe (it.game in scanned())
+                                if (it.game in scanned()) run.waiting.first() shouldBe planned.first { p -> p.game == it.game }
                                 run.stall shouldBe stall
                             }
                         is Step.Focus -> {
@@ -136,8 +139,8 @@ class ScrapingTest {
                     taken = run.take()
                 }
                 // Only what the last scan asks for: a game it dropped is not looked for again.
-                asked.filter { it in found || it !in scanned }.shouldBeEmpty()
-                scanned.filter { it !in found && it !in asked + underWay }.shouldBeEmpty()
+                asked.filter { it in found || it !in scanned() }.shouldBeEmpty()
+                scanned().filter { it !in found && it !in asked + underWay }.shouldBeEmpty()
             }
             finished shouldBeGreaterThan 100
         }

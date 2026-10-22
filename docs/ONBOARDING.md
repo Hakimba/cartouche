@@ -149,7 +149,9 @@ The same words are used in the code, the tests and this document.
   **kind** of its scans: `ArtKind`; a scan of no front's shape, as a photo taken at an angle, is
   passed over); a
   game without one is drawn as a **blank** of its console (for the PS2, a silver disc with a dark
-  band) with its title. The **art extract** (`app/data/art/<platform>.tsv`) lists, per game of the
+  band): **plain** (no title, no platform, no band) until a download was tried for it and found
+  nothing (`absent.json`, for its sources' version), or no source can have one, then with its title (INV-E11-09); while its
+  label downloads, a **progress ring** fills on the plain blank. The **art extract** (`app/data/art/<platform>.tsv`) lists, per game of the
   LaunchBox Games Database, its name, alternate names and scans by region; several games a title
   finds alike are told apart by the **ladder** (its punctuation, accents, then exact text put back
   one at a time), a title still naming none or several giving no image; a platform's **serial source** (`scansBySerial` in
@@ -163,6 +165,9 @@ The same words are used in the code, the tests and this document.
   region** when its region is one of the release's or the zone holding one of them (`Regions.isOwn`:
   France's are Europe's too, never Germany's); the **order** (`ArtSources.order`, INV-E11-07) tries a
   cartridge's own-region textures first, a disc's own-region scans first, then the rest closest first.
+  The **preferred region** (a setting, none by default) orders that rest first, when the images
+  hold no or several regions surely the game's (INV-E11-08: its region, the zone holding it, the
+  world, then any other).
 - **Label choice**: which image a game's label shows: **automatic** (the closest region's, as
   scraping finds it), an image the user chose among the game's **images** (every image of both
   sources, each named by its **region** and its **source**, « Europe · ScreenScraper », in the
@@ -205,12 +210,13 @@ The same words are used in the code, the tests and this document.
   consoles screen or the games screen: the **platforms** set up, each opened in the same form to
   **edit** it (saved and scanned again) or **remove** it after a confirmation, the button style, and
   **Graphics**: the edges' smoothing (4×, 2× or none), each card showing a close-up of an edge drawn
-  with it.
+  with it, and the **preferred region of images**, chosen in a list (`ChoiceList`) of the regions the settings answer names (`preferred_regions`).
   Above the console, a **"+" ball**: holding up turns it into "Add a platform" (its strokes
   spreading into the button's outline), and A adds one more console, the consoles screen coming back
   on it.
-- **Settings**: the app's own choices, apart from the library: the button style and the edges'
-  smoothing (`EdgeSmoothing`: the 3D's multisampling, 4× unless the user chooses less).
+- **Settings**: the app's own choices, apart from the library: the button style, the edges'
+  smoothing (`EdgeSmoothing`: the 3D's multisampling, 4× unless the user chooses less) and the
+  preferred region of labels' images (`PreferredRegion`, none unless the user chooses one).
 - **Removing a platform**: its choices, games, selection, art and folder access go (INV-E6-03);
   the game files stay.
 - **Demo library**: a made-up library of any size, in debug builds, for measuring at scale.
@@ -318,7 +324,9 @@ The same words are used in the code, the tests and this document.
   (ScreenScraper's region codes become the app's region names there, `ss` and `cus` left out);
   `ArtSources.of` gathers a platform's sources from the catalog, its own extract and its own table;
   `ArtSources.requestFor` makes a game's request: the image of the region chosen for its label, then
-  every candidate in `ArtSources.order`'s order (INV-E11-07, on `Regions.isOwn`), with its
+  every candidate in `ArtSources.order`'s order (INV-E11-07, on `Regions.isOwn`; the rest by
+  `Regions.preferredFirst` first for a user's preferred region, INV-E11-08, the sources made
+  `preferring` it without indexing anything again), with its
   `LabelCut`; `variantsOf` lists its images for the chooser, among those offered (the plugin leaves
   out textures while ScreenScraper is not open, and those it has none of), the first of that order
   for each region and source. The
@@ -337,7 +345,7 @@ The same words are used in the code, the tests and this document.
 - **`library/DemoLibrary.kt`** makes up libraries of any size, the same for the same arguments.
 - **`storage/DocumentPaths.kt`** maps document ids such as `1A2B-3C4D:ROMs/ps2` to paths such as
   `/storage/1A2B-3C4D/ROMs/ps2`, and to a **place** the user reads (the SD card, then `ROMs`, `ps2`).
-- **`settings/`** holds the app's `Settings` (the button style, the edges' smoothing), whether the first launch is still
+- **`settings/`** holds the app's `Settings` (the button style, the edges' smoothing, the preferred region), whether the first launch is still
   to do, and their stored format.
 - **`Values.kt`** holds the newtypes shared across modules: `PackageName`, `ContentUri` (built
   with `ContentUri.parse`, so it is always a `content://` URI), `FilePath`, `FileName`.
@@ -418,7 +426,19 @@ The same words are used in the code, the tests and this document.
   called by the carousel once the selection settles, moves the game on screen and its neighbours to
   the front of the run.
   It stops while the app is paused (a game is played), resumes on the network callback or after a
-  growing delay, and tells Godot through the `art_changed` signal. It starts after the library is
+  growing delay, and tells Godot through the `art_changed` signal (the art found, or a game found
+  to have none, `absent`, a list: a look's planning names at once the automatic labels no source
+  can have, `ArtPlan.unfound`; the library's answer lists those too). Each download reads its image in
+  chunks and tells how far it has come (`Progress`, from the HTTP answer's length, or unknown);
+  for the games on screen only (the last `artFocus`), the `art_progress` signal carries it, ten
+  times a second at most per look (`Paced`), then once its look is over. Changing the preferred
+  region (`savePreferredRegion`, which answers once it is saved) looks up again, planned on
+  `artPlanning`, only the automatic labels whose first image tried it changes
+  (`ArtSources.reordered`); `Scraper.lookFor` asks them again (`ArtStore.retry`) under its lock, each
+  ask numbered (`Ask`) and kept in `again.json`: a look taken under an older ask leaves the label
+  asked, and the run looks for it again once that look ends (`Scraping` keeps the latest plan's
+  request of a game under way). A walk that skipped a ScreenScraper texture and found nothing
+  leaves the label as it was, still wanted. It starts after the library is
   read, after each scan and after a removal, never for a demo library; each time, the images of
   games no longer in the library are deleted first (`ArtStore.keepOnly`). A game's images (every
   one of both sources, `labelVariants`, each sent with its region and source) are downloaded when
@@ -466,7 +486,10 @@ The same words are used in the code, the tests and this document.
   depend on the number of games; titles are drawn in each place's small `SubViewport`, one per
   frame, until a game's art is read (`GameArt`: on a worker thread, one texture sent to the GPU a
   frame, the latest 24 kept); a game without a scan gets its shelf's blank (`LabelLook`, colours
-  and band from `appearance.json`). `CarouselLayout` holds the mechanics as pure functions.
+  and band from `appearance.json`), plain until `GameArt.is_absent`, and a `ProgressRing` drawn in
+  the label's viewport while its image downloads (centred, at the shape's `progress_ring_radius`: on a disc
+  between the hub and the label's edge; in the band's colour, else the ink): the viewport is drawn
+  again only at each progress told, every frame only while a ring of unknown size turns. `CarouselLayout` holds the mechanics as pure functions.
   `GameSearch` (`carousel/search/`) is the ribbon: the carousel hands it ↓, L1, R1 and, while
   what is found is kept, B; open, it takes every press. It asks the plugin for each view and shows
   it with `ShelfRow.show_games` (the same models, another list) and `ShelfRow.jump`; the pill
@@ -648,7 +671,8 @@ The same words are used in the code, the tests and this document.
   platform's shelf, `--art-refused` makes every art server refuse (to see the message and the
   retries), `--screenscraper=quota` makes ScreenScraper answer that the day's quota is spent,
   `--screenscraper=wrong-key` that the app's key is refused and `--screenscraper=wrong-account` that
-  the member is (the key alone then), `--demo-games=N` (all on one console with `--demo-shelf=ps2`, for a shelf of fan
+  the member is (the key alone then), `--art-slow=MS` waits MS milliseconds after each chunk of an
+  image read (to see a label's progress ring; `--art-slow=400`), `--demo-games=N` (all on one console with `--demo-shelf=ps2`, for a shelf of fan
   size) and `--bench=…` as in `dev/bench.sh`, `--shots=DIR` (`FrameShots`).
 - **Shaders are only compiled when something is drawn**: the headless runs of `dev/build.sh` do
   not see their errors. After changing one, run the desktop demo or the device and look for

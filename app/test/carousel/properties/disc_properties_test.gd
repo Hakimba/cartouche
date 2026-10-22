@@ -944,6 +944,8 @@ func test_Shift_turns_the_next_letter_and_accents_are_typed_as_letters() -> void
 func test_a_game_renamed_shows_its_name_on_the_label_drawn_on_its_disc() -> void:
 	var carousel: Carousel = (await _on_games())[0]
 	var row := carousel._row
+	# Its title is written on its blank only once a download found no image of it.
+	row.label_images.mark_absent(row.selected_game().id)
 	await _on_keyboard(carousel)
 	carousel._properties._naming._typed = "Mine"
 	await Fixtures.joypad(self, JOY_BUTTON_START)

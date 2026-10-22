@@ -3,8 +3,11 @@ package app.cartouche.android
 
 import android.util.Log
 import app.cartouche.android.apps.LaunchableApp
+import app.cartouche.android.art.AbsentArt
 import app.cartouche.android.art.FoundArt
+import app.cartouche.android.art.LabelDownload
 import app.cartouche.android.art.LabelFailure
+import app.cartouche.android.art.LabelNews
 import app.cartouche.android.art.OwnPicture
 import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.LaunchFailure
@@ -35,6 +38,7 @@ import app.cartouche.core.platforms.MediaType
 import app.cartouche.core.platforms.MediumId
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
+import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.search.Mark
 import app.cartouche.core.search.View
 import app.cartouche.core.settings.ButtonStyle
@@ -47,6 +51,7 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.filterIsInstance
+import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.toOption
 import kotlinx.serialization.json.JsonArray
@@ -321,10 +326,17 @@ internal val EdgeSmoothing.wire: String
             EdgeSmoothing.OFF -> "off"
         }
 
-/** `{"first_launch", "button_style"?, "edge_smoothing"}`: the style is absent until one is chosen. */
-internal fun Settings.toWire(firstLaunch: Boolean): Dictionary =
-    dictionary("first_launch" to firstLaunch, "edge_smoothing" to edgeSmoothing.wire)
-        .putSome("button_style", buttonStyle.map { it.wire })
+/**
+ * `{"first_launch", "button_style"?, "edge_smoothing", "preferred_region"?, "preferred_regions"}`:
+ * the style and the region are absent until one is chosen; the regions are those a preference can
+ * name, as [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes.
+ */
+internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
+    "first_launch" to firstLaunch,
+    "edge_smoothing" to edgeSmoothing.wire,
+    "preferred_regions" to PreferredRegion.entries.map { it.region }.toTypedArray(),
+).putSome("button_style", buttonStyle.map { it.wire })
+    .putSome("preferred_region", preferredRegion.map { it.region })
 
 internal val MediaType.wire: String
     get() =
@@ -336,9 +348,28 @@ internal val MediaType.wire: String
 
 /**
  * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`,
- * and the art just found, if any, under `"found"` ([FoundArt.toWire]).
+ * and what it just learnt of games' labels, if anything: the art found under `"found"`
+ * ([FoundArt.toWire]), or the ids of games no source has art for under `"absent"`.
  */
-internal fun Scraping.toWire(): Dictionary = dictionary("done" to done, "total" to total).putSome("stall", stall.map { it.wire })
+internal fun Scraping.toWire(news: Option<LabelNews>): Dictionary =
+    dictionary("done" to done, "total" to total).putSome("stall", stall.map { it.wire }).apply {
+        news.onSome {
+            when (it) {
+                is FoundArt -> put("found", it.toWire())
+                is AbsentArt -> put("absent", it.games.map(GameId::value).toTypedArray())
+            }
+        }
+    }
+
+/**
+ * What the `art_progress` signal carries of [game]'s label: `{"game_id", "fraction"}` while it
+ * downloads, the fraction from 0 to 1, or -1 when the image's size is unknown; `{"game_id"}` once
+ * its look is over.
+ */
+internal fun LabelDownload.toWire(game: GameId): Dictionary = when (this) {
+    is LabelDownload.Running -> dictionary("game_id" to game.value, "fraction" to fraction.getOrElse { -1.0 })
+    LabelDownload.Over -> dictionary("game_id" to game.value)
+}
 
 /** `{"game_id", "path"}`, the path an absolute one to a JPEG. */
 internal fun FoundArt.toWire(): Dictionary = dictionary("game_id" to game.value, "path" to art.file.path)
