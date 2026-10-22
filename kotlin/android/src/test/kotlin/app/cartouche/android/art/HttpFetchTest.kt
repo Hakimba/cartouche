@@ -5,7 +5,6 @@ import app.cartouche.core.art.ArtUrl
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.int
 import io.kotest.property.checkAll
@@ -16,7 +15,7 @@ import java.net.ServerSocket
 import kotlin.concurrent.thread
 
 class HttpFetchTest {
-    private val fetch = HttpFetch("Cartouche test")
+    private val fetch = HttpFetch(JavaHttp("Cartouche test"))
     private val server = ServerSocket(0)
 
     /** Answers the next request with [status], [headers] and [body]. */
@@ -53,21 +52,22 @@ class HttpFetchTest {
         }
 
     @Test
-    fun `an image is downloaded whole up to the largest size, and one byte more is not downloaded`() {
-        val largest = ByteArray(HttpFetch.LARGEST_BYTES) { it.toByte() }
+    fun `an image is downloaded whole up to the largest size, and one byte more is not downloaded`() = runBlocking<Unit> {
+        val largest = ByteArray(Http.LARGEST_BYTES) { it.toByte() }
         fetch.get(serve("/largest", 200, largest)).shouldBeRight() shouldBe largest
         fetch.get(serve("/larger", 200, largest + 1)).shouldBeLeft() shouldBe FetchFailure.NotFound
     }
 
     @Test
-    fun `a redirect to another protocol is an image it will never give`() {
+    fun `a redirect to another protocol is an image it will never give`() = runBlocking<Unit> {
         fetch.get(serve("/moved", 301, headers = mapOf("Location" to "ftp://127.0.0.1/a.png"))).shouldBeLeft() shouldBe
             FetchFailure.NotFound
     }
 
     @Test
-    fun `a server that cannot be reached is offline`() {
+    fun `INV-E11-06 a server that cannot be reached is offline, for the failure's class alone, never its message`() = runBlocking<Unit> {
         val closed = ServerSocket(0).use { it.localPort }
-        fetch.get(ArtUrl("http://127.0.0.1:$closed/a.png")).shouldBeLeft().shouldBeInstanceOf<FetchFailure.Offline>()
+        fetch.get(ArtUrl("http://127.0.0.1:$closed/a.png?devpassword=DEVSECRET42")).shouldBeLeft() shouldBe
+            FetchFailure.Offline("ConnectException")
     }
 }

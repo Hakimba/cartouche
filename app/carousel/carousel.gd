@@ -145,6 +145,8 @@ var _lift: Tween
 @onready var _screens: ScreenFlow = %Screens
 @onready var _top_bar: Control = %TopBar
 @onready var _hold_select: Timer = %HoldSelect
+## Fires once the selection has settled: the game on screen and its neighbours get their art first.
+@onready var _art_focus: Timer = %ArtFocus
 @onready var _game_launch: GameLaunch = %GameLaunch
 @onready var _games_hints: Control = %GamesHints
 @onready var _properties: DiscProperties = %Properties
@@ -591,6 +593,7 @@ func _show_platform() -> void:
 	for medium in models:
 		_appearance.animation_of(platform, medium)
 	_row.show_shelf(shelf.games, _positions[shelf.platform_id], models, _look(shelf.platform_id))
+	_art_focus.start()
 	_search.use_shelf(shelf.platform_id, shelf.games)
 	_sequence.use(_appearance.animation_of(platform, _row.selected_game().medium))
 	_console_name.text = _console_name_of(shelf.platform_id)
@@ -711,6 +714,7 @@ func _on_art_changed(change: AndroidServices.ArtChange) -> void:
 
 
 func _on_row_selection_changed(_game: AndroidServices.Game) -> void:
+	_art_focus.start()
 	if _screen == Screen.GAMES:
 		_show_title()
 
@@ -960,6 +964,11 @@ func _on_screens_welcome_closed() -> void:
 func _on_message_timer_timeout() -> void:
 	_message.hide()
 	_art_content.show()
+
+
+func _on_art_focus_timeout() -> void:
+	if _row.has_games():
+		android.art_focus(_row.games_around(CarouselLayout.REACH))
 
 
 func _on_hold_select_timeout() -> void:

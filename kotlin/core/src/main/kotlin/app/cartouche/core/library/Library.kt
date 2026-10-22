@@ -87,6 +87,23 @@ private object DisplayNameSerializer : KSerializer<DisplayName> by ParsedSeriali
     DisplayName::text,
 )
 
+/**
+ * Where a label's image comes from: the chooser names each image by its region and its source, and
+ * a chosen label remembers both. Stored and sent to Godot by [wire], spelled out so that renaming a
+ * constant cannot change it; shown as [label].
+ */
+@Serializable
+public enum class ArtSource(public val wire: String, public val label: String) {
+    @SerialName("launchbox")
+    LAUNCHBOX("launchbox", "LaunchBox"),
+
+    @SerialName("screenscraper")
+    SCREENSCRAPER("screenscraper", "ScreenScraper"),
+
+    @SerialName("psxdatacenter")
+    PSXDATACENTER("psxdatacenter", "psxdatacenter"),
+}
+
 /** Which image a game's label shows. */
 @Serializable
 public sealed interface LabelChoice {
@@ -95,10 +112,13 @@ public sealed interface LabelChoice {
     @SerialName("automatic")
     public data object Automatic : LabelChoice
 
-    /** The image the art sources have for [region], chosen by the user. */
+    /**
+     * The image [source] has for [region], chosen by the user. A choice stored before images had a
+     * source is LaunchBox's, which was all the chooser offered then.
+     */
     @Serializable
     @SerialName("region")
-    public data class Region(public val region: LabelRegion) : LabelChoice
+    public data class Region(public val region: LabelRegion, public val source: ArtSource = ArtSource.LAUNCHBOX) : LabelChoice
 
     /** A picture of the user's own, framed by them (`app.cartouche.core.art.LabelFraming`); the app keeps the framed copy. */
     @Serializable

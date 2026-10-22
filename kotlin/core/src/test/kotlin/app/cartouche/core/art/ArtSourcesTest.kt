@@ -2,14 +2,19 @@
 package app.cartouche.core.art
 
 import app.cartouche.core.Shipped
+import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.game
 import app.cartouche.core.platforms.ArtKind
+import app.cartouche.core.platforms.Catalog
+import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.MediaRule
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.platforms.ScreenScraperSystem
 import app.cartouche.core.platforms.SerialScans
+import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.mediumId
 import arrow.core.None
 import arrow.core.Option
@@ -17,13 +22,22 @@ import arrow.core.Some
 import arrow.core.getOrNone
 import io.kotest.assertions.arrow.core.shouldBeNone
 import io.kotest.assertions.arrow.core.shouldBeSome
+import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.bind
+import io.kotest.property.arbitrary.boolean
+import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
+import io.kotest.property.arbitrary.flatMap
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.pair
+import io.kotest.property.arbitrary.set
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -33,14 +47,83 @@ class ArtSourcesTest {
 
     private val bySerial = SerialScans.of("https://scans.test/{serial}.jpg", PLAYSTATION_SERIAL)
 
+    private val ps2 = ScreenScraperSystem(58)
+
+    private val table = TextureTable.parse("# 2026-10-18\nOkage (USA)\t1234\tus jp\n", ps2)
+
+    private val gba = cartridge("gba_cart", 1.74, crop(0.147, 0.218, 0.706, 0.628))
+
+    /** Okage as an American release the table knows, with a serial. */
+    private val okage = game("Okage").copy(regions = listOf("USA"), serials = listOf("SCUS-97129"), redumpName = Some("Okage (USA)"))
+
+    private fun sources(
+        kind: ArtKind = ArtKind.Disc,
+        index: ArtIndex = this.index,
+        bySerial: Option<SerialScans> = None,
+        textures: TextureTable = TextureTable.EMPTY,
+    ) = ArtSources(kind, PS2_MEDIA, index, bySerial, textures)
+
+    /** A candidate as the tests name it: a scan's file, a texture's identity. */
+    private fun names(candidates: List<Candidate>) = candidates.map { it.identity.value.substringAfterLast('/') }
+
+    private fun texture(region: String, media: String = "t-$region") =
+        Candidate.Texture(ps2, ScreenScraperGame(1), TextureMedia(media), region)
+
+    private fun texture(number: Int, region: String) = texture(region, "t$number")
+
     @Test
-    fun `a game is looked for as the extract's scans, then those of its serials, in the sources' version`() {
-        val okage = game("Okage").copy(serials = listOf("SCUS-97129"))
-        val request = ArtSources(ArtKind.Disc, PS2_MEDIA, index, bySerial).requestFor(okage).shouldBeSome()
+    fun `a disc is looked for as its region's scans, its region's textures, its serials' scans, then the rest, in the sources' version`() {
+        val request = sources(bySerial = bySerial, textures = table).requestFor(okage).shouldBeSome()
         request.title shouldBe "Okage"
-        request.version shouldBe Some(ArtVersion("2026-09-28"))
-        request.candidates.map { it.value.substringAfterLast('/') } shouldBe listOf("na.png", "jp.png", "SCUS-97129.jpg")
+        request.version shouldBe Some(ArtVersion("2026-09-28 2026-10-18"))
+        names(request.candidates) shouldBe
+            listOf("na.png", "ss:58:1234:support-texture(us)", "SCUS-97129.jpg", "jp.png", "ss:58:1234:support-texture(jp)")
     }
+
+    @Test
+    fun `a cartridge is looked for as its region's textures, then its region's scans, then the rest, a texture first when as close`() {
+        val request = sources(kind = gba, textures = table).requestFor(okage).shouldBeSome()
+        names(request.candidates) shouldBe listOf("ss:58:1234:support-texture(us)", "na.png", "ss:58:1234:support-texture(jp)", "jp.png")
+    }
+
+    @Test
+    fun `only a game identified as a release the table lists gets textures, and only on a platform whose profile names its system`() {
+        names(sources(textures = table).requestFor(okage.copy(redumpName = None)).shouldBeSome().candidates) shouldBe
+            listOf("na.png", "jp.png")
+        names(sources(textures = table).requestFor(okage.copy(redumpName = Some("Okage (Europe)"))).shouldBeSome().candidates) shouldBe
+            listOf("na.png", "jp.png")
+        val extracts = mapOf(PlatformId("p") to extract(listOf(ExtractGame("Okage", emptySet(), listOf("USA=na.png")))))
+        val tables = mapOf(PlatformId("p") to "# 2026-10-18\nOkage (USA)\t1234\tus\n")
+        names(
+            ArtSources.of(catalog(system = false), extracts, tables, PlatformId("p")).requestFor(okage).shouldBeSome().candidates,
+        ) shouldBe
+            listOf("na.png")
+        names(ArtSources.of(catalog(system = true), extracts, tables, PlatformId("p")).requestFor(okage).shouldBeSome().candidates) shouldBe
+            listOf("na.png", "ss:58:1234:support-texture(us)")
+    }
+
+    /** A disc platform `p` whose profile names the PS2's ScreenScraper system when [system]. */
+    private fun catalog(system: Boolean): Catalog {
+        val named = if (system) """, "screenScraperSystem": 58""" else ""
+        val profile = """{"media": "dvd", "medium": {"default": "ps2_dvd"}, "minimumGameBytes": 1, "art": {"kind": "disc"}$named}"""
+        return Catalog.parse(listOf(definition(platform = "p")), DefinitionSource("profiles.json", """{"p": $profile}"""))
+    }
+
+    @Test
+    fun `INV-E4-05 the sources' version is their dated files', the same read from their first lines alone, and none without any`() =
+        runBlocking<Unit> {
+            val p = PlatformId("p")
+            checkAll(Arb.boolean(), Arb.boolean(), Arb.boolean()) { withExtract, withTable, withSystem ->
+                val extracts = if (withExtract) mapOf(p to extract(emptyList(), "2026-09-28")) else emptyMap()
+                val tables = if (withTable) mapOf(p to "# 2026-10-18\n") else emptyMap()
+                val catalog = catalog(withSystem)
+                val dates = listOfNotNull("2026-09-28".takeIf { withExtract }, "2026-10-18".takeIf { withTable && withSystem })
+                val expected = if (dates.isEmpty()) None else Some(ArtVersion(dates.joinToString(" ")))
+                ArtSources.of(catalog, extracts, tables, p).version shouldBe expected
+                ArtSources.versionOf(catalog, extracts, tables, p) shouldBe expected
+            }
+            ArtSources.versionOf(catalog(true), emptyMap(), emptyMap(), PlatformId("other")).shouldBeNone()
+        }
 
     @Test
     fun `INV-E4-05 only the games still wanting art in their sources' version are planned, and only their platforms' extracts read`() =
@@ -55,15 +138,20 @@ class ArtSourcesTest {
 
             fun versionOf(platform: PlatformId) = extracts.getOrNone(platform).flatMap(ArtIndex::versionOf)
 
-            fun sources(platform: PlatformId) =
-                ArtSources(ArtKind.Disc, PS2_MEDIA, extracts.getOrNone(platform).fold({ ArtIndex.EMPTY }, ArtIndex::parse), None)
+            fun sources(platform: PlatformId) = sources(index = extracts.getOrNone(platform).fold({ ArtIndex.EMPTY }, ArtIndex::parse))
             val library = listOf(game("Okage"), game("Ico"), game("Unknown"), game("Ikaruga", "gc"), game("Okage", "gba"))
             val versions = Arb.element(Some(ArtVersion("2026-09-28")), newer, None)
             checkAll(Arb.list(Arb.element(library), 0..5), Arb.list(Arb.pair(Arb.element(library), versions), 0..6)) { games, done ->
                 // Stored, or known to be missing from that version of its sources.
                 val wants = { id: GameId, version: Option<ArtVersion> -> done.none { (game, v) -> game.id == id && v == version } }
                 val read = mutableSetOf<PlatformId>()
-                val planned = ArtSources.requests(games, wants, ::versionOf) { platform -> sources(platform).also { read += platform } }
+                val planned =
+                    ArtSources.requests(games, wants, { false }, ::versionOf) { platform ->
+                        sources(platform).also {
+                            read +=
+                                platform
+                        }
+                    }
                 // Every game's plan, as the scraper keeps it.
                 planned shouldBe games.flatMap { sources(it.platform).requestFor(it).toList() }.filter { wants(it.game, it.version) }
                 read shouldBe games.filter { wants(it.id, versionOf(it.platform)) }.map { it.platform }.toSet()
@@ -72,13 +160,24 @@ class ArtSourcesTest {
             val missing = { id: GameId, version: Option<ArtVersion> ->
                 !(id == game("Okage").id && version == Some(ArtVersion("2026-09-28")))
             }
-            ArtSources.requests(listOf(game("Okage")), missing, ::versionOf, ::sources).map { it.version } shouldBe listOf(newer)
+            ArtSources.requests(listOf(game("Okage")), missing, { false }, ::versionOf, ::sources).map { it.version } shouldBe listOf(newer)
         }
+
+    @Test
+    fun `INV-E11-07 a game whose label is provisional is planned again only while its label is automatic`() {
+        val sources = sources(textures = table)
+        val labels = listOf(LabelChoice.Automatic, LabelChoice.Region(LabelRegion("Japan")), LabelChoice.Own)
+        val games = labels.mapIndexed { i, label -> okage.copy(id = GameId("$i"), label = label) }
+        val stored = { _: GameId, _: Option<ArtVersion> -> false }
+        ArtSources.requests(games, stored, { true }, { sources.version }) { sources }.map { it.game } shouldBe listOf(GameId("0"))
+        ArtSources.requests(games, stored, { false }, { sources.version }) { sources }.shouldBeEmpty()
+    }
 
     @Test
     fun `a game's label is cut for the medium its regions give it, in each of its requests`() {
         val kind = cartridge("snes_pal_cart", 1.41, crop(0.09, 0.06, 0.82, 0.4))
-        val sources = ArtSources(kind, MediaRule(mediumId("snes_pal_cart"), Some(mediumId("snes_us_cart"))), index, None)
+        val sources =
+            ArtSources(kind, MediaRule(mediumId("snes_pal_cart"), Some(mediumId("snes_us_cart"))), index, None, TextureTable.EMPTY)
         val american = game("Okage").copy(regions = listOf("USA"))
         sources.cutOf(american) shouldBe LabelCut(kind, mediumId("snes_us_cart"))
         sources.requestFor(american).shouldBeSome().cut shouldBe sources.cutOf(american)
@@ -87,7 +186,7 @@ class ArtSourcesTest {
 
     @Test
     fun `INV-E10-06 a game is looked for in its own platform's scans only, each of its platform's kind`() = runBlocking<Unit> {
-        val kinds = mapOf("ps2" to ArtKind.Disc, "gba" to cartridge("gba_cart", 1.74, crop(0.147, 0.218, 0.706, 0.628)))
+        val kinds = mapOf("ps2" to ArtKind.Disc, "gba" to gba)
         val media = mapOf("ps2" to "ps2_dvd", "gba" to "gba_cart").mapValues { mediumId(it.value) }
         var both = 0
         checkAll(extracts, extracts, artTitles, Arb.list(regionNames, 0..2)) { ps2, gba, title, regions ->
@@ -100,14 +199,22 @@ class ArtSourcesTest {
                     }.toMap()
             val asked =
                 kinds.keys.map { platform ->
-                    val sources = ArtSources.of(Shipped.catalog, texts, PlatformId(platform))
+                    val sources = ArtSources.of(Shipped.catalog, texts, emptyMap(), PlatformId(platform))
                     val game = game(title, platform).copy(regions = regions)
                     val request = sources.requestFor(game)
                     request.onSome {
                         it.cut shouldBe LabelCut(kinds.getValue(platform), media.getValue(platform))
-                        it.candidates.all { url -> url.value.substringAfterLast('/').startsWith("$platform-") } shouldBe true
+                        it.candidates.all { candidate ->
+                            candidate.identity.value.substringAfterLast('/').startsWith("$platform-")
+                        } shouldBe
+                            true
                     }
-                    sources.variantsOf(game).all { it.url.value.substringAfterLast('/').startsWith("$platform-") } shouldBe true
+                    sources
+                        .variantsOf(
+                            game,
+                        ) { true }
+                        .all { it.candidate.identity.value.substringAfterLast('/').startsWith("$platform-") } shouldBe
+                        true
                     request
                 }
             if (asked.all { it.isSome() }) both++
@@ -119,14 +226,189 @@ class ArtSourcesTest {
     @Test
     fun `a game the extract does not know is looked for by its serials, and a game no source can have is not`() {
         val unknown = game("Unknown").copy(serials = listOf("SLPS-25358"))
-        ArtSources(ArtKind.Disc, PS2_MEDIA, index, bySerial).requestFor(unknown).shouldBeSome().candidates.size shouldBe 1
-        ArtSources(ArtKind.Disc, PS2_MEDIA, index, bySerial).requestFor(game("Unknown")).shouldBeNone()
-        ArtSources(ArtKind.Disc, PS2_MEDIA, index, None).requestFor(unknown).shouldBeNone()
-        ArtSources(ArtKind.Disc, PS2_MEDIA, ArtIndex.EMPTY, None).requestFor(game("Okage")).shouldBeNone()
+        sources(bySerial = bySerial).requestFor(unknown).shouldBeSome().candidates.size shouldBe 1
+        sources(bySerial = bySerial).requestFor(game("Unknown")).shouldBeNone()
+        sources().requestFor(unknown).shouldBeNone()
+        sources(index = ArtIndex.EMPTY).requestFor(game("Okage")).shouldBeNone()
+    }
+
+    /**
+     * Which images are of a game's region, written by hand: its own regions and the zone each lies
+     * in; the world only a world release's. The oracle of the order's stages, apart from the code's.
+     */
+    private val ownImages =
+        mapOf(
+            "France" to setOf("France", "Europe"),
+            "Germany" to setOf("Germany", "Europe"),
+            "Europe" to setOf("Europe"),
+            "USA" to setOf("USA", "North America"),
+            "North America" to setOf("North America", "USA"),
+            "Japan" to setOf("Japan", "Asia"),
+            "Korea" to setOf("Korea", "Asia"),
+            "Asia" to setOf("Asia"),
+            "Australia" to setOf("Australia", "Oceania"),
+            "Oceania" to setOf("Oceania"),
+            "Brazil" to setOf("Brazil", "South America"),
+            "South America" to setOf("South America"),
+            "World" to setOf("World"),
+        )
+
+    @Test
+    fun `INV-E11-07 a cartridge's own-region texture comes before any scan, a disc's own-region scan before any texture, then the rest`() =
+        runBlocking<Unit> {
+            val kinds = Arb.element(ArtKind.Disc, gba)
+            val gameRegions = Arb.element(ownImages.keys.toList())
+            val imageRegions = Arb.element(ownImages.keys.toList() + "")
+            // The images' regions lean on the game's own and their zones, so that images of its region are common.
+            val images =
+                Arb.list(gameRegions, 0..2).flatMap { regions ->
+                    val own = regions.flatMap { ownImages.getValue(it) }
+                    val near = if (own.isEmpty()) imageRegions else Arb.choice(imageRegions, Arb.element(own))
+                    Arb.bind(Arb.list(near, 0..5), Arb.list(near, 0..5)) { scans, textures ->
+                        Triple(regions, scans.mapIndexed { i, region -> web("https://lb/$i.png", region) }, textures.mapIndexed(::texture))
+                    }
+                }
+            val serials = Arb.set(Arb.element("SCUS-97129", "SLPS-25358"), 0..2).map { it.map { s -> web("https://serial/$s.jpg") } }
+            var staged = 0
+            checkAll(kinds, images, serials) { kind, (regions, lb, ss), serial ->
+                val ordered = ArtSources.order(kind, regions, lb, ss, serial)
+                ordered shouldContainExactlyInAnyOrder lb + ss + serial
+                val textureFirst = kind != ArtKind.Disc
+
+                // The invariant's stages: the kind's first source of the game's region, its second, the serial scans, the rest.
+                fun stage(candidate: Candidate): Int = when {
+                    candidate in serial -> 2
+                    regions.none { candidate.region in ownImages.getValue(it) } -> 3
+                    (candidate is Candidate.Texture) == textureFirst -> 0
+                    else -> 1
+                }
+                ordered.zipWithNext().forEach { (before, after) -> stage(before) shouldBeLessThanOrEqual stage(after) }
+                if (ordered.map(::stage).distinct().size == 4) staged++
+            }
+            staged shouldBeGreaterThan 100
+        }
+
+    @Test
+    fun `INV-E11-07 the order case by case, as the algorithm reads, own textures or scans first by kind, then the rest closest first`() {
+        val lbFR = web("https://lb/fr.png", "France")
+        val lbDE = web("https://lb/de.png", "Germany")
+        val lbUS = web("https://lb/us.png", "USA")
+        val lbEU = web("https://lb/eu.png", "Europe")
+        val lbJP = web("https://lb/jp.png", "Japan")
+        val lbKR = web("https://lb/kr.png", "Korea")
+        val lbAU = web("https://lb/au.png", "Australia")
+        val lbBR = web("https://lb/br.png", "Brazil")
+        val lbNA = web("https://lb/na.png", "North America")
+        val lbWOR = web("https://lb/wor.png", "World")
+        val serial = web("https://serial/SCUS-97129.jpg")
+        val disc = ArtKind.Disc
+        // Kind, the game's regions, its scans, its textures, its serial scans: the order expected.
+        val cases =
+            listOf(
+                Case(
+                    gba,
+                    listOf("France"),
+                    listOf(lbFR, lbDE, lbUS, lbEU),
+                    listOf(texture("Europe"), texture("Japan"), texture("France")),
+                    emptyList(),
+                ) to
+                    listOf(texture("France"), texture("Europe"), lbFR, lbEU, lbDE, lbUS, texture("Japan")),
+                Case(
+                    disc,
+                    listOf("France"),
+                    listOf(lbFR, lbDE, lbUS, lbEU),
+                    listOf(texture("Europe"), texture("Japan"), texture("France")),
+                    listOf(serial),
+                ) to
+                    listOf(lbFR, lbEU, texture("France"), texture("Europe"), serial, lbDE, lbUS, texture("Japan")),
+                Case(
+                    gba,
+                    listOf("USA"),
+                    listOf(lbUS, lbJP),
+                    listOf(texture("North America"), texture("Japan"), texture("Europe")),
+                    emptyList(),
+                ) to
+                    listOf(texture("North America"), lbUS, texture("Europe"), texture("Japan"), lbJP),
+                Case(disc, emptyList(), listOf(lbJP, lbNA), listOf(texture("World")), listOf(serial)) to
+                    listOf(serial, texture("World"), lbNA, lbJP),
+                Case(gba, listOf("Korea"), listOf(lbKR, lbJP), listOf(texture("Japan"), texture("Asia")), emptyList()) to
+                    listOf(texture("Asia"), lbKR, texture("Japan"), lbJP),
+                Case(disc, listOf("Australia"), listOf(lbEU, lbAU), listOf(texture("Oceania")), emptyList()) to
+                    listOf(lbAU, texture("Oceania"), lbEU),
+                Case(gba, listOf("World"), listOf(lbWOR, lbEU), listOf(texture("USA")), emptyList()) to
+                    listOf(lbWOR, texture("USA"), lbEU),
+                Case(gba, listOf("Brazil"), listOf(lbBR, lbNA), listOf(texture("South America")), emptyList()) to
+                    listOf(texture("South America"), lbBR, lbNA),
+            )
+        cases.forEach { (case, expected) ->
+            ArtSources.order(case.kind, case.regions, case.scans, case.textures, case.serials) shouldBe
+                expected
+        }
+    }
+
+    private data class Case(
+        val kind: ArtKind,
+        val regions: List<String>,
+        val scans: List<Candidate.Web>,
+        val textures: List<Candidate.Texture>,
+        val serials: List<Candidate.Web>,
+    )
+
+    @Test
+    fun `INV-E11-07 a French game takes Europe's image as its own, never Germany's, and a game of no region its serial scan first`() {
+        val france = listOf("France")
+        val lbFrance = web("https://lb/fr.png", "France")
+        val lbUsa = web("https://lb/us.png", "USA")
+        ArtSources.order(gba, france, listOf(lbFrance), listOf(texture("Europe")), emptyList()) shouldBe listOf(texture("Europe"), lbFrance)
+        ArtSources.order(gba, france, emptyList(), listOf(texture("Europe"), texture("France")), emptyList()) shouldBe
+            listOf(texture("France"), texture("Europe"))
+        ArtSources.order(ArtKind.Disc, france, listOf(lbFrance), listOf(texture("Europe")), emptyList()) shouldBe
+            listOf(lbFrance, texture("Europe"))
+        // Germany is not of a French game's region: it only comes closer than America in the rest.
+        ArtSources.order(gba, france, listOf(lbUsa), listOf(texture("Germany")), emptyList()) shouldBe listOf(texture("Germany"), lbUsa)
+        ArtSources.order(ArtKind.Disc, france, listOf(lbUsa), listOf(texture("Germany")), emptyList()) shouldBe
+            listOf(texture("Germany"), lbUsa)
+        val serial = web("https://serial/SCUS-97129.jpg")
+        ArtSources.order(ArtKind.Disc, emptyList(), listOf(lbUsa), listOf(texture("World")), listOf(serial)) shouldBe
+            listOf(serial, texture("World"), lbUsa)
+        // A zone's umbrella is not a country's own outside that zone: Japan's texture is only the closest for a Korean game.
+        val lbKorea = web("https://lb/kr.png", "Korea")
+        ArtSources.order(gba, listOf("Korea"), listOf(lbKorea), listOf(texture("Japan"), texture("Asia")), emptyList()) shouldBe
+            listOf(texture("Asia"), lbKorea, texture("Japan"))
+        ArtSources.order(
+            gba,
+            listOf("Australia"),
+            listOf(web("https://lb/eu.png", "Europe")),
+            listOf(texture("Oceania")),
+            emptyList(),
+        ) shouldBe
+            listOf(texture("Oceania"), web("https://lb/eu.png", "Europe"))
     }
 
     @Test
-    fun `INV-E7-03 a game whose label shows a chosen region is looked for in that region's scan first, among the same scans`() =
+    fun `INV-E7-03 a game's images are every image of both sources among those offered, once per region and source, as tried`() {
+        fun shown(variants: List<ArtVariant>) = variants.map { "${it.region.name} · ${it.candidate.source.label}" }
+        val cartridge = sources(kind = gba, textures = table)
+        shown(cartridge.variantsOf(okage) { true }) shouldBe
+            listOf("North America · ScreenScraper", "North America · LaunchBox", "Japan · ScreenScraper", "Japan · LaunchBox")
+        // Textures left out, as while ScreenScraper is not open: the scans alone, the serial source never.
+        shown(cartridge.variantsOf(okage) { it is Candidate.Web }) shouldBe listOf("North America · LaunchBox", "Japan · LaunchBox")
+        val disc = sources(bySerial = bySerial, textures = table)
+        shown(disc.variantsOf(okage) { true }) shouldBe
+            listOf("North America · LaunchBox", "North America · ScreenScraper", "Japan · LaunchBox", "Japan · ScreenScraper")
+        // Two scans of one region at one source: the first alone.
+        val twice = ArtIndex.parse(extract(listOf(ExtractGame("Okage", emptySet(), listOf("USA=na.png", "USA=na2.png")))))
+        names(sources(index = twice).variantsOf(okage) { true }.map { it.candidate }) shouldBe listOf("na.png")
+        // A chosen label is looked for as its region's image at its source first.
+        val texture = okage.copy(label = LabelChoice.Region(LabelRegion("Japan"), ArtSource.SCREENSCRAPER))
+        names(disc.requestFor(texture).shouldBeSome().candidates) shouldBe
+            listOf("ss:58:1234:support-texture(jp)", "na.png", "ss:58:1234:support-texture(us)", "SCUS-97129.jpg", "jp.png")
+        names(disc.requestFor(okage.copy(label = LabelChoice.Region(LabelRegion("Japan")))).shouldBeSome().candidates).take(1) shouldBe
+            listOf("jp.png")
+    }
+
+    @Test
+    fun `INV-E7-03 a game whose label shows a chosen region is looked for in that region's image first, among the same images`() =
         runBlocking<Unit> {
             var moved = 0
             // Mostly a region of the game's scans, sometimes one it has no scan for; another game
@@ -136,7 +418,7 @@ class ArtSourcesTest {
                 val lines = discs.mapIndexed { i, region -> "$region=d$i.png" }
                 val extract =
                     extract(listOf(ExtractGame("Okage", emptySet(), lines), ExtractGame("Okage 2", emptySet(), listOf("$chosen=o.png"))))
-                val sources = ArtSources(ArtKind.Disc, PS2_MEDIA, ArtIndex.parse(extract), bySerial)
+                val sources = sources(index = ArtIndex.parse(extract), bySerial = bySerial)
                 val okage = game("Okage").copy(regions = regions, serials = listOf("SCUS-97129"))
                 val automatic = sources.requestFor(okage).shouldBeSome().candidates
                 val picked = sources.requestFor(okage.copy(label = LabelChoice.Region(LabelRegion(chosen)))).shouldBeSome().candidates
@@ -146,7 +428,7 @@ class ArtSourcesTest {
                     if (first < 0) {
                         automatic
                     } else {
-                        automatic.first { it.value.endsWith("/d$first.png") }.let { listOf(it) + (automatic - it) }
+                        automatic.first { it.identity.value.endsWith("/d$first.png") }.let { listOf(it) + (automatic - it) }
                     }
                 picked shouldBe expected
                 if (picked != automatic) moved++
@@ -161,7 +443,7 @@ class ArtSourcesTest {
         checkAll(Arb.list(regionNames, 0..5), Arb.list(regionNames, 0..2), serialLists) { discs, regions, serials ->
             val extract = extract(listOf(ExtractGame("Okage", emptySet(), discs.mapIndexed { i, region -> "$region=d$i.png" })))
             val okage = game("Okage").copy(regions = regions, serials = serials)
-            val sources = ArtSources(ArtKind.Disc, PS2_MEDIA, ArtIndex.parse(extract), bySerial)
+            val sources = sources(index = ArtIndex.parse(extract), bySerial = bySerial)
             if (sources.requestFor(okage).isSome()) withScans++
             sources.requestFor(okage.copy(label = LabelChoice.Own)).shouldBeNone()
         }
@@ -172,7 +454,7 @@ class ArtSourcesTest {
     @Test
     fun `INV-E7-04 looking labels up again asks for each game a source may have art for, and never touches a label the user chose`() =
         runBlocking<Unit> {
-            val sources = ArtSources(ArtKind.Disc, PS2_MEDIA, index, None)
+            val sources = sources()
             val labels = Arb.element(LabelChoice.Automatic, LabelChoice.Own, LabelChoice.Region(LabelRegion("Japan")))
             var own = 0
             var region = 0
@@ -193,4 +475,41 @@ class ArtSourcesTest {
             own shouldBeGreaterThan 100
             region shouldBeGreaterThan 100
         }
+
+    @Test
+    fun `INV-E7-03 either chosen source moves only its image and an unavailable choice keeps every fallback`() = runBlocking<Unit> {
+        val sources = sources(bySerial = bySerial, textures = table)
+        val automatic = listOf("na.png", "ss:58:1234:support-texture(us)", "SCUS-97129.jpg", "jp.png", "ss:58:1234:support-texture(jp)")
+        val cases =
+            listOf(
+                Triple(ArtSource.LAUNCHBOX, "North America", automatic),
+                Triple(
+                    ArtSource.SCREENSCRAPER,
+                    "North America",
+                    listOf("ss:58:1234:support-texture(us)", "na.png", "SCUS-97129.jpg", "jp.png", "ss:58:1234:support-texture(jp)"),
+                ),
+                Triple(
+                    ArtSource.LAUNCHBOX,
+                    "Japan",
+                    listOf("jp.png", "na.png", "ss:58:1234:support-texture(us)", "SCUS-97129.jpg", "ss:58:1234:support-texture(jp)"),
+                ),
+                Triple(
+                    ArtSource.SCREENSCRAPER,
+                    "Japan",
+                    listOf("ss:58:1234:support-texture(jp)", "na.png", "ss:58:1234:support-texture(us)", "SCUS-97129.jpg", "jp.png"),
+                ),
+                Triple(ArtSource.LAUNCHBOX, "Atlantis", automatic),
+                Triple(ArtSource.SCREENSCRAPER, "Atlantis", automatic),
+            )
+        checkAll(Arb.element(cases)) { (source, region, expected) ->
+            val picked = okage.copy(label = LabelChoice.Region(LabelRegion(region), source))
+            names(sources.requestFor(picked).shouldBeSome().candidates) shouldBe expected
+        }
+        cases.forEach { (source, region, expected) ->
+            names(
+                sources.requestFor(okage.copy(label = LabelChoice.Region(LabelRegion(region), source))).shouldBeSome().candidates,
+            ) shouldBe
+                expected
+        }
+    }
 }

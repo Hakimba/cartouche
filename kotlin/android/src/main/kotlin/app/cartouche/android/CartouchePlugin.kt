@@ -12,15 +12,21 @@ import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import app.cartouche.android.apps.InstalledApps
+import app.cartouche.android.art.Answer
 import app.cartouche.android.art.ArtStore
+import app.cartouche.android.art.Credentials
 import app.cartouche.android.art.Fetch
 import app.cartouche.android.art.FetchFailure
 import app.cartouche.android.art.FoundArt
+import app.cartouche.android.art.Http
 import app.cartouche.android.art.HttpFetch
+import app.cartouche.android.art.JavaHttp
 import app.cartouche.android.art.LabelChoices
 import app.cartouche.android.art.OwnPictures
 import app.cartouche.android.art.Scraper
+import app.cartouche.android.art.ScreenScraperFetch
 import app.cartouche.android.art.StoredArt
+import app.cartouche.android.art.Textures
 import app.cartouche.android.art.VariantDownloads
 import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.Curtain
@@ -38,11 +44,14 @@ import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
-import app.cartouche.core.art.ArtIndex
 import app.cartouche.core.art.ArtSources
 import app.cartouche.core.art.ArtVariant
+import app.cartouche.core.art.ArtVersion
+import app.cartouche.core.art.Candidate
+import app.cartouche.core.art.Day
 import app.cartouche.core.art.LabelFraming
 import app.cartouche.core.art.Scraping
+import app.cartouche.core.art.ScreenScraperState
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DemoLibrary
@@ -70,6 +79,7 @@ import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
+import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.firstOrNone
@@ -83,6 +93,7 @@ import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.raise.option
 import arrow.core.recover
+import arrow.core.right
 import arrow.core.separateEither
 import arrow.core.toOption
 import kotlinx.coroutines.CoroutineDispatcher
@@ -101,6 +112,8 @@ import org.godotengine.godot.plugin.GodotPlugin
 import org.godotengine.godot.plugin.SignalInfo
 import org.godotengine.godot.plugin.UsedByGodot
 import java.io.File
+import java.net.HttpURLConnection
+import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import kotlin.time.TimeSource
@@ -127,8 +140,10 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private val pendingPicture = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
     private val ownPictures by lazy { OwnPictures(File(context.cacheDir, "own-label")) }
     private val artStore by lazy { ArtStore(File(context.filesDir, "art")) }
+    private val screenScraper by lazy { screenScraperFetch() }
+    private val textures by lazy { screenScraper.getOrElse { Textures.NONE } }
     private val fetch by lazy { artFetch() }
-    private val scraper by lazy { Scraper(artStore, fetch, scope, ::artChanged) }
+    private val scraper by lazy { Scraper(artStore, fetch, scope, textures, ::artChanged) }
 
     private val variantDownloads by lazy {
         VariantDownloads(artStore, fetch, scope, Dispatchers.IO.limitedParallelism(VARIANT_DOWNLOADS), ::variantDownloaded)
@@ -163,8 +178,10 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     @Volatile private var curtainTimes = CurtainTimes.NONE
 
-    /** Art extracts by platform, as loaded; each is indexed on first use. */
+    /** Art extracts and ScreenScraper's texture tables by platform, as loaded; each is indexed on first use. */
     @Volatile private var artLists: Map<PlatformId, String> = emptyMap()
+
+    @Volatile private var textureLists: Map<PlatformId, String> = emptyMap()
 
     @Volatile private var artSources = ConcurrentHashMap<PlatformId, ArtSources>()
 
@@ -231,8 +248,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /**
      * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
      * profiles file's text, the reference lists as `{platform id: text}`, the emulator data folder
-     * names (`data_folders.json`), the curtain times (`curtains.json`), the art extracts and the
-     * cartridge prints, each as `{platform id: text}`; returns the catalog summary.
+     * names (`data_folders.json`), the curtain times (`curtains.json`), the art extracts, the
+     * cartridge prints and ScreenScraper's texture tables, each as `{platform id: text}`; returns
+     * the catalog summary.
      */
     @UsedByGodot
     public fun loadCatalog(
@@ -243,6 +261,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         curtains: String,
         art: Dictionary,
         prints: Dictionary,
+        textures: Dictionary,
     ): Dictionary {
         val (notText, sources) =
             definitions.keys.sorted().separateEither { name ->
@@ -252,6 +271,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         printLists = prints.textsByPlatform()
         titleIndexes = ConcurrentHashMap()
         artLists = art.textsByPlatform()
+        textureLists = textures.textsByPlatform()
         artSources = ConcurrentHashMap()
         val folderNames = DataFolders.parse(DefinitionSource("data_folders.json", dataFolderNames))
         dataFolders = folderNames.getOrElse { DataFolders.NONE }
@@ -262,6 +282,16 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
                 it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + times.swap().getOrNone().toList() + it.rejected)
             }
         return catalog.toWire()
+    }
+
+    /**
+     * Looks for the art of [gameIds] (the game on screen and its neighbours) before the others':
+     * their requests, when still waiting, go to the front of the run, now and at each new plan.
+     */
+    @UsedByGodot
+    public fun artFocus(gameIds: Array<String>) {
+        val games = gameIds.map(::GameId)
+        scope.launch(artPlanning) { scraper.focus(games) }
     }
 
     /**
@@ -629,44 +659,59 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     }
 
     /**
-     * The images the art sources have for [gameId]'s label, one per region, closest to the game's own
-     * first: answers with `{"variants": [{"region", "path"?}]}`, `path` for those already downloaded;
-     * then downloads the others, each telling the `label_variant_downloaded` signal `{"game_id",
-     * "region", "path"}`, or `{"game_id", "region", "failure"}` (`offline`, `refused`, `not_found`,
-     * `unreadable`, `storage`).
+     * The images the art sources have for [gameId]'s label, every one of both sources (see
+     * [offered]), in the order they are tried: answers with `{"variants": [{"region", "source",
+     * "source_name", "path"?}]}`, `source` naming the source for [chooseLabel] (`launchbox`,
+     * `screenscraper`), `source_name` as shown, `path` for the images already downloaded; then
+     * downloads the others, each telling the `label_variant_downloaded` signal `{"game_id",
+     * "region", "source", "path"}`, or `{"game_id", "region", "source", "failure"}` (`offline`,
+     * `refused`, `not_found`, `unreadable`, `storage`).
      */
     @UsedByGodot
     public fun labelVariants(requestId: Int, gameId: String): Unit = answering(requestId, libraryThread) {
         val game = game(GameId(gameId))
         val sources = sources(game.platform)
-        val stored = sources.variantsOf(game).map { it to artStore.variant(it.url) }
+        val stored = sources.variantsOf(game, offered(sources.version)).map { it to artStore.variant(it.candidate) }
         val missing = stored.filter { it.second.isNone() }.map { it.first }
         trace("art") { "${game.title}: ${stored.size} images, ${missing.size} to download" }
-        variantDownloads.download(game.id, missing, sources.cutOf(game))
-        success(
-            "variants" to
-                stored.toWireArray { (variant, art) ->
-                    dictionary("region" to variant.region.name).putSome("path", art.map { it.file.path })
-                },
-        )
+        variantDownloads.download(game.id, missing, sources.cutOf(game), sources.version)
+        success("variants" to stored.toWireArray { (variant, art) -> variant.toWire().putSome("path", art.map { it.file.path }) })
     }
 
     /**
-     * Shows the image of [region] (as [labelVariants] names it, downloaded) on [gameId]'s label from
-     * now on, and remembers the choice (see [LabelChoices]); answers with `{"art": {"game_id",
-     * "path"}}`.
+     * Shows the image of [region] at [source] (as [labelVariants] names them, downloaded) on
+     * [gameId]'s label from now on, and remembers the choice (see [LabelChoices]); answers with
+     * `{"art": {"game_id", "path"}}`.
      */
     @UsedByGodot
-    public fun chooseLabel(requestId: Int, gameId: String, region: String): Unit = answering(requestId, libraryThread) {
+    public fun chooseLabel(requestId: Int, gameId: String, region: String, source: String): Unit = answering(requestId, libraryThread) {
         val game = game(GameId(gameId))
+        val sources = sources(game.platform)
         val variant =
-            sources(game.platform).variantsOf(game).firstOrNone { it.region.name == region }.getOrElse {
-                raise(failure(ErrorCode.NO_IMAGE, "No image of ${game.title} for region '$region'"))
-            }
+            sources
+                .variantsOf(game, offered(sources.version))
+                .firstOrNone { it.region.name == region && it.candidate.source.wire == source }
+                .getOrElse { raise(failure(ErrorCode.NO_IMAGE, "No image of ${game.title} for region '$region' at '$source'")) }
         val art = LabelChoices(library.value, artStore).choose(game, variant).mapLeft { it.toWire() }.bind()
-        trace("art") { "${game.title}: label of region '$region' chosen" }
+        trace("art") { "${game.title}: label of region '$region' at '$source' chosen" }
         success("art" to FoundArt(game.id, art).toWire())
     }
+
+    /**
+     * Which of a game's images the chooser offers: not a texture ScreenScraper answered it has none
+     * of (INV-E11-04), and no texture while ScreenScraper is not open or the app has no key: the
+     * region's scan alone then (INV-E7-03).
+     */
+    private fun offered(version: Option<ArtVersion>): (Candidate) -> Boolean = { candidate ->
+        !artStore.isMissing(candidate, version) &&
+            when (candidate) {
+                is Candidate.Web -> true
+                is Candidate.Texture -> textures.open
+            }
+    }
+
+    private fun ArtVariant.toWire(): Dictionary =
+        dictionary("region" to region.name, "source" to candidate.source.wire, "source_name" to candidate.source.label)
 
     /**
      * Shows [gameId] as [name] from now on (trimmed and cut, see [DisplayName]), or as its title
@@ -767,15 +812,17 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val games = library.value.library().games
         // A child: the look is over once the scraper has its requests, but this thread is free at once.
         launch(artPlanning) {
-            val versionOf = { platform: PlatformId -> artLists.getOrNone(platform).flatMap(ArtIndex::versionOf) }
-            scraper.lookFor(ArtSources.requests(games, artStore::wants, versionOf, ::sources))
+            val versionOf = { platform: PlatformId -> ArtSources.versionOf(catalog, artLists, textureLists, platform) }
+            scraper.lookFor(ArtSources.requests(games, artStore::wants, { artStore.provisional(it).isSome() }, versionOf, ::sources))
         }
         if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
     }
 
     private fun variantDownloaded(game: GameId, variant: ArtVariant, kept: Either<VariantFailure, StoredArt>) {
-        trace("art") { "${variant.region.name} image of ${game.value}: ${kept.fold({ it.wire }) { "downloaded" }}" }
-        val told = dictionary("game_id" to game.value, "region" to variant.region.name)
+        trace("art") {
+            "${variant.region.name} image of ${game.value} at ${variant.candidate.source.wire}: ${kept.fold({ it.wire }) { "downloaded" }}"
+        }
+        val told = variant.toWire().apply { put("game_id", game.value) }
         kept.fold({ told.put("failure", it.wire) }) { told.put("path", it.file.path) }
         emitSignal(VARIANT_SIGNAL, told)
     }
@@ -786,13 +833,67 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private fun sources(platform: PlatformId): ArtSources = artSources.computeIfAbsent(platform) {
         val started = TimeSource.Monotonic.markNow()
         ArtSources
-            .of(catalog, artLists, platform)
-            .also { trace("art") { "${platform.value}: ${it.size} games indexed in ${started.elapsedNow().inWholeMilliseconds} ms" } }
+            .of(catalog, artLists, textureLists, platform)
+            .also {
+                trace(
+                    "art",
+                ) {
+                    "${platform.value}: ${it.size} games, ${it.releases} releases indexed in ${started.elapsedNow().inWholeMilliseconds} ms"
+                }
+            }
     }
 
     /** Downloads over HTTP; in debug builds, `--art-refused` makes every server refuse, to try the message and the retries. */
-    private fun artFetch(): Fetch =
-        if ("--art-refused" in launchArguments()) Fetch { FetchFailure.Refused(503).left() } else HttpFetch("Cartouche")
+    private fun artFetch(): Fetch {
+        if ("--art-refused" in launchArguments()) return Fetch { FetchFailure.Refused(503).left() }
+        val scans = HttpFetch(JavaHttp(USER_AGENT))
+        return Fetch { candidate ->
+            when (candidate) {
+                is Candidate.Web -> scans.get(candidate.url)
+                is Candidate.Texture -> screenScraper.fold({ FetchFailure.NotFound.left() }) { it.get(candidate) }
+            }
+        }
+    }
+
+    /** ScreenScraper with the credentials built into the app; none without a key, and the textures are then images no server gives. */
+    private fun screenScraperFetch(): Option<ScreenScraperFetch> = Credentials.fromBuild().map { credentials ->
+        // The device's local day: the quota resets on the server's day, so a closure may lift a few hours early or late.
+        val today = { Day(LocalDate.now().toString()) }
+        ScreenScraperFetch(
+            screenScraperHttp(),
+            credentials,
+            File(context.filesDir, "art/screenscraper.json"),
+            System::currentTimeMillis,
+            today,
+        ) { trace("art") { "ScreenScraper: $it" } }
+    }
+
+    /**
+     * Debug builds: `--screenscraper=quota` makes ScreenScraper answer that the day's quota is spent,
+     * `--screenscraper=wrong-key` that the app's key is refused, `--screenscraper=wrong-account` that
+     * the member is, to try each state on the device.
+     */
+    private fun screenScraperHttp(): Http {
+        val real = JavaHttp(USER_AGENT)
+        val simulated =
+            launchArguments()
+                .asList()
+                .firstOrNone {
+                    it.startsWith(SCREENSCRAPER_ARGUMENT)
+                }.map { it.removePrefix(SCREENSCRAPER_ARGUMENT) }
+        return when (simulated) {
+            Some("quota") -> Http { Answer(ScreenScraperState.QUOTA_SPENT, None).right() }
+            Some(
+                "wrong-key",
+            ),
+            -> Http { Answer(HttpURLConnection.HTTP_OK, Some(ScreenScraperFetch.LOGIN_REFUSED.encodeToByteArray())).right() }
+            Some("wrong-account") ->
+                Http { url ->
+                    if ("ssuserInfos" in url) Answer(HttpURLConnection.HTTP_FORBIDDEN, None).right() else real.get(url)
+                }
+            else -> real
+        }
+    }
 
     private fun libraryIn(folder: File): LibraryService = LibraryService(
         LibraryStore(File(folder, LIBRARY_FILE)),
@@ -948,6 +1049,10 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         const val ART_SIGNAL = "art_changed"
 
         const val VARIANT_SIGNAL = "label_variant_downloaded"
+
+        const val USER_AGENT = "Cartouche"
+
+        const val SCREENSCRAPER_ARGUMENT = "--screenscraper="
 
         /** The battery's level, or whether a charger is plugged in, changed. */
         const val BATTERY_SIGNAL = "battery_changed"

@@ -12,9 +12,11 @@ const _FADED := 0.45
 ## What the thumbnail draws its blank disc on, before the image.
 static var _blank: Texture2D
 
-## The region of the art sources the image is for, as they name it (empty when they name none).
+## The region the image is for, as the art sources name it (empty when they name none).
 var region: String
-## Whether it is the card of the user's own image rather than of a region.
+## The source the image comes from, as the plugin names it (empty on the card of the user's own).
+var source: String
+## Whether it is the card of the user's own image rather than of a source's.
 var own: bool
 ## The image, once read; none before.
 var label: Texture2D
@@ -22,8 +24,9 @@ var _thumbnail := TextureRect.new()
 var _material := ShaderMaterial.new()
 
 
-func _init(region_name: String, caption: String, of_own := false) -> void:
+func _init(region_name: String, source_id: String, caption: String, of_own := false) -> void:
 	region = region_name
+	source = source_id
 	own = of_own
 	theme_type_variation = &"Card"
 	custom_minimum_size = _SIZE

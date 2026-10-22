@@ -42,10 +42,13 @@ class ScrapingTest {
 
         /** The request under way picked by [pick] was set aside before its end. */
         data class Return(val pick: Int) : Step
+
+        /** The games on screen: their requests go first. */
+        data class Focus(val games: List<Int>) : Step
     }
 
     private fun request(game: Int) =
-        ArtRequest(GameId("ps2/$game"), "Game $game", nonEmptyListOf(ArtUrl("https://a/$game.png")), None, PS2_DISC)
+        ArtRequest(GameId("ps2/$game"), "Game $game", nonEmptyListOf(web("https://a/$game.png")), None, PS2_DISC)
 
     private val steps: Arb<Step> =
         Arb.choice(
@@ -56,6 +59,7 @@ class ScrapingTest {
             Arb.bind(Arb.int(0..7), Arb.enum<Stall>(), Step::Halt),
             Arb.constant(Step.Resume),
             Arb.int(0..7).map(Step::Return),
+            Arb.list(Arb.int(0..7), 0..3).map(Step::Focus),
         )
 
     @Test
@@ -105,6 +109,17 @@ class ScrapingTest {
                                 if (it.game in scanned) run.waiting.first() shouldBe it
                                 run.stall shouldBe stall
                             }
+                        is Step.Focus -> {
+                            val before = run
+                            val focused = step.games.map { GameId("ps2/$it") }
+                            run = run.ahead(focused)
+                            // The same requests wait, the focused ones first in the order given, the others in theirs.
+                            run.waiting.toSet() shouldBe before.waiting.toSet()
+                            val first = focused.distinct().flatMap { game -> before.waiting.filter { it.game == game } }
+                            run.waiting shouldBe first + (before.waiting - first.toSet())
+                            (run.underWay to run.stall) shouldBe (before.underWay to before.stall)
+                            run.total shouldBe before.total
+                        }
                     }
                     val looked = (run.waiting + run.underWay).map { it.game }
                     looked.distinct() shouldBe looked

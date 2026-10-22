@@ -90,6 +90,14 @@ func test_the_cartridge_prints_loaded_with_the_catalog_are_those_of_the_six_cart
 	assert_array(lists).is_equal(["gb.tsv", "gba.tsv", "gbc.tsv", "n64.tsv", "nes.tsv", "snes.tsv"])
 
 
+func test_the_texture_tables_loaded_with_the_catalog_are_those_of_the_twelve_consoles_with_a_screenscraper_system() -> void:
+	var tables := Array(DirAccess.get_files_at("res://data/screenscraper")).filter(
+		func(file_name: String) -> bool: return file_name.ends_with(".tsv"))
+	tables.sort()
+	assert_array(tables).is_equal(["gb.tsv", "gba.tsv", "gbc.tsv", "gc.tsv", "n64.tsv", "nes.tsv", "ps2.tsv", "psx.tsv", "snes.tsv",
+		"wii.tsv", "xbox.tsv", "xbox360.tsv"])
+
+
 func test_the_plugin_gets_daijisho_s_definitions_and_cartouche_s_own() -> void:
 	assert_array(AndroidServices.platform_definitions().keys()).contains(
 		["SonyPlayStation2.json", "MicrosoftXbox.json", "MicrosoftXbox360.json"])
@@ -173,8 +181,27 @@ func test_the_battery_is_read_as_the_plugin_sends_it_plugged_or_not_its_level_wh
 	assert_bool(none.has_level or none.plugged).is_false()
 
 
+
+
+func test_art_focus_sends_the_ordered_ids_as_a_packed_string_array_to_the_plugin() -> void:
+	var services: AndroidServices = auto_free(AndroidServices.new())
+	var plugin: FakePlugin = auto_free(FakePlugin.new())
+	services._plugin = plugin
+	var games: Array[AndroidServices.Game] = []
+	for id: String in ["ps2/B", "ps2/C", "ps2/A"]:
+		games.append(AndroidServices.Game.new({"id": id, "platform_id": "ps2", "title": id, "identified": false,
+			"discs": [{"name": id}], "last_disc": 0}))
+	services.art_focus(games)
+	assert_array(plugin.focus_calls).is_equal([PackedStringArray(["ps2/B", "ps2/C", "ps2/A"])])
+
+
 ## Answers as the Kotlin plugin does, as JSON text.
 class FakePlugin extends Object:
+	var focus_calls: Array[PackedStringArray] = []
+
+	func artFocus(ids: PackedStringArray) -> void:
+		focus_calls.append(ids)
+
 	func browse(_platform_id: String, _order: String, _typed: String) -> String:
 		return """{"count": 3, "games": [2, 0], "groups": [], "keys": {}}"""
 

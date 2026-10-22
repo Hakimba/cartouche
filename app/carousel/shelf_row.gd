@@ -165,6 +165,17 @@ func jump(index: int, direction: int, slide: float) -> void:
 	selection_changed.emit(selected_game())
 
 
+## The selected game, then the [param reach] games on each side of it, nearest first, each once.
+func games_around(reach: int) -> Array[AndroidServices.Game]:
+	var around: Array[AndroidServices.Game] = [selected_game()]
+	for offset in range(1, reach + 1):
+		for side: int in [offset, -offset]:
+			var game := _games[posmod(_position + side, _games.size())]
+			if game not in around:
+				around.append(game)
+	return around
+
+
 ## Whether the shelf has games; the other methods need one.
 func has_games() -> bool:
 	return not _games.is_empty()

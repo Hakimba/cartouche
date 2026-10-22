@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
 
+const ScreenFixtures := preload("res://test/screens/fixtures.gd")
 const Fixtures := preload("res://test/carousel/fixtures.gd")
 
 
@@ -147,3 +148,35 @@ func _shown(carousel: Carousel) -> Dictionary:
 	shown["drift"] = ((carousel.get_node("Backdrop/Gradient") as CanvasItem).material as ShaderMaterial).get_shader_parameter(&"drift")
 	shown["blurred view"] = carousel._sequence.layer.view.render_target_update_mode
 	return shown
+
+
+func test_selection_priority_waits_for_the_last_selection_and_follows_a_shelf_change() -> void:
+	var device := ScreenFixtures.past_first_launch(self, {"ps2": 6, "gc": 1})
+	var carousel := ScreenFixtures.fresh_carousel(self, device)
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._art_focus.is_stopped())).is_true()
+	device.art_focus_calls.clear()
+	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
+	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
+	assert_array(device.art_focus_calls).is_empty()
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.art_focus_calls.size() == 1)).is_true()
+	assert_array(device.art_focus_calls).is_equal([PackedStringArray(["ps2/2", "ps2/3", "ps2/1"])])
+	await ScreenFixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.CONSOLES)).is_true()
+	device.art_focus_calls.clear()
+	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.art_focus_calls.size() == 1)).is_true()
+	assert_array(device.art_focus_calls).is_equal([PackedStringArray(["gc/0"])])
+
+
+func test_the_selection_priority_timer_sends_nothing_for_an_empty_row() -> void:
+	var device := ScreenFixtures.past_first_launch(self, {})
+	var carousel := ScreenFixtures.fresh_carousel(self, device)
+	await await_idle_frame()
+	device.art_focus_calls.clear()
+	assert_bool(carousel._row.has_games()).is_false()
+	carousel._art_focus.start()
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._art_focus.is_stopped())).is_true()
+	assert_array(device.art_focus_calls).is_empty()

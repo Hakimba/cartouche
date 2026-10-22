@@ -296,9 +296,11 @@ class NewDevice extends AndroidServices:
 	var removed: Array[String] = []
 	var setting_opened := false
 	var titles_prepared := 0
-	## The images every game's label can show, as the plugin lists them: `{"region", "path"?}`.
+	## The images every game's label can show, as the plugin lists them:
+	## `{"region", "source", "source_name", "path"?}`.
 	var variants: Array[Dictionary] = []
-	## The regions whose image was chosen for a label, in order.
+	var art_focus_calls: Array[PackedStringArray] = []
+	## The images chosen for a label, in order, each as `source/region`.
 	var chosen_labels: Array[String] = []
 
 	func _init() -> void:
@@ -400,6 +402,12 @@ class NewDevice extends AndroidServices:
 	func battery() -> AndroidServices.Battery:
 		return AndroidServices.Battery.new({"level_percent": 99, "plugged": false})
 
+	func art_focus(games_on_screen: Array[AndroidServices.Game]) -> void:
+		var ids := PackedStringArray()
+		for selected in games_on_screen:
+			ids.append(selected.id)
+		art_focus_calls.append(ids)
+
 	func select_game(_game: AndroidServices.Game) -> AndroidServices.Result:
 		return AndroidServices.Result.new({"ok": true})
 
@@ -408,8 +416,8 @@ class NewDevice extends AndroidServices:
 		await _frames(3)
 		return AndroidServices.LabelVariants.new({"ok": true, "variants": variants})
 
-	func choose_label(game: AndroidServices.Game, region: String) -> AndroidServices.ArtAnswer:
-		chosen_labels.append(region)
+	func choose_label(game: AndroidServices.Game, region: String, source: String) -> AndroidServices.ArtAnswer:
+		chosen_labels.append(source + "/" + region)
 		await _frames(3)
 		var answer := _payload(&"choose_label")
 		if answer["ok"]:
@@ -517,8 +525,9 @@ class NewDevice extends AndroidServices:
 
 	## An image [method label_variants] listed arrives for [param game_id]: at [param path], or
 	## not, for [param failure].
-	func arrive(game_id: String, region: String, path := "", failure := &"") -> void:
-		var told := {"game_id": game_id, "region": region}
+	func arrive(game_id: String, region: String, path := "", failure := &"", source := "launchbox") -> void:
+		var told := {"game_id": game_id, "region": region, "source": source,
+			"source_name": "ScreenScraper" if source == "screenscraper" else "LaunchBox"}
 		if path:
 			told["path"] = path
 		else:

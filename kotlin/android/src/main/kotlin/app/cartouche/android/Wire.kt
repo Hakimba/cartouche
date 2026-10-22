@@ -234,7 +234,10 @@ private fun Game.toJson(medium: Option<MediumId>): JsonObject = buildJsonObject 
     putSome("redump_name", redumpName)
     when (val chosen = label) {
         LabelChoice.Automatic -> Unit
-        is LabelChoice.Region -> put("label_region", chosen.region.name)
+        is LabelChoice.Region -> {
+            put("label_region", chosen.region.name)
+            put("label_source", chosen.source.wire)
+        }
         LabelChoice.Own -> put("label_own", true)
     }
 }

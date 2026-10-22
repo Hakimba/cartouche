@@ -472,12 +472,18 @@ unique_name_in_owner = true
 wait_time = 2.0
 one_shot = true
 
+[node name="ArtFocus" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 0.3
+one_shot = true
+
 [connection signal="selection_changed" from="Row" to="." method="_on_row_selection_changed"]
 [connection signal="selection_changed" from="Consoles" to="." method="_on_consoles_selection_changed"]
 [connection signal="failed" from="GameLaunch" to="." method="_on_game_launch_failed"]
 [connection signal="timeout" from="ClockTimer" to="." method="_on_clock_timeout"]
 [connection signal="timeout" from="MessageTimer" to="." method="_on_message_timer_timeout"]
 [connection signal="timeout" from="HoldSelect" to="." method="_on_hold_select_timeout"]
+[connection signal="timeout" from="ArtFocus" to="." method="_on_art_focus_timeout"]
 [connection signal="library_changed" from="Screens" to="." method="_on_screens_library_changed"]
 [connection signal="console_added" from="Screens" to="." method="_on_screens_console_added"]
 [connection signal="library_edited" from="Screens" to="." method="_on_screens_library_edited"]

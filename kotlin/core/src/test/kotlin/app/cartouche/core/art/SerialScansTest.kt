@@ -19,13 +19,14 @@ class SerialScansTest {
 
     @Test
     fun `a disc's scan is named after each of its serials, in order, once`() {
-        source.scansOf(listOf("SLPM-66363", "SCAJ-20175", "SLPM-66363")).map { it.value } shouldBe
+        source.scansOf(listOf("SLPM-66363", "SCAJ-20175", "SLPM-66363")).map { it.url.value } shouldBe
             listOf("https://scans.test/SLPM-66363/SLPM-66363-D.jpg", "https://scans.test/SCAJ-20175/SCAJ-20175-D.jpg")
     }
 
     @Test
     fun `serials of another form are left out, as the reference lists hold some`() {
-        source.scansOf(listOf("SLES-53974/GER", "SLES---54355", "SCES-53133-ANZ/P", "slus-20148", "")).map { it.value } shouldBe emptyList()
+        source.scansOf(listOf("SLES-53974/GER", "SLES---54355", "SCES-53133-ANZ/P", "slus-20148", "")).map { it.url.value } shouldBe
+            emptyList()
     }
 
     @Test
@@ -33,7 +34,7 @@ class SerialScansTest {
         val shipped = Shipped.ps2.profile.scansBySerial.shouldBeSome()
         val serials = Shipped.text("titles/ps2.tsv").lines().flatMap { line -> line.substringAfter('\t').split(',') }
         checkAll(Arb.element(serials)) { serial ->
-            shipped.scansOf(listOf(serial)).forEach { it.value shouldStartWith "https://psxdatacenter.com/" }
+            shipped.scansOf(listOf(serial)).forEach { it.url.value shouldStartWith "https://psxdatacenter.com/" }
         }
         serials.count { shipped.scansOf(listOf(it)).isNotEmpty() } shouldBeGreaterThan serials.size * 3 / 4
     }
@@ -41,7 +42,8 @@ class SerialScansTest {
     @Test
     fun `a source names only serials of its platform's form`() {
         val cartridges = SerialScans.of("https://scans.test/{serial}.png", "[A-Z0-9]{4}").shouldBeSome()
-        cartridges.scansOf(listOf("BJBE", "SLES-53047", "bjbe", "AGB-BJBE")).map { it.value } shouldBe listOf("https://scans.test/BJBE.png")
+        cartridges.scansOf(listOf("BJBE", "SLES-53047", "bjbe", "AGB-BJBE")).map { it.url.value } shouldBe
+            listOf("https://scans.test/BJBE.png")
         source.scansOf(listOf("BJBE")) shouldBe emptyList()
     }
 

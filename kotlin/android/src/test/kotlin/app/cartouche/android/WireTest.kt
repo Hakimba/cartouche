@@ -14,10 +14,11 @@ import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
 import app.cartouche.core.art.ArtRequest
-import app.cartouche.core.art.ArtUrl
 import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
+import app.cartouche.core.art.web
+import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.Disc
 import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderPath
@@ -147,7 +148,7 @@ class WireTest {
 
     @Test
     fun `a run's progress and the art found reach Godot with the keys and codes the GDScript adapter reads`() {
-        val request = ArtRequest(GameId("ps2/a"), "A", nonEmptyListOf(ArtUrl("https://a/a.png")), None, PS2_DISC)
+        val request = ArtRequest(GameId("ps2/a"), "A", nonEmptyListOf(web("https://a/a.png")), None, PS2_DISC)
         val (_, underWay) = Scraping.NONE.with(listOf(request)).take().shouldBeSome()
         underWay.toWire() shouldBe dictionary("done" to 0, "total" to 1)
         Stall.entries.map { underWay.stalled(request.game, it).toWire()["stall"] } shouldBe listOf("offline", "refused", "storage")
@@ -280,6 +281,9 @@ class WireTest {
             .single()
             .jsonObject
         sent(LabelChoice.Region(LabelRegion("Japan"))).getValue("label_region").jsonPrimitive.content shouldBe "Japan"
+        sent(LabelChoice.Region(LabelRegion("Japan"))).getValue("label_source").jsonPrimitive.content shouldBe "launchbox"
+        sent(LabelChoice.Region(LabelRegion("Japan"), ArtSource.SCREENSCRAPER)).getValue("label_source").jsonPrimitive.content shouldBe
+            "screenscraper"
         sent(LabelChoice.Region(LabelRegion(""))).getValue("label_region").jsonPrimitive.content shouldBe ""
         sent(LabelChoice.Automatic).containsKey("label_region") shouldBe false
         sent(LabelChoice.Own).getValue("label_own").jsonPrimitive.content shouldBe "true"

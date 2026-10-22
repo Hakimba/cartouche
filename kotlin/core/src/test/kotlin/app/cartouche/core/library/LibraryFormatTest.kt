@@ -99,9 +99,19 @@ class LibraryFormatTest {
         val stored = LibraryFormat.encode(Library(games = listOf(okage)))
         stored.contains("\"label\"") shouldBe false
         LibraryFormat.decode(stored).shouldBeRight().library.games.map { it.label } shouldBe listOf(LabelChoice.Automatic)
+        // A choice stored before images had a source is LaunchBox's, all the chooser offered then; a texture's says so.
         val chosen = Library(games = listOf(okage.copy(label = LabelChoice.Region(LabelRegion("Japan")))))
         val written = stored.replace("\"lastDisc\":0", "\"lastDisc\":0,\"label\":{\"type\":\"region\",\"region\":\"Japan\"}")
         LibraryFormat.decode(written).shouldBeRight().library shouldBe chosen
+        LibraryFormat.decode(written).shouldBeRight().library.games.map { it.label } shouldBe
+            listOf(LabelChoice.Region(LabelRegion("Japan"), ArtSource.LAUNCHBOX))
+        val texture = Library(games = listOf(okage.copy(label = LabelChoice.Region(LabelRegion("Japan"), ArtSource.SCREENSCRAPER))))
+        LibraryFormat.encode(texture) shouldBe
+            stored.replace(
+                "\"lastDisc\":0",
+                "\"lastDisc\":0,\"label\":{\"type\":\"region\",\"region\":\"Japan\",\"source\":\"screenscraper\"}",
+            )
+        LibraryFormat.decode(LibraryFormat.encode(texture)).shouldBeRight().library shouldBe texture
     }
 
     @Test

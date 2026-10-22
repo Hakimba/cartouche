@@ -3,7 +3,9 @@ package app.cartouche.core.regions
 
 import app.cartouche.core.art.regionNames
 import io.kotest.matchers.collections.shouldBeSortedWith
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThan
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.list
@@ -44,6 +46,22 @@ class RegionsTest {
             }
         }
     }
+
+    @Test
+    fun `INV-E11-07 an image of the game's own region is one of its own or of its group, and a game of no region has none`() =
+        runBlocking<Unit> {
+            var own = 0
+            checkAll(Arb.list(regionNames, 0..2), regionNames) { game, image ->
+                if (Regions.isOwn(game, image)) {
+                    // Its country or its zone, never a region of another group nor the world of a game of a known region.
+                    Regions.rank(game, image) shouldBeLessThanOrEqual 2
+                    if (game.map(Regions::same).contains(Regions.same(image))) Regions.rank(game, image) shouldBe 0
+                    own++
+                }
+                if (game.isEmpty() || image.isEmpty()) Regions.isOwn(game, image) shouldBe false
+            }
+            own shouldBeGreaterThan 50
+        }
 
     @Test
     fun `a game of no region takes the world first, then America, Europe and Japan`() {

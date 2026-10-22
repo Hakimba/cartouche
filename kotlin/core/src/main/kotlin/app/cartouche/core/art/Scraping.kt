@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.seconds
 public data class ArtRequest(
     public val game: GameId,
     public val title: String,
-    public val candidates: NonEmptyList<ArtUrl>,
+    public val candidates: NonEmptyList<Candidate>,
     public val version: Option<ArtVersion>,
     public val cut: LabelCut,
 )
@@ -80,6 +80,12 @@ public data class Scraping private constructor(
         ifUnderWay(game) { request, others -> copy(waiting = again(game, request) + waiting, underWay = others, leaving = leaving - game) }
 
     public fun resumed(): Scraping = copy(stall = None)
+
+    /** The run with [games]' waiting requests first, in that order, the others after in theirs: the games on screen are looked for first. */
+    public fun ahead(games: List<GameId>): Scraping {
+        val first = games.distinct().flatMap { game -> waiting.filter { it.game == game } }
+        return copy(waiting = first + (waiting - first.toSet()))
+    }
 
     /**
      * The run for [requests], the games that have no art now: those under way stay so, the others

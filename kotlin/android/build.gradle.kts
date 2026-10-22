@@ -2,6 +2,7 @@
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.library)
@@ -11,6 +12,18 @@ plugins {
 
 /** Name of the Godot singleton, used by the app's Android adapter. */
 val godotPluginName = "CartoucheAndroid"
+
+/**
+ * ScreenScraper's credentials, built into the app from `local.properties` (`screenscraper.devid`,
+ * never in the repository) or the environment (`SCREENSCRAPER_DEVID`); a build without a developer
+ * key has no ScreenScraper.
+ */
+val localProperties = Properties().apply { rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use(::load) }
+
+fun screenScraper(name: String, default: String = ""): String =
+    (localProperties.getProperty("screenscraper.$name") ?: System.getenv("SCREENSCRAPER_${name.uppercase()}") ?: default)
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
 
 android {
     namespace = "app.cartouche.android"
@@ -22,6 +35,21 @@ android {
         minSdk = 30
         manifestPlaceholders["godotPluginName"] = godotPluginName
         buildConfigField("String", "GODOT_PLUGIN_NAME", "\"$godotPluginName\"")
+        buildConfigField("String", "SCREENSCRAPER_DEVID", "\"${screenScraper("devid")}\"")
+        buildConfigField("String", "SCREENSCRAPER_DEVPASSWORD", "\"${screenScraper("devpassword")}\"")
+        buildConfigField("String", "SCREENSCRAPER_SOFTNAME", "\"${screenScraper("softname", "Cartouche")}\"")
+    }
+
+    // A member's account is the developer's own, for tests on a device: compiled into debug builds only.
+    buildTypes {
+        getByName("debug") {
+            buildConfigField("String", "SCREENSCRAPER_SSID", "\"${screenScraper("ssid")}\"")
+            buildConfigField("String", "SCREENSCRAPER_SSPASSWORD", "\"${screenScraper("sspassword")}\"")
+        }
+        getByName("release") {
+            buildConfigField("String", "SCREENSCRAPER_SSID", "\"\"")
+            buildConfigField("String", "SCREENSCRAPER_SSPASSWORD", "\"\"")
+        }
     }
 
     buildFeatures { buildConfig = true }

@@ -26,15 +26,28 @@ internal object Regions {
 
     private val GROUPS: Map<String, Group> =
         listOf(
-            Group.NTSC_U to "North America, Canada, Brazil, Mexico, Latin America, South America",
+            Group.NTSC_U to "North America, Canada, Brazil, Mexico, Chile, Peru, Latin America, South America",
             Group.PAL to
-                """Europe, Australia, New Zealand, Oceania, South Africa, India, Austria, Belgium, Croatia, Denmark, Finland, France,
-                Germany, Greece, Ireland, Italy, Netherlands, Norway, Poland, Portugal, Russia, Scandinavia, Spain, Sweden, Switzerland,
+                """Europe, Australia, New Zealand, Oceania, South Africa, Africa, Middle East, India, Austria, Belgium, Bulgaria, Croatia,
+                Czech Republic, Denmark, Finland, France, Germany, Greece, Hungary, Ireland, Israel, Italy, Kuwait, Netherlands, Norway,
+                Poland, Portugal, Russia, Saudi Arabia, Scandinavia, Slovakia, Spain, Sweden, Switzerland, Turkey, United Arab Emirates,
                 United Kingdom""",
             Group.NTSC_J to "Japan, Asia, China, Hong Kong, Korea, Taiwan",
         ).flatMap { (group, names) -> names.split(',').map { it.trim() to group } }.toMap()
 
     private val WORLD = setOf("World", "")
+
+    /** The zone each country's releases belong to, as a release names its region: a French game's is Europe. */
+    private val ZONES: Map<String, String> =
+        listOf(
+            "Europe" to
+                """Austria, Belgium, Croatia, Denmark, Finland, France, Germany, Greece, Ireland, Italy, Netherlands, Norway, Poland,
+                Portugal, Russia, Scandinavia, Spain, Sweden, Switzerland, United Kingdom""",
+            "Oceania" to "Australia, New Zealand",
+            "North America" to "Canada, Mexico",
+            "South America" to "Brazil",
+            "Asia" to "China, Hong Kong, Japan, Korea, Taiwan",
+        ).flatMap { (zone, countries) -> countries.split(',').map { it.trim() to zone } }.toMap()
 
     private const val OTHER_GROUPS = 4
 
@@ -51,6 +64,17 @@ internal object Regions {
             region in WORLD -> 3
             else -> OTHER_GROUPS + group.fold({ Group.entries.size }, Group::ordinal)
         }
+    }
+
+    /**
+     * Whether [image]'s region is the game's own, for a game of [game]'s regions: one of them, or the
+     * zone holding one of them (a French game's are France's and Europe's, never Germany's, nor a
+     * zone's umbrella for a country outside it: Japan is not a Korean game's); no region named is
+     * never own, the world only a world release's.
+     */
+    fun isOwn(game: List<String>, image: String): Boolean {
+        val region = same(image)
+        return region.isNotEmpty() && game.any { own -> region == same(own) || ZONES.getOrNone(same(own)).isSome { it == region } }
     }
 
     /**

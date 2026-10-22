@@ -179,6 +179,15 @@ func test_a_shelf_of_one_game_does_not_move() -> void:
 	assert_str(row.selected_game().id).is_equal("test/0")
 
 
+func test_the_games_around_the_selected_one_are_it_then_its_neighbours_nearest_first_each_once() -> void:
+	var ids := func(games: Array[AndroidServices.Game]) -> Array:
+		return games.map(func(game: AndroidServices.Game) -> String: return game.id)
+	assert_array(ids.call(_row(5, 2).games_around(1))).is_equal(["test/2", "test/3", "test/1"])
+	assert_array(ids.call(_row(5, 0).games_around(2))).is_equal(["test/0", "test/1", "test/4", "test/2", "test/3"])
+	assert_array(ids.call(_row(2, 1).games_around(1))).is_equal(["test/1", "test/0"])
+	assert_array(ids.call(_row(1, 0).games_around(2))).is_equal(["test/0"])
+
+
 ## A row showing [param count] test games from [param selected], moved only by the test, with no
 ## label images whatever the developer's own folder holds.
 func _row(count: int, selected: int, pose := ShelfRow.Pose.new()) -> ShelfRow:

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
+import app.cartouche.core.library.ArtSource
 import app.cartouche.core.platforms.ArtKind
 import app.cartouche.core.platforms.Front
 import app.cartouche.core.platforms.LabelCrop
 import app.cartouche.core.platforms.MediaRule
+import app.cartouche.core.platforms.ScreenScraperSystem
 import app.cartouche.core.platforms.mediumId
 import arrow.core.getOrElse
 
@@ -27,3 +29,10 @@ fun front(proportion: Double, label: LabelCrop): Front = Front.of(proportion, la
 /** The art of a platform of one cartridge, [medium], of this front, as written by hand in a test. */
 fun cartridge(medium: String, proportion: Double, label: LabelCrop): ArtKind.CartridgeFront =
     ArtKind.CartridgeFront(mapOf(mediumId(medium) to front(proportion, label)))
+
+/** A LaunchBox scan served at [url], of [region], as a test writes one. */
+fun web(url: String, region: String = ""): Candidate.Web = Candidate.Web(ArtUrl(url), region, ArtSource.LAUNCHBOX)
+
+/** A texture with the system, game, media name and region written by the test. */
+fun texture(system: Int, game: Int, media: String, region: String): Candidate.Texture =
+    Candidate.Texture(ScreenScraperSystem(system), ScreenScraperGame(game), TextureMedia(media), region)

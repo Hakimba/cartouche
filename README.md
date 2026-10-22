@@ -23,7 +23,8 @@ Game Boy Color, Game Boy Advance, GameCube, Wii, PlayStation, Xbox and Xbox 360.
   games.
 - **Launching:** the disc or cartridge goes into the console, each its own way, then the game starts
   in its emulator, which stays hidden until the game shows.
-- **Labels:** each game's real disc or cartridge label, downloaded in the background.
+- **Labels:** each game's real disc or cartridge label, downloaded in the background from
+  LaunchBox and ScreenScraper (see [How a label is found](#how-a-label-is-found)).
 - **Setting up:** everything with the controller: first launch, adding, editing and removing
   consoles, button style, and in Graphics how smooth the edges are drawn (4× unless you choose 2× or
   none, for less work on the graphics card).
@@ -64,6 +65,28 @@ dev/bench.sh            # measures the installed debug build at several library 
 How the code is organised: [docs/ONBOARDING.md](docs/ONBOARDING.md). Guarantees every change must
 keep, each enforced by tests: [docs/INVARIANTS.md](docs/INVARIANTS.md).
 
+## How a label is found
+
+1. **Which game it is.** Cartouche reads the file itself (a cartridge's CRC32, a disc's serial) and looks it up in
+   the No-Intro and Redump lists; when the file says nothing, its name decides.
+2. **Which region.** The regions of the release found (France, Europe, USA, Japan…).
+3. **The images on offer.** LaunchBox's scans, found by the game's name; ScreenScraper's textures, found in a table
+   shipped with the app (`app/data/screenscraper/`) that gives, for every release of the reference lists, its
+   ScreenScraper game and the images it has. The project builds that table once per release of the app, asking
+   ScreenScraper about each release by its reference hashes, so the device never asks which game a file is: it only
+   downloads images, one request each, and nothing for a game ScreenScraper lacks. PS2 discs also have
+   psxdatacenter, by serial.
+4. **Which image first.** An image of the game's region (its country, or the zone containing it: France → Europe)
+   comes first: on a cartridge ScreenScraper's (the printed label itself), then LaunchBox's; on a disc LaunchBox's,
+   then ScreenScraper's, then psxdatacenter's. Then every other image, closest region first. The first image that
+   downloads is kept. A label you chose, or a picture of your own, is never replaced; a game's properties list every
+   image of every source, each named by its region and source.
+5. **When ScreenScraper cannot answer** (busy, closed, quota spent), the next image is taken at once and ScreenScraper
+   is tried again at a later scan.
+
+ScreenScraper is used with Cartouche's developer key, which builds take from `kotlin/local.properties`
+(`screenscraper.devid`, `screenscraper.devpassword`), never from the repository; see `docs/ONBOARDING.md`.
+
 ## Open-source work used
 
 Cartouche builds on these projects, and thanks their authors.
@@ -73,6 +96,7 @@ Cartouche builds on these projects, and thanks their authors.
 | [Daijishō](https://github.com/TapiocaFox/Daijishou) | Platform and emulator definitions (`app/data/platforms/daijishou/`) | MIT |
 | [libretro-database](https://github.com/libretro/libretro-database) | Redump and No-Intro game titles and serials (`app/data/titles/`), cartridge ROMs' CRC32 (`app/data/prints/`) | CC BY-SA 4.0 |
 | [LaunchBox Games Database](https://gamesdb.launchbox-app.com) | Which disc and cartridge scans each game has (`app/data/art/`), and the scans, downloaded on the device | Used with the database's public dump; images stay their owners' |
+| [ScreenScraper](https://www.screenscraper.fr) | Which disc and cartridge images each release has (`app/data/screenscraper/`), and the images, downloaded on the device | Data under CC BY-NC-SA 4.0; images stay their owners' |
 | [PlayStation DataCenter](https://psxdatacenter.com) | PS2 disc scans by serial, downloaded on the device | Images stay their owners' |
 | [Fredoka](https://github.com/hafontia/Fredoka-One) | The app's font (`app/fonts/`) | SIL Open Font License 1.1 |
 | [Godot Engine](https://godotengine.org) | Engine, and the Android plugin template the plugin started from | MIT |

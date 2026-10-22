@@ -35,6 +35,8 @@ const _CURTAINS := "res://data/launch/curtains.json"
 const _ART := "res://data/art"
 ## The prints of each cartridge platform's games, named after its id (`nes.tsv`).
 const _PRINTS := "res://data/prints"
+## ScreenScraper's texture table per platform, named after its id (`ps2.tsv`).
+const _SCREENSCRAPER := "res://data/screenscraper"
 ## The catalog and a demo library as the plugin sends them, for running without it: see
 ## `DesktopDemoTest.kt`, which keeps it up to date.
 const DESKTOP_DEMO := "res://dev/demo/desktop.json"
@@ -65,8 +67,8 @@ func is_available() -> bool:
 
 # Getters
 
-## Loads the bundled platform definitions, profiles, reference lists, art extracts and cartridge
-## prints into the plugin, once.
+## Loads the bundled platform definitions, profiles, reference lists, art extracts, cartridge
+## prints and texture tables into the plugin, once.
 func _load_catalog() -> void:
 	var started := Time.get_ticks_usec()
 	var profiles := FileAccess.get_file_as_string(_PLATFORM_PROFILES)
@@ -76,9 +78,10 @@ func _load_catalog() -> void:
 	var curtains := FileAccess.get_file_as_string(_CURTAINS)
 	var art := _files_in(_ART, ".tsv", true)
 	var cartridge_prints := _files_in(_PRINTS, ".tsv", true)
+	var textures := _files_in(_SCREENSCRAPER, ".tsv", true)
 	var read := Time.get_ticks_usec()
-	var summary: Dictionary = _query(&"loadCatalog", [definitions, profiles, titles, data_folders, curtains, art, cartridge_prints],
-		_desktop_demo("catalog"))
+	var summary: Dictionary = _query(&"loadCatalog",
+		[definitions, profiles, titles, data_folders, curtains, art, cartridge_prints, textures], _desktop_demo("catalog"))
 	catalog = CatalogSummary.new(summary)
 	if Diagnostics.enabled:
 		Diagnostics.trace("plugin", "catalog read in %.1f ms, loaded in %.1f ms" % [(read - started) / 1000.0,
@@ -211,6 +214,14 @@ func set_up_platform(platform_id: String, setup: PlatformSetup) -> LibraryAnswer
 	return LibraryAnswer.new(await _request(&"setUpPlatform", [platform_id, setup.to_wire()]))
 
 
+## Looks for the art of [param games] (the game on screen and its neighbours) before the others'.
+func art_focus(games: Array[AndroidServices.Game]) -> void:
+	var ids := PackedStringArray()
+	for game in games:
+		ids.append(game.id)
+	_query(&"artFocus", [ids], null)
+
+
 ## Prepares in the background what looking at a folder needs (the reference lists' indexes), as a
 ## console is about to be added or changed.
 func prepare_titles() -> void:
@@ -277,17 +288,17 @@ func rescrape() -> RescrapeAnswer:
 	return RescrapeAnswer.new(await _request(&"rescrape"))
 
 
-## The images the art sources have for [param game]'s label, one per region, closest to the
-## game's own first; those not downloaded yet then arrive through [signal label_variant_downloaded].
-## Without the plugin, none.
+## The images the art sources have for [param game]'s label, every one of both sources, each with
+## its region and source, in the order they are tried; those not downloaded yet then arrive
+## through [signal label_variant_downloaded]. Without the plugin, none.
 func label_variants(game: Game) -> LabelVariants:
 	return LabelVariants.new(await _request(&"labelVariants", [game.id]))
 
 
-## Shows the image of [param region] (downloaded, as [method label_variants] names it) on
-## [param game]'s label from now on.
-func choose_label(game: Game, region: String) -> ArtAnswer:
-	return ArtAnswer.new(await _request(&"chooseLabel", [game.id, region]))
+## Shows the image of [param region] at [param source] (downloaded, as [method label_variants]
+## names them) on [param game]'s label from now on.
+func choose_label(game: Game, region: String, source: String) -> ArtAnswer:
+	return ArtAnswer.new(await _request(&"chooseLabel", [game.id, region, source]))
 
 
 ## Shows [param game] as [param shown] from now on (trimmed, cut at 80 characters), or as its own
@@ -654,9 +665,12 @@ class Game:
 	var discs: Array[Disc] = []
 	## Index into [member discs] of the disc launched last.
 	var last_disc: int
-	## Whether the user chose the region of the image its label shows, [member label_region].
+	## Whether the user chose the image its label shows, by [member label_region] and
+	## [member label_source].
 	var has_label_region: bool
 	var label_region: String
+	## The source of the chosen image, as the plugin names sources (`launchbox`, `screenscraper`).
+	var label_source: String
 	## Whether its label shows a picture of the user's own.
 	var label_own: bool
 	## The title it had before the user renamed it, [member title] being the name they gave it.
@@ -685,6 +699,7 @@ class Game:
 		last_disc = item["last_disc"]
 		has_label_region = item.has("label_region")
 		label_region = item.get("label_region", "")
+		label_source = item.get("label_source", "")
 		label_own = item.get("label_own", false)
 		has_original_title = item.has("original_title")
 		original_title = item.get("original_title", "")
@@ -960,12 +975,15 @@ class ArtChange:
 			found = Art.new(item)
 
 
-## One image a game's label can show: the art sources' for [member region] (as they name it, empty
-## when they name none), at [member path] once downloaded.
+## One image a game's label can show: [member source]'s for [member region] (as the sources name
+## it, empty when they name none), at [member path] once downloaded.
 class LabelVariant:
 	## Set when it arrives through [signal AndroidServices.label_variant_downloaded].
 	var game_id: String
 	var region: String
+	## The source, as the plugin names it for [method AndroidServices.choose_label], and as shown.
+	var source: String
+	var source_name: String
 	var has_path: bool
 	var path: String
 	## Why it could not be downloaded: `offline`, `refused`, `not_found`, `unreadable` or `storage`;
@@ -975,6 +993,8 @@ class LabelVariant:
 	func _init(item: Dictionary) -> void:
 		game_id = item.get("game_id", "")
 		region = item["region"]
+		source = item["source"]
+		source_name = item["source_name"]
 		has_path = item.has("path")
 		path = item.get("path", "")
 		failure = item.get("failure", &"")

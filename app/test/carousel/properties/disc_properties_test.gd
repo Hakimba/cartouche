@@ -28,10 +28,19 @@ func before() -> void:
 		image.fill(Color.RED if region == "Europe" else Color.BLUE)
 		var path := IMAGES.path_join(region + ".png")
 		image.save_png(path)
-		_variants.append({"region": region, "path": ProjectSettings.globalize_path(path)})
+		_variants.append(_scan(region, ProjectSettings.globalize_path(path)))
 	_red = _variants[0]["path"]
 	_blue = _variants[1]["path"]
-	_variants.append({"region": "Japan"})
+	_variants.append(_scan("Japan"))
+
+
+## An image as the plugin lists it, at [param path] when downloaded.
+func _scan(region: String, path := "", source := "launchbox") -> Dictionary:
+	var listed := {"region": region, "source": source,
+		"source_name": "ScreenScraper" if source == "screenscraper" else "LaunchBox"}
+	if path:
+		listed["path"] = path
+	return listed
 
 
 ## A device past its first launch with three PS2 games, each with [param variants] (the usual
@@ -170,6 +179,7 @@ func test_A_on_the_label_offers_its_images_by_region_the_one_shown_first_and_the
 	var carousel: Carousel = (await _on_games())[0]
 	carousel._row.selected_game().has_label_region = true
 	carousel._row.selected_game().label_region = "North America"
+	carousel._row.selected_game().label_source = "launchbox"
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	await _settled(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -184,6 +194,34 @@ func test_A_on_the_label_offers_its_images_by_region_the_one_shown_first_and_the
 	assert_object(Fixtures.focus(self)).is_same(cards[2])
 	await Fixtures.action(self, &"ui_right")
 	assert_object(Fixtures.focus(self)).is_same(cards[3])
+
+
+func test_INV_E7_03_an_image_of_each_source_is_offered_named_by_region_and_source_and_the_one_chosen_is_remembered_with_its_source() -> void:
+	var both: Array[Dictionary] = [_scan("Europe", _blue, "screenscraper"), _scan("Europe", _red), _scan("Japan")]
+	var setup := await _on_games(both)
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	var game := carousel._row.selected_game()
+	game.has_label_region = true
+	game.label_region = "Europe"
+	game.label_source = "launchbox"
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _settled(carousel)
+	var cards := _cards(carousel)
+	var captions := cards.map(func(card: LabelCard) -> String: return (card.get_child(0).get_child(1) as Label).text)
+	assert_array(captions).contains_exactly(["Europe · ScreenScraper", "Europe · LaunchBox", "Japan · LaunchBox", "My own image"])
+	# The focus on the image chosen: the region's scan, not its texture.
+	assert_object(Fixtures.focus(self)).is_same(cards[1])
+	assert_bool(await Fixtures.until(self, func() -> bool: return cards[0].is_ready() and cards[1].is_ready())).is_true()
+	assert_object(cards[0].label).is_not_same(cards[1].label)
+	await Fixtures.action(self, &"ui_left")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _settled(carousel)
+	assert_array(device.chosen_labels).contains_exactly(["screenscraper/Europe"])
+	assert_str(game.label_region).is_equal("Europe")
+	assert_str(game.label_source).is_equal("screenscraper")
 
 
 func test_each_image_picked_shows_on_the_disc_at_once_and_B_brings_back_the_label_it_had() -> void:
@@ -220,10 +258,11 @@ func test_A_keeps_the_image_picked_and_remembers_its_region() -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
-	assert_array(device.chosen_labels).contains_exactly(["North America"])
+	assert_array(device.chosen_labels).contains_exactly(["launchbox/North America"])
 	assert_object(_label(carousel)).is_same(picked)
 	assert_bool(carousel._row.selected_game().has_label_region).is_true()
 	assert_str(carousel._row.selected_game().label_region).is_equal("North America")
+	assert_str(carousel._row.selected_game().label_source).is_equal("launchbox")
 	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.PROPERTIES)
 	assert_object(Fixtures.focus(self)).is_same(carousel._properties._zone)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
@@ -250,7 +289,7 @@ func test_an_image_still_to_come_cannot_be_kept_and_one_that_could_not_be_is_tol
 	first.grab_focus()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
-	assert_array(device.chosen_labels).contains_exactly(["Europe"])
+	assert_array(device.chosen_labels).contains_exactly(["launchbox/Europe"])
 	assert_int(told.size()).is_equal(1)
 	assert_object(Fixtures.focus(self)).is_same(first)
 	assert_object(_label(carousel)).is_same(first.label)
@@ -353,20 +392,21 @@ func test_an_image_arriving_after_the_list_can_be_shown_and_kept_and_one_that_fa
 	assert_object(_label(carousel)).is_same(cards[2].label)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
-	assert_array(device.chosen_labels).contains_exactly(["Japan"])
+	assert_array(device.chosen_labels).contains_exactly(["launchbox/Japan"])
 	# Late, once the images are gone: nothing happens.
 	device.arrive(game.id, "Europe", _red)
 	await await_idle_frame()
 
 
 func test_an_image_of_no_named_region_is_offered_as_such_and_a_region_no_longer_offered_starts_first() -> void:
-	var nameless: Array[Dictionary] = [{"region": "Japan", "path": _red}, {"region": "", "path": _blue}]
+	var nameless: Array[Dictionary] = [_scan("Japan", _red), _scan("", _blue)]
 	var setup := await _on_games(nameless)
 	var carousel: Carousel = setup[0]
 	var device: Fixtures.NewDevice = setup[1]
 	var game := carousel._row.selected_game()
 	game.has_label_region = true
 	game.label_region = ""
+	game.label_source = "launchbox"
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	await _settled(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -374,7 +414,7 @@ func test_an_image_of_no_named_region_is_offered_as_such_and_a_region_no_longer_
 	var cards := _cards(carousel)
 	assert_object(Fixtures.focus(self)).is_same(cards[1])
 	assert_bool(cards[1].own).is_false()
-	assert_str((cards[1].get_child(0).get_child(1) as Label).text).is_equal("No region")
+	assert_str((cards[1].get_child(0).get_child(1) as Label).text).is_equal("No region · LaunchBox")
 	# The last region: right goes on to the user's own picture, and no further.
 	await Fixtures.action(self, &"ui_right")
 	assert_object(Fixtures.focus(self)).is_same(cards[2])
@@ -384,7 +424,7 @@ func test_an_image_of_no_named_region_is_offered_as_such_and_a_region_no_longer_
 	assert_bool(await Fixtures.until(self, func() -> bool: return cards[1].is_ready())).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
-	assert_array(device.chosen_labels).contains_exactly([""])
+	assert_array(device.chosen_labels).contains_exactly(["launchbox/"])
 	game.label_region = "Atlantis"
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
@@ -912,3 +952,54 @@ func test_a_game_renamed_shows_its_name_on_the_label_drawn_on_its_disc() -> void
 	if not row.label_images.has_texture(row.selected_game()):
 		assert_str(place.shown._title.text).is_equal("Mine")
 
+
+
+func test_delayed_sources_of_the_same_region_keep_their_own_pixels_and_choice() -> void:
+	for early: bool in [false, true]:
+		for reverse: bool in [false, true]:
+			for chosen in 2:
+				await _delayed_sources(early, reverse, chosen)
+				if is_failure():
+					return
+
+
+func _delayed_sources(early: bool, reverse: bool, chosen: int) -> void:
+	var both: Array[Dictionary] = [_scan("Europe", "", "launchbox"), _scan("Europe", "", "screenscraper")]
+	var setup := await _on_games(both)
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	var game := carousel._row.selected_game()
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	var sources: Array[String] = ["launchbox", "screenscraper"]
+	var paths: Array[String] = [_red, _blue]
+	var order: Array[int] = [0, 1]
+	if reverse:
+		order.reverse()
+	if early:
+		for index in order:
+			device.arrive(game.id, "Europe", paths[index], &"", sources[index])
+	await _settled(carousel)
+	var cards := _cards(carousel)
+	if not early:
+		assert_bool(cards[0].is_ready() or cards[1].is_ready()).is_false()
+		device.arrive(game.id, "Europe", paths[order[0]], &"", sources[order[0]])
+		assert_bool(await Fixtures.until(self, func() -> bool: return cards[order[0]].is_ready())).is_true()
+		assert_bool(cards[order[1]].is_ready()).is_false()
+		device.arrive(game.id, "Europe", paths[order[1]], &"", sources[order[1]])
+	assert_bool(await Fixtures.until(self, func() -> bool: return cards[0].is_ready() and cards[1].is_ready())).is_true()
+	assert_object(cards[0].label).is_not_same(cards[1].label)
+	assert_bool(cards[0].label.get_image().get_pixel(16, 16).is_equal_approx(Color.RED)).is_true()
+	assert_bool(cards[1].label.get_image().get_pixel(16, 16).is_equal_approx(Color.BLUE)).is_true()
+	for card: LabelCard in cards.slice(0, 2):
+		card.grab_focus()
+		assert_object(_label(carousel)).is_same(card.label)
+	cards[chosen].grab_focus()
+	var picked := cards[chosen].label
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _settled(carousel)
+	assert_array(device.chosen_labels).is_equal([sources[chosen] + "/Europe"])
+	assert_object(_label(carousel)).is_same(picked)
+	carousel.queue_free()
+	await await_idle_frame()

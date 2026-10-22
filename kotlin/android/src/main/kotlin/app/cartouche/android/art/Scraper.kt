@@ -5,7 +5,8 @@ import android.util.Log
 import app.cartouche.android.TAG
 import app.cartouche.android.trace
 import app.cartouche.core.art.ArtRequest
-import app.cartouche.core.art.ArtUrl
+import app.cartouche.core.art.Candidate
+import app.cartouche.core.art.Identity
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.library.GameId
@@ -25,7 +26,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.TimeSource
 
-/** A game's disc scan, just stored. */
+/** A game's label image, just stored. */
 internal data class FoundArt(val game: GameId, val art: StoredArt)
 
 /**
@@ -33,16 +34,23 @@ internal data class FoundArt(val game: GameId, val art: StoredArt)
  * (see [Scraping] for the rules of a run). A stall (no network, a busy server) stops the run until
  * [networkBack] or a delay that grows with each stall in a row. After [stop] (the app leaves the
  * screen, a game is played), no download starts until [start]: the ones under way end, and their
- * games wait again. [changed] hears every change, in order.
+ * games wait again. [changed] hears every change, in order. A ScreenScraper texture skipped because
+ * it is not open ([textures]) leaves the label found after it provisional: at a later run with
+ * ScreenScraper open, the game is asked again for the images before it (see [ProvisionalArt]).
  */
 internal class Scraper(
     private val store: ArtStore,
     private val fetch: Fetch,
     private val scope: CoroutineScope,
+    private val textures: Textures = Textures.NONE,
     private val changed: (Scraping, Option<FoundArt>) -> Unit,
 ) {
     private sealed interface Outcome {
+        /** [art] stored, or the label the user chose meanwhile, kept. */
         data class Found(val art: StoredArt) : Outcome
+
+        /** The label stored stays: the images before it were asked for, with ScreenScraper skipped ([provisional]) or not. */
+        data class Kept(val provisional: Boolean) : Outcome
 
         data object Absent : Outcome
 
@@ -50,6 +58,16 @@ internal class Scraper(
 
         /** Stopped before its end: the request waits again. */
         data object SetAside : Outcome
+    }
+
+    /** What one image's attempt came to. */
+    private sealed interface Tried {
+        /** Not this image: the next, after ScreenScraper was [skipped] or not. */
+        data class Next(val skipped: Boolean) : Tried
+
+        data class Found(val art: StoredArt) : Tried
+
+        data class Stalled(val why: Stall) : Tried
     }
 
     /** Guards [run], [working], [retrying] and [began]. */
@@ -66,22 +84,29 @@ internal class Scraper(
 
     private var began = TimeSource.Monotonic.markNow()
 
+    /** The games looked for first, as the carousel last said ([focus]); kept through a new plan. */
+    private var focused: List<GameId> = emptyList()
+
     /** Whether the run is over, as of its last change. */
     private val over = MutableStateFlow(true)
 
     /**
-     * Makes the run look for the art of [requests]' games that want it (see [ArtStore.wants]), in
-     * place of what it looked for; returns once they are in the run. Calls made in turn, on one
-     * thread, change the run in that order (the lock is fair): a later plan always replaces an
-     * earlier one.
+     * Makes the run look for the art of [requests]' games that want it (see [ArtStore.wants]), and
+     * of those whose label is provisional while ScreenScraper is open, in place of what it looked
+     * for; returns once they are in the run. Calls made in turn, on one thread, change the run in
+     * that order (the lock is fair): a later plan always replaces an earlier one.
      */
     suspend fun lookFor(requests: List<ArtRequest>) {
+        textures.newRun()
+        val provisional = requests.filter { store.provisional(it.game).isSome() && !store.wants(it.game, it.version) }.map { it.game }
+        val again = if (textures.open) provisional.toSet() else emptySet()
         // Under the lock: a game a worker stores meanwhile is either stored or still under way.
         update(None) {
             if (run.isOver) began = TimeSource.Monotonic.markNow()
+            store.retry(again)
             val missing = requests.filter { store.wants(it.game, it.version) }
-            trace("art") { "${missing.size} of ${requests.size} games to look for" }
-            run.with(missing)
+            trace("art") { "${missing.size} of ${requests.size} games to look for, ${again.size} provisional labels among them" }
+            run.with(missing).ahead(focused)
         }
         startWorkers()
     }
@@ -109,6 +134,12 @@ internal class Scraper(
         scope.launch { if (lock.withLock { run.stall.isSome() }) scheduleRetry() else startWorkers() }
     }
 
+    /** Looks for [games]' art first, now and at each new plan: their requests, when still waiting, go to the front of the run. */
+    suspend fun focus(games: List<GameId>) = update(None) {
+        focused = games
+        run.ahead(games)
+    }
+
     private suspend fun resume() {
         update(None) { run.resumed() }
         startWorkers()
@@ -124,8 +155,19 @@ internal class Scraper(
     private suspend fun work() {
         while (true) {
             val request = next().getOrElse { return }
-            when (val outcome = lookUp(request, request.candidates)) {
+            when (val outcome = lookUp(request, request.candidates, skipped = false)) {
                 is Outcome.Found -> update(Some(FoundArt(request.game, outcome.art))) { run.finished(request.game) }
+                is Outcome.Kept -> {
+                    if (outcome.provisional) {
+                        store.keepProvisional(request.game)
+                    } else {
+                        store
+                            .settle(
+                                request.game,
+                            ).onLeft { trace("art") { "${request.title}: settled label not remembered: ${it.message}" } }
+                    }
+                    update(None) { run.finished(request.game) }
+                }
                 Outcome.Absent -> {
                     store.markAbsent(request).onLeft { trace("art") { "${request.title}: not remembered as absent: ${it.message}" } }
                     update(None) { run.finished(request.game) }
@@ -148,43 +190,70 @@ internal class Scraper(
 
     /**
      * The first of [candidates] that downloads, stored; the next is tried when one is not found, not
-     * an image, or a scan of no shape its label can be cut from (see [ArtImages.label]).
+     * an image, a scan of no shape its label can be cut from (see [ArtImages.label]), or skipped.
+     * A provisional label's own image ends the walk: the images before it were the better ones.
      */
-    private fun lookUp(request: ArtRequest, candidates: List<ArtUrl>): Outcome = if (stopped) {
+    private suspend fun lookUp(request: ArtRequest, candidates: List<Candidate>, skipped: Boolean): Outcome = if (stopped) {
         Outcome.SetAside
     } else {
-        candidates.firstOrNone().fold({ Outcome.Absent }) { url -> attempt(request, url).getOrElse { lookUp(request, candidates.drop(1)) } }
+        candidates.firstOrNone().fold({ Outcome.Absent }) { candidate ->
+            if (store.provisional(request.game) == Some(candidate.identity)) {
+                Outcome.Kept(skipped)
+            } else {
+                when (val tried = attempt(request, candidate, if (skipped) Some(candidate.identity) else None)) {
+                    is Tried.Next -> lookUp(request, candidates.drop(1), skipped || tried.skipped)
+                    is Tried.Found -> Outcome.Found(tried.art)
+                    is Tried.Stalled -> Outcome.Stalled(tried.why)
+                }
+            }
+        }
     }
 
     /**
-     * The scan at [url] stored, or why the run stalls; none when it is not found, not an image or of
-     * no known shape. Anything unexpected (a bug, a broken image) only skips this image: the worker goes on.
+     * [candidate]'s image stored (as a provisional label when it shows for want of a skipped
+     * texture, [shownFor] naming it), or why the run stalls, or the next image to try (not found,
+     * not an image, of no known shape, or ScreenScraper skipped). A texture ScreenScraper answered
+     * it has none of is remembered so, and never asked again until a new table (INV-E11-04).
+     * Anything unexpected (a bug, a broken image) only skips this image: the worker goes on. Only
+     * the exception's class is logged: its message may hold a URL with the credentials (INV-E11-06).
      */
-    private fun attempt(request: ArtRequest, url: ArtUrl): Option<Outcome> = Either
-        .catch {
-            val started = TimeSource.Monotonic.markNow()
-            fetch.get(url).fold({ failure ->
-                trace("art") { "${request.title}: ${url.value}: $failure" }
-                when (failure) {
-                    FetchFailure.NotFound -> None
-                    is FetchFailure.Offline -> Some(Outcome.Stalled(Stall.OFFLINE))
-                    is FetchFailure.Refused -> Some(Outcome.Stalled(Stall.REFUSED))
-                }
-            }) { image ->
-                ArtImages.label(image, request.cut).map { label ->
-                    // An image chosen by the user meanwhile stays.
-                    store.saveIfAbsent(request.game, label).fold({ Outcome.Stalled(Stall.STORAGE) }) { art ->
-                        trace("art") {
-                            "${request.title}: scan of ${image.size / 1024} kB, stored in ${label.size / 1024} kB, in ${started.elapsedNow().inWholeMilliseconds} ms"
+    private suspend fun attempt(request: ArtRequest, candidate: Candidate, shownFor: Option<Identity>): Tried = if (
+        store.isMissing(candidate, request.version)
+    ) {
+        Tried.Next(skipped = false)
+    } else {
+        Either
+            .catch {
+                val started = TimeSource.Monotonic.markNow()
+                fetch.get(candidate).fold({ failure ->
+                    trace("art") { "${request.title}: ${candidate.identity}: $failure" }
+                    when (failure) {
+                        FetchFailure.NotFound -> {
+                            store.markMissing(candidate, request.version).onLeft {
+                                trace("art") { "${request.title}: ${candidate.identity} not remembered as missing: ${it.message}" }
+                            }
+                            Tried.Next(skipped = false)
                         }
-                        Outcome.Found(art)
+                        is FetchFailure.Skipped -> Tried.Next(skipped = true)
+                        is FetchFailure.Offline -> Tried.Stalled(Stall.OFFLINE)
+                        is FetchFailure.Refused -> Tried.Stalled(Stall.REFUSED)
+                    }
+                }) { image ->
+                    ArtImages.label(image, candidate, request.cut).fold({ Tried.Next(skipped = false) }) { label ->
+                        // An image chosen by the user meanwhile stays.
+                        store.saveIfAbsent(request.game, label, shownFor).fold({ Tried.Stalled(Stall.STORAGE) }) { art ->
+                            trace("art") {
+                                "${request.title}: ${candidate.identity}: ${image.size / 1024} kB, stored in ${label.size / 1024} kB, in ${started.elapsedNow().inWholeMilliseconds} ms"
+                            }
+                            Tried.Found(art)
+                        }
                     }
                 }
+            }.getOrElse { e ->
+                Log.e(TAG, "${request.title}: ${candidate.identity} skipped: ${e.javaClass.name}")
+                Tried.Next(skipped = false)
             }
-        }.getOrElse { e ->
-            Log.e(TAG, "${request.title}: ${url.value} skipped", e)
-            None
-        }
+    }
 
     /** Schedules one retry: the workers that stall together wait for the same one. */
     private suspend fun scheduleRetry() = lock.withLock {
@@ -201,12 +270,15 @@ internal class Scraper(
             )
     }
 
-    /** Applies [change] and tells [changed], in the order changes are made. */
+    /** Applies [change] and tells [changed], in the order changes are made; a change that changes nothing is not told. */
     private suspend fun update(found: Option<FoundArt>, change: () -> Scraping) = lock.withLock {
-        run = change()
-        over.value = run.isOver
-        changed(run, found)
-        if (run.isOver && run.done > 0) trace("art") { "run over: ${run.done} games in ${began.elapsedNow().inWholeSeconds} s" }
+        val next = change()
+        if (next != run) {
+            run = next
+            over.value = run.isOver
+            changed(run, found)
+            if (run.isOver && run.done > 0) trace("art") { "run over: ${run.done} games in ${began.elapsedNow().inWholeSeconds} s" }
+        }
     }
 
     private companion object {

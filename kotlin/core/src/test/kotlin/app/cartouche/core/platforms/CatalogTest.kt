@@ -86,8 +86,24 @@ class CatalogTest {
     @Test
     fun `Xbox and Xbox 360 games are DVDs, offered to their emulators, which are handed the game's URI alone`() {
         fun profile(id: String) = shippedCatalog.platform(PlatformId(id)).shouldBeSome().profile
-        profile("xbox") shouldBe PlatformProfile(MediaType.DVD, MediaRule(mediumId("xbox_dvd")), 16_000_000, art = Some(ArtKind.Disc))
-        profile("xbox360") shouldBe PlatformProfile(MediaType.DVD, MediaRule(mediumId("xbox360_dvd")), 1_048_576, art = Some(ArtKind.Disc))
+        profile("xbox") shouldBe
+            PlatformProfile(
+                MediaType.DVD,
+                MediaRule(mediumId("xbox_dvd")),
+                16_000_000,
+                Some(ArtKind.Disc),
+                None,
+                Some(ScreenScraperSystem(32)),
+            )
+        profile("xbox360") shouldBe
+            PlatformProfile(
+                MediaType.DVD,
+                MediaRule(mediumId("xbox360_dvd")),
+                1_048_576,
+                Some(ArtKind.Disc),
+                None,
+                Some(ScreenScraperSystem(33)),
+            )
 
         fun extensions(id: String) = shippedCatalog.platform(PlatformId(id)).shouldBeSome().players.map { it.accepts.extensions }.toSet()
         extensions("xbox") shouldBe setOf(Some(listOf("iso", "xiso")))
@@ -153,6 +169,18 @@ class CatalogTest {
             refused.rejected.first().shouldBeInstanceOf<CatalogError.InvalidJson>()
         }
         profiles(""", "scansBySerial": {"url": "https://scans.test/{serial}.png", "serial": "[A-Z"}""").platforms.shouldBeEmpty()
+    }
+
+    @Test
+    fun `a profile names the system ScreenScraper numbers the platform, or none, and refuses anything but a number`() {
+        fun profiles(system: String) = Catalog.parse(
+            listOf(definition(platform = "p")),
+            DefinitionSource("profiles.json", """{"p": {"media": "dvd", "medium": {"default": "d"}, "minimumGameBytes": 1$system}}"""),
+        )
+        profiles("").platform(PlatformId("p")).shouldBeSome().profile.screenScraperSystem shouldBe None
+        profiles(""", "screenScraperSystem": 58""").platform(PlatformId("p")).shouldBeSome().profile.screenScraperSystem shouldBe
+            Some(ScreenScraperSystem(58))
+        profiles(""", "screenScraperSystem": "ps2"""").platforms.shouldBeEmpty()
     }
 
     @Test

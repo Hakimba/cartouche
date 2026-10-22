@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.art
 
+import app.cartouche.android.trace
 import app.cartouche.core.art.ArtVariant
+import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.art.LabelCut
 import app.cartouche.core.library.GameId
 import arrow.core.Either
+import arrow.core.Option
 import arrow.core.flatMap
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -36,12 +39,12 @@ internal class VariantDownloads(
 ) {
     private val underWay = ConcurrentHashMap.newKeySet<ArtVariant>()
 
-    /** Downloads [game]'s [variants], whose labels [cut] gives, that are not under way. */
-    fun download(game: GameId, variants: List<ArtVariant>, cut: LabelCut) {
+    /** Downloads [game]'s [variants], of sources of [version], whose labels [cut] gives, that are not under way. */
+    fun download(game: GameId, variants: List<ArtVariant>, cut: LabelCut, version: Option<ArtVersion>) {
         variants.filter(underWay::add).forEach { variant ->
             scope.launch(downloads) {
                 try {
-                    done(game, variant, kept(variant, cut))
+                    done(game, variant, kept(variant, cut, version))
                 } finally {
                     underWay.remove(variant)
                 }
@@ -49,14 +52,20 @@ internal class VariantDownloads(
         }
     }
 
-    private fun kept(variant: ArtVariant, cut: LabelCut): Either<VariantFailure, StoredArt> = fetch
-        .get(variant.url)
+    /** The image, cut and kept; a texture ScreenScraper has none of is remembered so (INV-E11-04). */
+    private suspend fun kept(variant: ArtVariant, cut: LabelCut, version: Option<ArtVersion>): Either<VariantFailure, StoredArt> = fetch
+        .get(variant.candidate)
         .mapLeft { failure ->
             when (failure) {
-                FetchFailure.NotFound -> VariantFailure.NOT_FOUND
+                FetchFailure.NotFound -> {
+                    store.markMissing(variant.candidate, version).onLeft {
+                        trace("art") { "${variant.candidate.identity} not remembered as missing: ${it.message}" }
+                    }
+                    VariantFailure.NOT_FOUND
+                }
                 is FetchFailure.Offline -> VariantFailure.OFFLINE
-                is FetchFailure.Refused -> VariantFailure.REFUSED
+                is FetchFailure.Refused, is FetchFailure.Skipped -> VariantFailure.REFUSED
             }
-        }.flatMap { image -> ArtImages.label(image, cut).toEither { VariantFailure.UNREADABLE } }
-        .flatMap { label -> store.saveVariant(variant.url, label).mapLeft { VariantFailure.STORAGE } }
+        }.flatMap { image -> ArtImages.label(image, variant.candidate, cut).toEither { VariantFailure.UNREADABLE } }
+        .flatMap { label -> store.saveVariant(variant.candidate, label).mapLeft { VariantFailure.STORAGE } }
 }

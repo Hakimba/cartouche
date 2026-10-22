@@ -29,8 +29,9 @@ code: it only describes what exists.
 - **`kotlin/core`** holds the domain rules as pure functions over immutable values: no Android, no
   IO, no `null`. Everything there is tested on the JVM, including property-based tests.
 - **`kotlin/android`** adapts Android APIs and exposes the core to Godot. It holds the only state:
-  the loaded catalog, reference lists and art extracts, the library and the selection, the pending
-  folder pick, the scraping run, and which apps are installed (until the next resume).
+  the loaded catalog, reference lists, art extracts and texture tables, the library and the
+  selection, the pending folder pick, the scraping run and ScreenScraper's state, and which apps are
+  installed (until the next resume).
 - **GDScript** is the UI shell: scenes, input and display, with no domain rules. The carousel's
   screen mechanics (which game stands where, how a held direction repeats) are pure functions in
   `CarouselLayout`, tested headless.
@@ -153,10 +154,19 @@ The same words are used in the code, the tests and this document.
   finds alike are told apart by the **ladder** (its punctuation, accents, then exact text put back
   one at a time), a title still naming none or several giving no image; a platform's **serial source** (`scansBySerial` in
   its profile, psxdatacenter for the PS2, with the form of the platform's serials) names scans
-  after a game's serial.
+  after a game's serial. The **texture table** (`app/data/screenscraper/<platform>.tsv`, built by the
+  project from the reference lists' hashes) lists, per release, its ScreenScraper game and the
+  **textures** it has (the printed label itself, by region and disc); a game identified as a release
+  (`redumpName`) gets them, under the system its profile names (`screenScraperSystem`). Every image a
+  game may get is a **candidate**: a scan at a URL (LaunchBox, a serial source) or a texture (system,
+  game, media), named by its **identity** in the store and the traces. An image is **of the game's
+  region** when its region is one of the release's or the zone holding one of them (`Regions.isOwn`:
+  France's are Europe's too, never Germany's); the **order** (`ArtSources.order`, INV-E11-07) tries a
+  cartridge's own-region textures first, a disc's own-region scans first, then the rest closest first.
 - **Label choice**: which image a game's label shows: **automatic** (the closest region's, as
-  scraping finds it), a **region** the user chose among the game's **images by region** (the first
-  scan of each region its extract has, closest first), or a **picture of their own**, picked with
+  scraping finds it), an image the user chose among the game's **images** (every image of both
+  sources, each named by its **region** and its **source**, « Europe · ScreenScraper », in the
+  order they are tried; the choice keeps both), or a **picture of their own**, picked with
   the system's picker and **framed** on the label (`LabelFraming`: a zoom and a centre, standing for a
   rectangle of the picture of the label's proportions), which no scraping replaces.
 - **Display name**: a name the user gave a game or a console (`DisplayName`, typed on the
@@ -172,13 +182,20 @@ The same words are used in the code, the tests and this document.
 - **Properties**: a game's screen opened with X from the games screen: its disc **staged** (out of
   the row, in the middle, still and facing the camera) under the **operating light** (the room
   darkened round it, a pool of light on it), its **zones** (its label, its name) picked
-  with up and down; A on the label opens its images by region, the disc showing each at once, and
+  with up and down; A on the label opens its images, the disc showing each at once, and
   the card of the user's own picture, which opens the system's picker and then the **framing**; A on
   the name opens a keyboard played with the stick (`GamepadKeyboard`).
 - **Scraping**: looking for the art of the games that have none, in the background. A **run** hands
-  out **requests** (a game and where to look, best first); a **stall** (offline, a server refusing,
-  no room to store) stops it until the network is back or a delay passes. Games no source has are
-  remembered as **absent** until the extract changes.
+  out **requests** (a game and where to look, best first; the game on screen and its neighbours
+  first); a **stall** (offline, a server refusing, no room to store) stops it until the network is
+  back or a delay passes. Games no source has are remembered as **absent**, and textures ScreenScraper
+  answered it has none of as **missing**, until the sources' **version** (the extract's and the
+  table's dates) changes. **ScreenScraper's state** (open, slowed by
+  a busy server, closed for the run, closed until the next day, off for a refused key) follows its
+  answers; while it is not open a texture is **skipped** for the game's next image, and the label
+  found then is **provisional**: asked again at a run with ScreenScraper open while its label is
+  still automatic (a region the user chose or their own picture is never asked again), replaced
+  only by a better one.
 - **Screens**: what shows in front of the carousel, over its background alone: the **welcome** at each
   start, a title screen that waits for a button while the app loads; on the **first launch** (no
   controller set up and no platform), the **button style** (how buttons are drawn: Nintendo, Xbox or
@@ -297,16 +314,26 @@ The same words are used in the code, the tests and this document.
   `LabelCut.on` cuts a game's label out of a scan: its disc's whole face, or on a cartridge's front
   the label of the front of the scan's shape (the scan's proportion within 6 % of the front's, the
   game's own medium's first), in whole pixels inside it, none for a scan of no front's shape;
-  `ArtSources.of` gathers a platform's sources from the catalog and its own extract only;
-  `ArtSources.requestFor` makes a game's request (the scan of the region chosen for its label, the
-  extract's, then the serial source's, with its `LabelCut`). The profile's data (`ArtKind`,
-  `Front`, `LabelCrop`, `SerialScans`) lives in `platforms/`, the rules in `art/`: `art` depends
-  on `platforms`, never the reverse
-  and lists its images by region (`variantsOf`); `ArtSources.requests` plans a library's: only its
-  games still wanting art in their sources' version (`ArtIndex.versionOf`, the extract's first
-  line), so that no extract is indexed when none does. `Scraping` is a run's state (waiting,
-  under way, done, stall, retry delay), changed only by its operations; `AbsentArt` stores the games
-  no source has, with the version of the sources they were looked for in.
+  `TextureTable.parse` reads a platform's texture table for the system its profile names
+  (ScreenScraper's region codes become the app's region names there, `ss` and `cus` left out);
+  `ArtSources.of` gathers a platform's sources from the catalog, its own extract and its own table;
+  `ArtSources.requestFor` makes a game's request: the image of the region chosen for its label, then
+  every candidate in `ArtSources.order`'s order (INV-E11-07, on `Regions.isOwn`), with its
+  `LabelCut`; `variantsOf` lists its images for the chooser, among those offered (the plugin leaves
+  out textures while ScreenScraper is not open, and those it has none of), the first of that order
+  for each region and source. The
+  profile's data (`ArtKind`, `Front`, `LabelCrop`, `SerialScans`, `ScreenScraperSystem`) lives in
+  `platforms/`, the rules in `art/`: `art` depends on `platforms`, never the reverse.
+  `ArtSources.requests` plans a library's: only its games still wanting art in their sources'
+  version (`ArtSources.versionOf`, read from the files' first lines), so that no extract or table is
+  indexed when none does. `Scraping` is a run's state (waiting, under way, done, stall, retry
+  delay; `ahead` puts the games on screen first), changed only by its operations; `Absences` stores
+  what no source of a version has (the games none has art for, the textures ScreenScraper has none
+  of), with the version of the sources it was asked in; `ProvisionalArt` the labels shown for want
+  of a skipped texture, with the identity of the image shown. `ScreenScraperState` is
+  ScreenScraper's availability as its answers (`ScreenScraperAnswer`) leave it, `KeptClosures` what
+  of it outlives a restart (until a `Day`, off for a `KeyHash`); `Account` reads what
+  `ssuserInfos.php` says of the member (their `Limits`, or refused).
 - **`library/DemoLibrary.kt`** makes up libraries of any size, the same for the same arguments.
 - **`storage/DocumentPaths.kt`** maps document ids such as `1A2B-3C4D:ROMs/ps2` to paths such as
   `/storage/1A2B-3C4D/ROMs/ps2`, and to a **place** the user reads (the SD card, then `ROMs`, `ps2`).
@@ -366,19 +393,40 @@ The same words are used in the code, the tests and this document.
   and `titleMarks` read them at once from Godot's thread: a key typed is answered
   within the frame, as JSON (`View.toWireJson`), with the shelf's size so that a view of another
   library is set aside.
-- **`art/`** runs scraping: `Scraper` hands a run's requests to four workers, which download
-  through the `Fetch` port (`HttpFetch` in the app, `FakeFetch` in tests), cut the scan to its
-  label (`ArtImages`: to its disc, on a square, or to the label `LabelCut` gives, at its own
-  proportions; 1,024 pixels at most, JPEG; a scan of no known shape passed over for the next)
-  and store it (`ArtStore`: one file per game, named after a hash of its id, written atomically).
+- **`art/`** runs scraping: `Scraper` hands a run's requests to four workers, which download each
+  candidate through the `Fetch` port (`FakeFetch` in tests): a scan through `HttpFetch`, a texture
+  through `ScreenScraperFetch`, both over the `Http` transport (`JavaHttp` in the app, `FakeHttp` in
+  tests). `ScreenScraperFetch` is the one gate every ScreenScraper request goes through (INV-E11-05:
+  the key alone one at a time, a member's threads and per-minute allowance once `ssuserInfos.php`
+  has given them, the back-off after a 429; a texture waits its turn there while ScreenScraper is
+  open, so a run with textures goes at the pace it allows, and is skipped at once while it is not),
+  builds each URL from the credentials built into the app
+  (`Credentials.fromBuild`, from `BuildConfig`; INV-E11-06: never stored or traced), reads the state
+  from each answer (an image only when its bytes are one, `NOMEDIA` as not found, anything else a
+  skip) and keeps what outlives a restart in `art/screenscraper.json` (`KeptClosures`: the closure
+  until a day, and an off state tied to the key's hash). A skipped texture makes the
+  label found after it provisional (the mark written with the image by `ArtStore.saveIfAbsent`,
+  `provisional.json`; a save of the user's choice settles it); `ArtSources.requests` plans those
+  games again while their label is automatic, and `Scraper.lookFor` asks them when ScreenScraper
+  is open (`Textures.open`), the stored label replaced only by an image before it. The workers cut
+  the image to its label (`ArtImages`, by `LabelCut.on`
+  for the candidate: a scan to its disc, on a square, or to the label the front of its shape gives,
+  at its own proportions, a scan of no known shape passed over for the next; a texture whole, it is
+  the label as printed, a disc's on a square, a cartridge's at its own proportions; 1,024 pixels at
+  most, JPEG) and store it
+  (`ArtStore`: one file per game, named after a hash of its id, written atomically). `artFocus`,
+  called by the carousel once the selection settles, moves the game on screen and its neighbours to
+  the front of the run.
   It stops while the app is paused (a game is played), resumes on the network callback or after a
   growing delay, and tells Godot through the `art_changed` signal. It starts after the library is
   read, after each scan and after a removal, never for a demo library; each time, the images of
-  games no longer in the library are deleted first (`ArtStore.keepOnly`). A game's images by region
-  are downloaded when its properties show them (`VariantDownloads`, three at a time, each once
-  while under way, told through the `label_variant_downloaded` signal) and kept apart
-  (`ArtStore.saveVariant`, the latest 48); choosing one (`chooseLabel`) records the choice, then
-  copies the image as the game's (`ArtStore.adopt`), giving the choice up if it cannot. An image
+  games no longer in the library are deleted first (`ArtStore.keepOnly`). A game's images (every
+  one of both sources, `labelVariants`, each sent with its region and source) are downloaded when
+  its properties show them (`VariantDownloads`, three at a time, each once while under way, told
+  through the `label_variant_downloaded` signal; a texture ScreenScraper has none of is remembered
+  so, `nomedia.json`) and kept apart (`ArtStore.saveVariant`, the latest 48); choosing one
+  (`chooseLabel`, by region and source) records the choice, then copies the image as the game's
+  (`ArtStore.adopt`), giving the choice up if it cannot. An image
   chosen while the game's art is being looked for stays (`ArtStore.saveIfAbsent`). A picture of the
   user's own (`OwnPictures`) is picked with the system's document picker (`pickLabelPicture`),
   copied upright and at most 2,048 pixels long while it is framed, then cut to its framed rectangle
@@ -468,7 +516,7 @@ The same words are used in the code, the tests and this document.
   its right, and "Change place" (or Y), which leaves for `ConsoleOrder`. `DiscProperties` stages the selected disc
   (`ShelfRow.stage` and `staged`, the neighbours fading), shows its zones
   (`LabelZone`, a black ring drawn as it has the focus, `FocusCallout` naming it with an arrow) and
-  its images by region (`LabelCard`, `label_thumbnail.gdshader`) and frames a picture of the user's
+  its images (`LabelCard`, `label_thumbnail.gdshader`) and frames a picture of the user's
   own (`LabelFraming`, the same rule as the core's `LabelFraming`, at the proportions of the model's
   label face, shown through the label shader's `label_window` without cutting the picture). Any
   image shows on a label through `label_window` covering its face, centred: one of another shape
@@ -540,6 +588,12 @@ The same words are used in the code, the tests and this document.
   traces; `adb exec-out screencap -p > screen.png` shows the screen. `cd kotlin && ./gradlew test`
   runs every Kotlin test; the core tests also parse the definition files shipped in `app/data`.
   `dev/test_godot.sh` runs the GDScript tests.
+- **ScreenScraper's credentials** come into the app at build time, from `kotlin/local.properties`
+  (`screenscraper.devid`, `screenscraper.devpassword`, `screenscraper.softname`, and a member's
+  `screenscraper.ssid`, `screenscraper.sspassword`, compiled into debug builds only) or the
+  environment (`SCREENSCRAPER_DEVID`, …),
+  never from the repository; a build without a developer key has no ScreenScraper (its textures are
+  images no server gives). Tests never use real credentials.
 - `dev/bench.sh` measures a debug build on a device at several library sizes (the device's own,
   and demo ones of 150 to 5,000 games) and can record every measurement as a JSON line, labelled
   (`--label`) to follow a series of changes. Besides times and frames, it measures what each
@@ -576,8 +630,10 @@ The same words are used in the code, the tests and this document.
   Database dump (`Metadata.zip`, published daily), of disc scans by default, of cartridge fronts
   with `--type "Cart - Front"`; `dev/dat_titles.py` does the same for the reference lists, from
   libretro-database's Redump and No-Intro DATs, and with `--prints` for the cartridges' prints (the
-  CRC32 of the ROM without an iNES header, in the N64's big-endian order). Images are never part
-  of the repository: they are downloaded on the device.
+  CRC32 of the ROM without an iNES header, in the N64's big-endian order); ScreenScraper's texture
+  tables (`app/data/screenscraper/`, its README) are built by the project by asking ScreenScraper
+  once per release of the reference lists, so that the device only ever downloads images. Images are
+  never part of the repository: they are downloaded on the device.
 - **Without the plugin**, A goes into a console, then plays the launch, which then fails: launch
   animations and insertions are tuned on a computer too. A launch animation's steps can be tuned
   apart from the app and exported as they are; `dev/launch_steps.py` keeps what the app plays.
@@ -590,7 +646,9 @@ The same words are used in the code, the tests and this document.
 - **Debug arguments** (`--esa arguments` on the device, after `--` on a desktop):
   `--turntable=0.25` turns the selected game to show all its sides, `--shelf=gba` opens on a
   platform's shelf, `--art-refused` makes every art server refuse (to see the message and the
-  retries), `--demo-games=N` (all on one console with `--demo-shelf=ps2`, for a shelf of fan
+  retries), `--screenscraper=quota` makes ScreenScraper answer that the day's quota is spent,
+  `--screenscraper=wrong-key` that the app's key is refused and `--screenscraper=wrong-account` that
+  the member is (the key alone then), `--demo-games=N` (all on one console with `--demo-shelf=ps2`, for a shelf of fan
   size) and `--bench=…` as in `dev/bench.sh`, `--shots=DIR` (`FrameShots`).
 - **Shaders are only compiled when something is drawn**: the headless runs of `dev/build.sh` do
   not see their errors. After changing one, run the desktop demo or the device and look for

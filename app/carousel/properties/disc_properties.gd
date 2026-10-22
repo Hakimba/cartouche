@@ -5,8 +5,9 @@ extends PropertiesScreen
 ## and facing the camera, under the light of an operating table ([OperatingLight]), while the other
 ## discs fade out; up and down go from one part of it to the other (its label, its name), the one
 ## with the focus outlined in black and named by a callout. A on the label opens the images it can
-## show, one per region the art sources have, the closest to the game's own first: the disc shows
-## the one with the focus at once, A keeps it, B goes back without changing it. The last card opens
+## show, every one of both art sources, each named by its region and source, in the order they are
+## tried: the disc shows the one with the focus at once, A keeps it, B goes back without changing
+## it. The last card opens
 ## the system's picker on the user's own pictures: the one picked shows on the disc, to be framed
 ## with the stick (moving it) and L1 / R1 (zooming), then A keeps it, B goes back to the cards. A on
 ## the name opens a keyboard played with the stick: X erases, Y types a space, Start keeps the name
@@ -61,8 +62,8 @@ var art: GameArt
 
 var _step := Step.CLOSED
 var _game: AndroidServices.Game
-## The images of [member _game]'s label downloaded since they were asked for, by region: one may
-## arrive before the list of its images.
+## The images of [member _game]'s label downloaded since they were asked for, by source and region
+## (see [method _image_key]): one may arrive before the list of its images.
 var _downloaded: Dictionary[String, String] = {}
 var _reader := ImageReader.new()
 ## The picture of the user's own being framed, read from the plugin's copy.
@@ -236,14 +237,15 @@ func _back_to_properties(screen: Control = _labels, move := _from_labels, focuse
 func _fill_cards(variants: Array[AndroidServices.LabelVariant]) -> void:
 	_clear_cards()
 	for variant in variants:
-		var card := LabelCard.new(variant.region, _region_name(variant.region))
+		var card := LabelCard.new(variant.region, variant.source,
+			"%s · %s" % [_region_name(variant.region), variant.source_name])
 		card.focus_entered.connect(_preview.bind(card))
 		card.pressed.connect(_choose.bind(card))
 		_cards.add_child(card)
-		var path: String = variant.path if variant.has_path else _downloaded.get(variant.region, "")
+		var path: String = variant.path if variant.has_path else _downloaded.get(_image_key(variant.region, variant.source), "")
 		if path:
-			_read(variant.region, path)
-	var own := LabelCard.new("", tr("My own image"), true)
+			_read(card, path)
+	var own := LabelCard.new("", "", tr("My own image"), true)
 	own.focus_entered.connect(row.show_own_label)
 	own.pressed.connect(_pick_own)
 	_cards.add_child(own)
@@ -269,7 +271,8 @@ func _focus_current() -> void:
 	var cards: Array[LabelCard] = []
 	cards.assign(_cards.get_children())
 	var chosen := cards.filter(func(card: LabelCard) -> bool:
-		return (card.own and _game.label_own) or (not card.own and _game.has_label_region and card.region == _game.label_region))
+		return (card.own and _game.label_own) or (not card.own and _game.has_label_region
+			and card.region == _game.label_region and card.source == _game.label_source))
 	for card: LabelCard in chosen + cards:
 		card.grab_focus()
 		return
@@ -285,7 +288,7 @@ func _region_cards() -> Array[LabelCard]:
 
 func _preview(card: LabelCard) -> void:
 	if card.is_ready():
-		Diagnostics.trace("properties", "image of '%s' on the disc" % card.region)
+		Diagnostics.trace("properties", "image of '%s' from %s on the disc" % [card.region, card.source])
 		row.preview_label(card.label)
 
 
@@ -293,20 +296,21 @@ func _choose(card: LabelCard) -> void:
 	if _busy:
 		return
 	if not card.is_ready():
-		Diagnostics.trace("properties", "image of '%s' not downloaded yet: not kept" % card.region)
+		Diagnostics.trace("properties", "image of '%s' from %s not downloaded yet: not kept" % [card.region, card.source])
 		return
 	_busy = true
 	_release_focus()
-	var answer := await android.choose_label(_game, card.region)
+	var answer := await android.choose_label(_game, card.region, card.source)
 	_busy = false
 	if not answer.ok:
 		Diagnostics.trace("properties", "label not kept (%s): %s" % [answer.code, answer.detail])
 		card.grab_focus()
 		choice_failed.emit()
 		return
-	Diagnostics.trace("properties", "%s: label of region '%s' kept" % [_game.title, card.region])
+	Diagnostics.trace("properties", "%s: label of region '%s' from %s kept" % [_game.title, card.region, card.source])
 	_game.has_label_region = true
 	_game.label_region = card.region
+	_game.label_source = card.source
 	_game.label_own = false
 	art.add(answer.art, card.label)
 	_back_to_properties()
@@ -456,26 +460,32 @@ func _on_label_variant_downloaded(variant: AndroidServices.LabelVariant) -> void
 	if not _game or variant.game_id != _game.id:
 		return
 	if not variant.has_path:
-		Diagnostics.trace("properties", "image of '%s' not downloaded: %s" % [
-			variant.region, variant.failure])
+		Diagnostics.trace("properties", "image of '%s' from %s not downloaded: %s" % [
+			variant.region, variant.source, variant.failure])
 		return
-	_downloaded[variant.region] = variant.path
-	if _region_cards().any(func(card: LabelCard) -> bool: return card.region == variant.region):
-		_read(variant.region, variant.path)
+	_downloaded[_image_key(variant.region, variant.source)] = variant.path
+	for card in _region_cards():
+		if card.region == variant.region and card.source == variant.source:
+			_read(card, variant.path)
 
 
-func _read(region: String, path: String) -> void:
-	_reader.request(region, path, "%s, %s" % [_game.title, region])
+func _read(card: LabelCard, path: String) -> void:
+	_reader.request(_image_key(card.region, card.source), path, "%s, %s from %s" % [_game.title, card.region, card.source])
 
 
-func _on_image_read(region: String, image: Texture2D) -> void:
+func _on_image_read(key: String, image: Texture2D) -> void:
 	if not image:
 		return
 	for card in _region_cards():
-		if card.region == region:
+		if _image_key(card.region, card.source) == key:
 			card.show_label(image)
 			if card.has_focus():
 				_preview(card)
+
+
+## What names an image among a game's: its [param source], then its [param region].
+func _image_key(region: String, source: String) -> String:
+	return source + "/" + region
 
 
 ## How the art sources' [param region] reads on a card.

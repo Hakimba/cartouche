@@ -15,6 +15,16 @@ import kotlin.math.roundToInt
 /** How a game's label is cut from a scan: by its platform's [kind] of scan, for a game that comes in [medium]. */
 public data class LabelCut(public val kind: ArtKind, public val medium: MediumId) {
     /**
+     * The label on [candidate]'s image whose medium (its opaque part) is [width] by [height] pixels:
+     * a texture whole, it is the label as printed (a disc's drawn on a square, a cartridge's at its
+     * own proportions, by [kind]); a scan as [on] reads it.
+     */
+    public fun on(candidate: Candidate, width: Int, height: Int): Option<PixelRect> = when (candidate) {
+        is Candidate.Texture -> Some(whole(width, height))
+        is Candidate.Web -> on(width, height)
+    }
+
+    /**
      * The label on a scan whose medium (its opaque part) is [width] by [height] pixels (at least 1
      * each): a disc's whole face; on a cartridge's front, the label where the crop of the front of
      * the scan's shape puts it, the nearest whole pixels, inside the scan and at least one each way.
@@ -23,12 +33,18 @@ public data class LabelCut(public val kind: ArtKind, public val medium: MediumId
      * an angle or a cartridge of a shape no medium has: its label would show something else.
      */
     public fun on(width: Int, height: Int): Option<PixelRect> {
-        val (w, h) = width.coerceAtLeast(1) to height.coerceAtLeast(1)
+        val scan = whole(width, height)
         return when (kind) {
-            ArtKind.Disc -> Some(PixelRect(0, 0, w, h))
-            is ArtKind.CartridgeFront -> frontOf(kind.fronts, w.toDouble() / h).map { it.label.on(w, h) }
+            ArtKind.Disc -> Some(scan)
+            is ArtKind.CartridgeFront ->
+                frontOf(
+                    kind.fronts,
+                    scan.width.toDouble() / scan.height,
+                ).map { it.label.on(scan.width, scan.height) }
         }
     }
+
+    private fun whole(width: Int, height: Int): PixelRect = PixelRect(0, 0, width.coerceAtLeast(1), height.coerceAtLeast(1))
 
     private fun frontOf(fronts: Map<MediumId, Front>, proportion: Double): Option<Front> =
         (fronts.getOrNone(medium).toList() + (fronts - medium).values).firstOrNone { abs(proportion / it.proportion - 1) <= TOLERANCE }

@@ -2,7 +2,10 @@
 package app.cartouche.core.art
 
 import app.cartouche.core.Shipped
+import app.cartouche.core.library.game
+import app.cartouche.core.platforms.ArtKind
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.regions.Regions
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -32,7 +35,7 @@ import java.text.Normalizer
 class ArtIndexTest {
     private val images = "https://images.launchbox-app.com/"
 
-    private fun files(scans: List<ArtUrl>) = scans.map { it.value.removePrefix(images) }
+    private fun files(scans: List<Candidate.Web>) = scans.map { it.url.value.removePrefix(images) }
 
     /** The index of scan `d<i>.png`. */
     private fun number(file: String) = file.removePrefix("d").removeSuffix(".png").toInt()
@@ -241,6 +244,10 @@ class ArtIndexTest {
             }
         }
 
+    /** The images by region the extract alone gives a game of [title] and [regions]. */
+    private fun variantsOf(index: ArtIndex, title: String, regions: List<String>) =
+        ArtSources(ArtKind.Disc, PS2_MEDIA, index, None, TextureTable.EMPTY).variantsOf(game(title).copy(regions = regions)) { true }
+
     @Test
     fun `a game's images by region are one per region, its own first, each region under one name`() {
         val zone =
@@ -249,8 +256,8 @@ class ArtIndexTest {
                 emptySet(),
                 listOf("North America=na.png", "Europe=eu.png", "USA=us.png", "Japan=jp.png", "Europe=eu2.png"),
             )
-        val variants = ArtIndex.parse(extract(listOf(zone))).variantsOf("Zone of the Enders", listOf("Europe"))
-        variants.map { it.region.name to it.url.value.removePrefix(images) } shouldContainExactly
+        val variants = variantsOf(ArtIndex.parse(extract(listOf(zone))), "Zone of the Enders", listOf("Europe"))
+        variants.map { it.region.name to it.candidate.identity.value.removePrefix(images) } shouldContainExactly
             listOf("Europe" to "eu.png", "North America" to "na.png", "Japan" to "jp.png")
     }
 
@@ -260,14 +267,17 @@ class ArtIndexTest {
             var several = 0
             checkAll(extracts, artTitles, Arb.list(regionNames, 0..2)) { games, title, regions ->
                 val index = ArtIndex.parse(extract(games))
-                val variants = index.variantsOf(title, regions)
+                val variants = variantsOf(index, title, regions)
                 val firsts =
                     owner(games, files(index.scansOf(title, regions))).fold({ emptyMap() }) { game ->
                         game.discs.reversed().associate { sameRegion(it.substringBefore('=')) to it.substringAfter('=') }
                     }
                 variants.map { it.region }.distinct().size shouldBe variants.size
-                variants.associate { it.region.name to files(listOf(it.url)).single() } shouldBe firsts
-                variants.map { closeness(regions, it.region.name) }.let { it shouldBe it.sorted() }
+                variants.associate { it.region.name to it.candidate.identity.value.removePrefix(images) } shouldBe firsts
+                // The game's own regions first, in the extract's order, then the others closest first.
+                val (own, others) = variants.partition { Regions.isOwn(regions, it.region.name) }
+                variants shouldBe own + others
+                others.map { closeness(regions, it.region.name) }.let { it shouldBe it.sorted() }
                 if (variants.size > 1) several++
             }
             several shouldBeGreaterThan 50
@@ -352,7 +362,7 @@ class ArtIndexTest {
                     0..60,
                 ).map { it.joinToString("") }
         checkAll(Arb.choice(Arb.string(0..200), nearlyLines), Arb.string(0..40), Arb.list(regionNames, 0..2)) { text, title, regions ->
-            ArtIndex.parse(text).scansOf(title, regions).forEach { it.value shouldStartWith images }
+            ArtIndex.parse(text).scansOf(title, regions).forEach { it.url.value shouldStartWith images }
         }
         val index = ArtIndex.parse("# 2026-09-28\nno tabs here\nA\t\tEurope=a.png\n\t\tEurope=b.png\nB\t\t=;bad-pair\nC\t\t\textra\n")
         index.version shouldBe Some(ArtVersion("2026-09-28"))

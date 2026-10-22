@@ -27,7 +27,10 @@ func after() -> void:
 ## the consoles screen.
 func _on_consoles() -> Array:
 	var device := Fixtures.past_first_launch(self, {"ps2": 6, "gc": 1, "gba": 1})
-	device.variants = [{"region": "Europe", "path": ProjectSettings.globalize_path(EUROPE)}, {"region": "USA"}]
+	device.variants = [
+		{"region": "Europe", "source": "launchbox", "source_name": "LaunchBox", "path": ProjectSettings.globalize_path(EUROPE)},
+		{"region": "USA", "source": "launchbox", "source_name": "LaunchBox"},
+	]
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
 	return [carousel, device]
@@ -244,7 +247,7 @@ func test_in_a_game_s_properties_a_tap_on_the_label_lists_its_images_and_one_on_
 			europe = card
 	await Fixtures.touch(self, [europe.get_global_rect().get_center()])
 	await _settled(carousel)
-	assert_array(device.chosen_labels).is_equal(["Europe"])
+	assert_array(device.chosen_labels).is_equal(["launchbox/Europe"])
 	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
 
 

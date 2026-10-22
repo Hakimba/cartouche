@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import app.cartouche.core.art.Candidate
 import app.cartouche.core.art.LabelCut
 import app.cartouche.core.platforms.ArtKind
 import arrow.core.Option
@@ -15,10 +16,11 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
 /**
- * Turns a downloaded scan into what a model's label shows, a JPEG of at most [LARGEST] pixels on its
- * longer side, the scan first cut to the medium (the transparent margin round it removed): of a disc,
- * a square covering its whole face, what was transparent turned black; of a cartridge's front, its
- * label alone, cut by the front of the scan's shape ([LabelCut]), at its own proportions.
+ * Turns a downloaded image into what a model's label shows, a JPEG of at most [LARGEST] pixels on
+ * its longer side, the image first cut to the medium (the transparent margin round it removed): of
+ * a disc, a square covering its whole face, what was transparent turned black; of a cartridge's
+ * front, its label alone, cut by the front of the scan's shape ([LabelCut]), at its own
+ * proportions; a texture, the label as printed, whole.
  */
 internal object ArtImages {
     const val LARGEST = 1024
@@ -29,13 +31,13 @@ internal object ArtImages {
     private const val MARGIN_ALPHA = 32
 
     /**
-     * The label [cut] gives of the scan [image]; none when it is not an image Android can read, or a
-     * scan of no shape [cut] knows.
+     * The label [cut] gives of [image], [candidate]'s; none when it is not an image Android can
+     * read, or a scan of no shape [cut] knows.
      */
-    fun label(image: ByteArray, cut: LabelCut): Option<ByteArray> = decoded(image).flatMap { bitmap ->
+    fun label(image: ByteArray, candidate: Candidate, cut: LabelCut): Option<ByteArray> = decoded(image).flatMap { bitmap ->
         try {
             val medium = opaquePart(bitmap)
-            cut.on(medium.width(), medium.height()).map { label ->
+            cut.on(candidate, medium.width(), medium.height()).map { label ->
                 drawn(bitmap, Rect(label.left, label.top, label.right, label.bottom).apply { offset(medium.left, medium.top) }, cut.kind)
             }
         } finally {

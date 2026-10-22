@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
-import app.cartouche.core.library.LabelRegion
+import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.TitleKey
 import app.cartouche.core.regions.Regions
 import arrow.core.None
@@ -52,18 +52,10 @@ public class ArtIndex private constructor(
      * accents, then the exact text), keeping those still named as the title; none or several left
      * name none, as the title could be any of them.
      */
-    public fun scansOf(title: String, regions: List<String>): List<ArtUrl> =
-        imagesOf(title, regions).sortedWith(compareBy(Regions.closestTo(regions), Image::region)).map { it.url }
-
-    /**
-     * The scan of each region the extract has for the game titled [title] (found as by
-     * [scansOf]), closest to [regions] first: one per region, the first the extract lists for it,
-     * whichever name a source gives the region (`USA` and `North America` are one).
-     */
-    public fun variantsOf(title: String, regions: List<String>): List<ArtVariant> = imagesOf(title, regions)
-        .map { ArtVariant(LabelRegion(Regions.same(it.region)), it.url) }
-        .distinctBy { it.region }
-        .sortedWith(compareBy(Regions.closestTo(regions)) { it.region.name })
+    public fun scansOf(title: String, regions: List<String>): List<Candidate.Web> =
+        imagesOf(title, regions).sortedWith(compareBy(Regions.closestTo(regions), Image::region)).map {
+            Candidate.Web(it.url, it.region, ArtSource.LAUNCHBOX)
+        }
 
     private fun imagesOf(title: String, regions: List<String>): List<Image> {
         val found =

@@ -103,11 +103,16 @@ public enum class MediaType {
     MINIDISC,
 }
 
+/** A platform as ScreenScraper numbers it (`systemeid`), such as 58 for the PlayStation 2. */
+@Serializable @JvmInline
+public value class ScreenScraperSystem(public val id: Int)
+
 /**
  * What Cartouche adds to a Daijishō platform, from `app/data/platforms/profiles.json`: the kind of
  * medium its games are shown as, the exact medium each game comes in ([MediaRule]), the size under
  * which an unknown file is not taken for a game, what its scans show ([ArtKind]: none when its
- * games' images are not looked for), and where its scans are named after their serial, if anywhere.
+ * games' images are not looked for), where its scans are named after their serial, if anywhere, and
+ * the system ScreenScraper's textures of its games are asked under, when it has a texture table.
  */
 @Serializable
 public data class PlatformProfile(
@@ -116,6 +121,7 @@ public data class PlatformProfile(
     public val minimumGameBytes: Long,
     public val art: Option<ArtKind> = None,
     public val scansBySerial: Option<SerialScans> = None,
+    public val screenScraperSystem: Option<ScreenScraperSystem> = None,
 )
 
 /** A player able to open a given file, with its platform. */

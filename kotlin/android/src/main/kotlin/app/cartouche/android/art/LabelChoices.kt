@@ -35,8 +35,8 @@ internal class LabelChoices(private val library: LibraryService, private val sto
      * when its image cannot be stored then, the choice is given up and the label stays as it was.
      */
     fun choose(game: Game, variant: ArtVariant): Either<LabelFailure, StoredArt> = either {
-        ensure(store.variant(variant.url).isSome()) { LabelFailure.NotDownloaded }
-        keeping(game, LabelChoice.Region(variant.region)) { store.adopt(game.id, variant.url) }.bind()
+        ensure(store.variant(variant.candidate).isSome()) { LabelFailure.NotDownloaded }
+        keeping(game, LabelChoice.Region(variant.region, variant.candidate.source)) { store.adopt(game.id, variant.candidate) }.bind()
     }
 
     /** Shows [image], a picture of the user's own framed by them, on [game]'s label from now on, as [choose] does. */
