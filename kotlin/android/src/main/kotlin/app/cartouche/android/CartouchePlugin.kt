@@ -277,7 +277,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         printLists = prints.textsByPlatform()
         titleIndexes = ConcurrentHashMap()
         artLists = art.textsByPlatform()
-        textureLists = textures.textsByPlatform()
+        // A build without ScreenScraper's key offers no texture: one answered as not found would be remembered
+        // missing, and stay so once a build with the key is installed over it.
+        textureLists = Credentials.fromBuild().fold({ emptyMap() }) { textures.textsByPlatform() }
         artSources = ConcurrentHashMap()
         val folderNames = DataFolders.parse(DefinitionSource("data_folders.json", dataFolderNames))
         dataFolders = folderNames.getOrElse { DataFolders.NONE }
