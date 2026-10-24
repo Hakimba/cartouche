@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name GbcModel
 extends ConsoleModel
-## The Game Boy Color, built from its [GbcShape]: a cartridge goes down into the pocket at the top of
-## its back, label to the back; the power switch on its right side slides up and the power light by
-## the screen comes on. Each part is moved only when its value changes: the launch animation gives
-## them every frame.
+## The Game Boy Color, drawn from its glb (`gbc.glb`) and read by its [GbcShape]: a cartridge goes down
+## the pocket at the top of its back, label to the back; the power switch on its right side rests on the
+## printed OFF and slides down to ON, and the power light by the screen comes on.
 
 ## How bright the power light is once on, as its material's emission energy.
 const _LIT := 2.5
@@ -12,18 +11,20 @@ const _LIT := 2.5
 ## in degrees, so that the slot shows as the cartridge comes down into it.
 const _LEAN_DEGREES := 15.0
 
-## How far the power knob has slid up, in millimetres.
+## How far the power switch has slid down to on, in millimetres.
 var power_mm := 0.0:
 	set(value):
 		if value != power_mm and is_node_ready():
-			_power.position.y = value * MeshBuilder.UNITS_PER_MM
+			_power.position.y = _power_top - value * MeshBuilder.UNITS_PER_MM
 		power_mm = value
 
-@onready var _power: Node3D = %Power
+@onready var _power: Node3D = $Model/gbc/power
+@onready var _power_top := _power.position.y
 
 
 func _ready() -> void:
-	_power.position.y = power_mm * MeshBuilder.UNITS_PER_MM
+	Diagnostics.trace("console", "model=gbc glb")
+	_power.position.y = _power_top - power_mm * MeshBuilder.UNITS_PER_MM
 
 
 func moving_parts() -> Array[MovingPart]:
@@ -43,3 +44,7 @@ func approach() -> Vector3:
 
 func presented() -> Basis:
 	return Basis(Vector3.RIGHT, deg_to_rad(_LEAN_DEGREES))
+
+
+func _lights() -> Array[MeshInstance3D]:
+	return [$Model/gbc/led]

@@ -124,6 +124,25 @@ public data class PlatformProfile(
     public val screenScraperSystem: Option<ScreenScraperSystem> = None,
 )
 
+/**
+ * A platform of the Type chooser: its maker, shown small above, when its name holds one of the
+ * makers', and its model name, the platform's name without the maker unless that would leave a bare
+ * number or a name the maker is part of (`Nintendo 64`, `Nintendo Entertainment System`). Split from the
+ * Daijishō name, which is the one place the names live; `CatalogTest` pins the split of all twelve consoles.
+ */
+public data class OfferedConsole(public val platform: PlatformId, public val maker: Option<String>, public val model: String) {
+    public companion object {
+        private val MAKERS = listOf("Atari", "Microsoft", "Nintendo", "Sega", "Sony")
+
+        internal fun of(platform: Platform): OfferedConsole {
+            val maker = MAKERS.firstOrNone { platform.name.contains(it) }
+            val rest = maker.map { platform.name.removePrefix("$it - ").removePrefix("$it ") }
+            val model = rest.filter { it != platform.name && it.any(Char::isLowerCase) && !it.startsWith("Entertainment") }
+            return OfferedConsole(platform.id, maker, model.getOrElse { platform.name })
+        }
+    }
+}
+
 /** A player able to open a given file, with its platform. */
 public data class Candidate(public val platform: Platform, public val player: Player)
 
@@ -196,7 +215,12 @@ public sealed interface CatalogError {
  * in [rejected]: bad data is visible, never silently missing. Hidden files are never offered to a
  * player, whatever the patterns say.
  */
-public data class Catalog(public val platforms: List<Platform> = emptyList(), public val rejected: List<CatalogError> = emptyList()) {
+public data class Catalog(
+    public val platforms: List<Platform> = emptyList(),
+    public val rejected: List<CatalogError> = emptyList(),
+    /** The platforms with a console model and coded support, which the app's console manifests name: the only ones a person may add. */
+    public val supported: Set<PlatformId> = emptySet(),
+) {
     private val all: List<Candidate> get() = platforms.flatMap { platform -> platform.players.map { Candidate(platform, it) } }
 
     /** Players able to open [file], in definition order. */
@@ -207,6 +231,10 @@ public data class Catalog(public val platforms: List<Platform> = emptyList(), pu
 
     public fun platform(id: PlatformId): Option<Platform> = platforms.firstOrNone { it.id == id }
 
+    /** The platforms a person may add, those of the catalog that are [supported], in the order of their names. */
+    public val offered: List<OfferedConsole>
+        get() = platforms.filter { it.id in supported }.sortedBy { it.name.lowercase() }.map(OfferedConsole::of)
+
     /** Resolves how [id] opens [file]. */
     public fun launch(id: PlayerId, file: GameFile): Either<LaunchError, Launch> = either {
         val player = find(id).getOrElse { raise(LaunchError.UnknownPlayer(id)) }.player
@@ -215,13 +243,20 @@ public data class Catalog(public val platforms: List<Platform> = emptyList(), pu
     }
 
     public companion object {
-        /** Reads the Daijishō [definitions] and the [profiles] file (`{platform id: profile}`). */
-        public fun parse(definitions: List<DefinitionSource>, profiles: DefinitionSource): Catalog {
+        /**
+         * Reads the Daijishō [definitions] and the [profiles] file (`{platform id: profile}`); [supported]
+         * names the platforms that have a console model.
+         */
+        public fun parse(
+            definitions: List<DefinitionSource>,
+            profiles: DefinitionSource,
+            supported: Set<PlatformId> = emptySet(),
+        ): Catalog {
             val readProfiles =
                 Either
                     .catch { Json.decodeFromString<Map<PlatformId, PlatformProfile>>(profiles.text) }
                     .mapLeft { CatalogError.InvalidJson(profiles.name, it.toString()) }
-            val initial = Catalog(rejected = readProfiles.fold({ listOf(it) }, { emptyList() }))
+            val initial = Catalog(rejected = readProfiles.fold({ listOf(it) }, { emptyList() }), supported = supported)
             return definitions.fold(initial) { catalog, source ->
                 either { DefinitionReader(source.name, readProfiles.getOrElse { emptyMap() }, this).platform(source.text) }.fold(
                     { catalog.copy(rejected = catalog.rejected + it) },
@@ -239,9 +274,9 @@ public data class Catalog(public val platforms: List<Platform> = emptyList(), pu
             // `add` is false for an id taken by another platform or earlier in this one.
             val taken = all.map { it.player.id }.toMutableSet()
             val (kept, duplicates) = platform.players.partition { taken.add(it.id) }
-            Catalog(
-                platforms + platform.copy(players = kept),
-                rejected + rejectedPlayers + duplicates.map { CatalogError.DuplicatePlayer(source, it.id) },
+            copy(
+                platforms = platforms + platform.copy(players = kept),
+                rejected = rejected + rejectedPlayers + duplicates.map { CatalogError.DuplicatePlayer(source, it.id) },
             )
         }
 }

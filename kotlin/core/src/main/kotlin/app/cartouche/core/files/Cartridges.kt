@@ -18,6 +18,9 @@ internal enum class Rom {
     /** In big-endian order, as dumped: byte-swapped (`.v64`) and word-swapped (`.n64`) files are put back, told by their first word. */
     N64,
 
+    /** The whole file, which also tells its [Shell] by its header's colour flag. */
+    GAME_BOY,
+
     /** The whole file. */
     WHOLE,
 }
@@ -25,6 +28,7 @@ internal enum class Rom {
 /** Reads of a ROM, which can be tens of megabytes; a multiple of 4 for the Nintendo 64's word order. */
 internal const val CHUNK = 1 shl 20
 
+private const val COLOUR_FLAG = 0x143L
 private const val INES = 0x4E45531AL
 private const val N64_BYTE_SWAPPED = 0x37804012L
 private const val N64_WORD_SWAPPED = 0x40123780L
@@ -36,7 +40,7 @@ internal fun Raise<ReadFailure>.cartridgePrint(rom: Rom, source: ByteSource): Op
         when (rom) {
             Rom.NES -> if (head.bigEndian(0, 4) == INES) 16L else 0L
             Rom.SNES -> if (source.size % 1024 == 512L) 512L else 0L
-            Rom.N64, Rom.WHOLE -> 0L
+            Rom.N64, Rom.GAME_BOY, Rom.WHOLE -> 0L
         }
     val reorder: (ByteArray) -> ByteArray =
         when (if (rom == Rom.N64) head.bigEndian(0, 4) else 0L) {
@@ -48,8 +52,12 @@ internal fun Raise<ReadFailure>.cartridgePrint(rom: Rom, source: ByteSource): Op
     generateSequence(skipped) { it + CHUNK }.takeWhile { it < source.size }.forEach { at ->
         crc.update(reorder(bytes(source, at, minOf(CHUNK.toLong(), source.size - at).toInt()).bind()))
     }
-    FileFacts.Print(crc.value.toUInt())
+    val shell = if (rom == Rom.GAME_BOY) gameBoyShell(source) else Shell.UNKNOWN
+    FileFacts.Print(crc.value.toUInt(), shell)
 }
+
+private fun Raise<ReadFailure>.gameBoyShell(source: ByteSource): Shell =
+    bytes(source, COLOUR_FLAG, 1).fold({ Shell.UNKNOWN }) { Shell.of(it.unsignedByte(0)) }
 
 /** Each byte exchanged with the one at its index xor [mask], within groups of mask + 1 bytes; a last, partial group left as is. */
 private fun swapped(mask: Int): (ByteArray) -> ByteArray = { chunk ->

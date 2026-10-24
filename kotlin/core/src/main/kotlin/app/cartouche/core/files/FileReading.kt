@@ -54,8 +54,8 @@ public object FileReading {
             PlatformId("nes") to cartridge(Rom.NES, "nes"),
             PlatformId("snes") to cartridge(Rom.SNES, "sfc", "smc"),
             PlatformId("n64") to cartridge(Rom.N64, "z64", "v64", "n64"),
-            PlatformId("gb") to cartridge(Rom.WHOLE, "gb"),
-            PlatformId("gbc") to cartridge(Rom.WHOLE, "gbc", "gb"),
+            PlatformId("gb") to cartridge(Rom.GAME_BOY, "gb"),
+            PlatformId("gbc") to cartridge(Rom.GAME_BOY, "gbc", "gb"),
             PlatformId("gba") to cartridge(Rom.WHOLE, "gba"),
         )
 

@@ -20,7 +20,6 @@ const _ANIMATION := &"launch"
 @export var row: ShelfRow
 @export var consoles: ConsoleRow
 @export var layer: ConsoleLayer
-@export var backdrop: Backdrop
 
 ## How far the chosen disc has left the row for the seat, from 0 to 1; how far it is from the seat
 ## along the console's way in ([method ConsoleModel.approach]), moved across it (world units), and
@@ -31,7 +30,7 @@ var disc_offset := Vector2.ZERO
 var disc_tilt := Vector2.ZERO
 var disc_turns_per_s := 0.0
 ## How the consoles show behind the games: blurred over this many pixels of a 1280 pixel wide
-## screen, the backdrop behind them as much, at this opacity, their colours at this saturation.
+## screen, at this opacity, their colours at this saturation.
 var blur := 0.0
 var layer_opacity := 1.0
 var saturation := 1.0
@@ -106,6 +105,11 @@ func leave() -> void:
 	_play(_moment(&"games"), _moment(&"consoles"), 0.0)
 
 
+## How long going into the console, or back out of it, takes.
+func trip_s() -> float:
+	return _moment(&"games") - _moment(&"consoles")
+
+
 ## Whether a game goes into the console, rather than by its medium's [Insertion].
 func can_launch() -> bool:
 	return _animation.length > _moment(&"launch") + 0.001
@@ -137,11 +141,6 @@ func black_origin() -> Vector3:
 	return row.global_position
 
 
-## The dots blurred as much as the consoles, sharp behind the screens that hide them.
-func blur_dots() -> void:
-	backdrop.blur = blur if consoles.visible else 0.0
-
-
 func _play(from_s: float, to_s: float, settle_s: float) -> void:
 	_seek(from_s)
 	_to_s = to_s
@@ -160,7 +159,6 @@ func _seek(time: float) -> void:
 	if behind != consoles.behind:
 		consoles.show_in_layers(ConsoleLayer.BEHIND if behind else ConsoleLayer.FRONT)
 	_look_behind(behind)
-	blur_dots()
 	layer.draw_again()
 	consoles.arrange()
 	_place_disc()

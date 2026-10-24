@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.storage
 
+import app.cartouche.core.ContentUri
 import app.cartouche.core.files.FileFacts
+import app.cartouche.core.files.Shell
 import app.cartouche.core.platforms.PlatformId
 import arrow.core.None
 import arrow.core.Option
@@ -81,6 +83,7 @@ class FactsStoreTest {
                 "cartouche-facts\t1",
                 "${a.value}\t1\t2\tserial:SLES_524.95",
                 "${b.value}\t1\t2\tprint:XYZ",
+                "${b.value}\t1\t2\tprint:0000000A:box",
                 "${b.value}\t1\t2\tsilence",
                 "${b.value}\tone\t2\tsilent",
                 "${b.value}\t1\tsilent",
@@ -88,6 +91,62 @@ class FactsStoreTest {
             ).joinToString("\n"),
         )
         FactsStore(folder).load(ps2) shouldBe told
+    }
+
+    @Test
+    fun `a Game Boy ROM's shell is kept with its print`() {
+        val told =
+            Shell.entries
+                .mapIndexed { i, shell ->
+                    documentUri("root/$i.gbc") to
+                        KnownFacts(FileStamp(Some(1L), None), FileFacts.Print(10u, shell))
+                }.toMap()
+        listOf("gb", "gbc").forEach { platform ->
+            FactsStore(folder).save(PlatformId(platform), told).shouldBeRight()
+            FactsStore(folder).load(PlatformId(platform)) shouldBe told
+        }
+    }
+
+    @Test
+    fun `a cache written before shells were told keeps every platform's facts but the Game Boy prints, read again`() {
+        val (a, b) = listOf("root/a.iso", "root/b.gbc").map(::documentUri)
+        val line = { uri: ContentUri, facts: String -> "${uri.value}\t1\t2\t$facts" }
+        listOf(
+            "ps2" to line(a, "serial:SLES_524.95"),
+            "psx" to line(a, "print:0000000A"),
+            "gbc" to line(b, "print:0000000A"),
+            "gb" to line(a, "print:0000000A"),
+            "gba" to line(b, "print:0000000A:unknown"),
+        ).forEach { (platform, text) -> File(folder.apply { mkdirs() }, "$platform.tsv").writeText("cartouche-facts\t1\n$text") }
+        val stamp = FileStamp(Some(1L), Some(2L))
+        FactsStore(folder).load(ps2) shouldBe mapOf(a to KnownFacts(stamp, FileFacts.Serial("SLES_524.95")))
+        FactsStore(folder).load(PlatformId("psx")) shouldBe mapOf(a to KnownFacts(stamp, FileFacts.Print(10u)))
+        FactsStore(folder).load(PlatformId("gbc")) shouldBe emptyMap()
+        FactsStore(folder).load(PlatformId("gb")) shouldBe emptyMap()
+        FactsStore(folder).load(PlatformId("gba")) shouldBe mapOf(b to KnownFacts(stamp, FileFacts.Print(10u, Shell.UNKNOWN)))
+    }
+
+    @Test
+    fun `a print's shell text is read the same way on every platform, one that says nothing known dropped`() {
+        val files = listOf("a", "b", "c", "d", "e").map { documentUri("root/$it") }
+        val texts =
+            listOf(
+                "print:0000000A:exclusive",
+                "print:0000000A:compatible",
+                "print:0000000A:box",
+                "print:0000000A:",
+                "print:0000000A:unknown:x",
+            )
+        val stamp = FileStamp(Some(1L), Some(2L))
+        listOf("ps2", "gb", "gbc").forEach { platform ->
+            val lines = files.zip(texts) { uri, text -> "${uri.value}\t1\t2\t$text" }
+            File(folder.apply { mkdirs() }, "$platform.tsv").writeText((listOf("cartouche-facts\t1") + lines).joinToString("\n"))
+            FactsStore(folder).load(PlatformId(platform)) shouldBe
+                mapOf(
+                    files[0] to KnownFacts(stamp, FileFacts.Print(10u, Shell.EXCLUSIVE)),
+                    files[1] to KnownFacts(stamp, FileFacts.Print(10u, Shell.COMPATIBLE)),
+                )
+        }
     }
 
     @Test

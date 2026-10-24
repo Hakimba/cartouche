@@ -65,7 +65,7 @@ public class ArtSources(
     public fun preferring(region: Option<PreferredRegion>): ArtSources = ArtSources(kind, media, index, bySerial, textures, region)
 
     /** How [game]'s label is cut from a scan. */
-    public fun cutOf(game: Game): LabelCut = LabelCut(kind, media.of(game.regions))
+    public fun cutOf(game: Game): LabelCut = LabelCut(kind, media.of(game.regions), game.shell)
 
     /**
      * The images the extract and the table have for [game] among those [offered] (the others left
@@ -226,6 +226,20 @@ public class ArtSources(
             return games
                 .filter { it.label == LabelChoice.Automatic && first(before(it.platform), it) != first(after(it.platform), it) }
                 .mapTo(HashSet()) { it.id }
+        }
+
+        /**
+         * The automatic labels of [after]'s games cut otherwise now than when they were cut as [before]'s same games
+         * were (the shell their file's header tells, once known, moves a Game Boy Color exclusive's label): those a
+         * scan looks up again, the image cut anew; a label the user chose is never one.
+         */
+        public fun recut(before: List<Game>, after: List<Game>, sources: (PlatformId) -> ArtSources): Set<GameId> {
+            val was = before.associateBy { it.id }
+            return after
+                .filter { game ->
+                    game.label == LabelChoice.Automatic &&
+                        was.getOrNone(game.id).isSome { !sources(game.platform).cutOf(it).cutsAs(sources(game.platform).cutOf(game)) }
+                }.mapTo(HashSet()) { it.id }
         }
 
         /**

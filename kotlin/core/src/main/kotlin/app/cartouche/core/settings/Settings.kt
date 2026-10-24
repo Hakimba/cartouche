@@ -42,12 +42,16 @@ public enum class EdgeSmoothing {
     OFF,
 }
 
-/** The app's own settings, apart from the library; [preferredRegion], none until the user chooses one, orders labels' images. */
+/**
+ * The app's own settings, apart from the library; [preferredRegion], none until the user chooses one,
+ * orders labels' images; [gamesFloat] makes the selected game sway and bob (the consoles never do).
+ */
 @Serializable
 public data class Settings(
     public val buttonStyle: Option<ButtonStyle> = None,
     public val edgeSmoothing: EdgeSmoothing = EdgeSmoothing.FOUR_TIMES,
     public val preferredRegion: Option<PreferredRegion> = None,
+    public val gamesFloat: Boolean = false,
 ) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An

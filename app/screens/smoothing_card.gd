@@ -55,9 +55,9 @@ func _draw() -> void:
 	var font := get_theme_font(&"font", &"FieldValue")
 	var width := size.x - 2.0 * _MARGIN
 	var below := _MARGIN + _close_up.get_height()
-	draw_string(font, Vector2(_MARGIN, below + 48.0), tr(title), HORIZONTAL_ALIGNMENT_CENTER, width, _TITLE_SIZE, ButtonMark.INK)
+	draw_string(font, Vector2(_MARGIN, below + 48.0), tr(title), HORIZONTAL_ALIGNMENT_CENTER, width, _TITLE_SIZE, StudioTokens.INK)
 	draw_multiline_string(font, Vector2(_MARGIN, below + 84.0), tr(note), HORIZONTAL_ALIGNMENT_CENTER, width, _NOTE_SIZE, 3,
-		ButtonMark.INK.lerp(_BACKGROUND, 0.35))
+		StudioTokens.INK.lerp(_BACKGROUND, 0.35))
 
 
 ## A close-up of the bottom of a disc's dark band over the background, [param area] large, as

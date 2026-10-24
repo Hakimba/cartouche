@@ -1,8 +1,10 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://screens/edge_smoothing_screen.gd" id="1"]
 [ext_resource type="Script" path="res://screens/smoothing_card.gd" id="2"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
+[ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
 
 [node name="EdgeSmoothingScreen" type="Control"]
 layout_mode = 3
@@ -29,6 +31,7 @@ theme_override_font_sizes/font_size = 54
 text = "Which edge smoothing?"
 horizontal_alignment = 1
 vertical_alignment = 1
+script = ExtResource("studio_label")
 
 [node name="Note" type="Label" parent="."]
 layout_mode = 1
@@ -81,24 +84,16 @@ smoothing = &"off"
 title = "Off"
 note = "Edges in small steps; much less work for the graphics card."
 
-[node name="Hints" type="HBoxContainer" parent="."]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 890.0
-offset_right = 400.0
-offset_bottom = 934.0
-mouse_filter = 2
-theme_override_constants/separation = 6
+[node name="Hints" parent="." instance=ExtResource("hint_row")]
 
-[node name="Choose" type="PanelContainer" parent="Hints"]
+[node name="Choose" type="Control" parent="Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 text = "Choose"
 
-[node name="Back" type="PanelContainer" parent="Hints"]
+[node name="Back" type="Control" parent="Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"b"
 text = "Back"
+

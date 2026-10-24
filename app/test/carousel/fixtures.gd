@@ -4,6 +4,9 @@ extends RefCounted
 ## the same cases on every run.
 
 ## Cases each property checks.
+## Millimetres in the models' units, and how near two values of a model are the same.
+const MM := MeshBuilder.UNITS_PER_MM
+const EPSILON := 0.001
 const CASES := 2000
 const FRAME_S := 1.0 / 60.0
 const DVD := preload("res://carousel/media/ps2_dvd/ps2_dvd.tscn")
@@ -250,6 +253,39 @@ static func moving_parts(random: RandomNumberGenerator) -> Array[MovingPart]:
 ## A new console of [param scene], not in the tree.
 static func new_console(scene: String) -> ConsoleModel:
 	return (load(scene) as PackedScene).instantiate()
+
+
+## A new console of [param scene], shown in [param suite]'s tree and freed with it.
+static func shown_console(suite: GdUnitTestSuite, scene: String) -> ConsoleModel:
+	var console: ConsoleModel = suite.auto_free(new_console(scene))
+	suite.add_child(console)
+	return console
+
+
+## Asserts that [param console], drawn from a glb whose root node is [param glb], moves the nodes [param nodes]
+## names (by moving part, each an array of node names), that with its `body` they are the glb's whole, and that
+## it draws [param count] triangles of them within its manifest's budget.
+static func assert_glb(suite: GdUnitTestSuite, console: ConsoleModel, glb: String, nodes: Dictionary,
+		count: int) -> void:
+	var root: Node = console.get_node("Model/%s" % glb)
+	var named: Array[String] = ["body"]
+	for each: Array in nodes.values():
+		named.append_array(each)
+	var drawn := 0
+	for node in named:
+		var part := root.get_node_or_null(node) as MeshInstance3D
+		suite.assert_object(part).override_failure_message("no node %s in the glb" % node).is_not_null()
+		if not part:
+			return
+		for surface in part.mesh.get_surface_count():
+			var indices: PackedInt32Array = part.mesh.surface_get_arrays(surface)[Mesh.ARRAY_INDEX]
+			drawn += int(indices.size() / 3.0)
+	var moved: Array[StringName] = []
+	moved.assign(console.moving_parts().map(func(part: MovingPart) -> StringName: return part.property))
+	suite.assert_array(moved).contains_exactly_in_any_order(nodes.keys())
+	suite.assert_int(drawn).is_equal(count).is_less_equal(
+		ConsoleManifest.of(console.scene_file_path.get_base_dir().get_file()).triangle_budget)
+	suite.assert_int(root.get_child_count()).is_equal(named.size())
 
 
 ## How far [param console]'s part [param property] goes, fully moved; NaN for a part it lacks.
@@ -647,6 +683,27 @@ static func open_edges(meshes: Array[Array]) -> Array[PackedVector3Array]:
 		if counts[edge] > 0:
 			found.append(PackedVector3Array([spots[edge >> 32], spots[edge & 0xFFFFFFFF]]))
 	return found
+
+
+## How many edges of [param meshes] belong to more than two faces, points joined as for [method open_edges]:
+## none on a surface that never folds back on itself.
+static func folded_edges(meshes: Array[Array]) -> int:
+	var joined := _joined(meshes)
+	var corners: PackedInt32Array = joined[0]
+	var counts: Dictionary[int, int] = {}
+	for t in range(0, corners.size(), 3):
+		for k in 3:
+			var from := corners[t + k]
+			var to := corners[t + (k + 1) % 3]
+			var key := (mini(from, to) << 32) | maxi(from, to)
+			counts[key] = counts.get(key, 0) + 1
+	return counts.values().filter(func(faces: int) -> bool: return faces > 2).size()
+
+
+## The way face [param a], [param b], [param c] looks, its length twice its area: Godot's front faces are
+## clockwise seen from the side they face.
+static func face_normal(a: Vector3, b: Vector3, c: Vector3) -> Vector3:
+	return (c - a).cross(b - a)
 
 
 ## The volume each separate piece of [param meshes] encloses (pieces share no point): positive

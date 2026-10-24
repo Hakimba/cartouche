@@ -1,0 +1,12 @@
+Model Information:
+* title: Sony PlayStation 2
+* source: https://sketchfab.com/3d-models/sony-playstation-2-b53f858aa1584229a7f906239fc158a2
+* author: Dolgov (https://sketchfab.com/Dolgov12)
+
+Model License:
+* license type: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements: Author must be credited. Commercial use is allowed.
+
+This work is based on "Sony PlayStation 2" (https://sketchfab.com/3d-models/sony-playstation-2-b53f858aa1584229a7f906239fc158a2) by Dolgov (https://sketchfab.com/Dolgov12) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: console isolated, geometry reduced, textures cleaned and rebaked, movable parts separated, screen and power light switched off where present.

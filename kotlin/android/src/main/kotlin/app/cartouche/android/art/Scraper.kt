@@ -315,6 +315,7 @@ internal class Scraper(
                         is FetchFailure.Refused -> Tried.Stalled(Stall.REFUSED)
                     }
                 }) { image ->
+                    trace("art") { "front=${request.cut.medium.value} shell=${request.cut.shell.key}" }
                     ArtImages.label(image, candidate, request.cut).fold({ Tried.Next(skipped = false) }) { label ->
                         // An image chosen by the user meanwhile stays.
                         store.saveIfAbsent(request.game, label, shownFor, seen).fold({ Tried.Stalled(Stall.STORAGE) }) { art ->

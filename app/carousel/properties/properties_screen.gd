@@ -6,13 +6,10 @@ extends Control
 ## [ConsoleProperties]): their model staged under the light of an operating table
 ## ([OperatingLight]), and each move from one of their screens to another played in three parts:
 ## what leaves goes, the 3D moves from one staging to the next, then what comes arrives ([Move]).
-## No press counts meanwhile, nor while the plugin answers ([member _busy]). Both have a name that
-## A opens a keyboard on ([NameEditor]): X erases, Y types a space, Start keeps the name, B leaves it.
+## No press counts while a staging moves or the plugin answers ([member _busy]).
 
 ## Back on the screen behind, the model in its row again.
 signal closed
-## The name typed could not be kept.
-signal rename_failed
 
 ## How what leaves a screen goes: fading, or sliding down as it fades.
 enum Leave { FADE, SLIDE }
@@ -22,8 +19,6 @@ enum Arrive { FADE, RISE }
 ## How far, in pixels, what arrives rises and what leaves slides down.
 const _RISE := 30.0
 const _SLIDE := 40.0
-## A name shows whole up to this width, in pixels, cut short beyond.
-const _NAME_WIDEST := 1160.0
 
 var android: AndroidServices = Android
 ## Milliseconds since the start, as fingers are read (see [member Carousel.clock]).
@@ -33,67 +28,17 @@ var light: OperatingLight
 ## What the screen behind shows over its row: it leaves while the properties show.
 var behind: Array[CanvasItem] = []
 
-# Used by the screens of the kind only.
-@warning_ignore_start("unused_private_class_variable")
-## The moves to a name's keyboard and back from it (or from another screen of the kind), in seconds.
-static var _to_naming := Move.new(Leave.FADE, 0.15, 0.42, Arrive.RISE, 0.24, 0.22)
-static var _from_editing := Move.new(Leave.FADE, 0.15, 0.42, Arrive.FADE, 0.22, 0.26)
-
-@onready var _properties: Control = %Properties
-@onready var _callout: FocusCallout = %Callout
-@warning_ignore_restore("unused_private_class_variable")
-
 var _staging: Staging
 var _busy := false
 
-@onready var _name: Button = %Name
-@onready var _naming: NameEditor = %Naming
-## What X, Y and Start do on the keyboard.
-@onready var _naming_presses: Dictionary[StringName, Callable] = {
-	&"open_properties": _naming.erase, &"open_settings": _naming.space, &"form_submit": _keep_name}
+# Used by the derived screens.
+@warning_ignore("unused_private_class_variable")
+@onready var _properties: Control = %Properties
 
 
 func _ready() -> void:
 	hide()
 	set_process(false)
-	_name.pressed.connect(_open_naming)
-	_naming.submitted.connect(_keep_name)
-
-
-## Opens the keyboard of the name.
-@abstract func _open_naming() -> void
-
-
-## Keeps the name typed, asking the plugin.
-@abstract func _keep_name() -> void
-
-
-## Takes X, Y or Start on the keyboard, unless the plugin answers; whether [param event] was one.
-func _naming_press(event: InputEvent) -> bool:
-	if _busy:
-		return false
-	for action in _naming_presses:
-		if event.is_action_pressed(action):
-			get_viewport().set_input_as_handled()
-			_naming_presses[action].call()
-			return true
-	return false
-
-
-## Asks the plugin to rename with [param request], no press counting meanwhile; when it cannot, the
-## focus is back where it was and [signal rename_failed] tells it. Answers the plugin's answer.
-func _renaming(request: Callable) -> AndroidServices.Result:
-	_busy = true
-	var focused := get_viewport().gui_get_focus_owner()
-	_release_focus()
-	var answer: AndroidServices.Result = await request.call()
-	_busy = false
-	if not answer.ok:
-		Diagnostics.trace("properties", "name not kept (%s): %s" % [answer.code, answer.detail])
-		if focused:
-			focused.grab_focus()
-		rename_failed.emit()
-	return answer
 
 
 ## Puts the model back in its row as [param staging] and [param move] have it, [param leaving] going
@@ -136,18 +81,6 @@ func _move(leaving: Array[CanvasItem], arriving: Array[CanvasItem], staging: Sta
 		if move.leave == Leave.SLIDE and item is Control:
 			(item as Control).position.y -= _SLIDE
 	_busy = false
-
-
-## Shows [param title] on [param name_button], centred, as wide as it needs up to
-## [constant _NAME_WIDEST].
-func _show_name(name_button: Button, title: String) -> void:
-	name_button.text = title
-	var font_size := name_button.get_theme_font_size(&"font_size")
-	var text := name_button.get_theme_font(&"font").get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
-	var margins := name_button.get_theme_stylebox(&"normal").get_minimum_size().x
-	var width := minf(text.x + margins + name_button.get_theme_constant(&"outline_size"), _NAME_WIDEST)
-	name_button.offset_left = -width / 2.0
-	name_button.offset_right = width / 2.0
 
 
 ## The 3D [param amount] of the way from [param from] to [param to].

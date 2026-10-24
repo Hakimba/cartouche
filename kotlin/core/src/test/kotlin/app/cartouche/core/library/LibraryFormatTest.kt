@@ -8,6 +8,7 @@ import app.cartouche.core.uri
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
+import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -141,14 +142,11 @@ class LibraryFormatTest {
     }
 
     @Test
-    fun `console names are stored only once there is one`() {
-        val library = Library(games = listOf(game("Okage")))
-        LibraryFormat.encode(library).contains("consoleNames") shouldBe false
-        LibraryFormat
-            .encode(
-                library.withConsoleName(PlatformId("ps2"), DisplayName.of("Ma PS2"), "PlayStation 2"),
-            ).contains("consoleNames") shouldBe
-            true
+    fun `INV-E7-07 a library saved with console names still loads`() {
+        val stored = """{"version":2,"library":{"consoleNames":{"ps2":"Legacy console"}}}"""
+        val library = LibraryFormat.decode(stored).shouldBeRight().library
+        library.consoleNames shouldBe mapOf(PlatformId("ps2") to DisplayName.of("Legacy console").shouldBeSome())
+        LibraryFormat.decode(LibraryFormat.encode(library)).shouldBeRight().library shouldBe library
     }
 
     @Test

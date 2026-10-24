@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://screens/field_button.gd" id="1"]
+
+[node name="SettingsRow" type="Button"]
+script = ExtResource("1")
+scale_on_focus = false
+
+[node name="Name" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+
+[node name="Value" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+auto_translate_mode = 2

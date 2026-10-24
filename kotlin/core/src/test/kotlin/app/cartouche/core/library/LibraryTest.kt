@@ -8,8 +8,8 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
-import arrow.core.getOrNone
 import arrow.core.nonEmptyListOf
+import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeGreaterThan
@@ -17,12 +17,75 @@ import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import kotlin.random.Random
 
 class LibraryTest {
+    @Test
+    fun `the default variant is the base model`() = runBlocking<Unit> {
+        val bases =
+            listOf(
+                ConsoleVariant.PS2_SLIM,
+                ConsoleVariant.GBA,
+                ConsoleVariant.GB,
+                ConsoleVariant.GBC,
+                ConsoleVariant.GC,
+                ConsoleVariant.N64,
+                ConsoleVariant.NES,
+                ConsoleVariant.SNES,
+                ConsoleVariant.PSX,
+                ConsoleVariant.WII,
+                ConsoleVariant.XBOX,
+                ConsoleVariant.XBOX360,
+            )
+        checkAll(setups) { setup ->
+            bases.forEach { base -> Library().withSetup(base.platform, setup).variantOf(base.platform) shouldBe Some(base) }
+        }
+    }
+
+    @Test
+    fun `an unknown or foreign variant is a typed error`() = runBlocking<Unit> {
+        checkAll(Arb.int(0..100000)) { suffix ->
+            val library = Library().withSetup(ps2.id, PlatformSetup())
+            library.withVariant(ps2.id, "unknown-$suffix").shouldBeLeft(VariantError.Unknown(ps2.id, "unknown-$suffix"))
+            library.withVariant(ps2.id, "gba_sp").shouldBeLeft(VariantError.Unknown(ps2.id, "gba_sp"))
+            Library().withVariant(ps2.id, "ps2_fat").shouldBeLeft(VariantError.NotInLibrary(ps2.id))
+        }
+    }
+
+    @Test
+    fun `INV-E12-V1-01 a chosen variant survives saving reading and rescanning without changing other choices`() = runBlocking<Unit> {
+        checkAll(folderFiles, setups) { files, setup ->
+            val other = PlatformId("gba")
+            val library = Library().withSetup(ps2.id, setup).withSetup(other, setup).withScan(ps2.id, scan(files))
+            val chosen = library.withVariant(ps2.id, "ps2_fat").shouldBeRight()
+            chosen.variantOf(ps2.id) shouldBe Some(ConsoleVariant.PS2_FAT)
+            chosen.copy(consoleVariants = emptyMap()) shouldBe library
+            val restored = LibraryFormat.decode(LibraryFormat.encode(chosen)).shouldBeRight().library
+            restored shouldBe chosen
+            restored.withScan(ps2.id, scan(files)).variantOf(ps2.id) shouldBe Some(ConsoleVariant.PS2_FAT)
+            restored.withSetup(ps2.id, setup).variantOf(ps2.id) shouldBe Some(ConsoleVariant.PS2_FAT)
+            restored.without(ps2.id).consoleVariants shouldBe emptyMap()
+            restored.without(ps2.id).variantOf(other) shouldBe Some(ConsoleVariant.GBA)
+        }
+    }
+
+    @Test
+    fun `a library stored without variants reads with the base`() = runBlocking<Unit> {
+        checkAll(folderFiles, setups) { files, setup ->
+            val library = Library().withSetup(ps2.id, setup).withScan(ps2.id, scan(files))
+            val old = LibraryFormat.encode(library)
+            old.contains("consoleVariants") shouldBe false
+            val read = LibraryFormat.decode(old).shouldBeRight().library
+            read shouldBe library
+            read.variantOf(ps2.id) shouldBe Some(ConsoleVariant.PS2_SLIM)
+        }
+    }
+
     private fun scan(files: List<ListedFile>) = Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED)
 
     @Test
@@ -180,28 +243,72 @@ class LibraryTest {
     }
 
     @Test
-    fun `INV-E7-07 a console's name stays through saving, reading back and rescans, and goes with its platform`() = runBlocking<Unit> {
+    fun `INV-E7-07 old console names survive reading and rescans`() = runBlocking<Unit> {
         var named = 0
         checkAll(folderFiles, typedNames, typedNames) { files, ps2Name, gbaName ->
             val gba = PlatformId("gba")
-            val library =
-                Library()
-                    .withScan(ps2.id, scan(files))
-                    .withConsoleName(ps2.id, DisplayName.of(ps2Name), "PlayStation 2")
-                    .withConsoleName(gba, DisplayName.of(gbaName), "Game Boy Advance")
+            val names =
+                DisplayName.of(ps2Name).fold({ emptyMap() }) { mapOf(ps2.id to it) } +
+                    DisplayName.of(gbaName).fold({ emptyMap() }) { mapOf(gba to it) }
+            val library = Library(consoleNames = names).withScan(ps2.id, scan(files))
             LibraryFormat.decode(LibraryFormat.encode(library)).shouldBeRight().library shouldBe library
-            library.withScan(ps2.id, scan(files.drop(1))).consoleNames shouldBe library.consoleNames
-            // The consoles' order too (INV-E7-08).
+            library.withScan(ps2.id, scan(files.drop(1))).consoleNames shouldBe names
+            library.without(ps2.id).consoleNames shouldBe names - ps2.id
             val ordered = library.withConsoleOrder(listOf(gba, ps2.id))
             ordered.withScan(ps2.id, scan(files.drop(1))).consoleOrder shouldBe ordered.consoleOrder
-            library.consoleNames.getOrNone(ps2.id) shouldBe DisplayName.of(ps2Name).filter { it.text != "PlayStation 2" }
-            library.without(ps2.id).consoleNames shouldBe library.consoleNames - ps2.id
-            // A blank name, or none, gives the console its own back.
-            library.withConsoleName(ps2.id, DisplayName.of(" "), "PlayStation 2").consoleNames shouldBe library.consoleNames - ps2.id
-            library.withConsoleName(ps2.id, DisplayName.of(" PlayStation  2 "), "PlayStation 2").consoleNames shouldBe
-                library.consoleNames - ps2.id
-            if (library.consoleNames.isNotEmpty()) named++
+            if (names.isNotEmpty()) named++
         }
         named shouldBeGreaterThan 100
     }
+
+    @Test
+    fun `INV-E12-C1-03 placing at gap g puts the console between the consoles at g-1 and g, keeps the others in order and is total`() =
+        runBlocking<Unit> {
+            var placed = 0
+            checkAll(Arb.int(1..12), Arb.int(0..11), Arb.long()) { count, chosenAt, seed ->
+                val all = (0 until count).map { PlatformId("p$it") }
+                val random = Random(seed)
+                val console = all[chosenAt % count]
+                // Some consoles have games, the others are set up and empty; the console placed has games.
+                val withGames = all.filter { it == console || random.nextBoolean() }.toSet()
+                val ghost = PlatformId("ghost")
+                // The catalog's order may repeat a platform; the stored order may hold repeats and a platform the catalog lacks.
+                val catalogOrder = (all + all.filter { random.nextBoolean() } + ghost).shuffled(random)
+                val known = (all + all.filter { random.nextBoolean() } + ghost).filter { random.nextBoolean() }.shuffled(random)
+                val library =
+                    all.fold(Library().withConsoleOrder(known)) { lib, id ->
+                        val setUp = lib.withSetup(id, PlatformSetup())
+                        if (id in withGames) setUp.copy(games = setUp.games + game("g", platform = id.value)) else setUp
+                    }
+
+                // Written from the rule, not from `shown`: the stored order first, then the catalog's, those with games.
+                fun shownBy(order: List<PlatformId>): List<PlatformId> =
+                    (order.filter { it in catalogOrder && it in withGames } + catalogOrder.filter { it in withGames }).distinct()
+                val before = shownBy(known) - console
+                (0..before.size).forEach { gap ->
+                    val saved = library.withConsoleAt(console, gap, catalogOrder).shouldBeRight()
+                    val expected = before.take(gap) + console + before.drop(gap)
+                    saved.shown(catalogOrder) shouldBe expected
+                    // The order is saved whole, and the positions stored for consoles hidden or without games stay, after it.
+                    saved.consoleOrder.take(expected.size) shouldBe expected
+                    saved.consoleOrder.drop(expected.size) shouldBe known.distinct().filter { it !in expected }
+                    placed++
+                }
+                library.withConsoleAt(console, -1, catalogOrder) shouldBeLeft PlacementError.GapOutOfRange(-1, before.size)
+                library.withConsoleAt(console, before.size + 1, catalogOrder) shouldBeLeft
+                    PlacementError.GapOutOfRange(before.size + 1, before.size)
+                all.filter { it !in withGames }.forEach {
+                    library.withConsoleAt(it, 0, catalogOrder) shouldBeLeft PlacementError.NotInLibrary(it)
+                }
+                val unset = PlatformId("unset")
+                library
+                    .copy(
+                        games = library.games + game("g", platform = "unset"),
+                    ).withConsoleAt(unset, 0, catalogOrder + unset) shouldBeLeft
+                    PlacementError.NotInLibrary(unset)
+                library.withConsoleAt(console, 0, catalogOrder.filter { it != console }) shouldBeLeft PlacementError.NotInLibrary(console)
+                library.withConsoleAt(PlatformId("absent"), 0, catalogOrder) shouldBeLeft PlacementError.NotInLibrary(PlatformId("absent"))
+            }
+            placed shouldBeGreaterThan 500
+        }
 }

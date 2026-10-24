@@ -24,6 +24,31 @@ const _VERSION := "^[a-z0-9]+(-[a-z0-9]+)*$"
 @export_file("*.json") var launch: String
 ## The most triangles its model may be drawn with.
 @export var triangle_budget := 0
+## Other model folders of this platform, in the order shown after its base model.
+@export var variants := PackedStringArray()
+
+
+## The base model and the extra models this console offers, in their display order.
+func models() -> Array[ConsoleManifest]:
+	var choices: Array[ConsoleManifest] = [self]
+	for folder in variants:
+		var variant := of(folder)
+		if variant and variant.platform == platform:
+			choices.append(variant)
+	return choices
+
+
+## The platform's decided colour, shared by all its models.
+func gel() -> Color:
+	for base in found():
+		if base.platform == platform and base.is_default:
+			return StudioTokens.GEL.get(StringName(ConsoleManifest.folder_of(base)), StudioTokens.NEUTRAL)
+	return StudioTokens.NEUTRAL
+
+
+## The containing model folder, for a manifest or a scene; empty when there is no resource.
+static func folder_of(resource: Resource) -> String:
+	return resource.resource_path.get_base_dir().get_file() if resource else ""
 
 
 ## The manifest of every console folder under [param folders]. The listing follows the remapped

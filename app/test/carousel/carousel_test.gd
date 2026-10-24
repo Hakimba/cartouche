@@ -56,31 +56,33 @@ func test_the_battery_shows_its_level_and_the_bolt_exactly_while_plugged_in_as_s
 	tell.call({"level_percent": 57, "plugged": false})
 	assert_str(chip.text).is_equal("57 %")
 	assert_array(chip.bolt()).is_empty()
-	var without := chip.get_combined_minimum_size().x
 	tell.call({"level_percent": 57, "plugged": true})
 	assert_str(chip.text).is_equal("57 %")
-	# The bolt after the level, inside the chip, which makes room for it.
-	assert_float(chip.get_combined_minimum_size().x).is_greater(without)
-	chip.size = chip.get_combined_minimum_size()
 	var bolt := chip.bolt()
 	assert_int(bolt.size()).is_equal(7)
-	var level_ends := chip.get_theme_stylebox(&"normal").get_margin(SIDE_LEFT) \
-		+ chip.get_theme_font(&"font").get_string_size(chip.text, HORIZONTAL_ALIGNMENT_LEFT, -1, chip.get_theme_font_size(&"font_size")).x
+	var left: float = Array(bolt).reduce(func(least: float, point: Vector2) -> float: return minf(least, point.x), INF)
+	var right: float = Array(bolt).reduce(func(most: float, point: Vector2) -> float: return maxf(most, point.x), -INF)
+	var level := StudioText.of(StudioTokens.Role.PILL, chip.text).width
+	# Within half a pixel: the bolt's box on whole pixels, as the browser places an SVG.
+	assert_float(left - StudioTokens.PILL_GAP - level).is_equal_approx(chip.size.x - right, 1.0)
+	var top: float = Array(bolt).reduce(func(least: float, point: Vector2) -> float: return minf(least, point.y), INF)
+	assert_vector(Vector2(left, top)).is_equal(Vector2(left, top).round())
+	var level_end := (chip.size.x - (right - left) - StudioTokens.PILL_GAP - level) / 2.0 + level
+	assert_float(left).is_greater(level_end)
 	for point in bolt:
-		assert_bool(Rect2(Vector2.ZERO, chip.size).has_point(point) and point.x > level_ends).is_true()
+		assert_bool(Rect2(Vector2.ZERO, chip.size).has_point(point)).is_true()
 	tell.call({"plugged": true})
 	assert_str(chip.text).is_empty()
 	assert_array(chip.bolt()).is_not_empty()
 	tell.call({"level_percent": 57, "plugged": false})
 	assert_str(chip.text).is_equal("57 %")
 	assert_array(chip.bolt()).is_empty()
-	assert_float(chip.get_combined_minimum_size().x).is_equal(without)
 
 
 func test_what_moves_by_itself_goes_at_the_pace_of_the_rest() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	get_tree().set_group(Resting.PACED, &"pace", 0.25)
-	for node: Node in [carousel._row, carousel._consoles, carousel.get_node("Backdrop/Gradient")]:
+	for node: Node in [carousel._row, carousel._consoles]:
 		assert_float(node.get(&"pace")).is_equal(0.25)
 	get_tree().set_group(Resting.PACED, &"pace", 1.0)
 
@@ -135,7 +137,7 @@ func test_still_the_carousel_changes_nothing_frame_after_frame() -> void:
 
 
 ## What [param carousel] shows: where every 3D node stands, whether every 2D item shows and in which
-## colour and place, the backdrop's dots, and whether the consoles' blurred view is drawn again.
+## colour and place, and whether the consoles' blurred view is drawn again.
 func _shown(carousel: Carousel) -> Dictionary:
 	var shown := {}
 	for node in carousel.find_children("*", "", true, false):
@@ -145,7 +147,6 @@ func _shown(carousel: Carousel) -> Dictionary:
 		elif node is CanvasItem:
 			var item := node as CanvasItem
 			shown[path] = [item.visible, item.modulate, item.self_modulate, (item as Control).position if item is Control else Vector2.ZERO]
-	shown["drift"] = ((carousel.get_node("Backdrop/Gradient") as CanvasItem).material as ShaderMaterial).get_shader_parameter(&"drift")
 	shown["blurred view"] = carousel._sequence.layer.view.render_target_update_mode
 	return shown
 

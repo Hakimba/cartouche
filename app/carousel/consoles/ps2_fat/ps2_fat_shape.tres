@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="Ps2FatShape" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/ps2_fat/ps2_fat_shape.gd" id="1"]
+
+[resource]
+script = ExtResource("1")

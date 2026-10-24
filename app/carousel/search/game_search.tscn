@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://carousel/search/game_search.gd" id="1"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
+[ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
 
 [node name="GameSearch" type="Control"]
 layout_mode = 3
@@ -80,7 +82,7 @@ custom_minimum_size = Vector2(3, 28)
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
-color = Color(0.13, 0.14, 0.17, 1)
+color = Color(0.141176, 0.12549, 0.105882, 1)
 
 [node name="Count" type="Label" parent="Chip/Items"]
 unique_name_in_owner = true
@@ -88,6 +90,7 @@ layout_mode = 2
 size_flags_vertical = 8
 theme_type_variation = &"SearchCount"
 auto_translate_mode = 2
+script = ExtResource("studio_label")
 
 [node name="Ribbon" type="PanelContainer" parent="."]
 unique_name_in_owner = true
@@ -112,13 +115,6 @@ anchor_bottom = 1.0
 grow_vertical = 2
 theme_override_constants/separation = 2
 
-[node name="Hints" type="HBoxContainer" parent="."]
+[node name="Hints" parent="." instance=ExtResource("hint_row")]
 unique_name_in_owner = true
 visible = false
-layout_mode = 0
-offset_left = 40.0
-offset_top = 878.0
-offset_right = 1240.0
-offset_bottom = 922.0
-mouse_filter = 2
-theme_override_constants/separation = 6

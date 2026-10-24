@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://carousel/properties/disc_properties.gd" id="1"]
 [ext_resource type="Script" path="res://carousel/properties/label_zone.gd" id="2"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 [ext_resource type="Script" path="res://carousel/properties/focus_callout.gd" id="4"]
 [ext_resource type="PackedScene" path="res://carousel/properties/name_editor.tscn" id="5"]
 
@@ -59,24 +60,15 @@ theme_type_variation = &"NameButton"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Hints" type="HBoxContainer" parent="Properties"]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 890.0
-offset_right = 400.0
-offset_bottom = 934.0
-mouse_filter = 2
-theme_override_constants/separation = 6
+[node name="Hints" parent="Properties" instance=ExtResource("hint_row")]
 
-[node name="Change" type="PanelContainer" parent="Properties/Hints"]
+[node name="Change" type="Control" parent="Properties/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 text = "Change"
 
-[node name="Back" type="PanelContainer" parent="Properties/Hints"]
+[node name="Back" type="Control" parent="Properties/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"b"
 text = "Back"
@@ -122,37 +114,44 @@ text = "Choose the label's image"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Cards" type="HBoxContainer" parent="Labels"]
-unique_name_in_owner = true
+[node name="Scroll" type="ScrollContainer" parent="Labels"]
 layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_top = 650.0
-offset_bottom = 870.0
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 618.0
+offset_bottom = 902.0
 grow_horizontal = 2
+mouse_filter = 2
+follow_focus = true
+horizontal_scroll_mode = 3
+vertical_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="Labels/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 32
+
+[node name="Cards" type="HBoxContainer" parent="Labels/Scroll/Margin"]
+unique_name_in_owner = true
+layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 30
 alignment = 1
 
-[node name="Hints" type="HBoxContainer" parent="Labels"]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 890.0
-offset_right = 400.0
-offset_bottom = 934.0
-mouse_filter = 2
-theme_override_constants/separation = 6
+[node name="Hints" parent="Labels" instance=ExtResource("hint_row")]
 
-[node name="Choose" type="PanelContainer" parent="Labels/Hints"]
+[node name="Choose" type="Control" parent="Labels/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 text = "Choose"
 
-[node name="Back" type="PanelContainer" parent="Labels/Hints"]
+[node name="Back" type="Control" parent="Labels/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"b"
 text = "Back"
@@ -180,45 +179,33 @@ text = "Adjust the image on the label"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Hints" type="HBoxContainer" parent="Framing"]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 890.0
-offset_right = 900.0
-offset_bottom = 934.0
-mouse_filter = 2
-theme_override_constants/separation = 6
+[node name="Hints" parent="Framing" instance=ExtResource("hint_row")]
 
-[node name="Move" type="PanelContainer" parent="Framing/Hints"]
+[node name="Move" type="Control" parent="Framing/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"stick"
 text = "Move"
 
-[node name="Further" type="PanelContainer" parent="Framing/Hints"]
+[node name="Further" type="Control" parent="Framing/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"l1"
 text = "Zoom out"
 
-[node name="Closer" type="PanelContainer" parent="Framing/Hints"]
+[node name="Closer" type="Control" parent="Framing/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"r1"
 text = "Zoom in"
 
-[node name="Place" type="PanelContainer" parent="Framing/Hints"]
+[node name="Place" type="Control" parent="Framing/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 text = "Place"
 
-[node name="Cancel" type="PanelContainer" parent="Framing/Hints"]
+[node name="Cancel" type="Control" parent="Framing/Hints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"b"
 text = "Cancel"

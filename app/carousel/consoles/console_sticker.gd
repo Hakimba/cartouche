@@ -7,9 +7,11 @@ extends Control
 ## view is drawn again only when the console moves or peels, and it is window-sized only while the
 ## ring shows ([method watch]): a full-size view with its MSAA weighs some tens of megabytes.
 
-## The border and the shadow's offset, in pixels of the screen, once peeled off.
-const _BORDER := 9.0
-const _SHADOW := Vector2(6.0, 11.0)
+## The border and the shadow's offset, in pixels of the screen, once peeled off, and the shadow's colour: the design's
+## white outline (0.3 cqw) and drop shadow (1.4 cqw down).
+const _BORDER := 3.84
+const _SHADOW := Vector2(0.0, 17.92)
+const _SHADOW_COLOR := Color(60.0 / 255.0, 40.0 / 255.0, 20.0 / 255.0, 0.38)
 
 ## Set by the carousel before the ring first opens.
 var consoles: ConsoleRow
@@ -24,6 +26,7 @@ var _drawn := []
 
 func _ready() -> void:
 	_material.set_shader_parameter(&"picture", _view.get_texture())
+	_material.set_shader_parameter(&"shadow_color", _SHADOW_COLOR)
 	get_window().size_changed.connect(_fit)
 	watch(false)
 

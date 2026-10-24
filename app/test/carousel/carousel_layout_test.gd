@@ -115,3 +115,11 @@ func test_a_jump_goes_the_shorter_way_round_an_endless_row_and_straight_to_its_g
 			assert_int(absi(target - position) * 2).is_less_equal(count)
 		else:
 			assert_int(target).is_equal(index)
+
+
+
+func test_the_games_ring_shows_small_shelves_once_and_wraps_both_ways() -> void:
+	assert_array(GamesLayout.offsets(1, 0.0).keys()).is_equal([0])
+	assert_array(GamesLayout.offsets(2, 0.0).keys()).contains_exactly_in_any_order([0, 1])
+	assert_float(GamesLayout.offsets(5, 4.0)[0]).is_equal(1.0)
+	assert_float(GamesLayout.offsets(5, 0.0)[4]).is_equal(-1.0)

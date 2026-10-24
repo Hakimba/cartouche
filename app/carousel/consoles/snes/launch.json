@@ -1,5 +1,5 @@
 {
- "model_hash": "ae2e184249f0e19d35b248bdc286ba164a20456e1481536d3648c9edf986a1d2",
+ "model_hash": "e3b88ed9fe29e276ca6d70c7062a94b441916aeb83b2b72a7f9f89ffe34b1ebc",
  "choice": 2,
  "steps": [
   {
@@ -49,16 +49,16 @@
     "fade": 0
    },
    "console": {
-    "bob": 0.25,
+    "bob": 0,
     "pose": 1,
-    "px": 0,
-    "py": 0,
-    "pz": 0,
-    "rx": 30,
-    "ry": 0,
-    "rz": 0,
-    "scale": 0.5,
-    "sway": 3.5
+    "px": 0.5536,
+    "py": 2.2713,
+    "pz": -10.5997,
+    "rx": 26.59434,
+    "ry": 19.86376,
+    "rz": -9.65414,
+    "scale": 0.83656,
+    "sway": 0
    }
   },
   {
@@ -185,7 +185,7 @@
    "hold": 0,
    "parts": {
     "eject_degrees": 0,
-    "flaps_degrees": 82,
+    "flaps_degrees": 90,
     "power_mm": 0,
     "reset_mm": 0
    },
@@ -244,7 +244,7 @@
    "hold": 0.08,
    "parts": {
     "eject_degrees": 0,
-    "flaps_degrees": 82,
+    "flaps_degrees": 90,
     "power_mm": 0,
     "reset_mm": 0
    },
@@ -303,7 +303,7 @@
    "hold": 0.15,
    "parts": {
     "eject_degrees": 0,
-    "flaps_degrees": 82,
+    "flaps_degrees": 90,
     "power_mm": 4.5,
     "reset_mm": 0
    },
@@ -362,7 +362,7 @@
    "hold": 0.3,
    "parts": {
     "eject_degrees": 0,
-    "flaps_degrees": 82,
+    "flaps_degrees": 90,
     "power_mm": 4.5,
     "reset_mm": 0
    },

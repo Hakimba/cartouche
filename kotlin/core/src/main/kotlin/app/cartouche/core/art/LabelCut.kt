@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
+import app.cartouche.core.files.Shell
 import app.cartouche.core.platforms.ArtKind
 import app.cartouche.core.platforms.Front
 import app.cartouche.core.platforms.LabelCrop
@@ -12,8 +13,11 @@ import arrow.core.getOrNone
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** How a game's label is cut from a scan: by its platform's [kind] of scan, for a game that comes in [medium]. */
-public data class LabelCut(public val kind: ArtKind, public val medium: MediumId) {
+/**
+ * How a game's label is cut from a scan: by its platform's [kind] of scan, for a game that comes in [medium]
+ * and whose ROM says it was sold in a [shell].
+ */
+public data class LabelCut(public val kind: ArtKind, public val medium: MediumId, public val shell: Shell = Shell.UNKNOWN) {
     /**
      * The label on [candidate]'s image whose medium (its opaque part) is [width] by [height] pixels:
      * a texture whole, it is the label as printed (a disc's drawn on a square, a cartridge's at its
@@ -38,11 +42,16 @@ public data class LabelCut(public val kind: ArtKind, public val medium: MediumId
             ArtKind.Disc -> Some(scan)
             is ArtKind.CartridgeFront ->
                 frontOf(
-                    kind.fronts,
+                    kind.fronts + kind.exclusives.takeIf { shell == Shell.EXCLUSIVE }.orEmpty(),
                     scan.width.toDouble() / scan.height,
                 ).map { it.label.on(scan.width, scan.height) }
         }
     }
+
+    /** Whether the same scan is cut as [other] cuts it: the shell only counts for a front the profile gives exclusives of. */
+    public fun cutsAs(other: LabelCut): Boolean = kind == other.kind && medium == other.medium && exclusive == other.exclusive
+
+    private val exclusive: Boolean get() = shell == Shell.EXCLUSIVE && kind is ArtKind.CartridgeFront && medium in kind.exclusives
 
     private fun whole(width: Int, height: Int): PixelRect = PixelRect(0, 0, width.coerceAtLeast(1), height.coerceAtLeast(1))
 

@@ -18,6 +18,12 @@ func _shown(device: Fixtures.NewDevice) -> Carousel:
 	return carousel
 
 
+func _settings_ready(carousel: Carousel) -> bool:
+	return await Fixtures.until(self, func() -> bool:
+		var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
+		return menu.is_visible_in_tree() and menu.state == SettingsMenu.State.OPEN)
+
+
 func _focused() -> String:
 	return Fixtures.focus(self).name
 
@@ -29,24 +35,26 @@ func _text(carousel: Carousel, path: String) -> String:
 ## From the consoles screen to the settings, then to the list of platforms.
 func _to_list(carousel: Carousel) -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
 
 
 ## From the list to the form editing the line [param line].
 func _open(carousel: Carousel, line: int) -> void:
-	for step in line:
-		await Fixtures.action(self, &"ui_down")
+	(carousel._screens._platforms._rows.get_child(line) as Control).grab_focus()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 
 
 ## From the form to the confirmation, through "Remove".
 func _ask_removal(carousel: Carousel) -> void:
-	# Down the form: the last toggle leads to "Remove".
+	# Down the form to the buttons (to "Save" when games are found), then left to "Remove".
 	for step in 6:
 		await Fixtures.action(self, &"ui_down")
+		if _focused() in ["Cancel", "Add"]:
+			break
+	await Fixtures.action(self, &"ui_left")
 	assert_str((Fixtures.focus(self) as Button).text).is_equal("Remove")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "Confirm")).is_true()
@@ -63,19 +71,20 @@ func _confirm(carousel: Carousel) -> void:
 func _save(carousel: Carousel) -> void:
 	assert_bool(await Fixtures.until(self, func() -> bool:
 		return not (carousel.get_node("%Screens/AddConsole/%Add") as Button).disabled)).is_true()
-	await Fixtures.action(self, &"form_submit")
+	(carousel.get_node("%Screens/AddConsole/%Add") as Control).grab_focus()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
 
 
 ## The names the list of platforms shows.
 func _rows(carousel: Carousel) -> PackedStringArray:
 	var names := PackedStringArray()
 	for row: Control in carousel.get_node("%Screens/Platforms/%Rows").get_children():
-		names.append((row.get_node("%Name") as Label).text)
+		names.append((row as Button).text)
 	return names
 
 
 func _focused_row() -> String:
-	return (Fixtures.focus(self).get_node("%Name") as Label).text
+	return (Fixtures.focus(self) as Button).text
 
 
 ## Whether the screens closed, the carousel taking the controller again.
@@ -97,7 +106,7 @@ func test_INV_E6_03_removing_the_last_console_asks_first_then_leads_to_no_consol
 	await _to_list(carousel)
 	await _open(carousel, 0)
 	assert_str(_text(carousel, "AddConsole/%Title")).is_equal("Edit the platform")
-	assert_str(_text(carousel, "AddConsole/%Folder/%Value")).is_equal("SD card › ROMs › ps2")
+	assert_str(_text(carousel, "AddConsole/%Folder")).is_equal("SD card › ROMs › ps2")
 	assert_str(_focused()).is_equal("Emulator")
 	await _ask_removal(carousel)
 	assert_str(_text(carousel, "Confirm/%Title")).is_equal("Remove %s?" % Fixtures.platform_name(device, "ps2"))
@@ -116,26 +125,22 @@ func test_INV_E6_03_removing_the_last_console_asks_first_then_leads_to_no_consol
 	assert_bool((carousel.get_node("%Consoles") as Node3D).visible).is_false()
 	# Y still opens the settings, with no platform to open.
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_bool((carousel.get_node("%Screens/Settings/%Platforms") as Button).disabled).is_true()
 	assert_str(_focused()).is_equal("ButtonStyle")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	# Adding a console again: the form is new, then the console's discovery, then the carousel.
+	# Adding a console again uses the form and arrives directly on the carousel.
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	assert_str(_text(carousel, "AddConsole/%Title")).is_equal("Add a console")
 	assert_str(_text(carousel, "AddConsole/%Cancel")).is_equal("Cancel")
-	assert_str(_text(carousel, "AddConsole/%Folder/%Value")).is_equal("Choose…")
-	assert_str(_text(carousel, "AddConsole/%Type/%Value")).is_equal("Choose…")
-	assert_str(_text(carousel, "AddConsole/%Emulator/%Value")).is_equal("Choose…")
+	assert_str(_text(carousel, "AddConsole/%Folder")).is_equal("Choose…")
+	assert_str(_text(carousel, "AddConsole/%Type")).is_equal("Choose…")
+	assert_str(_text(carousel, "AddConsole/%Emulator")).is_equal("Choose…")
 	await Fixtures.choose_console(self, carousel, device)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return _focused() == "Add")).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.on(self, carousel, "Discovery")).is_true()
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return Fixtures.focus(self) != null and _focused() == "Continue")).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await _closed(carousel)).is_true()
 	assert_bool(await _usable(carousel)).is_true()
@@ -159,7 +164,7 @@ func test_INV_E6_03_removing_one_of_two_consoles_lists_the_other_and_the_carouse
 	assert_array(_rows(carousel)).is_equal([Fixtures.platform_name(device, "gba")])
 	assert_str(_focused_row()).is_equal(Fixtures.platform_name(device, "gba"))
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_focused()).is_equal("Platforms")
 	assert_str(_text(carousel, "Settings/%Platforms/%Value")).is_equal("1")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
@@ -191,7 +196,7 @@ func test_what_a_form_counts_games_with_is_prepared_as_the_settings_open_never_a
 	var carousel := await _shown(device)
 	assert_int(device.titles_prepared).is_equal(0)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	# Before any form: the one editing a platform counts its games as it opens.
 	assert_int(device.titles_prepared).is_equal(1)
 
@@ -222,12 +227,12 @@ func test_the_form_shows_the_choices_stored_and_saving_stores_the_new_ones_and_s
 	var carousel := await _shown(device)
 	await _to_list(carousel)
 	await _open(carousel, 0)
-	assert_str(_text(carousel, "AddConsole/%Emulator/%Value")).is_equal("Other")
+	assert_str(_text(carousel, "AddConsole/%Emulator")).is_equal("Other")
 	assert_bool((carousel.get_node("%Screens/AddConsole/%Subfolders") as Button).button_pressed).is_false()
 	assert_bool((carousel.get_node("%Screens/AddConsole/%Discs") as Button).button_pressed).is_false()
 	# Back to the front, the emulator chosen stays.
 	await Fixtures.resume(self)
-	assert_str(_text(carousel, "AddConsole/%Emulator/%Value")).is_equal("Other")
+	assert_str(_text(carousel, "AddConsole/%Emulator")).is_equal("Other")
 	assert_str(_text(carousel, "AddConsole/%Add")).is_equal("Save")
 	for step in 2:
 		await Fixtures.action(self, &"ui_down")
@@ -249,7 +254,7 @@ func test_a_folder_whose_access_is_gone_still_shows_by_name_and_its_place_is_not
 	var carousel := await _shown(device)
 	await _to_list(carousel)
 	await _open(carousel, 0)
-	assert_str(_text(carousel, "AddConsole/%Folder/%Value")).is_equal("ps2")
+	assert_str(_text(carousel, "AddConsole/%Folder")).is_equal("ps2")
 	await _ask_removal(carousel)
 	assert_str(_text(carousel, "Confirm/%Text")).contains("stay where they are")
 
@@ -264,21 +269,20 @@ func test_saving_another_type_adds_that_console_and_removes_the_one_edited_which
 	assert_str(_focused()).is_equal("Type")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	# Another console set up cannot be taken over.
-	var list: Control = carousel.get_node("%Screens/AddConsole/%Choice")
+	var list: StudioChooser = carousel.get_node("%Screens/AddConsole/%Choice")
 	assert_bool(await Fixtures.until(self, func() -> bool: return list.visible)).is_true()
-	for item: Button in list.get_node("%Items").get_children():
-		assert_str(item.text).is_not_equal(Fixtures.platform_name(device, "gc"))
-	await Fixtures.choose_in_list(self, carousel, Fixtures.platform_name(device, "gba"))
+	assert_array(Array(list.ids())).not_contains(["gc"])
+	await Fixtures.choose_in_list(self, carousel, "gba")
 	# Removing now still names the console edited.
 	await _ask_removal(carousel)
 	assert_str(_text(carousel, "Confirm/%Title")).is_equal("Remove %s?" % Fixtures.platform_name(device, "ps2"))
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	# Another type: its emulator is to choose again.
-	assert_str(_text(carousel, "AddConsole/%Emulator/%Value")).is_equal("Choose…")
+	assert_str(_text(carousel, "AddConsole/%Emulator")).is_equal("Choose…")
 	(carousel.get_node("%Screens/AddConsole/%Emulator") as Control).grab_focus()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.choose_in_list(self, carousel, device.installed_players("gba")[0].emulator_name)
+	await Fixtures.choose_in_list(self, carousel, device.installed_players("gba")[0].id)
 	await _save(carousel)
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
 	assert_array(device.removed).is_equal(["ps2"])
@@ -290,7 +294,7 @@ func test_a_console_set_up_without_games_found_again_from_no_console_brings_the_
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_text(carousel, "Settings/%Platforms/%Value")).is_equal("1")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
@@ -326,7 +330,7 @@ func test_the_button_style_changes_from_the_settings_and_B_there_keeps_it() -> v
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	var carousel := await _shown(device)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("ButtonStyle")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -338,7 +342,7 @@ func test_the_button_style_changes_from_the_settings_and_B_there_keeps_it() -> v
 	assert_bool((carousel.get_node("%ConsoleTitle") as Control).visible).is_false()
 	await Fixtures.action(self, &"ui_right")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(Controls.style).is_equal("xbox")
 	assert_str(_focused()).is_equal("ButtonStyle")
 	assert_bool(consoles.visible).is_false()
@@ -346,7 +350,7 @@ func test_the_button_style_changes_from_the_settings_and_B_there_keeps_it() -> v
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
 	await Fixtures.action(self, &"ui_right")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(Controls.style).is_equal("nintendo")
 	assert_array(device.saved_styles).is_equal([&"nintendo"])
 	assert_str(_text(carousel, "Settings/%ButtonStyle/%Value")).is_equal("Nintendo")
@@ -358,9 +362,9 @@ func test_the_preferred_region_is_chosen_in_a_list_from_the_settings_saved_once_
 	device.preferred_region = "Japan"
 	var carousel := await _shown(device)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_text(carousel, "Settings/%Region/%Value")).is_equal("Japan")
-	for step in 3:
+	for step in 4:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Region")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -375,7 +379,7 @@ func test_the_preferred_region_is_chosen_in_a_list_from_the_settings_saved_once_
 	# B gives the list up: nothing saved, the settings still open on the line.
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(choice.visible).is_false()
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_focused()).is_equal("Region")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await await_idle_frame()
@@ -390,7 +394,7 @@ func test_the_preferred_region_is_chosen_in_a_list_from_the_settings_saved_once_
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await await_idle_frame()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_array(device.saved_regions).is_equal([""])
 
 
@@ -400,8 +404,8 @@ func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_n
 	device.failing = [&"save_preferred_region"]
 	var carousel := await _shown(device)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
-	for step in 3:
+	assert_bool(await _settings_ready(carousel)).is_true()
+	for step in 4:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	var choice: ChoiceList = carousel.get_node("%Screens/Settings/%Choice")
@@ -414,7 +418,7 @@ func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_n
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_regions.size() == 1)).is_true()
 	assert_array(device.saved_regions).is_equal(["Japan"])
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_text(carousel, "Settings/%Region/%Value")).is_equal("None")
 
 
@@ -423,7 +427,7 @@ func test_Y_opens_the_settings_from_the_games_screen_too_and_B_goes_back_to_it()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null)).is_true()
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
@@ -439,7 +443,7 @@ func test_a_direction_held_as_the_settings_open_on_the_games_screen_moves_nothin
 	await Fixtures.hold(self, &"carousel_right")
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	await Fixtures.hold(self, &"carousel_right", false)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null)).is_true()
 	var selected := carousel._row.selected_index()
@@ -468,8 +472,9 @@ func test_INV_E6_01_on_every_settings_screen_exactly_one_control_of_it_has_the_f
 	var random := CarouselFixtures.cases(62)
 	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3, "gba": 2}))
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
 	await Fixtures.wander(self, carousel, "Settings", random)
-	for step in 2:
+	for step in 4:
 		await Fixtures.action(self, &"ui_up")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.wander(self, carousel, "Platforms", random)
@@ -518,7 +523,7 @@ func test_under_the_settings_and_the_forms_the_carousel_draws_only_its_backgroun
 	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
 	_assert_covered(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	_assert_covered(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await _closed(carousel)).is_true()
@@ -528,6 +533,8 @@ func test_under_the_settings_and_the_forms_the_carousel_draws_only_its_backgroun
 	assert_float(carousel._console_title.modulate.a).is_equal(title_alpha)
 	# The form adding one more console, from the "+" above the consoles.
 	await Fixtures.open_add_console(self, carousel)
+	# The consoles stay under the form as it comes in, then go.
+	assert_bool(await Fixtures.until(self, func() -> bool: return not carousel._consoles.visible)).is_true()
 	_assert_covered(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await _closed(carousel)).is_true()
@@ -546,10 +553,307 @@ func test_under_the_settings_and_the_forms_the_carousel_draws_only_its_backgroun
 	carousel._sequence.behind_amount = 1.0
 	assert_bool(carousel._sequence.layer.visible).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.on(self, carousel, "Settings")).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
 	_assert_covered(carousel)
 	carousel.set_process(true)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await _closed(carousel)).is_true()
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
 	assert_array(_drawn(carousel)).is_equal([true, true, true, true, true, false, false, false])
+
+
+class FailedFloatDevice extends Fixtures.NewDevice:
+	func save_games_float(floating: bool) -> AndroidServices.Result:
+		saved_floats.append(floating)
+		return AndroidServices.Result.new({"ok": false, "code": "write_failed", "detail": "Settings unavailable"})
+
+
+func _float_row(carousel: Carousel) -> SettingsMenu:
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	for step in 3:
+		await Fixtures.action(self, &"ui_down")
+	assert_str(_focused()).is_equal("GamesFloat")
+	return carousel.get_node("%Screens/Settings")
+
+
+func test_floating_is_off_by_default_saved_on_A_and_keeps_one_focus() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	var carousel := await _shown(device)
+	var menu := await _float_row(carousel)
+	assert_bool(menu.games_float).is_false()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_floats.size() == 1)).is_true()
+	assert_array(device.saved_floats).is_equal([true])
+	assert_bool(menu.games_float).is_true()
+	assert_str(_focused()).is_equal("GamesFloat")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_array(device.saved_floats).is_equal([true, false])
+	assert_bool(menu.games_float).is_false()
+	assert_str(_focused()).is_equal("GamesFloat")
+
+
+func test_a_failed_float_save_restores_the_stored_switch_and_focus() -> void:
+	var device: FailedFloatDevice = auto_free(FailedFloatDevice.new())
+	device.first_launch = false
+	device.curtain = true
+	device.consoles = {"ps2": 3}
+	device.games_float = true
+	var menu := await _float_row(await _shown(device))
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_array(device.saved_floats).is_equal([false])
+	assert_bool(menu.games_float).is_true()
+	assert_bool(device.games_float).is_true()
+	assert_str(_focused()).is_equal("GamesFloat")
+
+
+func test_settings_navigation_clamps_at_both_ends_and_preserves_the_region_row() -> void:
+	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3}))
+	await _float_row(carousel)
+	for step in 8:
+		await Fixtures.action(self, &"ui_down")
+	assert_str(_focused()).is_equal("Region")
+	for step in 8:
+		await Fixtures.action(self, &"ui_up")
+	assert_str(_focused()).is_equal("Platforms")
+
+
+func test_settings_transition_reverses_from_the_current_sample_without_jumping() -> void:
+	var menu: SettingsMenu = auto_free(preload("res://screens/settings_menu.tscn").instantiate())
+	add_child(menu)
+	menu.open(1, &"platforms", "")
+	menu.enter()
+	menu._process(0.1)
+	menu._process(0.08)
+	var shown := menu.get_node("Panel") as Control
+	var previous_position := shown.position
+	var alpha := shown.modulate.a
+	menu._reverse(false)
+	menu._process(0.0)
+	assert_bool(shown.position.is_equal_approx(previous_position)).is_true()
+	assert_bool(is_equal_approx(shown.modulate.a, alpha)).is_true()
+	menu._process(0.1)
+	menu._reverse(true)
+	for step in 4:
+		menu._process(0.1)
+	assert_int(menu.state).is_equal(SettingsMenu.State.OPEN)
+	menu._reverse(false)
+	menu._process(0.1)
+	previous_position = shown.position
+	menu._reverse(true)
+	menu._process(0.0)
+	assert_bool(shown.position.is_equal_approx(previous_position)).is_true()
+	menu._process(0.1)
+	assert_int(menu.state).is_equal(SettingsMenu.State.OPEN)
+
+
+class SlowFloatDevice extends Fixtures.NewDevice:
+	func save_games_float(floating: bool) -> AndroidServices.Result:
+		saved_floats.append(floating)
+		await released
+		games_float = floating
+		return AndroidServices.Result.new({"ok": true})
+
+
+func test_while_a_float_save_is_pending_presses_do_not_start_another_save_or_leave() -> void:
+	var device: SlowFloatDevice = auto_free(SlowFloatDevice.new())
+	device.first_launch = false
+	device.curtain = true
+	device.consoles = {"ps2": 3}
+	var carousel := await _shown(device)
+	var menu := await _float_row(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(menu.games_float).is_true()
+	for button: JoyButton in [JOY_BUTTON_A, JOY_BUTTON_B]:
+		await Fixtures.joypad(self, button)
+	await Fixtures.action(self, &"ui_down")
+	assert_array(device.saved_floats).is_equal([true])
+	assert_bool(menu.is_visible_in_tree()).is_true()
+	assert_int(menu.state).is_equal(SettingsMenu.State.OPEN)
+	assert_str(_focused()).is_equal("GamesFloat")
+	device.released.emit()
+	assert_bool(await Fixtures.until(self, func() -> bool: return not menu.saving)).is_true()
+	assert_bool(menu.games_float).is_true()
+	assert_bool(device.games_float).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _closed(carousel)).is_true()
+
+
+func test_a_slow_frame_stretches_the_settings_transition_to_at_most_100_ms() -> void:
+	var menu: SettingsMenu = auto_free(preload("res://screens/settings_menu.tscn").instantiate())
+	add_child(menu)
+	menu.open(1, &"platforms", "")
+	menu.enter()
+	menu._process(1.0)
+	assert_int(menu.state).is_equal(SettingsMenu.State.OPENING)
+	assert_float((menu.get_node("Panel") as Control).modulate.a).is_equal(0.0)
+	for step in 3:
+		menu._process(0.1)
+	assert_int(menu.state).is_equal(SettingsMenu.State.OPEN)
+	assert_float((menu.get_node("Panel") as Control).modulate.a).is_equal(1.0)
+
+
+func test_settings_without_a_platform_clamp_on_button_style_and_can_open_again() -> void:
+	var device := Fixtures.past_first_launch(self, {})
+	var carousel := Fixtures.fresh_carousel(self, device)
+	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
+	for opening in 2:
+		await Fixtures.joypad(self, JOY_BUTTON_Y)
+		assert_bool(await _settings_ready(carousel)).is_true()
+		assert_str(_focused()).is_equal("ButtonStyle")
+		await Fixtures.action(self, &"ui_up")
+		assert_str(_focused()).is_equal("ButtonStyle")
+		await Fixtures.joypad(self, JOY_BUTTON_B)
+		assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
+
+
+func test_the_graphics_row_keeps_its_existing_screen_and_four_times_default() -> void:
+	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3}))
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_int(carousel.get_viewport().msaa_3d).is_equal(Viewport.MSAA_4X)
+	for step in 2:
+		await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.on(self, carousel, "EdgeSmoothing")).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_str(_focused()).is_equal("Graphics")
+	assert_int(carousel.get_viewport().msaa_3d).is_equal(Viewport.MSAA_4X)
+
+
+class SlowSettingsDevice extends Fixtures.NewDevice:
+	var reads := 0
+	var waiting := false
+
+	func settings() -> AndroidServices.SettingsAnswer:
+		reads += 1
+		if reads > 1:
+			waiting = true
+			await released
+		return await super.settings()
+
+
+func test_the_settings_clock_starts_on_the_frame_after_the_press_with_a_slow_plugin() -> void:
+	var device: SlowSettingsDevice = auto_free(SlowSettingsDevice.new())
+	device.first_launch = false
+	device.curtain = true
+	device.consoles = {"ps2": 3}
+	device.games_float = true
+	var carousel := await _shown(device)
+	var press := InputEventJoypadButton.new()
+	press.button_index = JOY_BUTTON_Y
+	press.pressed = true
+	Input.parse_input_event(press)
+	await get_tree().process_frame
+	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
+	assert_bool(menu.is_visible_in_tree()).is_true()
+	assert_bool(menu.is_processing()).is_true()
+	assert_int(device.reads).is_equal(1)
+	assert_bool(menu.games_float).is_true()
+	assert_float(menu._knob_x).is_equal(38.4)
+	press.pressed = false
+	Input.parse_input_event(press)
+	assert_bool(await _settings_ready(carousel)).is_true()
+
+
+func test_opening_settings_during_arrival_resumes_the_remaining_title_fade_on_return() -> void:
+	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3}))
+	carousel._title_fade.kill()
+	carousel._console_title.modulate.a = 0.25
+	carousel._title_fade = carousel.create_tween()
+	carousel._title_fade.tween_property(carousel._console_title, ^"modulate:a", 1.0, 0.7)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _closed(carousel)).is_true()
+	assert_bool(await Fixtures.until(self, func() -> bool:
+		return is_equal_approx(carousel._console_title.modulate.a, 1.0))).is_true()
+
+
+func test_B_closes_after_two_seconds_even_when_the_save_never_answers() -> void:
+	var device: SlowFloatDevice = auto_free(SlowFloatDevice.new())
+	device.first_launch = false
+	device.curtain = true
+	device.consoles = {"ps2": 3}
+	var carousel := await _shown(device)
+	var menu := await _float_row(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await get_tree().create_timer(2.05).timeout
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _closed(carousel)).is_true()
+	assert_bool(menu.games_float).is_false()
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_bool(menu.games_float).is_false()
+	assert_bool(menu.saving).is_false()
+
+
+func test_a_late_success_after_closing_does_not_change_the_hidden_switch_or_its_confirmed_value() -> void:
+	var device: SlowFloatDevice = auto_free(SlowFloatDevice.new())
+	device.first_launch = false
+	device.curtain = true
+	device.consoles = {"ps2": 3}
+	var carousel := await _shown(device)
+	var menu := await _float_row(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await get_tree().create_timer(2.05).timeout
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _closed(carousel)).is_true()
+	var knob := menu._knob_x
+	device.released.emit()
+	assert_bool(carousel._screens._games_float).is_false()
+	assert_bool(menu.games_float).is_false()
+	assert_float(menu._knob_x).is_equal(knob)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_bool(menu.games_float).is_false()
+	assert_bool(device.games_float).is_true()
+
+
+func test_stored_switch_values_snap_but_toggle_and_rollback_animate() -> void:
+	var menu: SettingsMenu = auto_free(preload("res://screens/settings_menu.tscn").instantiate())
+	add_child(menu)
+	menu.games_float = true
+	assert_float(menu._knob_x).is_equal(38.4)
+	menu.games_float = false
+	assert_float(menu._knob_x).is_equal(0.0)
+	menu.animate_float(true)
+	assert_float(menu._knob_x).is_equal(0.0)
+	var moving := menu._switch_tween
+	menu.games_float = true
+	assert_bool(menu._switch_tween == moving).is_true()
+	await get_tree().create_timer(0.25).timeout
+	assert_bool(is_equal_approx(menu._knob_x, 38.4)).is_true()
+	menu.animate_float(false)
+	assert_bool(is_equal_approx(menu._knob_x, 38.4)).is_true()
+	await get_tree().create_timer(0.25).timeout
+	assert_bool(is_zero_approx(menu._knob_x)).is_true()
+
+
+func test_card_dim_and_hints_follow_the_specified_intervals_and_curves() -> void:
+	var menu: SettingsMenu = auto_free(preload("res://screens/settings_menu.tscn").instantiate())
+	add_child(menu)
+	# Each interval is sampled independently, including the overshoot of ARRIVE.
+	var tracks := [
+		[false, "Panel", 0.12, 0.24, Motion.Easing.ARRIVE],
+		[false, "Dim", 0.08, 0.2, Motion.Easing.EASE_OUT],
+		[false, "Hints", 0.21, 0.15, Motion.Easing.LINEAR],
+		[true, "Panel", 0.0, 0.18, Motion.Easing.EASE_IN],
+		[true, "Dim", 0.06, 0.2, Motion.Easing.EASE_IN],
+		[true, "Hints", 0.0, 0.12, Motion.Easing.LINEAR],
+	]
+	for track: Array in tracks:
+		menu._closing = track[0]
+		for fraction: float in [0.25, 0.5, 0.75]:
+			menu._time = track[2] + fraction * track[3]
+			menu._sample()
+			var curve: Motion.Easing = track[4]
+			var amount := Motion.eased(curve, fraction)
+			var expected := 1.0 - amount if track[0] else amount
+			var node := menu.get_node(NodePath(str(track[1]))) as Control
+			assert_bool(is_equal_approx(node.modulate.a, expected)).is_true()
+			if track[1] == "Panel":
+				var hidden := 1.0 - expected
+				assert_bool(is_equal_approx(node.position.y, 172.8 + hidden * (25.6 if track[0] else 38.4))).is_true()
+				assert_bool(is_equal_approx(node.scale.x, lerpf(1.0, 0.98 if track[0] else 0.97, hidden))).is_true()

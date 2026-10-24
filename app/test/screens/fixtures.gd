@@ -34,7 +34,8 @@ static func past_first_launch(suite: GdUnitTestSuite, consoles: Dictionary[Strin
 ## Once the properties of a console and the ring putting the consoles in order have stopped moving.
 static func settled_consoles(suite: GdUnitTestSuite, carousel: Carousel) -> void:
 	suite.assert_bool(await until(suite, func() -> bool:
-		return not carousel._console_properties._busy and not carousel._order._busy)).is_true()
+		return not carousel._console_properties._busy and not carousel._order._busy \
+			and not (carousel.get_node("%Screens/Settings") as SettingsMenu).is_processing())).is_true()
 	await suite.await_idle_frame()
 
 
@@ -46,10 +47,10 @@ static func fresh_carousel(suite: GdUnitTestSuite, device: NewDevice) -> Carouse
 
 
 ## On the form, the focus on the type, chooses [param platform_id].
-static func choose_type(suite: GdUnitTestSuite, carousel: Carousel, device: NewDevice, platform_id := "ps2") -> void:
+static func choose_type(suite: GdUnitTestSuite, carousel: Carousel, platform_id := "ps2") -> void:
 	suite.assert_str(focus(suite).name).is_equal("Type")
 	await joypad(suite, JOY_BUTTON_A)
-	await choose_in_list(suite, carousel, platform_name(device, platform_id))
+	await choose_in_list(suite, carousel, platform_id)
 
 
 ## The catalog's name of [param platform_id]; fails the test when there is none.
@@ -68,6 +69,7 @@ static func on_form(suite: GdUnitTestSuite, device: NewDevice, chosen := true) -
 	var carousel := fresh_carousel(suite, device)
 	suite.assert_bool(await on(suite, carousel, "ButtonStyle")).is_true()
 	await joypad(suite, JOY_BUTTON_A)
+	await choose_initial_region(suite, carousel)
 	suite.assert_bool(await on(suite, carousel, "NoConsole")).is_true()
 	await joypad(suite, JOY_BUTTON_A)
 	suite.assert_bool(await on(suite, carousel, "AddConsole")).is_true()
@@ -76,13 +78,21 @@ static func on_form(suite: GdUnitTestSuite, device: NewDevice, chosen := true) -
 	return carousel
 
 
+static func choose_initial_region(suite: GdUnitTestSuite, carousel: Carousel, region := "") -> void:
+	suite.assert_bool(await on(suite, carousel, "PreferredRegion")).is_true()
+	var screen := carousel.get_node("%Screens/PreferredRegion") as PreferredRegionScreen
+	var index := screen._choices.find(region)
+	(screen._cards.get_child(index) as Control).grab_focus()
+	await joypad(suite, JOY_BUTTON_A)
+
+
 ## On the form just opened (the focus on the type), chooses [param platform_id] and its first
 ## emulator; the focus ends on the folder.
 static func choose_console(suite: GdUnitTestSuite, carousel: Carousel, device: NewDevice, platform_id := "ps2") -> void:
-	await choose_type(suite, carousel, device, platform_id)
+	await choose_type(suite, carousel, platform_id)
 	await action(suite, &"ui_down")
 	await joypad(suite, JOY_BUTTON_A)
-	await choose_in_list(suite, carousel, device.installed_players(platform_id)[0].emulator_name)
+	await choose_in_list(suite, carousel, device.installed_players(platform_id)[0].id)
 	await action(suite, &"ui_down")
 	suite.assert_str(focus(suite).name).is_equal("Folder")
 
@@ -116,7 +126,7 @@ static func until(suite: GdUnitTestSuite, condition: Callable) -> bool:
 
 
 ## Forty moves drawn by [param random] on [param carousel]'s screen [param screen_name], once it
-## shows: after each, exactly one control of that screen has the focus, visible (INV-E6-01).
+## shows: after each, exactly one control of that screen has the focus, visible and whole in view (INV-E6-01).
 static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: String, random: RandomNumberGenerator) -> void:
 	suite.assert_bool(await on(suite, carousel, screen_name)).is_true()
 	for move in 40:
@@ -126,18 +136,65 @@ static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: Stri
 		if focused == null:
 			return
 		suite.assert_bool(focused.is_visible_in_tree()).is_true()
+		suite.assert_bool(in_view(focused)).is_true()
 		suite.assert_bool(shown_screen(carousel).is_ancestor_of(focused)).is_true()
 
 
-## Chooses [param option] in the list the form of [param carousel] shows now.
-static func choose_in_list(suite: GdUnitTestSuite, carousel: Carousel, option: String) -> void:
-	var list: Control = carousel.get_node("%Screens/AddConsole/%Choice")
+## The flags a screen sets while it takes no press (a screen without one, or a signal of that name, is not guarded), and must have cleared once it is shown and still.
+const _GUARDS: Array[StringName] = [&"_busy", &"_leaving", &"_closing", &"saving"]
+
+
+## Whether a person can act on [param carousel] now (INV-E12-R4-03): the focus is on a control seen (no ancestor fully
+## faded) that takes presses, inside the screen in front when one shows, and no input guard of that screen is left set;
+## or no screen is in front and the carousel, shown and processing, or its ring takes the presses.
+static func alive(carousel: Carousel) -> bool:
+	var screen := shown_screen(carousel)
+	var focused := carousel.get_viewport().gui_get_focus_owner()
+	if focused != null and focused.is_visible_in_tree() and focused.can_process() and _seen(focused):
+		return screen == null or (screen.is_ancestor_of(focused) and not _guarded(screen))
+	return screen == null and ((carousel._shown and carousel.is_visible_in_tree() and carousel.can_process())
+		or carousel._order.is_open())
+
+
+## Whether an input guard of [param screen] is set.
+static func _guarded(screen: Control) -> bool:
+	for guard in _GUARDS:
+		var flag: Variant = screen.get(guard)
+		if flag is bool and flag:
+			return true
+	return false
+
+
+## Whether [param control] shows whole: inside the screen and inside every scrolling container holding it.
+static func in_view(control: Control) -> bool:
+	var rect := control.get_global_rect()
+	var node: Node = control
+	while node is Control:
+		if node is ScrollContainer and not (node as Control).get_global_rect().encloses(rect):
+			return false
+		node = node.get_parent()
+	return control.get_viewport_rect().encloses(rect)
+
+
+## Whether [param item] shows: neither it nor any ancestor fully transparent.
+static func _seen(item: CanvasItem) -> bool:
+	var node: Node = item
+	while node is CanvasItem:
+		if (node as CanvasItem).modulate.a <= 0.0 or (node as CanvasItem).self_modulate.a <= 0.0:
+			return false
+		node = node.get_parent()
+	return true
+
+
+## Chooses the platform or player [param id] in the chooser the form of [param carousel] shows now.
+static func choose_in_list(suite: GdUnitTestSuite, carousel: Carousel, id: String) -> void:
+	var list: StudioChooser = carousel.get_node("%Screens/AddConsole/%Choice")
 	suite.assert_bool(await until(suite, func() -> bool: return list.visible)).is_true()
 	await suite.await_idle_frame()
-	for item: Button in list.get_node("%Items").get_children():
-		if item.text == option:
-			item.grab_focus()
-	suite.assert_str((focus(suite) as Button).text).is_equal(option)
+	var at := list.ids().find(id)
+	suite.assert_int(at).is_greater_equal(0)
+	list.rows()[at].grab_focus()
+	suite.assert_int(list.focused()).is_equal(at)
 	await joypad(suite, JOY_BUTTON_A)
 
 
@@ -272,6 +329,8 @@ class NewDevice extends AndroidServices:
 	## The button style and the preferred region stored, as the settings send them; none when empty.
 	var button_style := ""
 	var preferred_region := ""
+	## Whether the selected game floats, as the settings send it.
+	var games_float := false
 	## The regions the plugin takes, as the settings send them.
 	var preferred_regions := PackedStringArray(["Europe", "North America", "Japan"])
 	## Whether the library already has games (the desktop demo's, set up nowhere).
@@ -280,6 +339,8 @@ class NewDevice extends AndroidServices:
 	var consoles: Dictionary[String, int] = {}
 	## Choices of [member consoles] other than the usual ones (sub-folders, discs grouped, ARMSX2), by id.
 	var setups: Dictionary[String, Dictionary] = {}
+	var console_variants: Dictionary[String, String] = {}
+	var variants_kept: Array[Array] = []
 	## The platforms whose folder access is gone.
 	var lost_folders: Array[String] = []
 	var players_everywhere := false
@@ -293,6 +354,11 @@ class NewDevice extends AndroidServices:
 	var saved_styles: Array[StringName] = []
 	var saved_smoothings: Array[StringName] = []
 	var saved_regions: Array[String] = []
+	var saved_floats: Array[bool] = []
+	## The consoles placed, each as `[platform id, gap]`.
+	var placed: Array[Array] = []
+	## The order the consoles are in, as placing answers it.
+	var order := PackedStringArray()
 	var previews: Array[AndroidServices.PlatformSetup] = []
 	var previewed_platforms: Array[String] = []
 	var set_up: Array[AndroidServices.PlatformSetup] = []
@@ -319,7 +385,8 @@ class NewDevice extends AndroidServices:
 	## A frame after it is asked for, as the plugin answers: after the scene's first frame.
 	func settings() -> AndroidServices.SettingsAnswer:
 		await _frames(1)
-		var answer := {"ok": true, "first_launch": first_launch, "preferred_regions": preferred_regions}
+		var answer := {"ok": true, "first_launch": first_launch, "games_float": games_float,
+			"preferred_regions": preferred_regions}
 		if button_style:
 			answer["button_style"] = button_style
 		if preferred_region:
@@ -347,9 +414,33 @@ class NewDevice extends AndroidServices:
 		saved_smoothings.append(smoothing)
 		return AndroidServices.Result.new({"ok": true})
 
+	func save_games_float(floating: bool) -> AndroidServices.Result:
+		saved_floats.append(floating)
+		games_float = floating
+		return AndroidServices.Result.new({"ok": true})
+
+	## Places as the plugin does, answering as it sends it: `not_in_library` for a console not set up or without games,
+	## `gap_out_of_range`, else the whole order.
+	func place_console(platform_id: String, gap: int) -> AndroidServices.Placed:
+		placed.append([platform_id, gap])
+		var others := Array(order).filter(func(id: String) -> bool: return id != platform_id)
+		var answer := {"ok": true}
+		if consoles.get(platform_id, 0) == 0:
+			answer = {"ok": false, "code": "not_in_library", "detail": "No console %s in the library to place" % platform_id}
+		elif gap < 0 or gap > others.size():
+			answer = {"ok": false, "code": "gap_out_of_range", "detail": "No gap %d among %d other consoles" % [gap, others.size()]}
+		else:
+			others.insert(gap, platform_id)
+			order = PackedStringArray(others)
+			answer["order"] = order
+		return AndroidServices.Placed.new(answer)
+
 	func save_preferred_region(region: String) -> AndroidServices.Result:
 		saved_regions.append(region)
-		return AndroidServices.Result.new(_payload(&"save_preferred_region"))
+		var answer := _payload(&"save_preferred_region")
+		if answer["ok"]:
+			preferred_region = region
+		return AndroidServices.Result.new(answer)
 
 	func installed_players(platform_id: String) -> Array[AndroidServices.Player]:
 		var found: Array[AndroidServices.Player] = []
@@ -379,6 +470,22 @@ class NewDevice extends AndroidServices:
 		if answer["ok"]:
 			consoles[platform_id] = consoles.get(platform_id, 0)
 			setups[platform_id] = setup.to_wire()
+			if not setup.variant_id.is_empty():
+				console_variants[platform_id] = setup.variant_id
+			answer["library"] = _library()
+		return AndroidServices.LibraryAnswer.new(answer)
+
+	func set_variant(platform_id: String, variant: String) -> AndroidServices.LibraryAnswer:
+		variants_kept.append([platform_id, variant])
+		var answer := await _later(&"set_variant")
+		if platform_id not in consoles:
+			answer = {"ok": false, "code": "not_in_library"}
+		var base: ConsoleManifest = Appearance.defaults(ConsoleManifest.found()).get(platform_id)
+		if base and not base.models().any(func(model: ConsoleManifest) -> bool:
+			return ConsoleManifest.folder_of(model) == variant):
+			answer = {"ok": false, "code": "unknown_variant"}
+		if answer["ok"]:
+			console_variants[platform_id] = variant
 			answer["library"] = _library()
 		return AndroidServices.LibraryAnswer.new(answer)
 
@@ -396,7 +503,7 @@ class NewDevice extends AndroidServices:
 		if answer["ok"]:
 			removed.append(platform_id)
 			consoles.erase(platform_id)
-			console_names.erase(platform_id)
+			console_variants.erase(platform_id)
 			answer["library"] = _library()
 		return AndroidServices.LibraryAnswer.new(answer)
 
@@ -476,8 +583,6 @@ class NewDevice extends AndroidServices:
 
 	## The names given with [method rename_game], in order.
 	var names_given: Array[String] = []
-	## The names the consoles were given ([method rename_console]), by platform id, sent with the library.
-	var console_names: Dictionary[String, String] = {}
 
 	## The orders the consoles were put in ([method order_consoles]), in turn.
 	var orders: Array[PackedStringArray] = []
@@ -493,21 +598,6 @@ class NewDevice extends AndroidServices:
 			ordered.merge(consoles)
 			consoles = ordered
 		return AndroidServices.Result.new(answer)
-
-	## Keeps a console's name as `DisplayName.of` and `Library.withConsoleName` do; blank or its own,
-	## none; a console the library does not have, refused.
-	func rename_console(platform_id: String, shown: String, own: String) -> AndroidServices.ConsoleRenamed:
-		var answer := await _later(&"rename_console")
-		if platform_id not in consoles:
-			answer = {"ok": false, "code": &"unknown_platform"}
-		if answer["ok"]:
-			var kept := _display_name(shown)
-			if kept and kept != own:
-				console_names[platform_id] = kept
-				answer["name"] = kept
-			else:
-				console_names.erase(platform_id)
-		return AndroidServices.ConsoleRenamed.new(answer)
 
 	## Keeps a name as `DisplayName.of` and `Library.withDisplayName` do: one line, single spaces,
 	## trimmed, 80 characters at most; blank or the game's own title, no name.
@@ -565,7 +655,7 @@ class NewDevice extends AndroidServices:
 			if not indices.is_empty():
 				shelves.append({"platform": platform_id, "games": indices, "selected": 0})
 		return JSON.stringify({"setups": sent, "games": listed, "shelves": {"shelves": shelves, "selected": 0},
-			"console_names": console_names})
+			"console_variants": console_variants})
 
 	static func _folder_uri(platform_id: String) -> String:
 		return "content://tree/card%3AROMs%2F" + platform_id

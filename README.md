@@ -28,8 +28,8 @@ Game Boy Color, Game Boy Advance, GameCube, Wii, PlayStation, Xbox and Xbox 360.
 - **Setting up:** everything with the controller: first launch, adding, editing and removing
   consoles, button style, and in Graphics how smooth the edges are drawn (4× unless you choose 2× or
   none, for less work on the graphics card).
-- **Properties:** a game's label image (by region, or a picture of your own) and its name, a
-  console's name, the consoles' order on a ring; by controller or by touch.
+- **Properties:** a game's label image (by region, or a picture of your own) and its name, and
+  the consoles' order on a ring; by controller or by touch.
 - **Frugal:** left alone, once its disc labels are downloaded, the screen stops moving and is drawn
   only when something changes, until the next press; little memory, and quick starts even with
   thousands of games.
@@ -98,7 +98,9 @@ Cartouche builds on these projects, and thanks their authors.
 | [LaunchBox Games Database](https://gamesdb.launchbox-app.com) | Which disc and cartridge scans each game has (`app/data/art/`), and the scans, downloaded on the device | Used with the database's public dump; images stay their owners' |
 | [ScreenScraper](https://www.screenscraper.fr) | Which disc and cartridge images each release has (`app/data/screenscraper/`), and the images, downloaded on the device | Data under CC BY-NC-SA 4.0; images stay their owners' |
 | [PlayStation DataCenter](https://psxdatacenter.com) | PS2 disc scans by serial, downloaded on the device | Images stay their owners' |
-| [Fredoka](https://github.com/hafontia/Fredoka-One) | The app's font (`app/fonts/`) | SIL Open Font License 1.1 |
+| [Fredoka](https://github.com/hafontia/Fredoka-One) | The font of the games' labels (`app/fonts/`) | SIL Open Font License 1.1 |
+| [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) | The app's text (`app/fonts/plus-jakarta-sans/`) | SIL Open Font License 1.1 |
+| [IBM Plex Mono](https://github.com/IBM/plex) | The app's monospaced notes, counts and kickers (`app/fonts/ibm-plex-mono/`), Reserved Font Name "Plex" | SIL Open Font License 1.1 |
 | [Godot Engine](https://godotengine.org) | Engine, and the Android plugin template the plugin started from | MIT |
 | [Arrow](https://arrow-kt.io) | Typed functional programming in Kotlin | Apache 2.0 |
 | [XZ for Java](https://tukaani.org/xz/java.html) | LZMA decoding of CHD disc images | 0BSD |
@@ -109,6 +111,27 @@ Cartouche builds on these projects, and thanks their authors.
 | [GdUnit4](https://github.com/MikeSchulze/gdUnit4) | GDScript tests (downloaded by `dev/test_godot.sh`, not shipped) | MIT |
 | [ktlint](https://pinterest.github.io/ktlint/) | Kotlin style | MIT |
 | [Gradle](https://gradle.org) | Build, and the wrapper in `kotlin/` | Apache 2.0 |
+
+### 3D models
+
+The consoles' 3D models are adapted from these downloads (CC-BY-4.0, licence texts beside each model in `app/carousel/consoles/`):
+
+- This work is based on "NES Console and Controller" (https://sketchfab.com/3d-models/nes-console-and-controller-ffd427134d5e44b4850628030aa66236) by Daz (https://sketchfab.com/Darren.Hogan) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Game Boy Color" (https://sketchfab.com/3d-models/game-boy-color-03c6fe28d45244d2acd55486e3cfee19) by Wikiti (https://sketchfab.com/wikiti) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Super Retro Game Console" (https://sketchfab.com/3d-models/super-retro-game-console-d672d0ac1d6a4d238314d6675f8f92b2) by ELIZION (https://sketchfab.com/ELIZION) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+- This work is based on "Sony PlayStation 2" (https://sketchfab.com/3d-models/sony-playstation-2-b53f858aa1584229a7f906239fc158a2) by Dolgov (https://sketchfab.com/Dolgov12) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+- This work is based on "Gameboy Advance SP" (https://sketchfab.com/3d-models/gameboy-advance-sp-18c9688eaa8f4903a940c105242df15f) by thegraphicsgeek (https://sketchfab.com/thegraphicsgeek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+### 3D logos
+
+The PlayStation 2, Xbox and GameCube logos are pictures rendered from these downloads (CC-BY-4.0):
+
+- This work is based on "Playstation 2 Logo" (https://sketchfab.com/3d-models/playstation-2-logo-266d26be2a6d47d58880bb723d1faf7a) by Anthony Yanez (https://sketchfab.com/paulyanez) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Xbox Logo" (https://sketchfab.com/3d-models/xbox-logo-6fedd757c2fe47b2850df4ab6e110670) by Anthony Yanez (https://sketchfab.com/paulyanez) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Gamecube Logo" (https://sketchfab.com/3d-models/gamecube-logo-f08be17bd3fc4a15ae35e00055d899bb) by Anthony Yanez (https://sketchfab.com/paulyanez) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "GameCube Logo" (https://sketchfab.com/3d-models/gamecube-logo-98bbc36e66b5445da6eeb6b2eb5b36ff) by ExplainedLake (https://sketchfab.com/explainedlake98) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 ## License
 

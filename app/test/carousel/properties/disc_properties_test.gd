@@ -136,10 +136,10 @@ func test_X_stages_the_selected_disc_under_the_light_and_B_puts_it_back_in_the_r
 	await _settled(carousel)
 	assert_float(carousel._row.stage).is_equal(1.0)
 	assert_float(carousel._row.neighbours).is_equal(0.0)
-	# In the middle, 1.12 times its size in the row, facing the camera, still.
+	# The validated fit, facing the camera, still.
 	var stand := carousel._row.selected_stand()
-	assert_vector(carousel._row.to_global(stand.origin)).is_equal_approx(Vector3(0.0, 0.14, 0.0), Vector3.ONE * 0.0001)
-	assert_vector(stand.basis.get_scale()).is_equal_approx(Vector3.ONE * 1.12, Vector3.ONE * 0.0001)
+	assert_vector(carousel._row.to_global(stand.origin)).is_equal_approx(Vector3(0.0, 0.2, 0.0), Vector3.ONE * 0.0001)
+	assert_vector(stand.basis.get_scale()).is_equal_approx(Vector3.ONE * 0.98, Vector3.ONE * 0.0001)
 	assert_bool(stand.basis.orthonormalized().is_equal_approx(Basis.IDENTITY)).is_true()
 	for frame in 10:
 		await await_idle_frame()
@@ -242,6 +242,71 @@ func test_each_image_picked_shows_on_the_disc_at_once_and_B_brings_back_the_labe
 	assert_object(Fixtures.focus(self)).is_same(carousel._properties._zone)
 
 
+func test_the_image_under_the_cursor_is_drawn_on_the_still_disc_without_a_press_and_B_draws_the_saved_one_again() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	var saved := _label(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _settled(carousel)
+	var cards := _cards(carousel)
+	assert_bool(await Fixtures.until(self, func() -> bool: return cards[1].is_ready())).is_true()
+	# The staged disc stands still: only a redraw asked for shows what its label became.
+	var view := carousel._properties._medium.view()
+	for card: LabelCard in [cards[1], cards[-1]]:
+		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		card.grab_focus()
+		assert_object(_label(carousel)).is_same(card.label if not card.own else saved)
+		await await_idle_frame()
+		assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	cards[1].grab_focus()
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await _settled(carousel)
+	assert_object(_label(carousel)).is_same(saved)
+	assert_object(Fixtures.focus(self)).is_same(carousel._properties._zone)
+
+
+func test_the_ring_of_a_label_downloading_keeps_drawing_on_the_still_disc() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	var view := carousel._properties._medium.view()
+	var game := carousel._row.selected_game()
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	await await_idle_frame()
+	await await_idle_frame()
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
+	carousel._row.downloading(game.id, -1.0)
+	for frame in 3:
+		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		await await_idle_frame()
+		assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	carousel._row.downloaded(game.id)
+	await await_idle_frame()
+	# Once the ring is gone and drawn out, the idle disc is drawn no more.
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	await await_idle_frame()
+	await await_idle_frame()
+	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
+
+
+func test_the_cards_follow_the_focus_whole_in_view_to_the_last_and_back() -> void:
+	var many: Array[Dictionary] = []
+	for region: String in ["Europe", "North America", "Japan", "France", "Germany", "Spain", "Italy", "Korea"]:
+		many.append(_scan(region, _red))
+	var carousel: Carousel = (await _on_games(many))[0]
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _settled(carousel)
+	var cards := _cards(carousel)
+	for move: StringName in [&"ui_right", &"ui_left"]:
+		for step in cards.size() - 1:
+			await Fixtures.action(self, move)
+			assert_bool(Fixtures.in_view(Fixtures.focus(self))).is_true()
+		assert_object(Fixtures.focus(self)).is_same(cards[-1] if move == &"ui_right" else cards[0])
+
+
 func test_A_keeps_the_image_picked_and_remembers_its_region() -> void:
 	var setup := await _on_games()
 	var carousel: Carousel = setup[0]
@@ -338,14 +403,14 @@ func test_after_a_launch_the_games_screen_and_the_properties_still_hide_the_cons
 	assert_float(title.modulate.a).is_equal(0.0)
 
 
-func test_B_pressed_while_the_properties_open_does_nothing() -> void:
+func test_B_during_opening_reverses_to_the_games() -> void:
 	var carousel: Carousel = (await _on_games())[0]
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.PROPERTIES)
-	assert_float(carousel._row.stage).is_equal(1.0)
-	assert_object(Fixtures.focus(self)).is_same(carousel._properties._zone)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+	assert_float(carousel._row.stage).is_equal(0.0)
+	assert_bool(carousel._properties.visible).is_false()
 
 
 func test_the_game_s_own_image_arriving_while_another_is_shown_waits_until_it_is_put_back() -> void:
@@ -486,7 +551,7 @@ func test_INV_E7_02_whatever_is_pressed_and_when_the_properties_settle_on_one_wh
 		var focused := Fixtures.focus(self)
 		match step:
 			DiscProperties.Step.PROPERTIES:
-				assert_object(properties._staging).is_same(DiscProperties._on_properties)
+				assert_object(properties._staging).is_same(properties._on_properties)
 				assert_bool(properties._labels.visible or properties._framing_screen.visible).is_false()
 				assert_float(properties._properties.modulate.a).is_equal(1.0)
 				assert_bool(focused in [properties._zone, properties._name]).is_true()
@@ -625,24 +690,34 @@ func test_by_touch_pinching_zooms_the_picture_and_a_drag_moves_it_with_the_finge
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
 	var centre := Vector2(640.0, 480.0)
-	# The same pinch handed over twice in a frame counts once; the next frame's counts again.
 	_pinch(centre, 1.5)
+	Input.flush_buffered_events()
 	_pinch(centre, 1.5)
-	await await_idle_frame()
+	Input.flush_buffered_events()
 	assert_float(properties._framing.zoom).is_equal_approx(1.5, 0.0001)
 	_pinch(centre, 1.2)
-	await await_idle_frame()
+	Input.flush_buffered_events()
 	assert_float(properties._framing.zoom).is_equal_approx(1.8, 0.0001)
-	# Dragged right 10 pixels at a time, the picture goes right with the finger, as far: the label
-	# shows more of its left.
 	var framed_before := _window(carousel)
-	var path: Array[Vector2] = []
-	for step in 13:
-		path.append(centre + Vector2(10.0 * step, 0.0))
-	await Fixtures.touch(self, path)
-	var moved := 120.0 / properties._label_px * framed_before.z
-	# Within the label's breathing as the disc floats.
-	assert_float(_window(carousel).x).is_equal_approx(framed_before.x - moved, 0.002)
+	var centre_before := properties._framing.centre
+	var label_width := properties._label_px
+	var touch := InputEventScreenTouch.new()
+	touch.position = get_tree().root.get_final_transform() * centre
+	touch.pressed = true
+	_send_touch_now(touch)
+	for step in range(1, 13):
+		var drag := InputEventScreenDrag.new()
+		drag.position = get_tree().root.get_final_transform() * (centre + Vector2(10.0 * step, 0.0))
+		_send_touch_now(drag)
+	touch.position = get_tree().root.get_final_transform() * (centre + Vector2(120.0, 0.0))
+	touch.pressed = false
+	_send_touch_now(touch)
+	var moved := 120.0 / label_width * framed_before.z
+	var centre_after := centre_before.x - moved
+	assert_float(properties._framing.centre.x).is_equal_approx(centre_after, 0.000001)
+	var width := properties._picture.size.x
+	var left_pixel := int(centre_after * width - framed_before.z * width / 2.0)
+	assert_float(_window(carousel).x).is_equal_approx(float(left_pixel) / width, 0.000001)
 	var framed := properties._framing.window(properties._picture.size)
 	assert_vector(_window(carousel)).is_equal_approx(
 		Vector4(framed.position.x, framed.position.y, framed.size.x, framed.size.y), Vector4.ONE * 0.0001)
@@ -1005,3 +1080,454 @@ func _delayed_sources(early: bool, reverse: bool, chosen: int) -> void:
 	assert_object(_label(carousel)).is_same(picked)
 	carousel.queue_free()
 	await await_idle_frame()
+
+
+func test_INV_E12_08_the_zone_shape_follows_every_medium_kind_and_its_projected_label() -> void:
+	var subjects: Array[Array] = [
+		["ps2", "ps2_dvd"], ["psx", "ps1_cd"], ["gc", "gc_mini_dvd"], ["wii", "wii_dvd"],
+		["xbox", "xbox_dvd"], ["xbox360", "xbox360_dvd"], ["nes", "nes_cart"], ["snes", "snes_pal_cart"],
+		["n64", "n64_cart"], ["gb", "gb_cart"], ["gbc", "gbc_cart"], ["gba", "gba_cart"],
+		["nes", "famicom_cart"], ["snes", "sfc_cart"], ["snes", "snes_us_cart"],
+	]
+	var covered: Array[String] = []
+	for subject in subjects:
+		var platform: String = subject[0]
+		var medium: String = subject[1]
+		var device := Fixtures.past_first_launch(self, {platform: 1})
+		var carousel := Fixtures.fresh_carousel(self, device)
+		assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+		await Fixtures.joypad(self, JOY_BUTTON_A)
+		assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
+		var game := carousel._row.selected_game()
+		game.medium = medium
+		var games: Array[AndroidServices.Game] = [game]
+		var manifest: MediumManifest = load(MediumManifest.FOLDERS.path_join(medium).path_join(MediumManifest.FILE))
+		var models: Dictionary[String, PackedScene] = {medium: load(manifest.scene)}
+		carousel._row.show_shelf(games, 0, models, ShelfRow.LabelLook.new())
+		covered.append(medium)
+		await await_idle_frame()
+		await Fixtures.joypad(self, JOY_BUTTON_X)
+		await _settled(carousel)
+		var properties := carousel._properties
+		var zone := properties._zone
+		var cartridge := platform in ["nes", "snes", "n64", "gb", "gbc", "gba"]
+		assert_int(zone.shape).is_equal(LabelZone.Shape.RECTANGLE if cartridge else LabelZone.Shape.DISC)
+		var label := properties._label_mesh
+		var camera := carousel.get_viewport().get_camera_3d()
+		var bounds := label.get_aabb()
+		var box := Rect2(camera.unproject_position(label.to_global(bounds.get_endpoint(0))), Vector2.ZERO)
+		for corner in range(1, 8):
+			box = box.expand(camera.unproject_position(label.to_global(bounds.get_endpoint(corner))))
+		var expected := box.grow(10.0)
+		if not cartridge:
+			var diameter := maxf(expected.size.x, expected.size.y)
+			expected = Rect2(expected.get_center() - Vector2.ONE * diameter / 2.0, Vector2.ONE * diameter)
+		assert_vector(zone.position).is_equal_approx(expected.position, Vector2.ONE * 0.02)
+		assert_vector(zone.size).is_equal_approx(expected.size, Vector2.ONE * 0.02)
+		assert_float(zone.corner_radius).is_equal_approx(20.48 if cartridge else expected.size.x / 2.0, 0.02)
+		assert_float(zone._material.get_shader_parameter(&"radius")).is_equal_approx(zone.corner_radius, 0.001)
+		assert_vector(zone._material.get_shader_parameter(&"box_size")).is_equal_approx(expected.size, Vector2.ONE * 0.02)
+		var expected_rig := StudioLights.mixed(StudioLights.rig_of(carousel._row.selected_game().medium, &"properties"),
+			StudioLights.rig_of(carousel._row.selected_game().medium, &"properties", true), 0.0 if properties.art.has_texture(carousel._row.selected_game()) else 1.0)
+		var sources := properties._medium.lights()
+		assert_int(sources.size()).is_equal(expected_rig.sources.size())
+		for i in sources.size():
+			assert_float(sources[i].light_energy).is_equal_approx(expected_rig.sources[i].energy, 0.001)
+		var pool := _light(carousel).material as ShaderMaterial
+		assert_bool(pool.get_shader_parameter(&"shaped")).is_true()
+		var body := Plinth.bounds(properties._model, properties._medium.holder())
+		var world := properties._medium.holder().global_transform
+		assert_vector(world * body.get_center()).is_equal_approx(Vector3(0.0, 0.2, 0.0), Vector3.ONE * 0.001)
+		var extent := body.size * world.basis.get_scale()
+		assert_float(maxf(extent.x, extent.y)).is_equal_approx(1.2 * (0.92 if cartridge else 0.98), 0.001)
+		var body_box := Rect2(camera.unproject_position(world * body.get_endpoint(0)), Vector2.ZERO)
+		for corner in range(1, 8):
+			body_box = body_box.expand(camera.unproject_position(world * body.get_endpoint(corner)))
+		if cartridge:
+			# A cartridge's body is its meshes' own vertices, not the corners of their box.
+			body_box = Rect2(camera.unproject_position(properties._model.global_position), Vector2.ZERO)
+			for mesh: MeshInstance3D in properties._model.find_children("*", "MeshInstance3D", true, false):
+				for surface in mesh.mesh.get_surface_count():
+					for point: Vector3 in mesh.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+						body_box = body_box.expand(camera.unproject_position(mesh.global_transform * point))
+		assert_float(properties._name.position.y).is_equal_approx(
+			maxf(zone.get_rect().end.y, body_box.end.y) + 23.04, 0.02)
+		await Fixtures.joypad(self, JOY_BUTTON_A)
+		await _settled(carousel)
+		for card in _cards(carousel):
+			var thumbnail := card.get_child(0).get_child(0) as TextureRect
+			var material := thumbnail.material as ShaderMaterial
+			assert_bool(material.get_shader_parameter(&"cartridge")).is_equal(cartridge)
+			assert_float(material.get_shader_parameter(&"proportion")).is_equal_approx(carousel._row.selected_label_proportion(), 0.001)
+		await Fixtures.joypad(self, JOY_BUTTON_B)
+		await _settled(carousel)
+		await Fixtures.joypad(self, JOY_BUTTON_B)
+		await _settled(carousel)
+		assert_bool(properties.is_open()).is_false()
+		assert_bool(properties._model == null).is_true()
+		assert_int(carousel._row.selected_game().medium.length()).is_greater(0)
+		carousel.queue_free()
+		await await_idle_frame()
+
+	covered.sort()
+	var expected := MediumManifest.found().keys()
+	expected.sort()
+	assert_array(covered).contains_exactly(expected)
+
+
+func test_the_properties_travel_reverses_without_jumping_and_ignores_other_presses() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var properties := carousel._properties
+	var initial_stand := carousel._row.selected_stand()
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	for frame in 5:
+		await await_idle_frame()
+	var progress := properties._travel
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_int(properties._direction).is_equal(-1)
+	assert_float(properties._travel).is_less_equal(progress)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	assert_int(properties._direction).is_equal(1)
+	await _settled(carousel)
+	assert_object(Fixtures.focus(self)).is_same(properties._zone)
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await _settled(carousel)
+	assert_float(carousel._row.stage).is_equal(0.0)
+	assert_vector(carousel._row.selected_stand().origin).is_equal_approx(initial_stand.origin, Vector3(0.001, 0.05, 0.001))
+	assert_vector(carousel._row.selected_stand().basis.get_scale()).is_equal_approx(initial_stand.basis.get_scale(), Vector3.ONE * 0.001)
+
+
+func test_a_long_properties_name_is_one_line_with_a_fitted_ellipsis() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	carousel._row.selected_game().title = "The Long Adventure ".repeat(20)
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	var properties := carousel._properties
+	var line := properties._name_text.line
+	assert_float(properties._name.size.x).is_less_equal(1160.0)
+	assert_float(properties._name.size.y).is_equal_approx(93.44, 0.01)
+	assert_int(line.placements(Vector2.ZERO).size()).is_less(properties._name.text.length())
+	var dots := StudioText.new("…", StudioTokens.Face.JAKARTA_800, 53.76, -0.035).placements(Vector2.ZERO)
+	var placed := line.placements(Vector2.ZERO)
+	assert_int(placed[-1].index).is_equal(dots[-1].index)
+
+
+func test_the_zone_morphs_between_label_shapes_in_320_ms() -> void:
+	var zone: LabelZone = auto_free(LabelZone.new())
+	add_child(zone)
+	zone.place(Rect2(100.0, 100.0, 120.0, 120.0), LabelZone.Shape.DISC, Color.BLUE)
+	var original := zone.get_rect()
+	zone.place(Rect2(200.0, 180.0, 240.0, 80.0), LabelZone.Shape.RECTANGLE, Color.BLUE)
+	assert_vector(zone.position).is_equal(original.position)
+	for frame in 3:
+		await await_idle_frame()
+	assert_float(zone.corner_radius).is_between(20.48, 70.0)
+	assert_bool(await Fixtures.until(self, func() -> bool: return zone._morph == null)).is_true()
+	assert_vector(zone.position).is_equal(Vector2(190.0, 170.0))
+	assert_vector(zone.size).is_equal(Vector2(260.0, 100.0))
+	assert_float(zone.corner_radius).is_equal_approx(20.48, 0.000001)
+
+
+func test_the_travel_clock_caps_a_slow_frame_and_reversal_preserves_the_drawn_transform() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	var properties := carousel._properties
+	properties.set_process(false)
+	var started := properties._travel
+	properties._process(1.0)
+	assert_float(properties._travel - started).is_equal_approx(0.25, 0.001)
+	for back_profile: bool in [false, true]:
+		properties._back_profile = back_profile
+		properties._direction = -1 if back_profile else 1
+		properties._travel = 0.55
+		properties._process(0.0)
+		var drawn := properties._medium.holder().global_transform
+		var duration := 0.38 if back_profile else 0.4
+		var step := 0.02 / duration
+		var direction := 1 if back_profile else -1
+		properties._input(_travel_press(&"open_properties" if back_profile else &"screen_back"))
+		assert_bool(properties._back_profile).is_equal(back_profile)
+		assert_float(properties._travel).is_equal(0.55)
+		properties._process(0.02)
+		var expected_progress := 0.55 + direction * step
+		assert_float(properties._travel).is_equal_approx(expected_progress, 0.000001)
+		assert_bool(properties._back_profile).is_equal(back_profile)
+		var expected := _expected_stand(properties, expected_progress, back_profile)
+		var actual := properties._medium.holder().global_transform
+		assert_vector(actual.origin).is_equal_approx(expected.origin, Vector3.ONE * 0.0001)
+		assert_bool(actual.basis.is_equal_approx(expected.basis)).is_true()
+		var bound := drawn.origin.distance_to(expected.origin) + 0.0001
+		assert_float(actual.origin.distance_to(drawn.origin)).is_less_equal(bound)
+		properties._input(_travel_press(&"screen_back" if back_profile else &"open_properties"))
+		properties._process(0.02)
+		assert_bool(properties._back_profile).is_equal(back_profile)
+		assert_float(properties._travel).is_equal_approx(0.55, 0.000001)
+	properties.set_process(true)
+	await _settled(carousel)
+
+
+@warning_ignore("unused_parameter")
+func test_the_zone_border_and_glow_obey_both_focus_and_transition_opacity(
+		do_skip := DisplayServer.get_name() == "headless", skip_reason := "draws in a window: needs a renderer") -> void:
+	var view: SubViewport = auto_free(SubViewport.new())
+	view.size = Vector2i(256, 256)
+	view.transparent_bg = true
+	view.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var zone := LabelZone.new()
+	view.add_child(zone)
+	add_child(view)
+	zone.place(Rect2(78.0, 78.0, 100.0, 100.0), LabelZone.Shape.RECTANGLE, Color.RED)
+	for alpha: float in [1.0, 0.5, 0.0]:
+		zone._outline.modulate.a = alpha
+		var picture := await _viewport_frame(view)
+		assert_float(picture.get_pixel(70, 128).a).is_equal_approx(alpha, 2.0 / 255.0)
+	zone._outline.modulate.a = 1.0
+	zone.modulate.a = 0.0
+	var hidden := await _viewport_frame(view)
+	assert_float(hidden.get_pixel(70, 128).a).is_less(1.0 / 255.0)
+
+
+func _send_touch_now(event: InputEvent) -> void:
+	Fixtures.clock.ms += 16
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+
+
+func _viewport_frame(view: SubViewport) -> Image:
+	view.render_target_update_mode = SubViewport.UPDATE_ONCE
+	await await_idle_frame()
+	RenderingServer.force_draw(false)
+	return view.get_texture().get_image()
+
+
+func _travel_press(action: StringName) -> InputEventAction:
+	var event := InputEventAction.new()
+	event.action = action
+	event.pressed = true
+	return event
+
+
+func _reference_curve(points: Vector4, t: float) -> float:
+	var low := 0.0
+	var high := 1.0
+	for iteration in 60:
+		var u := (low + high) / 2.0
+		var x := 3.0 * (1.0 - u) * (1.0 - u) * u * points.x + 3.0 * (1.0 - u) * u * u * points.z + u * u * u
+		if x < clampf(t, 0.0, 1.0):
+			low = u
+		else:
+			high = u
+	var u := (low + high) / 2.0
+	return 3.0 * (1.0 - u) * (1.0 - u) * u * points.y + 3.0 * (1.0 - u) * u * u * points.w + u * u * u
+
+
+func _expected_stand(properties: DiscProperties, progress: float, back: bool) -> Transform3D:
+	var elapsed := (1.0 - progress) * 0.38 if back else progress * 0.4
+	var moved := _reference_curve(Vector4(0.2, 0.8, 0.2, 1.0), elapsed / 0.36)
+	if back:
+		moved = 1.0 - moved
+	var basis := Basis.from_scale(Vector3.ONE * properties._on_properties.size)
+	var centre := properties.row.to_local(Vector3(0.0, 0.2, properties.row.global_position.z))
+	var box := Plinth.bounds(properties._model, properties._medium.holder())
+	var target := Transform3D(basis, centre - basis * box.get_center())
+	return properties.row.global_transform * properties._row_stand.interpolate_with(target, moved)
+
+
+func test_the_opening_and_back_profiles_follow_the_briefs_intervals() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	var properties := carousel._properties
+	properties.set_process(false)
+	for back: bool in [false, true]:
+		properties._back_profile = back
+		properties._direction = -1 if back else 1
+		for progress: float in [0.25, 0.5, 0.625, 0.75, 0.9, 1.0]:
+			properties._travel = progress
+			properties._apply_travel()
+			var t := (1.0 - progress) * 0.38 if back else progress * 0.4
+			var zone := 1.0 - clampf(t / 0.1, 0.0, 1.0) if back \
+				else _reference_curve(Vector4(0.0, 0.0, 0.58, 1.0), (t - 0.24) / 0.16)
+			var name_alpha := 1.0 - _reference_curve(Vector4(0.42, 0.0, 1.0, 1.0), t / 0.16) if back \
+				else _reference_curve(Vector4(0.2, 0.9, 0.25, 1.04), (t - 0.2) / 0.2)
+			var callout := 1.0 - clampf(t / 0.12, 0.0, 1.0) if back else clampf((t - 0.28) / 0.12, 0.0, 1.0)
+			assert_float(properties._zone.modulate.a).is_equal_approx(zone, 0.00001)
+			assert_float(properties._name.modulate.a).is_equal_approx(name_alpha, 0.00001)
+			assert_float(properties._callout.modulate.a).is_equal_approx(callout, 0.00001)
+			assert_float(properties._name_drop()).is_equal_approx(20.48 * (1.0 - name_alpha), 0.00001)
+			properties._process(0.0)
+			var actual := properties._medium.holder().global_transform
+			var expected := _expected_stand(properties, progress, back)
+			assert_vector(actual.origin).is_equal_approx(expected.origin, Vector3.ONE * 0.0001)
+			assert_bool(actual.basis.is_equal_approx(expected.basis)).is_true()
+	properties._close()
+	properties.set_process(true)
+	await _settled(carousel)
+
+
+func test_B_on_settled_properties_returns_the_model_and_the_games_chrome() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	var properties := carousel._properties
+	var model := properties._model
+	var parent := properties._model_parent
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(properties._back_profile).is_true()
+	await _settled(carousel)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+	assert_bool(properties.visible).is_false()
+	assert_object(model.get_parent()).is_same(parent)
+	assert_object(parent.get_child(0)).is_same(model)
+	assert_float(carousel._row.stage).is_equal(0.0)
+	for item in properties.behind:
+		assert_bool(item.visible).is_true()
+		assert_float(item.modulate.a).is_equal(1.0)
+
+
+func test_a_repeated_target_and_new_tint_during_a_morph_finish_on_the_requested_box() -> void:
+	var zone: LabelZone = auto_free(LabelZone.new())
+	add_child(zone)
+	var target := Rect2(200.0, 180.0, 240.0, 80.0)
+	zone.place(Rect2(100.0, 100.0, 120.0, 120.0), LabelZone.Shape.DISC, Color.BLUE)
+	zone.place(target, LabelZone.Shape.RECTANGLE, Color.BLUE)
+	for frame in 3:
+		await await_idle_frame()
+	var partial := zone.get_rect()
+	zone.place(target, LabelZone.Shape.RECTANGLE, Color.RED)
+	zone.place(target, LabelZone.Shape.RECTANGLE, Color.RED)
+	assert_vector(zone.position).is_equal(partial.position)
+	assert_vector(zone.size).is_equal(partial.size)
+	assert_bool(zone._morph != null).is_true()
+	assert_bool(await Fixtures.until(self, func() -> bool: return zone._morph == null)).is_true()
+	assert_vector(zone.position).is_equal(target.grow(10.0).position)
+	assert_vector(zone.size).is_equal(target.grow(10.0).size)
+	assert_float(zone.corner_radius).is_equal_approx(20.48, 0.000001)
+	assert_that(zone.gel).is_equal(Color.RED)
+
+
+func test_clearing_a_timeline_driven_callout_resets_its_fade_target() -> void:
+	var callout: FocusCallout = auto_free(FocusCallout.new())
+	var caption := Label.new()
+	caption.name = "Caption"
+	callout.add_child(caption)
+	add_child(callout)
+	callout.point("Name", Vector2(10.0, 20.0), Vector2(40.0, 20.0))
+	callout.timeline = true
+	callout.modulate.a = 0.4
+	callout.clear()
+	assert_float(callout._fade_alpha).is_equal(0.0)
+	callout.timeline = false
+	callout.point("Name", Vector2(10.0, 20.0), Vector2(40.0, 20.0))
+	assert_bool(await Fixtures.until(self, func() -> bool: return is_equal_approx(callout.modulate.a, 1.0))).is_true()
+
+
+func test_an_absent_or_incomplete_selected_model_closes_properties_without_moving_nodes() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var properties := carousel._properties
+	var row := carousel._row
+	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	var model := place.shown.get_child(0)
+	var label: MeshInstance3D = model.get_node("Label")
+	var mesh := label.mesh
+	for missing: String in ["place", "model", "label", "mesh", "body"]:
+		row.set_process(false)
+		var extra := MeshInstance3D.new()
+		match missing:
+			"place": place.game = -1
+			"model": place.shown.remove_child(model)
+			"label": label.name = "MissingLabel"
+			"mesh": label.mesh = null
+			"body": model.add_child(extra)
+		carousel._open_properties()
+		assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+		assert_bool(properties.is_open()).is_false()
+		assert_bool(properties.visible).is_false()
+		assert_object(properties._medium).is_null()
+		assert_float(row.stage).is_equal(0.0)
+		match missing:
+			"place": place.game = row.selected_index()
+			"model":
+				place.shown.add_child(model)
+				place.shown.move_child(model, 0)
+			"label": label.name = "Label"
+			"mesh": label.mesh = mesh
+			"body": model.remove_child(extra)
+		extra.free()
+		assert_object(model.get_parent()).is_same(place.shown)
+		row.set_process(true)
+		await await_idle_frame()
+
+
+func test_resting_properties_only_reproject_when_the_medium_or_view_changes() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 1})
+	var carousel := Fixtures.carousel_for(self, device)
+	var properties: DiscProperties = carousel.get_node("%Properties")
+	# Replacing an unready script does not free Nodes created by its field initializers.
+	properties._reader.free()
+	properties._picture_reader.free()
+	properties._zone = properties.get_node("%Zone")
+	properties._zone._outline.free()
+	properties.set_script(_CountingProperties)
+	properties.get_node("%Zone").set_script(_CountingZone)
+	carousel.get_node("%Light").set_script(_CountingLight)
+	add_child(carousel)
+	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	var counted: _CountingProperties = carousel._properties
+	var zone: _CountingZone = counted._zone
+	var light: _CountingLight = counted.light
+	var projections := counted.projections
+	var places := zone.places
+	var pools := light.pools
+	for frame in 8:
+		await await_idle_frame()
+	assert_int(counted.projections).is_equal(projections)
+	assert_int(zone.places).is_equal(places)
+	assert_int(light.pools).is_equal(pools)
+	var camera := get_viewport().get_camera_3d()
+	camera.position.x += 0.01
+	counted._process(0.0)
+	assert_int(counted.projections).is_equal(projections + 2)
+	camera.fov += 1.0
+	counted._process(0.0)
+	assert_int(counted.projections).is_equal(projections + 4)
+	var pixels := get_window().size
+	get_window().size += Vector2i(64, 0)
+	counted._process(0.0)
+	assert_int(counted.projections).is_equal(projections + 6)
+	get_window().size = pixels
+	counted._process(0.0)
+	counted._travel_stand.origin.x += 0.01
+	counted._process(0.0)
+	assert_int(counted.projections).is_equal(projections + 10)
+	counted._process(0.0)
+	assert_int(counted.projections).is_equal(projections + 10)
+
+
+class _CountingProperties extends DiscProperties:
+	var projections := 0
+
+	func _project(vertices: PackedVector3Array, stand: Transform3D, camera: Camera3D) -> Rect2:
+		projections += 1
+		return super._project(vertices, stand, camera)
+
+
+class _CountingZone extends LabelZone:
+	var places := 0
+
+	func place(label: Rect2, kind: Shape, tint: Color) -> void:
+		places += 1
+		super.place(label, kind, tint)
+
+
+class _CountingLight extends OperatingLight:
+	var pools := 0
+
+	func shaped(box: Rect2, gel: Color, opacity: float) -> void:
+		pools += 1
+		super.shaped(box, gel, opacity)

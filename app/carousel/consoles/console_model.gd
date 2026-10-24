@@ -24,13 +24,14 @@ const PRESSED_SHOWS_MM := 0.3
 
 @export var shape: ModelShape
 
-## How bright the console's light is, from off (0): the glow of its scene's `%Light` mesh, on a
+## How bright the console's light is, from off (0): the glow of its `_lights()`, its scene's `%Light` mesh by default, on a
 ## console whose moving parts have a [enum MovingPart.Role] `LIGHT` one by this name.
 var light_energy := 0.0:
 	set(value):
 		# Given each frame by the launch animation: set on the light only when it changes.
 		if value != light_energy and is_node_ready():
-			set_shader_value(_light(), &"emission_energy", value)
+			for light in _lights():
+				set_shader_value(light, &"emission_energy", value)
 		light_energy = value
 
 var _fade: ModelFade
@@ -47,8 +48,8 @@ static func press_travel(raise: float, travel: float) -> float:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_READY:
 		_fade = ModelFade.new(self)
-		if has_node(^"%Light"):
-			set_shader_value(_light(), &"emission_energy", light_energy)
+		for light in _lights():
+			set_shader_value(light, &"emission_energy", light_energy)
 
 
 ## The parts that move, each a float property of this model, at its rest value on a new model.
@@ -98,13 +99,25 @@ func set_shader_value(geometry: MeshInstance3D, parameter: StringName, value: Va
 
 
 ## What steps are tuned on, hashed: the shape's dimensions and each moving part's property, role and
-## values at rest and fully moved. A console's `launch.json` carries the one its steps were tuned
-## on (`model_hash`).
+## values at rest and fully moved, and the bytes of the glb it is drawn from. A console's `launch.json`
+## carries the one its steps were tuned on (`model_hash`).
 func fingerprint() -> String:
 	var parts := moving_parts().map(func(part: MovingPart) -> Array:
 		return [part.property, part.role, part.rest, part.open])
-	return var_to_str([shape.dimensions(), parts]).sha256_text()
+	var tuned: Array = [shape.dimensions(), parts]
+	# A glb's own bytes too: another export of it is another model.
+	var glbs := find_children("*", "Node3D", true, false).filter(func(node: Node) -> bool:
+		return node.scene_file_path.get_extension() == "glb")
+	if not glbs.is_empty():
+		tuned.append(glbs.map(func(node: Node) -> String: return FileAccess.get_sha256(node.scene_file_path)))
+	return var_to_str(tuned).sha256_text()
 
 
-func _light() -> MeshInstance3D:
-	return get_node(^"%Light")
+## The meshes that glow when the light is on: the scene's `%Light` unless a model finds them elsewhere (in a
+## glb, whose nodes are not the scene's own); none on a console without one.
+func _lights() -> Array[MeshInstance3D]:
+	var found: Array[MeshInstance3D] = []
+	var light := get_node_or_null(^"%Light") as MeshInstance3D
+	if light:
+		found.append(light)
+	return found

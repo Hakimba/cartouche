@@ -22,10 +22,12 @@ import app.cartouche.core.library.IgnoredCount
 import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.ListedFile
+import app.cartouche.core.library.PlacementError
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.Scan
 import app.cartouche.core.library.StoredLibrary
 import app.cartouche.core.library.TitleIndex
+import app.cartouche.core.library.VariantError
 import app.cartouche.core.library.WalkFailure
 import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
@@ -53,6 +55,10 @@ internal sealed interface LibraryFailure {
 
     data class UnknownPlatform(val platform: PlatformId) : LibraryFailure
 
+    data class Placement(val error: PlacementError) : LibraryFailure
+
+    data class Variant(val error: VariantError) : LibraryFailure
+
     data class Storage(val failure: StorageFailure) : LibraryFailure
 
     data class TooManyEntries(val walk: WalkFailure.TooManyEntries) : LibraryFailure
@@ -64,6 +70,16 @@ internal sealed interface LibraryFailure {
                 is UnknownGame -> "No game ${id.value} in the library"
                 is NoDisc -> "${game.value} has no disc $disc"
                 is UnknownPlatform -> "No console ${platform.value} in the library"
+                is Placement ->
+                    when (error) {
+                        is PlacementError.NotInLibrary -> "No console ${error.platform.value} in the library to place"
+                        is PlacementError.GapOutOfRange -> "No gap ${error.gap} among ${error.consoles} other consoles"
+                    }
+                is Variant ->
+                    when (error) {
+                        is VariantError.Unknown -> "Unknown variant ${error.id} of ${error.platform.value}"
+                        is VariantError.NotInLibrary -> "No console ${error.platform.value} in the library"
+                    }
                 is Storage -> failure.message
                 is TooManyEntries -> {
                     fun name(folder: Option<FolderPath>) = folder.fold({ "the folder itself" }) { it.value }
@@ -159,8 +175,11 @@ internal class LibraryService(
     }
 
     /** Stores [setup] for [platform]; the access to a folder no platform uses any more is given up. */
-    fun setUp(platform: PlatformId, setup: PlatformSetup): Either<LibraryFailure, Library> =
-        save(library().withSetup(platform, setup)).onRight(::keepFoldersOf)
+    fun setUp(platform: PlatformId, setup: PlatformSetup, variant: Option<String> = None): Either<LibraryFailure, Library> = either {
+        val changed = library().withSetup(platform, setup)
+        val chosen = variant.fold({ changed }) { changed.withVariant(platform, it).mapLeft(LibraryFailure::Variant).bind() }
+        save(chosen).bind().also(::keepFoldersOf)
+    }
 
     /**
      * Removes [platform]: its choices, games and what its scans set aside, what the selection
@@ -322,16 +341,20 @@ internal class LibraryService(
         save(library().withDisplayName(id, name)).bind().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id)) }
     }
 
-    /** Shows [platform]'s console as [name] from now on, or under its own name, [own], again when none or when [name] is it; answers the name kept. */
-    fun renameConsole(platform: PlatformId, name: Option<DisplayName>, own: String): Either<LibraryFailure, Option<DisplayName>> = either {
-        ensure(platform in library().setups) { LibraryFailure.UnknownPlatform(platform) }
-        save(library().withConsoleName(platform, name, own)).bind().consoleNames.getOrNone(platform)
-    }
-
     /** Shows the consoles in [order] from now on (see [Library.withConsoleOrder]); every one must be in the library. */
     fun orderConsoles(order: List<PlatformId>): Either<LibraryFailure, Library> = either {
         order.forEach { ensure(it in library().setups) { LibraryFailure.UnknownPlatform(it) } }
         save(library().withConsoleOrder(order)).bind()
+    }
+
+    /** Puts [platform]'s console at [gap] among the others shown ([Library.withConsoleAt]), [platforms] being the catalog's, and keeps the order. */
+    fun placeConsole(platform: PlatformId, gap: Int, platforms: List<PlatformId>): Either<LibraryFailure, Library> = either {
+        save(library().withConsoleAt(platform, gap, platforms).mapLeft(LibraryFailure::Placement).bind()).bind()
+    }
+
+    /** Stores a console's model without changing its games, folder or other choices. */
+    fun setVariant(platform: PlatformId, variant: String): Either<LibraryFailure, Library> = either {
+        save(library().withVariant(platform, variant).mapLeft(LibraryFailure::Variant).bind()).bind()
     }
 
     private fun save(library: Library): Either<LibraryFailure, Library> = either {

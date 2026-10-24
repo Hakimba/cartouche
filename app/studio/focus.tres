@@ -1,0 +1,7 @@
+[gd_resource type="StyleBox" script_class="SatinStyle" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://studio/satin_style.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+look = 4

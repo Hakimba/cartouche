@@ -1,0 +1,77 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://screens/variant_chooser.gd" id="1"]
+[ext_resource type="Script" path="res://studio/cyclorama.gd" id="2"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="3"]
+[ext_resource type="Script" path="res://screens/button_hint.gd" id="4"]
+
+[node name="VariantChooser" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Backdrop" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("2")
+
+[node name="Title" type="Control" parent="."]
+offset_left = 64.0
+offset_top = 102.4
+offset_right = 464.0
+offset_bottom = 182.4
+mouse_filter = 2
+
+[node name="Count" type="Control" parent="."]
+offset_left = 66.56
+offset_top = 186.88
+offset_right = 266.56
+offset_bottom = 216.88
+mouse_filter = 2
+
+[node name="Choice" type="Button" parent="."]
+offset_left = 552.96
+offset_top = 125.44
+offset_right = 1210.88
+offset_bottom = 207.36
+focus_neighbor_left = NodePath(".")
+focus_neighbor_right = NodePath(".")
+focus_neighbor_top = NodePath(".")
+focus_neighbor_bottom = NodePath(".")
+flat = true
+
+[node name="Error" type="Label" parent="."]
+offset_left = 552.96
+offset_top = 260.0
+offset_right = 1210.88
+offset_bottom = 340.0
+theme_type_variation = &"ScreenText"
+autowrap_mode = 2
+
+[node name="Hints" parent="." instance=ExtResource("3")]
+
+[node name="Variant" type="Control" parent="Hints"]
+layout_mode = 2
+script = ExtResource("4")
+button = &"← →"
+text = "Variant"
+
+[node name="Choose" type="Control" parent="Hints"]
+layout_mode = 2
+script = ExtResource("4")
+button = &"a"
+text = "Choose"
+
+[node name="Back" type="Control" parent="Hints"]
+layout_mode = 2
+script = ExtResource("4")
+button = &"b"
+text = "Back"

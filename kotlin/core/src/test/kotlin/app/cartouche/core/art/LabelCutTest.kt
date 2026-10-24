@@ -2,6 +2,7 @@
 package app.cartouche.core.art
 
 import app.cartouche.core.Shipped
+import app.cartouche.core.files.Shell
 import app.cartouche.core.platforms.ArtKind
 import app.cartouche.core.platforms.Front
 import app.cartouche.core.platforms.LabelCrop
@@ -24,6 +25,7 @@ import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class LabelCutTest {
     private val fractions = Arb.choice(Arb.double(0.0..1.0, includeNonFiniteEdgeCases = false), Arb.element(0.0, 0.5, 1.0))
@@ -45,6 +47,65 @@ class LabelCutTest {
     fun `a GBA cartridge's label is cut from the middle of its front, below its top ridge`() {
         LabelCut(cartridge("gba_cart", 1.74, crop(0.15, 0.23, 0.72, 0.62)), mediumId("gba_cart")).on(1000, 574) shouldBe
             Some(PixelRect(150, 132, 720, 356))
+    }
+
+    @Test
+    fun `a Game Boy Color exclusive's label is cut lower than a compatible game's, from a scan of the same shape`() {
+        val exclusive = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.EXCLUSIVE)
+        exclusive.on(663, 755) shouldBe Some(PixelRect(82, 254, 499, 436))
+        LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.COMPATIBLE).on(663, 755) shouldBe Some(PixelRect(82, 215, 499, 436))
+        LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.UNKNOWN).on(663, 755) shouldBe Some(PixelRect(82, 215, 499, 436))
+    }
+
+    @Test
+    fun `an exclusive's rectangle differs from the compatible one's only by its top, 0_337 of the height, for any shape`() =
+        runBlocking<Unit> {
+            checkAll(Arb.int(200..4000), Arb.int(-5..10)) { height, step ->
+                val width = (height * 0.885 * (1 + step * 0.005)).roundToInt().coerceAtLeast(1)
+                // Steps of at most 5 %: always a scan of the front's shape.
+                val e = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.EXCLUSIVE).on(width, height).shouldBeSome()
+                val c = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.COMPATIBLE).on(width, height).shouldBeSome()
+                listOf(e.left, e.width) shouldBe listOf(c.left, c.width)
+                e.top shouldBe (0.337 * height).roundToInt().coerceIn(0, height - 1)
+                e.height shouldBe (0.577 * height).roundToInt().coerceIn(1, height - e.top)
+            }
+        }
+
+    @Test
+    fun `a game that is not a Game Boy Color exclusive is always cut by today's front, whatever the platform and the scan`() =
+        runBlocking<Unit> {
+            val platforms = Arb.element("gb", "gbc", "gba", "nes", "snes", "n64")
+            checkAll(
+                platforms,
+                Arb.element(Shell.COMPATIBLE, Shell.UNKNOWN),
+                Arb.int(1..2500),
+                Arb.int(1..2500),
+            ) { platform, shell, width, height ->
+                shipped(platform).fronts.keys.forEach { medium ->
+                    LabelCut(shipped(platform), medium, shell).on(width, height) shouldBe
+                        LabelCut(shipped(platform), medium).on(width, height)
+                }
+            }
+            // Only a front of the platform's own exclusives is ever different; the others' fronts are untouched by the flag.
+            var checked = 0
+            checkAll(platforms, Arb.int(1..2500), Arb.int(1..2500)) { platform, width, height ->
+                shipped(platform).fronts.keys.filter { it !in shipped(platform).exclusives.keys }.forEach { medium ->
+                    LabelCut(shipped(platform), medium, Shell.EXCLUSIVE).on(width, height) shouldBe
+                        LabelCut(shipped(platform), medium).on(width, height)
+                    checked++
+                }
+            }
+            checked shouldBeGreaterThan 100
+        }
+
+    @Test
+    fun `a shell moves a cut only where the profile gives exclusives of the front`() {
+        val gbc = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.EXCLUSIVE)
+        gbc.cutsAs(gbc.copy(shell = Shell.UNKNOWN)) shouldBe false
+        gbc.cutsAs(gbc.copy(shell = Shell.EXCLUSIVE)) shouldBe true
+        gbc.copy(shell = Shell.COMPATIBLE).cutsAs(gbc.copy(shell = Shell.UNKNOWN)) shouldBe true
+        val gb = LabelCut(shipped("gb"), mediumId("gb_cart"), Shell.EXCLUSIVE)
+        gb.cutsAs(gb.copy(shell = Shell.UNKNOWN)) shouldBe true
     }
 
     @Test

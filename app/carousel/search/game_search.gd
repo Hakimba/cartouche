@@ -71,7 +71,7 @@ var _hints_shown: Array[PackedStringArray] = []
 @onready var _big_text: Label = %BigText
 @onready var _filter: Control = %Filter
 @onready var _filter_text: Label = %FilterText
-@onready var _hints: HBoxContainer = %Hints
+@onready var _hints: HintRow = %Hints
 @onready var _ribbon_y := _ribbon.position.y
 @onready var _big_size := _big_text.get_theme_font_size(&"font_size")
 
@@ -482,7 +482,6 @@ func _show_hints() -> void:
 		if told[1].is_empty():
 			continue
 		var hint := ButtonHint.new()
-		hint.theme_type_variation = &"ButtonHint"
 		hint.button = StringName(told[0])
 		hint.text = told[1]
 		_hints.add_child(hint)
@@ -540,7 +539,7 @@ class RibbonKey extends PanelContainer:
 	func show_as(current: bool, lit: bool) -> void:
 		theme_type_variation = &"RibbonKeyOn" if current else &"RibbonKey"
 		_text.theme_type_variation = &"RibbonTextOn" if current else &"RibbonText"
-		_space.ink = Color.WHITE if current else ButtonMark.INK
+		_space.ink = Color.WHITE if current else StudioTokens.INK
 		_space.queue_redraw()
 		modulate.a = 1.0 if lit or current else _DIMMED
 
@@ -556,7 +555,7 @@ class RibbonKey extends PanelContainer:
 
 ## A space, drawn as a bracket open upwards: fonts rarely have the sign for it.
 class SpaceMark extends Control:
-	var ink := ButtonMark.INK
+	var ink := StudioTokens.INK
 
 	func _init() -> void:
 		mouse_filter = MOUSE_FILTER_IGNORE

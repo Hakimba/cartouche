@@ -1,0 +1,181 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+class_name StudioText
+extends RefCounted
+## One line of text in a Studio face at its fractional size and em tracking, laid out to the browser's width.
+## Godot's font sizes and glyph spacing are whole pixels, which drifts a string by up to 20 px; so the glyphs
+## are shaped once on an MSDF twin of the face (exact advances at any size, no raster at the shaping size),
+## placed at their exact x, and drawn from the raster face at the nearest whole size with no scale (a scale
+## near 1 blurs them). [member width] is the CSS box's width.
+
+## The shaping size: the twin's advances are exact at it.
+const _SHAPE_SIZE := 4096
+## The CSS line box: every Studio text is 1.5 times its size tall.
+const _LINE_HEIGHT := 1.5
+const _ELLIPSIS := "…"
+const _FILES: Array[String] = [
+	"res://fonts/plus-jakarta-sans/PlusJakartaSans-Medium.ttf",
+	"res://fonts/plus-jakarta-sans/PlusJakartaSans-Bold.ttf",
+	"res://fonts/plus-jakarta-sans/PlusJakartaSans-ExtraBold.ttf",
+	"res://fonts/ibm-plex-mono/IBMPlexMono-Medium.ttf",
+	"res://fonts/ibm-plex-mono/IBMPlexMono-SemiBold.ttf",
+]
+
+## Each face loaded once, by [enum StudioTokens.Face]: its raster font to draw and its MSDF twin to shape.
+static var _faces: Dictionary[StudioTokens.Face, Array] = {}
+
+var text: String
+## The width of the CSS box, the tracking after the last letter included; less once [method fit] cut it.
+var width := 0.0
+## The CSS line box's height.
+var height: float
+## The baseline from the line box's top, half the leading above the font's ascent, as the browser sets it.
+var baseline: float
+## The font's ascent at this size, as the browser sets a line's baseline from its box's top: rounded.
+var ascent: float
+
+var _px: float
+var _display: Font
+var _measure: Font
+var _line := _Run.new()
+var _ellipsis := _Run.new()
+## The glyphs drawn: all of them, or those before the ellipsis.
+var _shown := 0
+
+
+## One glyph to draw: from which face, where, which.
+class Placement:
+	extends RefCounted
+
+	var font: RID
+	var at: Vector2
+	var index: int
+
+	func _init(face: RID, place: Vector2, glyph: int) -> void:
+		font = face
+		at = place
+		index = glyph
+
+
+## Shaped glyphs and each one's x from the run's left; the last x is the run's width.
+class _Run:
+	extends RefCounted
+
+	var glyphs: Array[Dictionary] = []
+	var x := PackedFloat64Array([0.0])
+
+
+## [param shown] in [param face] at [param px], tracked by [param tracking_em], its figures tabular when
+## [param tabular].
+func _init(shown: String, face: StudioTokens.Face, px: float, tracking_em := 0.0, tabular := false) -> void:
+	text = shown
+	_px = px
+	var fonts := _face(face)
+	_display = fonts[0]
+	_measure = fonts[1]
+	var features := {"tnum": 1} if tabular else {}
+	# Chromium leaves optional ligatures out between letters spaced apart.
+	if tracking_em != 0.0:
+		features["liga"] = 0
+	height = px * _LINE_HEIGHT
+	# The raster face's metrics are the font's own, as the browser reads them; the twin's are padded.
+	var raw_ascent := _display.get_ascent(_SHAPE_SIZE) * px / _SHAPE_SIZE
+	ascent = roundf(raw_ascent)
+	baseline = (height - (raw_ascent + _display.get_descent(_SHAPE_SIZE) * px / _SHAPE_SIZE)) / 2.0 + raw_ascent
+	_line = _shape(shown, tracking_em, features)
+	_ellipsis = _shape(_ELLIPSIS, tracking_em, features)
+	fit(INF)
+
+
+## [param shown] in [param role] ([enum StudioTokens.Role]), its size times [param scale].
+static func of(role: StudioTokens.Role, shown: String, scale := 1.0) -> StudioText:
+	return StudioText.new(shown, StudioTokens.ROLE_FACE[role], StudioTokens.ROLE_PX[role] * scale,
+		StudioTokens.ROLE_TRACKING[role], StudioTokens.ROLE_TNUM[role])
+
+
+## Cuts the line to [param room] px with an ellipsis when it is wider; the whole line again when it fits.
+func fit(room: float) -> void:
+	_shown = _line.glyphs.size()
+	width = _line.x[_shown]
+	if width <= room:
+		return
+	var room_before := room - _ellipsis.x[-1]
+	# Cut only before a cluster's first glyph: a letter and its accent stay together.
+	while _shown > 0 and (_line.x[_shown] > room_before or _line.glyphs[mini(_shown, _line.glyphs.size() - 1)].count == 0):
+		_shown -= 1
+	width = _line.x[_shown] + _ellipsis.x[-1]
+
+
+## Draws the line in [param canvas] with its box's top left at [param at], in [param outline_color] a
+## [param outline_size] px round each glyph first.
+func draw(canvas: CanvasItem, at: Vector2, color: Color, outline_size := 0, outline_color := Color.WHITE) -> void:
+	var ts := TextServerManager.get_primary_interface()
+	var item := canvas.get_canvas_item()
+	var whole := roundi(_px)
+	var oversampling := canvas.get_viewport().get_oversampling()
+	var drawn := placements(at)
+	if outline_size > 0:
+		for placed in drawn:
+			ts.font_draw_glyph_outline(placed.font, item, whole, outline_size, placed.at, placed.index, outline_color, oversampling)
+	for placed in drawn:
+		ts.font_draw_glyph(placed.font, item, whole, placed.at, placed.index, color, oversampling)
+
+
+## Each glyph drawn with the box's top left at [param at], the ellipsis's after the glyphs shown: its face (the
+## raster one, or the fallback face that shaped it), its place (its exact x, on a baseline on a whole pixel) and
+## its index.
+func placements(at: Vector2) -> Array[Placement]:
+	var placed: Array[Placement] = []
+	var on_line := roundf(at.y + baseline)
+	var display := _display.get_rids()[0]
+	var measure := _measure.get_rids()[0]
+	var runs: Array[Array] = [[_line, _shown, 0.0]]
+	if _shown < _line.glyphs.size():
+		runs.append([_ellipsis, _ellipsis.glyphs.size(), _line.x[_shown]])
+	for shown: Array in runs:
+		var run: _Run = shown[0]
+		var count: int = shown[1]
+		var start: float = shown[2]
+		for i in count:
+			var glyph := run.glyphs[i]
+			var face: RID = display if glyph.font_rid == measure else glyph.font_rid
+			var index: int = glyph.index
+			placed.append(Placement.new(face, Vector2(at.x + start + run.x[i], on_line), index))
+	return placed
+
+
+func _shape(shown: String, tracking_em: float, features: Dictionary) -> _Run:
+	var ts := TextServerManager.get_primary_interface()
+	var shaped := ts.create_shaped_text()
+	ts.shaped_text_add_string(shaped, shown, _measure.get_rids(), _SHAPE_SIZE, features)
+	var k := _px / _SHAPE_SIZE
+	var run := _Run.new()
+	run.glyphs = ts.shaped_text_get_glyphs(shaped)
+	ts.free_rid(shaped)
+	run.x.resize(run.glyphs.size() + 1)
+	var x := 0.0
+	for i in run.glyphs.size():
+		var glyph := run.glyphs[i]
+		run.x[i] = x + glyph.offset.x * k
+		x += glyph.advance * k
+		if glyph.count > 0:
+			x += tracking_em * _px * (glyph.end - glyph.start)
+	run.x[run.glyphs.size()] = x
+	return run
+
+
+## The raster font and its MSDF twin of [param face], loaded the first time.
+static func _face(face: StudioTokens.Face) -> Array:
+	if face not in _faces:
+		var display: FontFile = load(_FILES[face])
+		var measure: FontFile = display.duplicate()
+		measure.multichannel_signed_distance_field = true
+		# A tiny MSDF raster: only the advances are read from it, and its first use is six times faster.
+		measure.msdf_size = 8
+		measure.msdf_pixel_range = 2
+		# A letter the face lacks comes from the system's fonts, as MSDF too, and is drawn from that font.
+		measure.allow_system_fallback = false
+		var fallback := SystemFont.new()
+		fallback.multichannel_signed_distance_field = true
+		measure.fallbacks = [fallback]
+		_faces[face] = [display, measure]
+	return _faces[face]

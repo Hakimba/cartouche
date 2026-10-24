@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://screens/confirm_removal.gd" id="1"]
 [ext_resource type="Script" path="res://screens/glyph_button.gd" id="2"]
+[ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
 
 [node name="ConfirmRemoval" type="Control"]
 layout_mode = 3
@@ -48,6 +49,7 @@ theme_type_variation = &"PanelTitle"
 theme_override_font_sizes/font_size = 38
 horizontal_alignment = 1
 autowrap_mode = 3
+script = ExtResource("studio_label")
 
 [node name="Text" type="Label" parent="Panel/Items"]
 unique_name_in_owner = true

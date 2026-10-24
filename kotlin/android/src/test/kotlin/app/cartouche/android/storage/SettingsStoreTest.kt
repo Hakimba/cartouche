@@ -19,7 +19,7 @@ class SettingsStoreTest {
 
     @Test
     fun `saved settings load back, and no file means none set`() {
-        val settings = Settings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.OFF)
+        val settings = Settings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.OFF, gamesFloat = true)
         SettingsStore(file).load().shouldBeRight(Settings())
         SettingsStore(file).save(settings).shouldBeRight()
         SettingsStore(file).load().shouldBeRight(settings)

@@ -3,7 +3,7 @@ class_name FrameShots
 extends Node
 ## Saves pictures of the carousel at set frames, to check that a change keeps every pixel: started
 ## with `--shots=DIR` (debug builds) and Godot's `--fixed-fps 60`, each frame lasts exactly 1/60 s,
-## so whatever moves with time (the backdrop's dots, the sway) is at the same place in the same
+## so whatever moves with time (the float, the sway) is at the same place in the same
 ## frame of every run. Presses are sent at set frames too: the consoles screen, a step to the next
 ## console and back, the ring, a console's properties, the console turned by the stick, going into
 ## it, the games screen, a game turned, a game's properties, the settings, many of them half-way

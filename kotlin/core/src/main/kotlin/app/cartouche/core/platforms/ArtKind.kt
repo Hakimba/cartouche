@@ -26,11 +26,13 @@ public sealed interface ArtKind {
 
     /**
      * A cartridge's front: the [fronts] of the platform's cartridges, by medium, in the profile's
-     * order (`app.cartouche.core.art.LabelCut` reads a scan as the one of its shape).
+     * order (`app.cartouche.core.art.LabelCut` reads a scan as the one of its shape); the
+     * [exclusives] replace the fronts of the same medium for a game that runs on a Game Boy Color only.
      */
     @Serializable
     @SerialName("cartridge_front")
-    public data class CartridgeFront(public val fronts: Map<MediumId, Front>) : ArtKind
+    public data class CartridgeFront(public val fronts: Map<MediumId, Front>, public val exclusives: Map<MediumId, Front> = emptyMap()) :
+        ArtKind
 }
 
 /**

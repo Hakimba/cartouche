@@ -6,7 +6,7 @@ extends Node
 ## changes, its loop running at the rate of `application/run/low_processor_mode_sleep_usec`, rather
 ## than capping the engine's frame rate, which kept frames slow for a while after waking. After
 ## [constant STILL_AFTER_S], the motions that go on by themselves (the nodes of the group
-## [constant PACED]: the backdrop's dots, the games' and consoles' float and sway, the welcome's worm)
+## [constant PACED]: the games' and consoles' float and sway, the welcome's worm)
 ## slow to a stop in [constant STOPPING_S], and from then on the screen is drawn only when something
 ## on it changes (the clock, the battery). The first press, touch or return to the app wakes
 ## everything at once, and acts as it always does. Animations no press started (a message) play
@@ -21,10 +21,12 @@ const STOPPING_S := 1.2
 const _STICK_DEAD := 0.3
 
 ## Whether something goes on that must not be slowed (labels downloading, a launch, the way into or
-## out of a console, a console's discovery): no rest meanwhile.
+## out of a console, the order ring moving or placing, a console arriving): no rest meanwhile.
 var moving := func() -> bool: return false
 ## Debug runs measuring motion keep the app awake.
 var stays_awake := false
+## Optional visible motion keeps full frame pacing until it has stopped, without postponing rest.
+var smooth_motion := func() -> bool: return false
 ## The pace of what moves by itself, given to the group [constant PACED]; at 0, only what changes
 ## is drawn.
 var pace := 1.0:
@@ -56,7 +58,7 @@ func _process(delta: float) -> void:
 		wake()
 		return
 	_idle_s += delta
-	if _idle_s >= SLOW_AFTER_S and not OS.low_processor_usage_mode:
+	if _idle_s >= SLOW_AFTER_S and not smooth_motion.call() and not OS.low_processor_usage_mode:
 		OS.low_processor_usage_mode = true
 		Diagnostics.trace("rest", "drawn when something changes")
 	var paced := clampf(1.0 - (_idle_s - STILL_AFTER_S) / STOPPING_S, 0.0, 1.0)

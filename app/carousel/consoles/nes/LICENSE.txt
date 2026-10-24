@@ -1,0 +1,11 @@
+Model Information:
+* title:	NES Console and Controller
+* source:	https://sketchfab.com/3d-models/nes-console-and-controller-ffd427134d5e44b4850628030aa66236
+* author:	Daz (https://sketchfab.com/Darren.Hogan)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "NES Console and Controller" (https://sketchfab.com/3d-models/nes-console-and-controller-ffd427134d5e44b4850628030aa66236) by Daz (https://sketchfab.com/Darren.Hogan) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

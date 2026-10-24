@@ -279,7 +279,7 @@ func _stray_touch(at: Vector2, canceled: bool) -> void:
 	await Fixtures.finger(self, at, false, 0 if canceled else 1, canceled)
 
 
-func test_the_system_s_back_is_B_on_the_games_the_ring_the_properties_and_the_keyboard() -> void:
+func test_the_system_s_back_is_B_on_the_games_the_ring_and_both_properties_screens() -> void:
 	var carousel: Carousel = (await _on_games())[0]
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
 	await _settled(carousel)
@@ -305,10 +305,8 @@ func test_the_system_s_back_is_B_on_the_games_the_ring_the_properties_and_the_ke
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
 	await _settled(carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-	await Fixtures.touch(self, [carousel._console_properties._name.get_global_rect().get_center()])
+	await Fixtures.touch(self, [carousel._console_properties._logo.get_global_rect().get_center()])
 	await _settled(carousel)
-	assert_int(carousel._console_properties._step).is_equal(ConsoleProperties.Step.NAMING)
-	await _back(carousel)
 	assert_int(carousel._console_properties._step).is_equal(ConsoleProperties.Step.PROPERTIES)
 	await _back(carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)

@@ -6,11 +6,11 @@ extends Control
 ## outline (the horizontal one into its top and bottom edges, the vertical one into its round ends),
 ## the white widening with them, then the text comes in. Closed, the other way round.
 
-const _BALL := 64.0
+const _BALL := StudioTokens.PLUS.size.x
 const _BUTTON := Vector2(330.0, 46.0)
-## Half the length of each stroke of the "+".
-const _ARM := 14.0
-const _STROKE := 3.5
+## Half the length of each stroke of the "+", its round ends left out.
+const _ARM := (StudioTokens.PLUS_BAR.x - StudioTokens.PLUS_BAR.y) / 2.0
+const _STROKE := StudioTokens.PLUS_BAR.y
 const _MORPH_S := 0.34
 const _TEXT_SIZE := 20
 ## How far into the morph the text starts to show.
@@ -25,16 +25,11 @@ var _opened := 0.0:
 		_opened = value
 		queue_redraw()
 var _tween: Tween
-var _box := StyleBoxFlat.new()
+var _ball := SatinPanel.Backing.new(self, StudioTokens.Look.PLUS)
 
 
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
-	_box.bg_color = Color(1, 1, 1, 0.94)
-	_box.shadow_color = Color(0, 0, 0, 0.14)
-	_box.shadow_size = 6
-	_box.shadow_offset = Vector2(0, 2)
-	_box.anti_aliasing = true
 
 
 ## Turns the ball into the button.
@@ -71,21 +66,18 @@ func _draw() -> void:
 	var button := Vector2(_BALL, _BALL).lerp(_BUTTON, p)
 	var radius := button.y / 2.0
 	var straight := (button.x - button.y) / 2.0
-	# The white: the ball growing flatter, then pushed wider by the strokes' ends as they spread.
-	var white := Vector2(maxf(lerpf(_BALL, button.y, t), button.x * t), button.y)
-	_box.set_corner_radius_all(roundi(radius))
-	draw_style_box(_box, Rect2(centre - white / 2.0, white))
-	var ink := ButtonMark.INK
+	_ball.place(white_box(), radius)
+	var ink := StudioTokens.INK
 	for side: float in [-1.0, 1.0]:
 		# The horizontal stroke parts into the top and bottom edges, as long as the straight sides.
 		var half := lerpf(_ARM, straight, t)
 		var y := side * radius * t
-		draw_line(centre + Vector2(-half, y), centre + Vector2(half, y), ink, _STROKE, true)
+		_stroke(centre + Vector2(-half, y), centre + Vector2(half, y), t == 0.0)
 		# The vertical stroke parts into the two ends, bending from a line into a half circle.
 		var middle := centre + Vector2(side * (straight + radius) * t, 0.0)
 		var sweep := PI * t
 		if sweep < 0.02:
-			draw_line(middle - Vector2(0, _ARM), middle + Vector2(0, _ARM), ink, _STROKE, true)
+			_stroke(middle - Vector2(0, _ARM), middle + Vector2(0, _ARM))
 			continue
 		var bend := lerpf(2.0 * _ARM, PI * radius, t) / sweep
 		var facing := 0.0 if side > 0.0 else PI
@@ -98,3 +90,24 @@ func _draw() -> void:
 		var baseline := centre.y + (font.get_ascent(_TEXT_SIZE) - font.get_descent(_TEXT_SIZE)) / 2.0
 		var shown := Color(ink, clampf((p - _TEXT_FROM) / (1.0 - _TEXT_FROM), 0.0, 1.0))
 		draw_string(font, Vector2(centre.x - width / 2.0, baseline), text, HORIZONTAL_ALIGNMENT_LEFT, -1, _TEXT_SIZE, shown)
+
+
+## Where the white is drawn in the control: the ball growing flatter, then pushed wider by the strokes' ends as
+## they spread.
+func white_box() -> Rect2:
+	var button := Vector2(_BALL, _BALL).lerp(_BUTTON, _opened)
+	var white := Vector2(maxf(lerpf(_BALL, button.y, minf(_opened, 1.0)), button.x * minf(_opened, 1.0)), button.y)
+	return Rect2(size / 2.0 - white / 2.0, white)
+
+
+## A stroke of the "+" from [param from] to [param to] (along an axis): a bar of ink with rounded ends, its edge
+## covered as a browser covers it. A [param boxed] stroke is the closed ball's flat bar, a box the browser paints on
+## whole pixels; the other bar is turned, so not.
+func _stroke(from: Vector2, to: Vector2, boxed := false) -> void:
+	var bar := SatinStyle.Mesh2D.new()
+	var box := Rect2(from.min(to), (to - from).abs()).grow(_STROKE / 2.0)
+	if boxed:
+		box = Rect2(box.position.round(), box.end.round() - box.position.round())
+	SatinStyle.fill_rounded(bar, box, StudioTokens.PLUS_BAR_RADIUS, func(_at: Vector2) -> Color: return StudioTokens.INK,
+		0.0 if boxed else 1.0)
+	RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), bar.indices, bar.points, bar.colors)

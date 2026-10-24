@@ -10,7 +10,7 @@ const Fixtures := preload("res://test/carousel/fixtures.gd")
 const ScreenFixtures := preload("res://test/screens/fixtures.gd")
 const APPEARANCE := "res://data/carousel/appearance.json"
 const PROFILES := "res://data/platforms/profiles.json"
-const MM := MeshBuilder.UNITS_PER_MM
+const MM := Fixtures.MM
 ## Dimensions drawn per console, and of them, consoles built whole and moved: the first ones, and as
 ## many again of those drawn far from the shipped ones.
 const SHAPES := 100
@@ -39,16 +39,45 @@ const LOGO := preload("res://test/carousel/consoles/logo_test.svg")
 const LOGO_CLEAR_MM := 20.0
 const LOGO_ON_MM := 1.0
 const EPSILON := 0.0001
+## The least area, in square millimetres, of a face that is one.
+const MIN_AREA_MM2 := 1.0e-6
 ## The parts of each console a seated medium lies in, drawn solid: its way in is open through the
 ## others.
 const HOUSINGS: Dictionary[String, Array] = {
 	"nes": [&"Upper", &"Lower", &"Throat"], "wii": [&"Front", &"Body", &"Light"],
+	"gbc": [&"body"], "snes": [&"body"], "gba_sp": [&"body"], "ps2_fat": [&"body", &"tray"],
 }
+## How far from the rim of a wall a swept part may cross it and still only graze it, in millimetres: a flap
+## hangs in its slot to a tenth of a millimetre by design, its edge level with the slot's rim.
+const CONTACT_MM := 0.2
+## The open edges of each glb's body as shipped: the shells have openings (undersides, hidden faces), welded by
+## position. The closed-mesh promise does not hold for them; these hold.
+const OPEN_EDGES: Dictionary[String, int] = {"nes": 80, "gbc": 2475, "snes": 2210, "ps2_fat": 998, "gba_sp": 1359}
+## The two bench models' rest poses: the SP's screen stands open and the PS2 tray's bezel stands proud.
+## These exact boxes preserve their supplied geometry without changing the other consoles' rest envelopes.
+const BENCH_RESTS: Dictionary[String, AABB] = {
+	"gba_sp: lid": AABB(Vector3(-0.4199632, 0.07824055, -0.5978231), Vector3(0.8399357, 0.8035966, 0.2716731)),
+	"ps2_fat: tray": AABB(Vector3(-0.0571249, 0.5008283, -0.8095596), Vector3(1.2912878, 0.1669884, 1.7316538)),
+}
+## At least this share of a glb mesh's triangles face the way the vertex normals say.
+const WINDING_AGREES := 0.98
+## The edges of more than two faces of a glb's meshes, by `console: mesh`: none, but ten on the Super Nintendo's
+## body where its shell was cut.
+const FOLDED_EDGES: Dictionary[String, int] = {"snes: body": 10}
+## How a segment meets a wall: not at all, grazing its rim, or through it.
+enum Meeting { CLEAR, GRAZED, CROSSED }
+## How many crossings of a wall each glb console's sweeps excuse as grazes, by platform, playing the placeholder
+## and playing its own launch steps alike: the Super Nintendo's flaps, level with the slot's rim. A new one fails.
+const GRAZES: Dictionary[String, int] = {"snes": 35}
 ## The side of the grid's squares a medium's way in is checked by, in millimetres.
 const _CELL_MM := 4.0
 ## Each console's moving parts and what each does: a part dropped, added or given another role is
 ## a choice made here too.
 const ROLES: Dictionary[String, Dictionary] = {
+	"ps2_fat": {&"tray_mm": MovingPart.Role.OPENING, &"eject_mm": MovingPart.Role.PRESS,
+		&"power_mm": MovingPart.Role.POWER_PRESS, &"light_energy": MovingPart.Role.LIGHT},
+	"gba_sp": {&"lid_degrees": MovingPart.Role.POSE, &"power_mm": MovingPart.Role.POWER,
+		&"light_energy": MovingPart.Role.LIGHT},
 	"gb": {&"power_mm": MovingPart.Role.POWER, &"light_energy": MovingPart.Role.LIGHT},
 	"gba": {&"power_mm": MovingPart.Role.POWER, &"light_energy": MovingPart.Role.LIGHT,
 		&"shoulders_degrees": MovingPart.Role.POSE},
@@ -59,7 +88,7 @@ const ROLES: Dictionary[String, Dictionary] = {
 		&"reset_mm": MovingPart.Role.POSE, &"light_energy": MovingPart.Role.LIGHT},
 	"nes": {&"door_degrees": MovingPart.Role.OPENING, &"tray_degrees": MovingPart.Role.OPENING,
 		&"power_mm": MovingPart.Role.POWER, &"reset_mm": MovingPart.Role.POSE, &"light_energy": MovingPart.Role.LIGHT},
-	"ps2": {&"lid_degrees": MovingPart.Role.OPENING},
+	"ps2_slim": {&"lid_degrees": MovingPart.Role.OPENING},
 	"psx": {&"lid_degrees": MovingPart.Role.OPENING, &"open_mm": MovingPart.Role.PRESS,
 		&"power_mm": MovingPart.Role.POWER, &"light_energy": MovingPart.Role.LIGHT},
 	"snes": {&"flaps_degrees": MovingPart.Role.FLAP, &"eject_degrees": MovingPart.Role.POSE,
@@ -80,6 +109,9 @@ const PLACED: Dictionary[MovingPart.Role, Array] = {
 	MovingPart.Role.SPIN: [false, false, false, true], MovingPart.Role.POWER_PRESS: [false, false, false, false],
 }
 
+
+## The crossings of a wall the last sweeps excused as grazes.
+var _grazes := 0
 
 func test_INV_E10_01_every_console_folder_holds_a_manifest_the_app_can_show() -> void:
 	var folders := Array(ResourceLoader.list_directory(ConsoleManifest.FOLDERS)).filter(
@@ -116,7 +148,7 @@ func test_INV_E10_01_every_console_folder_holds_a_manifest_the_app_can_show() ->
 
 func test_every_console_moves_its_own_parts_each_in_its_role() -> void:
 	var manifests := ConsoleManifest.found()
-	assert_array(manifests.map(func(manifest: ConsoleManifest) -> String: return manifest.platform)) \
+	assert_array(manifests.map(func(manifest: ConsoleManifest) -> String: return ConsoleManifest.folder_of(manifest))) \
 		.contains_exactly_in_any_order(ROLES.keys())
 	for manifest in manifests:
 		var scene: PackedScene = load(manifest.scene)
@@ -125,7 +157,7 @@ func test_every_console_moves_its_own_parts_each_in_its_role() -> void:
 		for part in console.moving_parts():
 			roles[part.property] = part.role
 		assert_dict(roles).override_failure_message("%s: %s" % [manifest.platform, roles]) \
-			.is_equal(ROLES[manifest.platform])
+			.is_equal(ROLES[ConsoleManifest.folder_of(manifest)])
 
 
 func test_INV_E10_01_steps_moving_a_part_the_console_lacks_are_refused() -> void:
@@ -195,8 +227,8 @@ func test_the_contract_depends_on_the_shape_and_the_moving_parts_alone() -> void
 		var scene: PackedScene = load(manifest.scene)
 		var fresh: ConsoleModel = auto_free(scene.instantiate())
 		var in_tree: ConsoleModel = auto_free(scene.instantiate())
-		fresh.name = manifest.platform
-		in_tree.name = manifest.platform
+		fresh.name = ConsoleManifest.folder_of(manifest)
+		in_tree.name = fresh.name
 		add_child(in_tree)
 		var medium := _default_medium_box(appearance, manifest.platform)
 		_assert_same_animation(LaunchAnimation.placeholder(fresh, medium), LaunchAnimation.placeholder(in_tree, medium))
@@ -214,6 +246,16 @@ func test_INV_E10_02_a_console_built_from_any_dimensions_its_rules_accept_is_clo
 		var folder := manifest.scene.get_base_dir()
 		var shipped: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
 		var medium := _default_medium_box(appearance, manifest.platform)
+		if _is_glb(shipped):
+			# Its meshes are the glb's, not built from dimensions: the model as shipped is what holds.
+			add_child(shipped)
+			_assert_moving_parts_fit(shipped, medium)
+			_grazes = 0
+			_assert_nothing_passed_through(shipped, LaunchAnimation.placeholder(shipped, medium))
+			_assert_grazes(manifest.platform)
+			_assert_pressed_parts_show(shipped)
+			_assert_logos(shipped, folder)
+			continue
 		var refused := 0
 		var drawn := 0
 		# Built whole and moved: the first shapes accepted, and those drawn far from the shipped one.
@@ -268,7 +310,7 @@ func test_INV_E10_07_every_medium_a_console_s_platform_declares_comes_down_its_w
 		var model: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
 		add_child(model)
 		var media := Fixtures.platform(manifest.platform).media
-		var housings: Array = HOUSINGS.get(manifest.platform, [])
+		var housings: Array = HOUSINGS.get(ConsoleManifest.folder_of(manifest), [])
 		for medium in Fixtures.media(manifest.platform):
 			var shown: Node3D = auto_free(appearance.model_of(medium, media).instantiate())
 			var box := appearance.medium_box(medium, media)
@@ -469,14 +511,180 @@ func test_every_console_is_drawn_within_its_triangle_budget() -> void:
 			.is_between(1, manifest.triangle_budget)
 
 
+func test_a_crossing_is_a_graze_only_within_the_contact_of_a_rim_never_at_a_seam_but_a_sliver_is_excused_whole() -> void:
+	# Two triangles making a quad, their seam its diagonal; its rim the four sides.
+	var quad := PackedVector3Array([Vector3(0, 0, 0), Vector3(10, 0, 0), Vector3(10, 10, 0), Vector3(0, 0, 0),
+		Vector3(10, 10, 0), Vector3(0, 10, 0)])
+	var rims := _rims(quad)
+	assert_int(rims.size()).is_equal(8)
+	var down := func(at: Vector3, depth: float) -> Meeting:
+		return _crossing(at + Vector3(0, 0, 0.5), at - Vector3(0, 0, depth), quad, rims)
+	# By a rim, within the contact, however deep; a millimetre in from it, or by the seam, a crossing.
+	assert_int(down.call(Vector3(0.1, 4.0, 0.0), 1.0)).is_equal(Meeting.GRAZED)
+	assert_int(down.call(Vector3(1.0, 4.0, 0.0), 0.1)).is_equal(Meeting.CROSSED)
+	assert_int(down.call(Vector3(4.05, 4.0, 0.0), 1.0)).is_equal(Meeting.CROSSED)
+	assert_int(down.call(Vector3(5.0, 4.0, 0.0), 0.1)).is_equal(Meeting.CROSSED)
+	assert_int(_crossing(Vector3(0.1, 4.0, 0.5), Vector3(0.1, 4.0, -1.0), quad)).is_equal(Meeting.CROSSED)
+	assert_int(_crossing(Vector3(1.0, 4.0, 0.5), Vector3(1.0, 4.0, 0.3), quad, rims)).is_equal(Meeting.CLEAR)
+	# A wall narrower than twice the contact is all rim: a crossing anywhere in it is a graze, which is why the
+	# sweeps count theirs.
+	var sliver := PackedVector3Array([Vector3(0, 0, 0), Vector3(10, 0, 0), Vector3(10, 0.3, 0), Vector3(0, 0, 0),
+		Vector3(10, 0.3, 0), Vector3(0, 0.3, 0)])
+	assert_int(_crossing(Vector3(5, 0.15, 0.5), Vector3(5, 0.15, -2.0), sliver, _rims(sliver))).is_equal(Meeting.GRAZED)
+
+
+func test_every_glb_holds_beside_it_its_licence_and_source_and_its_credit_line_is_in_the_readme() -> void:
+	var readme := FileAccess.get_file_as_string(ProjectSettings.globalize_path("res://").path_join("../README.md"))
+	var glbs := _glbs("res://carousel")
+	for glb in glbs:
+		var licence := FileAccess.get_file_as_string(glb.get_base_dir().path_join("LICENSE.txt"))
+		var lines := Array(licence.split("\n")).map(func(line: String) -> String: return line.strip_edges())
+		var credit := lines.filter(func(line: String) -> bool: return line.begins_with("This work is based on"))
+		var source := lines.filter(func(line: String) -> bool: return line.begins_with("* source:"))
+		assert_array(credit).override_failure_message("%s: no credit line in its LICENSE.txt" % glb).has_size(1)
+		assert_array(source).override_failure_message("%s: no source in its LICENSE.txt" % glb).has_size(1)
+		if credit.size() != 1 or source.size() != 1:
+			continue
+		var line: String = source[0]
+		var url := line.trim_prefix("* source:").strip_edges()
+		for kept: String in [licence, credit[0], readme]:
+			assert_bool(kept.contains(url) and kept.contains("CC-BY-4.0")).override_failure_message(
+				"%s: its source or its licence (CC-BY-4.0) is missing from %s" % [glb, kept.left(60)]).is_true()
+		assert_bool(credit[0] in readme).override_failure_message("%s: its credit line is not in the README" % glb) \
+			.is_true()
+	assert_int(glbs.size()).is_greater(2)
+
+
+func test_a_glb_console_s_fingerprint_covers_the_bytes_of_its_glb() -> void:
+	var checked := 0
+	for manifest in ConsoleManifest.found():
+		var model: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
+		if not _is_glb(model):
+			continue
+		var glb := manifest.scene.get_base_dir().path_join("%s.glb" % manifest.scene.get_base_dir().get_file())
+		var parts := model.moving_parts().map(func(part: MovingPart) -> Array:
+			return [part.property, part.role, part.rest, part.open])
+		assert_str(model.fingerprint()).is_equal(
+			var_to_str([model.shape.dimensions(), parts, [FileAccess.get_sha256(glb)]]).sha256_text())
+		checked += 1
+	assert_int(checked).is_equal(5)
+
+
+func test_a_glb_console_s_own_launch_steps_open_its_openings_fully_by_the_seat_and_sweep_clear_on_their_values() -> void:
+	var played := 0
+	for manifest in ConsoleManifest.found():
+		var model := Fixtures.shown_console(self, manifest.scene)
+		if not _is_glb(model):
+			continue
+		_grazes = 0
+		var animation := LaunchAnimation.read(manifest.launch, model)
+		var seated := LaunchAnimation.moment(animation, &"seated", -1.0)
+		assert_float(seated).override_failure_message("%s: nothing seated" % manifest.platform).is_greater(0.0)
+		for part in model.moving_parts():
+			var track := animation.find_track(NodePath("Consoles/%s:%s" % [model.name, part.property]),
+				Animation.TYPE_VALUE)
+			var values := range(animation.track_get_key_count(track)).map(func(key: int) -> float:
+				return animation.track_get_key_value(track, key))
+			if part.role in [MovingPart.Role.OPENING, MovingPart.Role.FLAP]:
+				assert_float(animation.value_track_interpolate(track, seated)).override_failure_message(
+					"%s: %s not fully open by the seat" % [manifest.platform, part.property]) \
+					.is_equal_approx(part.open, EPSILON)
+			for other in model.moving_parts():
+				model.set(other.property, other.rest)
+			var low: float = values.min()
+			var high: float = values.max()
+			_assert_swept_clear(model, part, Vector2(low, high))
+		for part in model.moving_parts():
+			model.set(part.property, part.rest)
+		_assert_grazes(manifest.platform)
+		played += 1
+	assert_int(played).is_equal(5)
+
+
+func test_a_glb_console_fades_through_copies_and_never_touches_the_glb_s_own_materials() -> void:
+	var faded := 0
+	for manifest in ConsoleManifest.found():
+		var model := Fixtures.shown_console(self, manifest.scene)
+		if not _is_glb(model):
+			continue
+		var surfaces: Array[Array] = []
+		for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			for surface in geometry.mesh.get_surface_count():
+				surfaces.append([geometry, surface, geometry.get_active_material(surface)])
+		model.fade(0.5)
+		for each in surfaces:
+			var geometry: MeshInstance3D = each[0]
+			var own: Material = each[2]
+			var surface: int = each[1]
+			var drawn := geometry.get_active_material(surface)
+			if own is BaseMaterial3D:
+				var standard := drawn as BaseMaterial3D
+				assert_float(standard.albedo_color.a).override_failure_message(
+					"%s: %s does not fade" % [manifest.platform, geometry.name]).is_less(1.0)
+				assert_int(standard.transparency).is_not_equal(BaseMaterial3D.TRANSPARENCY_DISABLED)
+				assert_object(drawn).is_not_same(own)
+				faded += 1
+			else:
+				assert_float(geometry.get_instance_shader_parameter(&"fade")).is_equal_approx(0.5, EPSILON)
+			# The glb's own material, shared by every surface that has it, is never touched.
+			assert_float((own as BaseMaterial3D).albedo_color.a if own is BaseMaterial3D else 1.0).is_equal(1.0)
+		model.fade(0.0)
+		for each in surfaces:
+			var geometry: MeshInstance3D = each[0]
+			var surface: int = each[1]
+			assert_object(geometry.get_active_material(surface)).is_same(each[2])
+	assert_int(faded).is_greater(10)
+
+
+func test_INV_E12_M1_01_a_glb_console_s_meshes_never_fold_nor_degenerate_and_their_winding_agrees_with_their_normals() -> void:
+	var checked := 0
+	for manifest in ConsoleManifest.found():
+		var model: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
+		if not _is_glb(model):
+			continue
+		for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+			var arrays := geometry.mesh.surface_get_arrays(0)
+			var meshes: Array[Array] = [arrays]
+			var label := "%s: %s" % [ConsoleManifest.folder_of(manifest), geometry.name]
+			var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+			var corners: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+			var agreeing := 0
+			for point in points:
+				assert_bool(is_finite(point.x) and is_finite(point.y) and is_finite(point.z)).override_failure_message(
+					"%s: a point is not a number" % label).is_true()
+			for t in range(0, corners.size(), 3):
+				var facing := Fixtures.face_normal(points[corners[t]], points[corners[t + 1]], points[corners[t + 2]])
+				assert_float(facing.length() / (MM * MM)).override_failure_message("%s: a degenerate face" % label) \
+					.is_greater(MIN_AREA_MM2)
+				var told := normals[corners[t]] + normals[corners[t + 1]] + normals[corners[t + 2]]
+				agreeing += 1 if facing.dot(told) > 0.0 else 0
+			var folded := Fixtures.folded_edges(meshes)
+			assert_int(folded).override_failure_message("%s: %d edges of more than two faces" % [label, folded]) \
+				.is_equal(FOLDED_EDGES.get(label, 0))
+			assert_float(agreeing / (corners.size() / 3.0)).override_failure_message(
+				"%s: its winding disagrees with its normals" % label).is_greater_equal(WINDING_AGREES)
+			if geometry.name == &"body":
+				assert_int(Fixtures.open_edges(meshes).size()).override_failure_message(label).is_equal(
+					OPEN_EDGES[ConsoleManifest.folder_of(manifest)])
+				var volume := 0.0
+				for piece in Fixtures.volumes(meshes):
+					volume += piece
+				assert_float(volume).override_failure_message("%s: its volume is not positive" % label).is_greater(0.0)
+			checked += 1
+	assert_int(checked).is_greater(10)
+
+
 func test_a_console_s_lights_show_on_what_it_is_drawn_with_lit_before_it_is_ready_or_after_faded_or_not() -> void:
 	var lit := 0
+	var declaring := 0
 	for manifest in ConsoleManifest.found():
 		var scene: PackedScene = load(manifest.scene)
 		var dark: ConsoleModel = auto_free(scene.instantiate())
 		var console: ConsoleModel = auto_free(scene.instantiate())
 		var lights := console.moving_parts().filter(func(part: MovingPart) -> bool:
 			return part.role == MovingPart.Role.LIGHT)
+		declaring += 1 if not lights.is_empty() else 0
 		for part: MovingPart in lights:
 			console.set(part.property, part.open)
 		add_child(dark)
@@ -488,7 +696,8 @@ func test_a_console_s_lights_show_on_what_it_is_drawn_with_lit_before_it_is_read
 		assert_bool(lights.is_empty() or not changed.is_empty()).override_failure_message(
 			"%s: its lights show on nothing" % manifest.platform).is_true()
 		# On its light alone.
-		assert_bool(changed.all(func(key: String) -> bool: return key.begins_with("Light/"))) \
+		var glows: Array = console._lights().map(func(light: MeshInstance3D) -> String: return "%s/" % light.name)
+		assert_bool(changed.all(func(key: String) -> bool: return glows.any(key.begins_with))) \
 			.override_failure_message("%s: %s lit" % [manifest.platform, changed]).is_true()
 		console.fade(0.5)
 		var faded_on := _drawn(console)
@@ -501,7 +710,7 @@ func test_a_console_s_lights_show_on_what_it_is_drawn_with_lit_before_it_is_read
 			assert_str(var_to_str([faded_on[key], faded_off[key], off[key]])).override_failure_message(
 				"%s: %s" % [manifest.platform, key]).is_equal(var_to_str([on[key], at_rest[key], at_rest[key]]))
 		lit += 1 if not changed.is_empty() else 0
-	assert_int(lit).is_greater(5)
+	assert_int(lit).is_equal(declaring)
 
 
 func test_every_console_is_drawn_with_the_shaders_the_carousel_already_has_its_clear_plastic_clear() -> void:
@@ -514,7 +723,9 @@ func test_every_console_is_drawn_with_the_shaders_the_carousel_already_has_its_c
 			assert_object(geometry.material_overlay).is_null()
 			for surface in geometry.mesh.get_surface_count():
 				var material := geometry.get_active_material(surface)
-				assert_bool(material is ShaderMaterial and (material as ShaderMaterial).shader in shaders) \
+				# A glb's atlas is a standard material, which [ModelFade] fades too; its light a shader of ours.
+				var standard := _is_glb(model) and material is StandardMaterial3D
+				assert_bool(standard or material is ShaderMaterial and (material as ShaderMaterial).shader in shaders) \
 					.override_failure_message("%s: %s drawn with %s" % [manifest.platform, geometry.name, material]) \
 					.is_true()
 				# Clear plastic darkens a disc's rim, its vertices marked green: a console has none.
@@ -782,6 +993,23 @@ func test_a_manifest_with_problems_or_a_platform_s_second_default_is_left_out() 
 		assert_object(shown[shipped.platform]).is_same(shipped)
 
 
+## Every glb under [param dir], at any depth.
+static func _glbs(dir: String) -> Array[String]:
+	var found: Array[String] = []
+	for file in DirAccess.get_files_at(dir):
+		if file.get_extension() == "glb":
+			found.append(dir.path_join(file))
+	for sub in DirAccess.get_directories_at(dir):
+		found.append_array(_glbs(dir.path_join(sub)))
+	return found
+
+
+## Whether [param model] is drawn from a glb: its meshes are its own, placed as the glb places them.
+static func _is_glb(model: Node) -> bool:
+	return model.find_children("*", "Node3D", true, false).any(func(node: Node) -> bool:
+		return node.scene_file_path.get_extension() == "glb")
+
+
 ## How far [param part] of the console named `Console` is moved at [param time] of [param animation],
 ## from 0 at rest to 1 fully moved.
 static func _share(animation: Animation, part: MovingPart, time: float) -> float:
@@ -822,7 +1050,9 @@ static func _drawn(model: ConsoleModel) -> Dictionary[String, Variant]:
 	var found: Dictionary[String, Variant] = {}
 	for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		for surface in geometry.mesh.get_surface_count():
-			var material: ShaderMaterial = geometry.get_active_material(surface)
+			var material := geometry.get_active_material(surface) as ShaderMaterial
+			if not material:
+				continue
 			for uniform: Dictionary in material.shader.get_shader_uniform_list():
 				var parameter: String = uniform["name"]
 				found["%s/%d/%s" % [geometry.name, surface, parameter]] = material.get_shader_parameter(parameter)
@@ -971,9 +1201,14 @@ func _assert_moving_parts_fit(model: ConsoleModel, medium: AABB) -> void:
 		if geometry not in moving:
 			body = resting[geometry] if body.size == Vector3.ZERO else body.merge(resting[geometry])
 	for geometry in moving:
-		var proud := 0.5 if geometry in opened_by else ConsoleModel.PROUD_MM
-		assert_bool(body.grow(proud * MM).encloses(resting[geometry])).override_failure_message(
-			"%s sticks out at rest" % geometry.name).is_true()
+		var bench_key := "%s: %s" % [model.scene_file_path.get_base_dir().get_file(), geometry.name]
+		if BENCH_RESTS.has(bench_key):
+			var expected: AABB = BENCH_RESTS[bench_key]
+			assert_bool(resting[geometry].is_equal_approx(expected)).override_failure_message(bench_key).is_true()
+		else:
+			var proud := 0.5 if geometry in opened_by else ConsoleModel.PROUD_MM
+			assert_bool(body.grow(proud * MM).encloses(resting[geometry])).override_failure_message(
+				"%s sticks out at rest" % geometry.name).is_true()
 	for part in openings:
 		model.set(part.property, part.open)
 	# In millimetres, as all that is crossed: in world units, a small triangle seems flat.
@@ -1079,8 +1314,14 @@ func _assert_nothing_passed_through(model: ConsoleModel, placeholder: Animation)
 		model.set(part.property, part.rest)
 
 
+func _assert_grazes(platform: String) -> void:
+	assert_int(_grazes).override_failure_message("%s: %d grazes" % [platform, _grazes]).is_equal(GRAZES.get(platform, 0))
+	_grazes = 0
+
+
 ## Moving [param part] of [param model] across [param span], the points of what it moves that go
-## further than [constant SWING_MM] cross none of the parts it does not move on their way.
+## further than [constant SWING_MM] (the vertices of a glb's meshes, all of them, else a sample) cross none of the
+## parts it does not move on their way, but for grazes, counted in `_grazes`.
 func _assert_swept_clear(model: ConsoleModel, part: MovingPart, span: Vector2) -> void:
 	var to_mm := _to_mm(model)
 	model.set(part.property, span.x)
@@ -1096,7 +1337,9 @@ func _assert_swept_clear(model: ConsoleModel, part: MovingPart, span: Vector2) -
 		for geometry in moved:
 			var vertices: PackedVector3Array = geometry.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 			var placed := to_mm * geometry.global_transform
-			for i in range(0, vertices.size(), ceili(vertices.size() / float(FOLLOWED))):
+			# Every vertex of a glb's meshes, a sample of those built from a shape.
+			var every := 1 if _is_glb(model) else ceili(vertices.size() / float(FOLLOWED))
+			for i in range(0, vertices.size(), every):
 				points.append(placed * vertices[i])
 		ways.append(points)
 	var reached := Fixtures.bounds(ways[0])
@@ -1106,12 +1349,15 @@ func _assert_swept_clear(model: ConsoleModel, part: MovingPart, span: Vector2) -
 	for geometry in start:
 		if geometry not in moved:
 			walls.append_array(_triangles(geometry, to_mm, reached.grow(1.0)))
+	var rims := _rims(walls)
 	for i in ways[0].size():
 		if ways[0][i].distance_to(ways[-1][i]) < SWING_MM:
 			continue
 		for step in STEPS:
-			assert_bool(_crosses(ways[step][i], ways[step + 1][i], walls)).override_failure_message(
-				"%s passes through the console" % part.property).is_false()
+			var met := _crossing(ways[step][i], ways[step + 1][i], walls, rims)
+			_grazes += 1 if met == Meeting.GRAZED else 0
+			assert_bool(met == Meeting.CROSSED).override_failure_message(
+				"%s passes through the console at %s, step %d" % [part.property, ways[step][i], step]).is_false()
 
 
 ## Fully moved, each part pressed or slid without turning (a press, a power press, a power part, a
@@ -1229,12 +1475,51 @@ static func _triangles(geometry: MeshInstance3D, to: Transform3D, within := AABB
 	return found
 
 
-## Whether the segment from [param from] to [param to] crosses a triangle of [param corners].
-static func _crosses(from: Vector3, to: Vector3, corners: PackedVector3Array) -> bool:
+## The edges of [param corners]' triangles that only one of them has, as their two ends: the rims of the walls,
+## where a surface stops.
+static func _rims(corners: PackedVector3Array) -> PackedVector3Array:
+	var edges: Dictionary[String, PackedVector3Array] = {}
+	var uses: Dictionary[String, int] = {}
 	for i in range(0, corners.size(), 3):
-		if Geometry3D.segment_intersects_triangle(from, to, corners[i], corners[i + 1], corners[i + 2]) != null:
-			return true
-	return false
+		for k in 3:
+			var ends := [corners[i + k], corners[i + (k + 1) % 3]]
+			var keys := ends.map(func(end: Vector3) -> String: return str(Vector3i((end * 1000.0).round())))
+			keys.sort()
+			var key := "%s %s" % keys
+			uses[key] = uses.get(key, 0) + 1
+			edges[key] = PackedVector3Array(ends)
+	var found := PackedVector3Array()
+	for key in edges:
+		if uses[key] == 1:
+			found.append_array(edges[key])
+	return found
+
+
+## How the segment from [param from] to [param to] meets a triangle of [param corners]: not at all, as a graze
+## (every crossing within [constant CONTACT_MM] of one of [param rims], a part sliding by the edge where a surface
+## stops: a wall narrower than twice that is excused whole, so the sweeps count their grazes and the tests pin each
+## console's count), or through a surface (a seam inside it, or the middle of a wide wall).
+static func _crossing(from: Vector3, to: Vector3, corners: PackedVector3Array,
+		rims := PackedVector3Array()) -> Meeting:
+	var met := Meeting.CLEAR
+	for i in range(0, corners.size(), 3):
+		var found: Variant = Geometry3D.segment_intersects_triangle(from, to, corners[i], corners[i + 1], corners[i + 2])
+		if found == null:
+			continue
+		var at: Vector3 = found
+		var grazes := false
+		for r in range(0, rims.size(), 2):
+			grazes = grazes or at.distance_to(Geometry3D.get_closest_point_to_segment(at, rims[r], rims[r + 1])) <= CONTACT_MM
+		if not grazes:
+			return Meeting.CROSSED
+		met = Meeting.GRAZED
+	return met
+
+
+## Whether the segment from [param from] to [param to] goes through a triangle of [param corners] (see
+## [method _crossing]).
+static func _crosses(from: Vector3, to: Vector3, corners: PackedVector3Array, rims := PackedVector3Array()) -> bool:
+	return _crossing(from, to, corners, rims) == Meeting.CROSSED
 
 
 ## A console of the tests whose way of being presented is given.

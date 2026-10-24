@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://screens/button_style_screen.gd" id="1"]
 [ext_resource type="Script" path="res://screens/style_card.gd" id="2"]
+[ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
 
 [node name="ButtonStyleScreen" type="Control"]
 layout_mode = 3
@@ -28,6 +29,7 @@ theme_override_font_sizes/font_size = 54
 text = "Which button style?"
 horizontal_alignment = 1
 vertical_alignment = 1
+script = ExtResource("studio_label")
 
 [node name="Note" type="Label" parent="."]
 layout_mode = 1

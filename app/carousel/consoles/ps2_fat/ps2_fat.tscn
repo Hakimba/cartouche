@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/ps2_fat/ps2_fat_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/ps2_fat/ps2_fat_shape.tres" id="2"]
+[ext_resource type="PackedScene" path="res://carousel/consoles/ps2_fat/ps2_fat.glb" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+
+[sub_resource type="ShaderMaterial" id="led_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.08, 0.12, 0.08, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/emission = Color(0.1, 1, 0.2, 1)
+shader_parameter/emission_energy = 0.0
+
+[node name="Ps2Fat" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Model" parent="." instance=ExtResource("3")]
+
+[editable path="Model"]
+
+[node name="led" parent="Model/ps2_fat/power" index="0"]
+surface_material_override/0 = SubResource("led_material")

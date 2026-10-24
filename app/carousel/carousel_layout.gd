@@ -10,6 +10,9 @@ extends RefCounted
 ## game slides back to the first, as no game can stand at both ends at once. The scroll is the
 ## position shown, fractional while the row moves.
 
+## The design frame shared by the console and games screens.
+const FRAME := Vector2(1280.0, 960.0)
+
 ## Places shown on each side of the selected game; one more on each side slides in and out.
 const REACH := 1
 const WHOLE_SHELF := 2 * REACH + 2

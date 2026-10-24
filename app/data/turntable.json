@@ -1,0 +1,61 @@
+{
+	"generated": "each console's start on the turntable, in degrees; never edited by hand",
+	"consoles": {
+		"gb": {
+			"yaw": -20.3,
+			"roll": 0
+		},
+		"gba": {
+			"yaw": -28.1,
+			"roll": 0
+		},
+		"gba_sp": {
+			"yaw": 24.0,
+			"roll": 0
+		},
+		"gbc": {
+			"yaw": -25.4,
+			"roll": 0
+		},
+		"gc": {
+			"yaw": 54.9,
+			"roll": 0
+		},
+		"n64": {
+			"yaw": 33.8,
+			"roll": 0
+		},
+		"nes": {
+			"yaw": 16.6,
+			"roll": 1.6
+		},
+		"ps2_fat": {
+			"yaw": 16.6,
+			"roll": 1.6
+		},
+		"ps2_slim": {
+			"yaw": 43.6,
+			"roll": 1.3
+		},
+		"psx": {
+			"yaw": 49.1,
+			"roll": 0
+		},
+		"snes": {
+			"yaw": 24.9,
+			"roll": 0
+		},
+		"wii": {
+			"yaw": -3.2,
+			"roll": 0.3
+		},
+		"xbox": {
+			"yaw": 46.6,
+			"roll": 0
+		},
+		"xbox360": {
+			"yaw": -5.7,
+			"roll": -89.5
+		}
+	}
+}

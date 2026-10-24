@@ -1,5 +1,5 @@
 {
- "model_hash": "b407dca7c71994d05bef77956bd10d8f4f45040ac3fa19856db85e598b5a019a",
+ "model_hash": "f7d8ed945de4b2296a049ebef0aa56ffc97e31cfb39cdf3def18c99766c3b3b3",
  "choice": 2,
  "steps": [
   {
@@ -47,16 +47,16 @@
     "fade": 0
    },
    "console": {
-    "bob": 0.25,
+    "bob": 0,
     "pose": 1,
-    "px": 0.443,
-    "py": 1.679,
-    "pz": 0,
-    "rx": -8,
-    "ry": 0,
-    "rz": 0,
-    "scale": 0.5,
-    "sway": 3.5
+    "px": 0.4456,
+    "py": 4.2042,
+    "pz": -1.283,
+    "rx": -27.11816,
+    "ry": 19.77914,
+    "rz": 9.83177,
+    "scale": 0.76382,
+    "sway": 0
    }
   },
   {

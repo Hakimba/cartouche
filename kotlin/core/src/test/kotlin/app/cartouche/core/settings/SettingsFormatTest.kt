@@ -59,6 +59,14 @@ class SettingsFormatTest {
     }
 
     @Test
+    fun `INV-E12-C1-02 an old file reads with games float off, and the choice is stored`() {
+        SettingsFormat
+            .decode("""{"version":2,"settings":{"buttonStyle":"xbox","edgeSmoothing":"2x"}}""")
+            .shouldBeRight(Settings(Some(ButtonStyle.XBOX), EdgeSmoothing.TWICE, None, gamesFloat = false))
+        SettingsFormat.decode(SettingsFormat.encode(Settings(gamesFloat = true))).shouldBeRight(Settings(gamesFloat = true))
+    }
+
+    @Test
     fun `reading a settings file is total, whatever is left of it`() = runBlocking<Unit> {
         checkAll(settings, Arb.int(0..200), Arb.string(0..20)) { settings, cut, noise ->
             val text = SettingsFormat.encode(settings)

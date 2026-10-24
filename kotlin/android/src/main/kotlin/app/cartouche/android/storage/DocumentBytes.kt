@@ -36,6 +36,6 @@ internal val FileFacts.described: String
     get() =
         when (this) {
             is FileFacts.Serial -> "serial $code"
-            is FileFacts.Print -> "print $hex"
+            is FileFacts.Print -> "print $hex, shell ${shell.key}"
             FileFacts.Silent -> "nothing read"
         }

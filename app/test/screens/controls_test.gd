@@ -30,6 +30,7 @@ func test_INV_E6_02_the_device_s_a_confirms_and_its_b_goes_back_whatever_style_i
 		await Fixtures.joypad(self, JOY_BUTTON_B)
 		assert_array(device.saved_styles).is_empty()
 		await Fixtures.joypad(self, JOY_BUTTON_A)
+		await Fixtures.choose_initial_region(self, carousel)
 		assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 		assert_array(device.saved_styles).is_equal([STYLES[style_index]])
 		assert_str(Controls.style).is_equal(STYLES[style_index])
@@ -47,6 +48,7 @@ func test_a_style_can_be_chosen_with_the_keyboard() -> void:
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
 	await Fixtures.enter(self)
+	await Fixtures.choose_initial_region(self, carousel)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	assert_array(device.saved_styles).is_equal([&"xbox"])
 

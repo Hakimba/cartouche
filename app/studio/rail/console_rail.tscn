@@ -1,0 +1,46 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://studio/rail/console_rail.gd" id="1"]
+[ext_resource type="Shader" path="res://studio/rail/rail_mask.gdshader" id="2"]
+[ext_resource type="Shader" path="res://studio/rail/rail_reflection.gdshader" id="3"]
+
+[sub_resource type="ShaderMaterial" id="mask"]
+shader = ExtResource("2")
+
+[sub_resource type="ShaderMaterial" id="reflection"]
+shader = ExtResource("3")
+
+[node name="ConsoleRail" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Stage" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Pool" type="TextureRect" parent="Stage"]
+layout_mode = 0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Mirrors" type="CanvasGroup" parent="Stage"]
+material = SubResource("reflection")
+fit_margin = 64.0
+clear_margin = 64.0
+
+[node name="Cloth" type="CanvasGroup" parent="Stage"]
+material = SubResource("mask")
+fit_margin = 64.0
+clear_margin = 64.0

@@ -2,28 +2,22 @@
 class_name ScreenFlow
 extends Control
 ## The screens in front of the carousel, over its background: the welcome at each start, while the
-## library loads, until a button is pressed; on a first launch the button style, then the curtain
+## library loads, until a button is pressed; on a first launch the button style and image region, then the curtain
 ## permission when Android does not allow it yet; while no console has games, "No console" and the
-## form adding one, then the discovery of the console added. Later, the settings (Y): the platforms
+## form adding one and its arrival on the carousel. Later, the settings (Y): the platforms
 ## set up, each to change or remove, the button style, the edges' smoothing and the region labels'
 ## images prefer; and the form adding
 ## one more console (the "+" above the consoles). One screen shows at a time, with the focus on it.
 ## Closes once the carousel can be used.
 
-## The first console was added: [param library] is the library with its games.
-signal library_changed(library: AndroidServices.Library)
-## One more console was added from the consoles screen, [param platform_id]: [param library] has
-## its games.
-signal console_added(library: AndroidServices.Library, platform_id: String)
 ## A console was saved or removed in the settings: [param library] is the library now.
 signal library_edited(library: AndroidServices.Library)
 ## The welcome, which has no top bar, is over.
 signal welcome_closed
 ## A screen shows, over the carousel's background: the carousel shows nothing else meanwhile.
 signal covering
-
-## Seconds the discovery plays before the carousel is set up behind it.
-const _LIBRARY_AFTER_S := 1.15
+## The form adding a console, given up, starts to go.
+signal form_leaving
 
 ## Whether the welcome waits for a button; off to measure starts.
 @export var welcome_waits := true
@@ -34,17 +28,23 @@ var android: AndroidServices = Android:
 		if is_node_ready():
 			_permission.android = services
 			_add_console.android = services
-## The consoles' names, as the carousel shows them.
-var appearance: Appearance
-## The console of a platform (by id) as the carousel shows it: a [Node3D], its model or medium.
-var console_of: Callable
+## Brings the added console to the hero, through the placing ring from the third console
+## ([code](library, platform_id) -> bool[/code]): true once placed, false when the user goes back to the form, which
+## comes back ([method bring_back_form]) as the console flies to it. Required before [method run].
+var place: Callable
 ## Where the consoles screen shows the selected console, on the screen.
 var console_point := Vector2(640, 478)
 ## The library as the carousel shows it, kept up to date by the screens that change it.
 var library: AndroidServices.Library
 
+## The current flow has already brought its added console to the hero position.
+var arrived := false
+
 ## Whether the settings open now left no console with games at some point.
 var _emptied := false
+var _holding_presses := false
+var _games_float := false
+var _float_save := 0
 ## The region labels' images prefer, as stored (empty for none), and those the plugin takes.
 var _preferred_region := ""
 var _preferred_regions: PackedStringArray
@@ -55,15 +55,23 @@ var _preferred_regions: PackedStringArray
 @onready var _permission: CurtainPermission = %Permission
 @onready var _no_console: NoConsole = %NoConsole
 @onready var _add_console: AddConsole = %AddConsole
-@onready var _discovery: Discovery = %Discovery
+@onready var _region_screen: PreferredRegionScreen = %PreferredRegion
+@onready var _pending: Label = %Saving
 @onready var _settings: SettingsMenu = %Settings
 @onready var _platforms: PlatformList = %Platforms
 @onready var _confirm: ConfirmRemoval = %Confirm
 
 
-## Goes on from the welcome as [param settings] and [member library] say; returns once the
-## carousel can be used.
+func _ready() -> void:
+	_add_console.saving.connect(func(pending: bool) -> void:
+		_pending.visible = pending
+		_holding_presses = pending)
+
+
+## Goes on from the welcome until the library can be used, completing setup on first launch.
 func run(settings: AndroidServices.SettingsAnswer) -> void:
+	arrived = false
+	_games_float = settings.games_float
 	_preferred_region = settings.preferred_region
 	_preferred_regions = settings.preferred_regions
 	if welcome_waits:
@@ -72,7 +80,9 @@ func run(settings: AndroidServices.SettingsAnswer) -> void:
 	_welcome.queue_free()
 	welcome_closed.emit()
 	if settings.first_launch:
-		await _choose_button_style()
+		await _choose_button_style(false, false)
+		await _choose_preferred_region(true)
+		await _save_button_style(Controls.style)
 		if not android.curtain_allowed():
 			_show(_permission)
 			_permission.focus()
@@ -86,6 +96,7 @@ func run(settings: AndroidServices.SettingsAnswer) -> void:
 ## "No console" until one is added. Returns whether the carousel must come in again: it was left
 ## with no console meanwhile.
 func open_settings() -> bool:
+	arrived = false
 	_emptied = false
 	await _settings_menu()
 	if not _has_games():
@@ -94,25 +105,45 @@ func open_settings() -> bool:
 	return _emptied
 
 
-## The form adding one more console, over the carousel, until it is added or given up.
-func add_console() -> void:
+## The form adding one more console, over the carousel, until it is added and placed, or given up; whether one was.
+func add_console() -> bool:
 	_show(_add_console)
 	_add_console.open(library.set_up_platforms())
-	if await _form_closed() == AddConsole.Outcome.DONE:
+	if not _add_console.leaving.is_connected(form_leaving.emit):
+		_add_console.leaving.connect(form_leaving.emit)
+	var added := false
+	while not added and await _form_closed() == AddConsole.Outcome.DONE:
 		library = _add_console.library
-		console_added.emit(library, _add_console.platform_id)
+		var platform_id := _add_console.platform_id
+		added = await place.call(library, platform_id)
+		_holding_presses = false
 	_close()
+	return added
 
 
-## Whether a screen plays an animation of its own: the discovery of a console added.
+## The form shows again, filled as it was, as the console flies back to it; it takes no press until the console is back.
+func bring_back_form() -> void:
+	show()
+	_holding_presses = true
+	_add_console.resume()
+
+
+## The form's presses are held while the console flies back to it.
+func _input(event: InputEvent) -> void:
+	if _holding_presses and (event is InputEventKey or event is InputEventJoypadButton or event is InputEventAction
+			or event is InputEventScreenTouch or event is InputEventMouseButton):
+		get_viewport().set_input_as_handled()
+
+
+## Whether the form is leaving while its save or scan is pending.
 func is_playing() -> bool:
-	return visible and _discovery.is_processing()
+	return _pending.visible
 
 
 func _close() -> void:
 	Diagnostics.trace("screens", "closed")
 	hide()
-	_discovery.let_go()
+	_pending.hide()
 
 
 func _has_games() -> bool:
@@ -120,7 +151,7 @@ func _has_games() -> bool:
 
 
 ## The button style, saved once chosen; with [param can_go_back], B leaves it as it was.
-func _choose_button_style(can_go_back := false) -> void:
+func _choose_button_style(can_go_back := false, keep := true) -> void:
 	_show(_button_style)
 	_button_style.can_go_back = can_go_back
 	_button_style.focus()
@@ -129,6 +160,12 @@ func _choose_button_style(can_go_back := false) -> void:
 		return
 	Controls.style = style
 	get_tree().call_group(ButtonGlyph.GROUP, &"queue_redraw")
+	if keep:
+		await _save_button_style(style)
+
+
+## Button style marks setup complete, so first launch saves it after the region choice.
+func _save_button_style(style: StringName) -> void:
 	var saved := await android.save_button_style(style)
 	if not saved.ok:
 		Diagnostics.trace("screens", "button style not saved (%s): %s" % [saved.code, saved.detail])
@@ -149,18 +186,27 @@ func _choose_edge_smoothing() -> void:
 
 ## The region labels' images prefer, saved once another is chosen, and shown once saved: the plugin
 ## looks again for the labels it changes.
-func _choose_preferred_region() -> void:
-	var region := await _settings.choose_region(_preferred_region, _preferred_regions)
-	if region == _preferred_region:
-		return
-	var saved := await android.save_preferred_region(region)
-	if saved.ok:
-		_preferred_region = region
+func _choose_preferred_region(first_launch := false) -> void:
+	var region: String
+	if first_launch:
+		_show(_region_screen)
+		_region_screen.open(_preferred_region, _preferred_regions)
+		region = await _region_screen.chosen
 	else:
+		region = await _settings.choose_region(_preferred_region, _preferred_regions)
+		if region == _preferred_region:
+			return
+	_holding_presses = true
+	var saved := await android.save_preferred_region(region)
+	_holding_presses = false
+	if saved.ok or first_launch:
+		_preferred_region = region
+	if not saved.ok:
 		Diagnostics.trace("screens", "preferred region not saved (%s): %s" % [saved.code, saved.detail])
 
 
-## "No console" until the form adds one, then its discovery. Returns at once when a console of
+
+## "No console" until the form adds one and it glides to the carousel. Returns at once when a console of
 ## the settings finds games.
 func _add_first_console() -> void:
 	while true:
@@ -177,33 +223,25 @@ func _add_first_console() -> void:
 			break
 	library = _add_console.library
 	var platform_id := _add_console.platform_id
-	var console: Node3D = console_of.call(platform_id)
-	_discovery.prepare(console, console_point)
-	# Drawn behind the form, before the discovery starts: its first frames must not wait for it.
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_show(_discovery)
-	var manifest := appearance.console_of(platform_id)
-	_discovery.play(manifest.name if manifest else _add_console.platform_name())
-	# Once the sticker has settled: setting the carousel up behind it takes a few frames, which the
-	# burst must not miss.
-	await get_tree().create_timer(_LIBRARY_AFTER_S).timeout
-	library_changed.emit(library)
-	await _discovery.finished
-	await _discovery.collapse()
+	arrived = await place.call(library, platform_id)
 
 
 ## "Settings" until B, or until no platform is set up any more.
 func _settings_menu() -> void:
 	# The form editing a platform counts its games as it opens: what that needs is prepared meanwhile.
 	android.prepare_titles()
+	_settings.games_float = _games_float
 	var focus := &"platforms"
 	while true:
-		_show(_settings)
-		_settings.open(_platforms_set_up().size(), focus, _preferred_region)
+		if focus != &"games_float":
+			_show(_settings)
+			_settings.open(_platforms_set_up().size(), focus, _preferred_region)
 		focus = await _settings.chosen
 		match focus:
 			&"close":
+				_float_save += 1
+				_settings.animate_float(_games_float)
+				_settings.saving = false
 				return
 			&"button_style":
 				await _choose_button_style(true)
@@ -211,10 +249,30 @@ func _settings_menu() -> void:
 				await _choose_edge_smoothing()
 			&"region":
 				await _choose_preferred_region()
+			&"games_float":
+				_choose_games_float()
 			&"platforms":
 				await _platform_menu()
 				if library.set_up_platforms().is_empty():
 					return
+
+
+func _choose_games_float() -> void:
+	_float_save += 1
+	var request := _float_save
+	var target := not _games_float
+	_settings.saving = true
+	_settings.animate_float(target)
+	var saved := await android.save_games_float(target)
+	if request != _float_save:
+		return
+	if saved.ok:
+		_games_float = target
+		Diagnostics.trace("settings", "games_float=%s" % str(target))
+	else:
+		Diagnostics.trace("settings", "games_float not saved (%s): %s" % [saved.code, saved.detail])
+	_settings.animate_float(_games_float)
+	_settings.saving = false
 
 
 ## "Platforms" until B, or until none is left.
@@ -264,7 +322,7 @@ func _edit_platform(platform: AndroidServices.Platform) -> void:
 
 
 ## How the form closed, once what it saved is taken: a console added is shown by the caller (its
-## discovery, or the consoles coming back on it).
+## arrival on the carousel, or the consoles coming back on it).
 func _form_closed() -> AddConsole.Outcome:
 	var outcome: AddConsole.Outcome = await _add_console.closed
 	if _add_console.library != null and (outcome != AddConsole.Outcome.DONE or _add_console.is_editing()):

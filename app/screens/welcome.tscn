@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://screens/welcome.gd" id="1"]
 [ext_resource type="Script" path="res://screens/logo_worm.gd" id="2"]
+[ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
 
 [node name="Welcome" type="Control"]
 layout_mode = 3
@@ -31,6 +32,7 @@ theme_override_font_sizes/font_size = 188
 text = "Cartouche"
 horizontal_alignment = 1
 vertical_alignment = 1
+script = ExtResource("studio_label")
 
 [node name="Hint" type="Label" parent="."]
 unique_name_in_owner = true

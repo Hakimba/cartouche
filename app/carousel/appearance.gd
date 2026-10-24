@@ -101,6 +101,24 @@ func console_of(platform_id: String) -> ConsoleManifest:
 	return _consoles.get(platform_id)
 
 
+## Applies the library's model choices; omitted choices restore the base models.
+func use_variants(variants: Dictionary[String, String]) -> void:
+	var bases := defaults(ConsoleManifest.found())
+	for platform in bases:
+		var chosen := bases[platform]
+		var wanted: String = variants.get(platform, "")
+		for model in chosen.models():
+			if ConsoleManifest.folder_of(model) == wanted:
+				chosen = model
+		if _consoles.get(platform) == chosen:
+			continue
+		_consoles[platform] = chosen
+		_scenes.erase(platform)
+		for key: String in _animations.keys():
+			if key == platform or key.begins_with(platform + " "):
+				_animations.erase(key)
+
+
 ## A new model of [param platform_id]'s console ([method console_of]), named after the platform: its
 ## launch animation moves its parts by that name. The console's scene is loaded the first time.
 func console(platform_id: String) -> ConsoleModel:

@@ -30,8 +30,11 @@ for path in "${@:-res://test}"; do targets+=(-a "$path"); done
 # A hung test must not hold the run: the whole suite takes a few minutes, GODOT_TESTS_S at most.
 # `timeout` is GNU coreutils (`gtimeout` on macOS with Homebrew); without either, the run is not bounded.
 bounded=$(command -v timeout || command -v gtimeout || true)
+# Each run its own user:// (Godot keeps it under XDG_DATA_HOME): runs going at once never share their files.
+data=$(mktemp -d)
+trap 'rm -rf "$data"' EXIT
 status=0
-${bounded:+"$bounded" -k 10 "${GODOT_TESTS_S:-900}"} "$GODOT" --headless --path app -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
+XDG_DATA_HOME="$data" ${bounded:+"$bounded" -k 10 "${GODOT_TESTS_S:-900}"} "$GODOT" --headless --path app -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
   --ignoreHeadlessMode "${targets[@]}" -rd ../build/gdunit-reports -c > build/test-godot.log 2>&1 || status=$?
 [ "$status" -ne 124 ] || fail "the tests did not finish within ${GODOT_TESTS_S:-900} s: one hangs? (full log: build/test-godot.log)"
 [ "$status" -eq 0 ] \

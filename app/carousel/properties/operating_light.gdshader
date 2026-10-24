@@ -9,6 +9,9 @@ uniform vec2 centre = vec2(640.0, 462.0);
 uniform float radius = 400.0;
 // How dark the room gets, from 0 (not at all: nothing drawn) to 1.
 uniform float darkness = 0.0;
+uniform bool shaped = false;
+uniform vec2 radii = vec2(600.0, 660.0);
+uniform vec4 pool_color : source_color;
 
 const vec3 WARM = vec3(1.0, 0.973, 0.91);
 const vec3 DARK = vec3(0.071, 0.078, 0.102);
@@ -20,7 +23,12 @@ void vertex() {
 }
 
 void fragment() {
-	// The pool: warm near its centre, clear further out, then darker and darker.
-	float t = clamp((length(position - centre) - radius * 0.3) / (radius * 1.4), 0.0, 1.0);
-	COLOR = t < 0.42 ? vec4(WARM, 0.38 * darkness * (1.0 - t / 0.42)) : vec4(DARK, 0.74 * darkness * (t - 0.42) / 0.58);
+	if (shaped) {
+		float t = clamp((length((position - centre) / radii) - 0.48) / 0.52, 0.0, 1.0);
+		COLOR = vec4(pool_color.rgb, pool_color.a * darkness * t);
+	} else {
+		// The pool: warm near its centre, clear further out, then darker and darker.
+		float t = clamp((length(position - centre) - radius * 0.3) / (radius * 1.4), 0.0, 1.0);
+		COLOR = t < 0.42 ? vec4(WARM, 0.38 * darkness * (1.0 - t / 0.42)) : vec4(DARK, 0.74 * darkness * (t - 0.42) / 0.58);
+	}
 }

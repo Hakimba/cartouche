@@ -6,11 +6,12 @@
 [ext_resource type="PackedScene" path="res://screens/curtain_permission.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://screens/no_console.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://screens/add_console.tscn" id="6"]
-[ext_resource type="PackedScene" path="res://screens/discovery.tscn" id="7"]
 [ext_resource type="PackedScene" path="res://screens/settings_menu.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://screens/platform_list.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://screens/confirm_removal.tscn" id="10"]
 [ext_resource type="PackedScene" path="res://screens/edge_smoothing_screen.tscn" id="11"]
+
+[ext_resource type="PackedScene" path="res://screens/preferred_region_screen.tscn" id="region"]
 
 [node name="Screens" type="Control"]
 layout_mode = 3
@@ -36,6 +37,11 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 1
 
+[node name="PreferredRegion" parent="." instance=ExtResource("region")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
 [node name="Permission" parent="." instance=ExtResource("4")]
 unique_name_in_owner = true
 visible = false
@@ -46,12 +52,19 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 1
 
-[node name="AddConsole" parent="." instance=ExtResource("6")]
+[node name="Saving" type="Label" parent="."]
 unique_name_in_owner = true
 visible = false
-layout_mode = 1
+offset_left = 160.0
+offset_top = 400.0
+offset_right = 1120.0
+offset_bottom = 560.0
+theme_type_variation = &"ScreenText"
+text = "Adding console…"
+horizontal_alignment = 1
+vertical_alignment = 1
 
-[node name="Discovery" parent="." instance=ExtResource("7")]
+[node name="AddConsole" parent="." instance=ExtResource("6")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1

@@ -1,8 +1,7 @@
-[gd_scene load_steps=28 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=36 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
-[ext_resource type="Shader" uid="uid://i8e1ijw1ftfn" path="res://carousel/background.gdshader" id="3"]
 [ext_resource type="Shader" path="res://carousel/studio_sky.gdshader" id="4"]
 [ext_resource type="Script" path="res://carousel/launch/game_launch.gd" id="5"]
 [ext_resource type="Shader" path="res://carousel/launch/blackout.gdshader" id="6"]
@@ -15,20 +14,23 @@
 [ext_resource type="PackedScene" path="res://screens/screens.tscn" id="13"]
 [ext_resource type="Script" path="res://screens/button_glyph.gd" id="14"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="20"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 [ext_resource type="Script" path="res://screens/add_ball.gd" id="21"]
 [ext_resource type="Script" path="res://carousel/properties/operating_light.gd" id="22"]
 [ext_resource type="Shader" path="res://carousel/properties/operating_light.gdshader" id="23"]
 [ext_resource type="PackedScene" path="res://carousel/properties/disc_properties.tscn" id="24"]
 [ext_resource type="PackedScene" path="res://carousel/properties/console_properties.tscn" id="25"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/console_order.tscn" id="26"]
-[ext_resource type="Script" path="res://carousel/backdrop.gd" id="27"]
+[ext_resource type="Script" path="res://studio/cyclorama.gd" id="27"]
+[ext_resource type="Script" path="res://studio/games/game_title_pill.gd" id="game_title"]
+[ext_resource type="Script" path="res://studio/logo_view.gd" id="games_logo"]
+[ext_resource type="Script" path="res://studio/studio_pill.gd" id="33"]
 [ext_resource type="Script" path="res://carousel/battery_chip.gd" id="28"]
 [ext_resource type="Script" path="res://carousel/resting.gd" id="29"]
 [ext_resource type="PackedScene" path="res://carousel/search/game_search.tscn" id="30"]
 [ext_resource type="Script" path="res://carousel/search/title_marks.gd" id="31"]
-
-[sub_resource type="ShaderMaterial" id="backdrop_material"]
-shader = ExtResource("3")
+[ext_resource type="Script" path="res://studio/views/contact_shadow.gd" id="ground"]
+[ext_resource type="PackedScene" path="res://studio/rail/console_rail.tscn" id="rail"]
 
 [sub_resource type="ShaderMaterial" id="studio_material"]
 shader = ExtResource("4")
@@ -68,8 +70,9 @@ script = ExtResource("1")
 [node name="Backdrop" type="CanvasLayer" parent="."]
 layer = -1
 
-[node name="Gradient" type="ColorRect" parent="Backdrop"]
-material = SubResource("backdrop_material")
+[node name="Cyclorama" type="Control" parent="Backdrop"]
+unique_name_in_owner = true
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -77,6 +80,56 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("27")
+
+[node name="Grounds" type="Control" parent="Backdrop"]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Arriving" type="Control" parent="Backdrop/Grounds"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("ground")
+
+[node name="Leaving" type="Control" parent="Backdrop/Grounds"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("ground")
+
+[node name="Fading" type="Control" parent="Backdrop/Grounds"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("ground")
+
+[node name="Faded" type="Control" parent="Backdrop/Grounds"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("ground")
 
 [node name="ConsoleView" type="TextureRect" parent="Backdrop" node_paths=PackedStringArray("watched", "view", "camera")]
 visible = false
@@ -126,12 +179,14 @@ fov = 32.0
 [node name="Sun" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.985, -0.087, 0.15, 0, 0.866, 0.5, -0.174, -0.492, 0.853, 0, 0, 0)
 layers = 5
+light_cull_mask = 4294967287
 light_specular = 0.0
 
 [node name="Row" type="Node3D" parent="."]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
 script = ExtResource("2")
+frame_origin = Vector3(0, -0.18, 0)
 
 [node name="Spindle" parent="Row" instance=ExtResource("7")]
 visible = false
@@ -143,7 +198,7 @@ script = ExtResource("9")
 [node name="Player" type="AnimationPlayer" parent="."]
 callback_mode_process = 2
 
-[node name="Sequence" type="Node" parent="." node_paths=PackedStringArray("player", "row", "consoles", "layer", "backdrop")]
+[node name="Sequence" type="Node" parent="." node_paths=PackedStringArray("player", "row", "consoles", "layer")]
 unique_name_in_owner = true
 process_priority = -1
 script = ExtResource("10")
@@ -151,7 +206,6 @@ player = NodePath("../Player")
 row = NodePath("../Row")
 consoles = NodePath("../Consoles")
 layer = NodePath("../Backdrop/ConsoleView")
-backdrop = NodePath("../Backdrop/Gradient")
 
 [node name="ConsoleTitle" type="Control" parent="."]
 unique_name_in_owner = true
@@ -162,31 +216,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-
-[node name="Names" type="VBoxContainer" parent="ConsoleTitle"]
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -400.0
-offset_top = 130.0
-offset_right = 400.0
-offset_bottom = 238.0
-grow_horizontal = 2
-mouse_filter = 2
-theme_override_constants/separation = 0
-
-[node name="ConsoleName" type="Label" parent="ConsoleTitle/Names"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"ConsoleName"
-horizontal_alignment = 1
-
-[node name="ConsoleModel" type="Label" parent="ConsoleTitle/Names"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"ConsoleModel"
-horizontal_alignment = 1
 
 [node name="AddBall" type="Control" parent="ConsoleTitle"]
 unique_name_in_owner = true
@@ -202,40 +231,29 @@ grow_horizontal = 2
 mouse_filter = 2
 script = ExtResource("21")
 
-[node name="ConsoleHints" type="HBoxContainer" parent="ConsoleTitle"]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 40.0
-offset_top = -82.0
-offset_right = 640.0
-offset_bottom = -38.0
-grow_vertical = 0
-mouse_filter = 2
-theme_override_constants/separation = 6
+[node name="ConsoleHints" parent="ConsoleTitle" instance=ExtResource("hint_row")]
 
-[node name="Settings" type="PanelContainer" parent="ConsoleTitle/ConsoleHints"]
+[node name="Settings" type="Control" parent="ConsoleTitle/ConsoleHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"y"
 text = "Settings"
 
-[node name="Properties" type="PanelContainer" parent="ConsoleTitle/ConsoleHints"]
+[node name="Properties" type="Control" parent="ConsoleTitle/ConsoleHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"x"
 text = "Properties"
 
-[node name="Arrange" type="PanelContainer" parent="ConsoleTitle/ConsoleHints"]
-unique_name_in_owner = true
+[node name="Arrange" type="Control" parent="ConsoleTitle/ConsoleHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
+unique_name_in_owner = true
 script = ExtResource("20")
 button = &"↓"
 text = "Arrange"
+
+[node name="ConsoleRail" parent="." instance=ExtResource("rail")]
+unique_name_in_owner = true
 
 [node name="ArtProgress" type="Control" parent="."]
 unique_name_in_owner = true
@@ -272,19 +290,31 @@ layout_mode = 2
 theme_type_variation = &"Status"
 horizontal_alignment = 1
 
-[node name="Pill" type="PanelContainer" parent="."]
+[node name="GamesLogo" type="TextureRect" parent="."]
+unique_name_in_owner = true
+visible = false
+offset_left = 432.0
+offset_top = 46.78
+offset_right = 848.0
+offset_bottom = 147.78
+mouse_filter = 2
+script = ExtResource("games_logo")
+
+[node name="Pill" type="Control" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.5
-anchor_top = 0.88
-anchor_right = 0.5
-anchor_bottom = 0.88
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_type_variation = &"Pill"
+mouse_filter = 2
+script = ExtResource("game_title")
 
 [node name="Items" type="HBoxContainer" parent="Pill"]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 16
 
@@ -310,57 +340,44 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("31")
 
-[node name="GamesHints" type="HBoxContainer" parent="."]
+[node name="GamesHints" parent="." instance=ExtResource("hint_row")]
 unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0)
-layout_mode = 0
-offset_left = 40.0
-offset_top = 878.0
-offset_right = 600.0
-offset_bottom = 922.0
-mouse_filter = 2
-theme_override_constants/separation = 6
 
-[node name="Settings" type="PanelContainer" parent="GamesHints"]
+[node name="Settings" type="Control" parent="GamesHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"y"
 text = "Settings"
 
-[node name="Properties" type="PanelContainer" parent="GamesHints"]
+[node name="Properties" type="Control" parent="GamesHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"x"
 text = "Properties"
 
-[node name="ClearFilter" type="PanelContainer" parent="GamesHints"]
+[node name="ClearFilter" type="Control" parent="GamesHints"]
+layout_mode = 2
 unique_name_in_owner = true
 visible = false
-layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"b"
 text = "Clear the filter"
 
-[node name="PreviousLetter" type="PanelContainer" parent="GamesHints"]
-unique_name_in_owner = true
+[node name="PreviousLetter" type="Control" parent="GamesHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
+unique_name_in_owner = true
 script = ExtResource("20")
 button = &"l1"
 
-[node name="NextLetter" type="PanelContainer" parent="GamesHints"]
-unique_name_in_owner = true
+[node name="NextLetter" type="Control" parent="GamesHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
+unique_name_in_owner = true
 script = ExtResource("20")
 button = &"r1"
 
-[node name="SearchHint" type="PanelContainer" parent="GamesHints"]
+[node name="SearchHint" type="Control" parent="GamesHints"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("20")
 button = &"↓"
 text = "Search"
@@ -400,34 +417,37 @@ autowrap_mode = 3
 unique_name_in_owner = true
 layout_mode = 1
 
-[node name="TopBar" type="MarginContainer" parent="."]
+[node name="TopBar" type="Control" parent="."]
 unique_name_in_owner = true
-layout_mode = 1
+layout_mode = 3
 anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 72.0
 grow_horizontal = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 32
-
-[node name="Items" type="HBoxContainer" parent="TopBar"]
-layout_mode = 2
-
-[node name="Clock" type="Label" parent="TopBar/Items"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"Chip"
-
-[node name="Space" type="Control" parent="TopBar/Items"]
-layout_mode = 2
-size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="Battery" type="Label" parent="TopBar/Items"]
+[node name="Clock" type="Container" parent="TopBar"]
 unique_name_in_owner = true
-layout_mode = 2
-theme_type_variation = &"Chip"
+layout_mode = 0
+offset_left = 29.0
+offset_top = 29.0
+offset_right = 123.0
+offset_bottom = 64.0
+mouse_filter = 2
+script = ExtResource("33")
+
+[node name="Battery" type="Container" parent="TopBar"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -157.0
+offset_top = 29.0
+offset_right = -32.0
+offset_bottom = 64.0
+grow_horizontal = 0
+mouse_filter = 2
 script = ExtResource("28")
 
 [node name="Front" type="CanvasLayer" parent="."]
@@ -450,7 +470,7 @@ row = NodePath("../Row")
 spindle = NodePath("../Row/Spindle")
 sequence = NodePath("../Sequence")
 blackout = NodePath("../Front/Blackout")
-controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill"), NodePath("../ConsoleTitle"), NodePath("../Search")]
+controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill"), NodePath("../ConsoleTitle"), NodePath("../ConsoleRail"), NodePath("../Search"), NodePath("../GamesLogo")]
 
 [node name="Art" type="Node" parent="."]
 unique_name_in_owner = true
@@ -484,7 +504,5 @@ one_shot = true
 [connection signal="timeout" from="MessageTimer" to="." method="_on_message_timer_timeout"]
 [connection signal="timeout" from="HoldSelect" to="." method="_on_hold_select_timeout"]
 [connection signal="timeout" from="ArtFocus" to="." method="_on_art_focus_timeout"]
-[connection signal="library_changed" from="Screens" to="." method="_on_screens_library_changed"]
-[connection signal="console_added" from="Screens" to="." method="_on_screens_console_added"]
 [connection signal="library_edited" from="Screens" to="." method="_on_screens_library_edited"]
 [connection signal="welcome_closed" from="Screens" to="." method="_on_screens_welcome_closed"]

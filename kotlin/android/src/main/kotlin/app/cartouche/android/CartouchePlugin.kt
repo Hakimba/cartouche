@@ -255,8 +255,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
      * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
      * profiles file's text, the reference lists as `{platform id: text}`, the emulator data folder
      * names (`data_folders.json`), the curtain times (`curtains.json`), the art extracts, the
-     * cartridge prints and ScreenScraper's texture tables, each as `{platform id: text}`; returns
-     * the catalog summary.
+     * cartridge prints and ScreenScraper's texture tables, each as `{platform id: text}`; [supported]
+     * names the platforms with a console model; returns the catalog summary, with the platforms a
+     * person may add under `offered` (see [Catalog.offered]).
      */
     @UsedByGodot
     public fun loadCatalog(
@@ -268,6 +269,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         art: Dictionary,
         prints: Dictionary,
         textures: Dictionary,
+        supported: Array<String>,
     ): Dictionary {
         val (notText, sources) =
             definitions.keys.sorted().separateEither { name ->
@@ -286,7 +288,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val times = CurtainTimes.parse(DefinitionSource("curtains.json", curtains))
         curtainTimes = times.getOrElse { CurtainTimes.NONE }
         catalog =
-            Catalog.parse(sources, DefinitionSource("profiles.json", profiles)).let {
+            Catalog.parse(sources, DefinitionSource("profiles.json", profiles), supported.map(::PlatformId).toSet()).let {
                 it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + times.swap().getOrNone().toList() + it.rejected)
             }
         return catalog.toWire()
@@ -544,7 +546,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun setUpPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = answering(requestId, libraryThread) {
         val platform = platform(PlatformId(platformId))
         val choices = setupOf(setup)
-        inLibrary { setUp(platform.id, choices) }
+        inLibrary { setUp(platform.id, choices, setup.text("variant")) }
+        success("library" to wire(library.value))
+    }
+
+    /** Stores [variant] as [platformId]'s model and answers with the library. */
+    @UsedByGodot
+    public fun setVariant(requestId: Int, platformId: String, variant: String): Unit = answering(requestId, libraryThread) {
+        inLibrary { setVariant(PlatformId(platformId), variant) }
+        trace("console") { "variant=$variant of $platformId" }
         success("library" to wire(library.value))
     }
 
@@ -566,6 +576,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     public fun settings(requestId: Int): Unit = answering(requestId, libraryThread) {
         val settings = storedSettings()
+        trace("settings") { "games_float=${settings.gamesFloat}" }
         success().apply { putAll(settings.toWire(settings.isFirstLaunch(library.value.library()))) }
     }
 
@@ -584,6 +595,14 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         val chosen = code("edge_smoothing", Some(smoothing), EdgeSmoothing.entries, EdgeSmoothing::wire)
         settingsStore.save(storedSettings().copy(edgeSmoothing = chosen)).mapLeft { it.toWire() }.bind()
         trace("settings") { "edge smoothing: $smoothing" }
+        success()
+    }
+
+    /** Stores whether the selected game sways and bobs ([floating]); the consoles never do. */
+    @UsedByGodot
+    public fun saveGamesFloat(requestId: Int, floating: Boolean): Unit = answering(requestId, libraryThread) {
+        settingsStore.save(storedSettings().copy(gamesFloat = floating)).mapLeft { it.toWire() }.bind()
+        trace("settings") { "games_float=$floating" }
         success()
     }
 
@@ -622,8 +641,13 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun scanPlatform(requestId: Int, platformId: String): Unit = answering(requestId, libraryThread) {
         val platform = platform(PlatformId(platformId))
         val titles = titles(platform.id)
+        val before = library.value.library().games
         val report = inLibrary { scan(platform, titles, dataFolders) }.second
-        success("library" to wire(library.value), "report" to report.toWire()).also { lookForArt() }
+        val preferred = storedSettings().preferredRegion
+        // A file's header may now tell a shell that moves its label's cut: those labels are cut anew.
+        success("library" to wire(library.value), "report" to report.toWire()).also {
+            lookForArt { games -> ArtSources.recut(before, games) { sources(it, preferred) } }
+        }
     }
 
     /**
@@ -646,13 +670,13 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /**
      * Debug builds only: replaces the library with a made-up one of [games] games spread over the
-     * catalog's platforms, or all on [platformId] unless it is empty (one shelf at fan size), stored
+     * supported consoles, or all on [platformId] unless it is empty (one shelf at fan size), stored
      * apart (the user's library is left alone), for measuring at scale; answers with `{"library"}`.
      */
     @UsedByGodot
     public fun useDemoLibrary(requestId: Int, games: Int, platformId: String): Unit = answering(requestId, libraryThread) {
         ensure(BuildConfig.DEBUG) { invalid("The demo library only exists in debug builds") }
-        val platforms = if (platformId.isEmpty()) catalog.platforms.map { it.id } else listOf(platform(PlatformId(platformId)).id)
+        val platforms = if (platformId.isEmpty()) catalog.offered.map { it.platform } else listOf(platform(PlatformId(platformId)).id)
         // Named after the library format: a library saved by an older build is never measured again.
         val name = "demo-${LibraryFormat.VERSION}-$games" + if (platformId.isEmpty()) "" else "-$platformId"
         val folder = File(context.filesDir, name).apply { mkdirs() }
@@ -768,23 +792,32 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         success("title" to game.shownTitle).putSome("original_title", game.displayName.map { game.title })
     }
 
-    /**
-     * Shows [platformId]'s console as [name] from now on (see [DisplayName]), or under its own name,
-     * [own], again when [name] is blank or is it; answers with `{"name"?}`, the name kept.
-     */
-    @UsedByGodot
-    public fun renameConsole(requestId: Int, platformId: String, name: String, own: String): Unit = answering(requestId, libraryThread) {
-        val kept = library.value.renameConsole(PlatformId(platformId), DisplayName.of(name), own).mapLeft { it.toWire() }.bind()
-        trace("library") { "console $platformId shown as '${kept.fold({ own }) { it.text }}'" }
-        success().putSome("name", kept.map { it.text })
-    }
-
     /** Shows the consoles of [platformIds] in that order from now on, on the consoles screen and after a restart. */
     @UsedByGodot
     public fun orderConsoles(requestId: Int, platformIds: Array<String>): Unit = answering(requestId, libraryThread) {
         library.value.orderConsoles(platformIds.map(::PlatformId)).mapLeft { it.toWire() }.bind()
         trace("library") { "consoles ordered: ${platformIds.joinToString()}" }
         success()
+    }
+
+    /**
+     * Puts [platformId]'s console at [gap] among the others as the consoles screen shows them (0 to
+     * their number), the others keeping their order; answers with `{"order"}`, the platform ids of
+     * the consoles shown, first to last. A gap out of range or a console not in the library keeps
+     * the order and answers `gap_out_of_range` or `not_in_library`.
+     */
+    @UsedByGodot
+    public fun placeConsole(requestId: Int, platformId: String, gap: Int): Unit = answering(requestId, libraryThread) {
+        val platforms = catalog.platforms.map { it.id }
+        val placed =
+            library.value
+                .placeConsole(PlatformId(platformId), gap, platforms)
+                .onLeft { trace("library") { "console $platformId not placed at $gap: ${it.message}" } }
+                .mapLeft { it.toWire() }
+                .bind()
+        val order = placed.shown(platforms).map { it.value }
+        trace("library") { "console $platformId placed at $gap: ${order.joinToString()}" }
+        success("order" to order.toTypedArray())
     }
 
     /**

@@ -1,9 +1,23 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://carousel/consoles/console_order.gd" id="1"]
 [ext_resource type="Shader" path="res://carousel/consoles/sticker.gdshader" id="2"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 [ext_resource type="Script" path="res://carousel/consoles/console_sticker.gd" id="4"]
+[ext_resource type="Script" path="res://studio/logo_view.gd" id="5"]
+
+[sub_resource type="Gradient" id="spot_gradient"]
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 1, 1, 0.36, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="spot_texture"]
+gradient = SubResource("spot_gradient")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
 
 [sub_resource type="ShaderMaterial" id="sticker_material"]
 shader = ExtResource("2")
@@ -48,96 +62,113 @@ visible = false
 
 [node name="Ring" type="Control" parent="Behind"]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+layout_mode = 3
+anchors_preset = 0
+offset_right = 1280.0
+offset_bottom = 960.0
 mouse_filter = 2
 
-[node name="Middle" type="VBoxContainer" parent="."]
+[node name="Spot" type="TextureRect" parent="Behind/Ring"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_right = 800.0
-offset_bottom = 110.0
+offset_right = 281.6
+offset_bottom = 153.6
 mouse_filter = 2
-alignment = 1
-theme_override_constants/separation = 2
+texture = SubResource("spot_texture")
+expand_mode = 1
 
-[node name="Name" type="Label" parent="Middle"]
+[node name="Frame" type="Control" parent="."]
 unique_name_in_owner = true
-auto_translate_mode = 2
-layout_mode = 2
-theme_type_variation = &"RingName"
-horizontal_alignment = 1
-text_overrun_behavior = 3
+layout_mode = 3
+anchors_preset = 0
+offset_right = 1280.0
+offset_bottom = 960.0
+mouse_filter = 2
 
-[node name="Place" type="Label" parent="Middle"]
-unique_name_in_owner = true
-auto_translate_mode = 2
-layout_mode = 2
-theme_type_variation = &"RingPlace"
-horizontal_alignment = 1
-text_overrun_behavior = 3
-
-[node name="Choosing" type="HBoxContainer" parent="."]
+[node name="Arrow" type="Control" parent="Frame"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_left = 40.0
-offset_top = 890.0
-offset_right = 640.0
-offset_bottom = 934.0
+offset_right = 35.84
+offset_bottom = 46.08
+pivot_offset = Vector2(17.92, 0)
+mouse_filter = 2
+
+[node name="Middle" type="VBoxContainer" parent="Frame"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 384.0
+offset_top = 419.2
+offset_right = 896.0
+offset_bottom = 522.88
 mouse_filter = 2
 theme_override_constants/separation = 6
 
-[node name="Choose" type="PanelContainer" parent="Choosing"]
+[node name="Emblem" type="CenterContainer" parent="Frame/Middle"]
+custom_minimum_size = Vector2(0, 69.12)
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
+mouse_filter = 2
+
+[node name="Logo" type="TextureRect" parent="Frame/Middle/Emblem"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("5")
+
+[node name="Where" type="HBoxContainer" parent="Frame/Middle"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 28.16)
+layout_mode = 2
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 11
+
+[node name="Before" type="TextureRect" parent="Frame/Middle/Where"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("5")
+
+[node name="After" type="TextureRect" parent="Frame/Middle/Where"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("5")
+
+[node name="Choosing" parent="." instance=ExtResource("hint_row")]
+unique_name_in_owner = true
+
+[node name="Choose" type="Control" parent="Choosing"]
+layout_mode = 2
 script = ExtResource("3")
 button = &"← →"
 text = "Choose"
 
-[node name="Take" type="PanelContainer" parent="Choosing"]
+[node name="Take" type="Control" parent="Choosing"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 text = "Take"
 
-[node name="Done" type="PanelContainer" parent="Choosing"]
+[node name="Done" type="Control" parent="Choosing"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"b"
 text = "Done"
 
-[node name="Moving" type="HBoxContainer" parent="."]
+[node name="Moving" parent="." instance=ExtResource("hint_row")]
 unique_name_in_owner = true
 visible = false
-layout_mode = 0
-offset_left = 40.0
-offset_top = 890.0
-offset_right = 640.0
-offset_bottom = 934.0
-mouse_filter = 2
-theme_override_constants/separation = 6
 
-[node name="Move" type="PanelContainer" parent="Moving"]
+[node name="Move" type="Control" parent="Moving"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"← →"
 text = "Move"
 
-[node name="PutDown" type="PanelContainer" parent="Moving"]
+[node name="PutDown" type="Control" parent="Moving"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 text = "Put down"
 
-[node name="Cancel" type="PanelContainer" parent="Moving"]
+[node name="Cancel" type="Control" parent="Moving"]
 layout_mode = 2
-theme_type_variation = &"ButtonHint"
 script = ExtResource("3")
 button = &"b"
 text = "Cancel"
+

@@ -4,9 +4,15 @@ package app.cartouche.core.library
 import app.cartouche.core.Shipped
 import app.cartouche.core.Shipped.ps2
 import app.cartouche.core.Shipped.ps2Titles
+import app.cartouche.core.art.ArtSources
+import app.cartouche.core.art.PixelRect
 import app.cartouche.core.files.FileFacts
+import app.cartouche.core.files.Shell
+import app.cartouche.core.files.facts
+import app.cartouche.core.platforms.PlatformId
 import arrow.core.None
 import arrow.core.Some
+import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.ints.shouldBeGreaterThan
@@ -43,6 +49,138 @@ class ScanTest {
     /** A scan of [files], each holding what it is paired with. */
     private fun read(vararg files: Pair<ListedFile, FileFacts>) =
         Scan.of(ps2, contents(files.map { it.first }), ps2Titles, DiscGrouping.GROUPED, files.associate { it.first.uri to it.second })
+
+    @Test
+    fun `a game keeps the shell its first file's header says`() {
+        Shell.entries.forEach { shell ->
+            val file = listed("Rayman.gbc", size = Some(1_000_000))
+            val scan =
+                Scan.of(
+                    gbc,
+                    contents(listOf(file)),
+                    TitleIndex.EMPTY,
+                    DiscGrouping.GROUPED,
+                    mapOf(
+                        file.uri to FileFacts.Print(1u, shell),
+                    ),
+                )
+            scan.games.single().shell shouldBe shell
+        }
+        Scan
+            .of(
+                gbc,
+                contents(listOf(listed("Rayman.gbc", size = Some(1_000_000)))),
+                TitleIndex.EMPTY,
+                DiscGrouping.GROUPED,
+            ).games
+            .single()
+            .shell shouldBe
+            Shell.UNKNOWN
+    }
+
+    @Test
+    fun `a game of several files takes the shell of its first`() {
+        val (first, second) = listOf("Rayman (Disc 1).gbc", "Rayman (Disc 2).gbc").map { listed(it, size = Some(1_000_000)) }
+        val told = mapOf(first.uri to FileFacts.Print(1u, Shell.EXCLUSIVE), second.uri to FileFacts.Print(2u, Shell.COMPATIBLE))
+        Scan.of(gbc, contents(listOf(second, first)), TitleIndex.EMPTY, DiscGrouping.GROUPED, told).games.single().shell shouldBe
+            Shell.EXCLUSIVE
+    }
+
+    private val gbc = Shipped.catalog.platforms.single { it.id == PlatformId("gbc") }
+
+    /** The rectangle cut from a 663 by 755 scan for a game of [gbc] whose only file, a ROM with [flag] in its header, is read as the app reads it. */
+    private fun cutFromRom(flag: Int): PixelRect {
+        val rom = ByteArray(32768).also { it[0x143] = flag.toByte() }
+        val file = listed("Rayman.gbc", size = Some(rom.size.toLong()))
+        val game =
+            Scan
+                .of(
+                    gbc,
+                    contents(listOf(file)),
+                    TitleIndex.EMPTY,
+                    DiscGrouping.GROUPED,
+                    mapOf(file.uri to facts("gbc", "Rayman.gbc", rom)),
+                ).games
+                .single()
+        return ArtSources.of(Shipped.catalog, emptyMap(), emptyMap(), gbc.id).cutOf(game).on(663, 755).shouldBeSome()
+    }
+
+    @Test
+    fun `a Game Boy Color ROM's colour flag reaches the cut of its label, the exclusives' lower, any other today's`() {
+        cutFromRom(0xC0) shouldBe PixelRect(82, 254, 499, 436)
+        listOf(0x80, 0x00, 0xC1).forEach { cutFromRom(it) shouldBe PixelRect(82, 215, 499, 436) }
+    }
+
+    @Test
+    fun `a game whose first file tells a serial or nothing has no shell`() {
+        val file = listed("Rayman.gbc", size = Some(1_000_000))
+        listOf(FileFacts.Serial("ABCD"), FileFacts.Silent).forEach { told ->
+            Scan
+                .of(
+                    gbc,
+                    contents(listOf(file)),
+                    TitleIndex.EMPTY,
+                    DiscGrouping.GROUPED,
+                    mapOf(file.uri to told),
+                ).games
+                .single()
+                .shell shouldBe
+                Shell.UNKNOWN
+        }
+    }
+
+    @Test
+    fun `the first disc's shell is taken, however the files sort by name and by address`() {
+        // By name disc 1's file comes first, by address disc 2's.
+        val disc1 = listed("Rayman (Disc 1).gbc", id = "b", size = Some(1_000_000))
+        val disc2 = listed("Rayman (Disc 2).gbc", id = "a", size = Some(1_000_000))
+        val told = mapOf(disc1.uri to FileFacts.Print(1u, Shell.EXCLUSIVE), disc2.uri to FileFacts.Print(2u, Shell.COMPATIBLE))
+        Scan.of(gbc, contents(listOf(disc2, disc1)), TitleIndex.EMPTY, DiscGrouping.GROUPED, told).games.single().shell shouldBe
+            Shell.EXCLUSIVE
+        val swapped = mapOf(disc1.uri to FileFacts.Print(1u, Shell.COMPATIBLE), disc2.uri to FileFacts.Print(2u, Shell.EXCLUSIVE))
+        Scan.of(gbc, contents(listOf(disc2, disc1)), TitleIndex.EMPTY, DiscGrouping.GROUPED, swapped).games.single().shell shouldBe
+            Shell.COMPATIBLE
+    }
+
+    @Test
+    fun `a label cut while the shell was unknown is cut again once it is known, and only then`() {
+        val file = listed("Rayman.gbc", size = Some(1_000_000))
+        val game = { shell: Shell, label: LabelChoice ->
+            Scan
+                .of(
+                    gbc,
+                    contents(listOf(file)),
+                    TitleIndex.EMPTY,
+                    DiscGrouping.GROUPED,
+                    mapOf(file.uri to FileFacts.Print(1u, shell)),
+                ).games
+                .single()
+                .copy(label = label)
+        }
+        val sources = ArtSources.of(Shipped.catalog, emptyMap(), emptyMap(), gbc.id)
+        val recut = { before: Game, after: Game -> ArtSources.recut(listOf(before), listOf(after)) { sources } }
+        val unknown = game(Shell.UNKNOWN, LabelChoice.Automatic)
+        recut(unknown, game(Shell.EXCLUSIVE, LabelChoice.Automatic)) shouldBe setOf(unknown.id)
+        recut(unknown, game(Shell.COMPATIBLE, LabelChoice.Automatic)) shouldBe emptySet()
+        recut(unknown, game(Shell.UNKNOWN, LabelChoice.Automatic)) shouldBe emptySet()
+        recut(game(Shell.EXCLUSIVE, LabelChoice.Automatic), game(Shell.EXCLUSIVE, LabelChoice.Automatic)) shouldBe emptySet()
+        recut(unknown, game(Shell.EXCLUSIVE, LabelChoice.Own)) shouldBe emptySet()
+        ArtSources.recut(emptyList(), listOf(game(Shell.EXCLUSIVE, LabelChoice.Automatic))) { sources } shouldBe emptySet()
+    }
+
+    @Test
+    fun `a stored game keeps its shell, and one stored without it has none`() {
+        val file = listed("Rayman.gbc", size = Some(1_000_000))
+        val told = mapOf(file.uri to FileFacts.Print(1u, Shell.EXCLUSIVE))
+        val exclusive = Scan.of(gbc, contents(listOf(file)), TitleIndex.EMPTY, DiscGrouping.GROUPED, told).games.single()
+        val library = Library(games = listOf(exclusive))
+        val stored = LibraryFormat.encode(library)
+        stored.contains("\"shell\":\"exclusive\"") shouldBe true
+        LibraryFormat.decode(stored).shouldBeRight().library.games.single().shell shouldBe Shell.EXCLUSIVE
+        val without = LibraryFormat.encode(Library(games = listOf(exclusive.copy(shell = Shell.UNKNOWN))))
+        without.contains("shell") shouldBe false
+        LibraryFormat.decode(without).shouldBeRight().library.games.single().shell shouldBe Shell.UNKNOWN
+    }
 
     @Test
     fun `a file holding a known disc is that disc whatever its name, with that disc's regions, languages and version`() {

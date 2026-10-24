@@ -4,7 +4,9 @@ package app.cartouche.core.files
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.boolean
+import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
+import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
@@ -39,10 +41,34 @@ class CartridgesTest {
     }
 
     @Test
-    fun `a Game Boy ROM is counted whole`() = runBlocking<Unit> {
-        checkAll(bytes(16..4096), Arb.element("gb" to "gb", "gbc" to "gbc", "gbc" to "gb", "gba" to "gba")) { rom, (platform, extension) ->
-            facts(platform, "game.$extension", rom) shouldBe FileFacts.Print(crc32(rom))
+    fun `a Game Boy ROM is counted whole, its shell told by the header's colour flag alone`() = runBlocking<Unit> {
+        checkAll(
+            bytes(0x144..4096),
+            Arb.element("gb" to "gb", "gbc" to "gbc", "gbc" to "gb"),
+            Arb.choice(Arb.element(0xC0, 0x80, 0xC1, 0x00, 0xFF), Arb.int(0..255)),
+        ) { rom, (platform, extension), flag ->
+            val flagged = rom.copyOf().also { it[0x143] = flag.toByte() }
+            val shell =
+                when (flag) {
+                    0xC0 -> Shell.EXCLUSIVE
+                    0x80 -> Shell.COMPATIBLE
+                    else -> Shell.UNKNOWN
+                }
+            facts(platform, "game.$extension", flagged) shouldBe FileFacts.Print(crc32(flagged), shell)
         }
+        // The same byte of a Game Boy Advance ROM says nothing about a shell.
+        checkAll(bytes(0x144..4096)) { rom ->
+            facts("gba", "game.gba", rom.copyOf().also { it[0x143] = 0xC0.toByte() }) shouldBe
+                FileFacts.Print(crc32(rom.copyOf().also { it[0x143] = 0xC0.toByte() }))
+        }
+    }
+
+    @Test
+    fun `a Game Boy ROM too short for the colour flag, or zipped, tells no shell`() {
+        val short = ByteArray(0x143) { 0xC0.toByte() }
+        facts("gbc", "game.gbc", short) shouldBe FileFacts.Print(crc32(short), Shell.UNKNOWN)
+        val rom = ByteArray(4096).also { it[0x143] = 0xC0.toByte() }
+        facts("gbc", "game.zip", zip("game.gbc" to rom)) shouldBe FileFacts.Print(crc32(rom), Shell.UNKNOWN)
     }
 
     @Test
@@ -67,6 +93,7 @@ class CartridgesTest {
         facts("n64", "game.v64", byteSwapped) shouldBe print
         facts("n64", "game.n64", wordSwapped) shouldBe print
         facts("gba", "game.gba", rom) shouldBe print
+        facts("gbc", "game.gbc", rom) shouldBe print
         // A Super Nintendo ROM is a whole number of kilobytes, 512 bytes more with a copier's header; any other size is counted whole.
         val snes = rom.copyOf(2 * CHUNK + 1024)
         facts("snes", "game.sfc", ByteArray(512) { 0x55 } + snes) shouldBe FileFacts.Print(crc32(snes))

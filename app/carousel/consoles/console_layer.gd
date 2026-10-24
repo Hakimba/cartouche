@@ -23,7 +23,6 @@ const _RESOLUTION := 0.5
 @export var camera: Camera3D
 
 @onready var _material: ShaderMaterial = material
-@onready var _design_width: float = ProjectSettings.get_setting("display/window/size/viewport_width")
 
 
 func _ready() -> void:
@@ -48,7 +47,7 @@ func look(behind: bool, blur: float, opacity: float, saturation: float) -> void:
 		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		return
 	# In the window's pixels, which the blur's taps step through.
-	_material.set_shader_parameter(&"radius", blur * get_window().size.x / _design_width)
+	_material.set_shader_parameter(&"radius", blur * StudioTokens.window_scale(get_window()))
 	_material.set_shader_parameter(&"opacity", opacity)
 	_material.set_shader_parameter(&"saturation", saturation)
 

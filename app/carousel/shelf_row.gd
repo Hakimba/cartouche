@@ -3,18 +3,15 @@ class_name ShelfRow
 extends Node3D
 ## The row of one shelf's games. A fixed pool of places is recycled as the row moves, so its cost
 ## does not depend on the number of games; a place keeps its game, and its drawn label, while the
-## game stays in view. The mechanics are [CarouselLayout]'s.
+## game stays in view. GamesLayout places its media; Motion.Spring follows each press.
 
 ## The game at the centre changed.
 signal selection_changed(game: AndroidServices.Game)
 
 ## A label texture shown whole (see [method preview_label]).
 const WHOLE := Rect2(0.0, 0.0, 1.0, 1.0)
-## Every game [method CarouselLayout.offsets] can show at once.
-const _PLACES := 2 * CarouselLayout.REACH + 3
-## How much a fast-moving row stretches its games.
-const _STRETCH := 0.012
-const _MAX_STRETCH := 0.1
+## Every game [method GamesLayout.offsets] can show at once.
+const _PLACES := 5
 
 ## Debug builds: turns per second of the selected game around its vertical axis, to see every side.
 var turntable := 0.0
@@ -24,7 +21,10 @@ var label_images: GameArt:
 	set(art):
 		label_images = art
 		art.loaded.connect(refresh_label)
-var pose := Pose.new()
+@export var frame_origin := Vector3.ZERO
+var camera: Camera3D
+var games_float := false
+var room_energy := 0.55
 ## How much of its pose and float the selected game has, from 0 (none) to 1.
 var pose_amount := 1.0
 ## How fast the selected game floats and sways, from 1 down to 0, still ([Resting]).
@@ -46,7 +46,8 @@ var _look := LabelLook.new()
 ## The selected game's position on the endless row (see [CarouselLayout]); the scroll follows it.
 var _position := 0
 var _scroll := 0.0
-var _speed := 0.0
+var _spring := Motion.Spring.new(0.0)
+var _title_tops: Dictionary[PackedScene, Vector3] = {}
 ## The direction held (-1 or 1), 0 when none.
 var _held := 0
 var _held_steps := 0
@@ -74,6 +75,13 @@ var _previewing := false
 var _downloads: Dictionary[String, float] = {}
 
 
+## Stops a row between steps at its selected position before another screen opens.
+func settle() -> void:
+	_scroll = float(_position)
+	_spring = Motion.Spring.new(_scroll)
+	_arrange()
+
+
 func _ready() -> void:
 	for i in _PLACES:
 		var place := Place.new()
@@ -84,8 +92,12 @@ func _ready() -> void:
 	set_process(false)
 
 
-# Runs every frame: the selected game floats. Arranging five places is negligible next to drawing
-# them.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree():
+		for place in _places:
+			place.hide_view()
+
+
 func _process(delta: float) -> void:
 	_clock_s += delta
 	_pose_s += delta * pace
@@ -93,9 +105,9 @@ func _process(delta: float) -> void:
 		step(_held)
 		_held_steps += 1
 		_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(_held_steps)
-	var before := _scroll
-	_scroll = CarouselLayout.scrolled(_scroll, _position, delta)
-	_speed = (_scroll - before) / delta if delta > 0.0 else 0.0
+	_spring.target = _position
+	_spring.step(delta)
+	_scroll = _spring.position
 	if not _games.is_empty():
 		if stage > 0.0 and _stick.is_zero_approx():
 			_turn.release()
@@ -114,6 +126,9 @@ func _process(delta: float) -> void:
 ## Frees every place's model of a medium not among [param models]: no game of the library comes in
 ## it any more.
 func keep_models(models: Array[PackedScene]) -> void:
+	for model: PackedScene in _title_tops.keys():
+		if model not in models:
+			_title_tops.erase(model)
 	for place in _places:
 		place.keep_models(models)
 
@@ -147,12 +162,13 @@ func show_games(games: Array[AndroidServices.Game], selected: int) -> void:
 	_games = games
 	_position = selected
 	_scroll = selected
+	_spring = Motion.Spring.new(selected)
 	_turn = StickTurn.new()
 	_held = 0
 	_placed.clear()
 	for place in _places:
 		place.game = -1
-	for game: int in CarouselLayout.offsets(_games.size(), _scroll):
+	for game: int in GamesLayout.offsets(_games.size(), _scroll):
 		var place: Place = kept.get(_games[game].id)
 		if place:
 			place.game = game
@@ -164,8 +180,10 @@ func show_games(games: Array[AndroidServices.Game], selected: int) -> void:
 ## Brings the game at [param index] to the centre at once, the row sliding in from [param slide]
 ## places before it, towards [param direction] (-1 or 1).
 func jump(index: int, direction: int, slide: float) -> void:
-	_position = CarouselLayout.nearest(_position, index, _games.size())
+	var ahead := posmod(index - _position, _games.size())
+	_position += ahead if ahead * 2 <= _games.size() else ahead - _games.size()
 	_scroll = _position - direction * slide
+	_spring = Motion.Spring.new(_scroll)
 	_turn.release()
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "jump to %d" % selected_index())
@@ -190,6 +208,11 @@ func has_games() -> bool:
 
 func selected_game() -> AndroidServices.Game:
 	return _games[selected_index()]
+
+
+## The selected game's position on the endless row: its index, plus the laps made.
+func selected_position() -> int:
+	return _position
 
 
 func selected_index() -> int:
@@ -231,6 +254,12 @@ func let_go() -> void:
 func freeze() -> void:
 	_held = 0
 	_stick = Vector2.ZERO
+	# A selected game still out of view has no place to launch from: the row lands on it at once. One in
+	# view keeps its spring, which finishes under the launch.
+	if has_games() and selected_index() not in _placed:
+		_scroll = _position
+		_spring = Motion.Spring.new(_scroll)
+		_arrange()
 
 
 ## Stands the selected game as [param stand] says (in the row's space) instead of posed, turned
@@ -353,7 +382,7 @@ func _download(game_id: String) -> float:
 func step(direction: int) -> void:
 	if _games.size() < 2:
 		return
-	_position = CarouselLayout.stepped(_position, direction, _games.size())
+	_position += direction
 	_turn.release()
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "step %d to %d (held for %d steps)" % [direction, selected_index(), _held_steps])
@@ -361,7 +390,7 @@ func step(direction: int) -> void:
 
 
 func _arrange() -> void:
-	var shown := CarouselLayout.offsets(_games.size(), _scroll)
+	var shown := GamesLayout.offsets(_games.size(), _scroll)
 	for game: int in _placed.keys():
 		if game not in shown:
 			_placed[game].game = -1
@@ -375,36 +404,62 @@ func _arrange() -> void:
 			_placed[game] = place
 			if place not in _unlabelled:
 				_unlabelled.append(place)
-	var stretch := minf(absf(_speed) * _STRETCH, _MAX_STRETCH)
-	# Gone, as on the consoles screen, every game is wholly faded: where it stands is not drawn.
+	var blank_weight := 0.0
+	for game: int in shown:
+		var place := _placed[game]
+		if place.shown.is_blank():
+			blank_weight += 1.0 - MediaView.softness(shown[game])
+	var focused: Place = _placed.get(selected_index())
+	if focused:
+		room_energy = lerpf(focused.lit.room, focused.blank.room, blank_weight)
 	var gone := selected_presence <= 0.0 and neighbours <= 0.0 and stage <= 0.0 and not _launched
+	var order := 0
 	for place in _places:
 		place.visible = place.game >= 0
-		if place.visible and gone:
+		if not place.visible:
+			place.hide_view()
+	for game: int in shown:
+		var place := _placed[game]
+		if gone:
 			place.shown.fade(1.0)
-		elif place.visible and _launched and place.game == selected_index():
-			place.transform = _launch_stand
+			place.hide_view()
+			continue
+		var offset: float = shown[game]
+		var centred := 1.0 - MediaView.softness(offset)
+		var turn := Basis(Vector3.UP, TAU * turntable * _clock_s * centred) * _turn.of(game)
+		var placed := place.layout.standing(offset, pose_amount, _pose_s, games_float)
+		placed.origin += frame_origin
+		placed.basis *= turn
+		var outside := (_launched or stage > 0.0) and game == selected_index()
+		if _launched and game == selected_index():
+			placed = _launch_stand
 			place.shown.spin(_launch_spin, _launch_blur)
-			place.shown.fade(0.0)
-		elif place.visible:
-			var offset: float = shown[place.game]
-			var centred := CarouselLayout.centred(offset)
-			var posed_part := centred * pose_amount
-			var stand := CarouselLayout.place(offset)
-			stand.origin.y += CarouselLayout.float_height(_pose_s, pose.bob, posed_part)
-			var spun := Basis(Vector3.UP, TAU * turntable * _clock_s * centred)
-			var turn := spun * _turn.of(place.game)
-			var stretched := Basis.from_scale(Vector3(1.0 + stretch, 1.0 - stretch * 0.6, 1.0))
-			var posed := stand.basis * pose.at(_pose_s, posed_part) * turn * stretched
-			var placed := Transform3D(posed, stand.origin)
-			if stage > 0.0 and place.game == selected_index():
-				var on_stage := Transform3D(staged.basis * turn, staged.origin)
-				placed = placed.interpolate_with(on_stage, stage)
-			# Set again, even unchanged, it would be sent to every part of the model.
-			if place.transform != placed:
-				place.transform = placed
-			var presence := selected_presence if place.game == selected_index() else neighbours
-			place.shown.fade(CarouselLayout.faded(offset, presence))
+		elif stage > 0.0 and game == selected_index():
+			placed = placed.interpolate_with(Transform3D(staged.basis * turn, staged.origin), stage)
+		if place.transform != placed:
+			place.transform = placed
+		var presence := selected_presence if game == selected_index() else neighbours
+		place.shown.fade(1.0 - presence if not _launched or game != selected_index() else 0.0)
+		var mode := Place.Draw.OUTSIDE if outside else Place.Draw.SHOWN if is_visible_in_tree() else Place.Draw.HIDDEN
+		place.draw_at(global_transform * placed, MediaView.softness(offset), blank_weight, mode, order - _PLACES)
+		order += 1
+
+
+## The title's resting top through the screen camera, cached per fitted model with the canvas size
+## it was measured for (x, y, then the top). While the properties lend the model out it cannot be
+## measured again: the last top stands.
+func title_top() -> float:
+	var frame := camera.get_viewport().get_visible_rect().size if camera else CarouselLayout.FRAME
+	var model := _models[selected_game().medium]
+	var place: Place = _placed.get(selected_index())
+	var kept: Vector3 = _title_tops.get(model, Vector3(NAN, NAN, 0.0))
+	var instance := place.shown.get_child(0) as Node3D if place else null
+	if Vector2(kept.x, kept.y) != frame and instance:
+		var layout := GamesLayout.new(ConsoleManifest.folder_of(model))
+		kept = Vector3(frame.x, frame.y, TitlePlace.top(TitlePlace.vertices(instance),
+			layout.chosen, camera.global_transform if camera else TitlePlace.CAMERA, frame, camera.fov if camera else 32.0))
+		_title_tops[model] = kept
+	return kept.z
 
 
 func _free_place() -> Place:
@@ -452,22 +507,91 @@ class Place extends Node3D:
 	var game := -1
 	var shown: LabelledModel
 	var _models: Dictionary[PackedScene, LabelledModel] = {}
+	var layout: GamesLayout
+	var lit: StudioLights.Rig
+	var blank: StudioLights.Rig
+	## One view per place, kept while the place lives: a place is reused by the games of the row, not
+	## made again at each move.
+	var media_view: MediaView
+	var _blank_weight := -1.0
 
 	## Frees its models of the media not among [param models].
 	func keep_models(models: Array[PackedScene]) -> void:
 		for model: PackedScene in _models.keys():
 			if model not in models:
+				if _models[model] == shown and media_view:
+					shown.reparent(self, false)
+					media_view.free()
+					media_view = null
 				_models[model].free()
 				_models.erase(model)
 
 	## Shows [param model], made the first time it is used here.
 	func use_model(model: PackedScene) -> void:
+		if model in _models and _models[model] == shown:
+			return
+		if media_view:
+			shown.reparent(self, false)
+			media_view.free()
+			media_view = null
 		if model not in _models:
 			_models[model] = LabelledModel.new(model)
 			add_child(_models[model])
+			var instance := _models[model].get_child(0) as Node3D
+			instance.transform = TitlePlace.fitting(instance) * instance.transform
+			_models[model].to_real_size = instance.transform.affine_inverse()
 		shown = _models[model]
 		for made: LabelledModel in _models.values():
 			made.visible = made == shown
+		var medium := ConsoleManifest.folder_of(model)
+		layout = GamesLayout.new(medium)
+		lit = StudioLights.rig_of(medium, &"games")
+		blank = StudioLights.rig_of(medium, &"games", true)
+
+	func hide_view() -> void:
+		if media_view:
+			media_view.hide()
+			media_view.set_process(false)
+			media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
+
+	## Where its medium is drawn: in its own view, in the main world (the launch has it outside the
+	## row), or nowhere.
+	enum Draw { SHOWN, OUTSIDE, HIDDEN }
+
+	func draw_at(at: Transform3D, softness: float, weight: float, mode: Draw, order: int) -> void:
+		var camera := (get_parent() as ShelfRow).camera
+		if not camera:
+			return
+		if mode == Draw.OUTSIDE:
+			if media_view and shown.get_parent() != self:
+				shown.reparent(self, false)
+			hide_view()
+			return
+		if mode == Draw.HIDDEN:
+			hide_view()
+			return
+		if not media_view:
+			media_view = MediaView.new()
+			media_view.camera = camera
+			add_child(media_view)
+			remove_child(shown)
+			media_view.show_medium(shown, lit, blank)
+			_blank_weight = -1.0
+		elif shown.get_parent() == self:
+			shown.reparent(media_view.holder(), false)
+			shown.dirty = true
+		var redraw := shown.dirty or not media_view.visible
+		media_view.show()
+		media_view.set_process(true)
+		media_view.z_index = order
+		# A change below one percent relights nothing visible; the ends are still reached exactly.
+		if weight != _blank_weight and (absf(weight - _blank_weight) >= 0.01 or weight in [0.0, 1.0]):
+			media_view.crossfade(weight)
+			_blank_weight = weight
+		media_view.place(at, softness)
+		if redraw:
+			media_view.view().render_target_update_mode = SubViewport.UPDATE_ONCE
+		shown.dirty = false
 
 
 ## A model and the label drawn for it, in its own small viewport shaped like the model's `Label`
@@ -504,6 +628,8 @@ class LabelledModel extends Node3D:
 	var _demo_art := ShaderMaterial.new()
 	## Whether its label shows the blank drawn in its viewport, not an image.
 	var _blank := false
+	var dirty := true
+	var _blur := 0.0
 
 	func _init(model: PackedScene) -> void:
 		alive += 1
@@ -548,6 +674,9 @@ class LabelledModel extends Node3D:
 		if what == NOTIFICATION_PREDELETE:
 			alive -= 1
 
+	func is_blank() -> bool:
+		return _blank
+
 	func clear_label() -> void:
 		_label(&"has_label", false)
 		_blank = false
@@ -590,6 +719,7 @@ class LabelledModel extends Node3D:
 		_redraw_ring()
 
 	func _redraw_ring() -> void:
+		dirty = dirty or _blank
 		_ring.queue_redraw()
 		if _blank:
 			_view.render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -614,12 +744,19 @@ class LabelledModel extends Node3D:
 	## Turns the model [param angle] radians about its own axis, its label blurred over
 	## [param blur] radians as when it spins fast.
 	func spin(angle: float, blur: float) -> void:
-		transform = Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO)
-		_label(&"spin_blur", blur)
+		var turned := Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO)
+		dirty = dirty or transform != turned
+		transform = turned
+		# Told every frame while it stands launched: only a blur that changed is a look that changed.
+		if blur != _blur:
+			_blur = blur
+			_label(&"spin_blur", blur)
 
 	## Fades the model [param amount], from 0 (opaque) to 1 (gone).
 	func fade(amount: float) -> void:
+		dirty = dirty or _fade.amount != amount
 		_fade.apply(amount)
 
 	func _label(parameter: StringName, value: Variant) -> void:
+		dirty = true
 		_fade.set_shader_value(_label_mesh, parameter, value)

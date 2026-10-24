@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://screens/choice_list.gd" id="1"]
+[ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
 
 [node name="ChoiceList" type="Control"]
 visible = false
@@ -45,6 +46,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"PanelTitle"
 horizontal_alignment = 1
+script = ExtResource("studio_label")
 
 [node name="Scroll" type="ScrollContainer" parent="Panel/Rows"]
 unique_name_in_owner = true

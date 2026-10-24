@@ -2,7 +2,7 @@
 extends GdUnitTestSuite
 
 const Fixtures := preload("res://test/carousel/fixtures.gd")
-const CONSOLES: Array[String] = ["ps2", "gc", "gba", "dc", "n64", "psp"]
+const CONSOLES: Array[String] = ["ps2", "gc", "gba", "snes", "n64", "psx"]
 
 
 ## Some of the consoles, in an order drawn by [param random].

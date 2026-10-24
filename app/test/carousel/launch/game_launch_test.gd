@@ -39,8 +39,8 @@ var _spun := 0.0
 
 func test_INV_E3_04_INV_E3_05_whatever_the_launch_comes_to_the_carousel_shows_again_as_it_was_and_nothing_acted_meanwhile() -> void:
 	# Games put into their console by its own steps (the black grown from the seat, the screen faded),
-	# by the placeholder (the NES as if it had no steps of its own), and one inserted by its medium.
-	for platform: String in ["ps2", "gba", "nes", "atari2600"]:
+	# and by the placeholder (the NES as if it had no steps of its own).
+	for platform: String in ["ps2", "gba", "nes"]:
 		var carousel := await _carousel(platform)
 		if platform == "nes":
 			var manifest: ConsoleManifest = carousel._appearance.console_of("nes").duplicate()
@@ -239,8 +239,11 @@ func test_INV_E10_05_a_game_goes_into_its_console_from_as_far_as_its_own_medium_
 ## The carousel on the games screen of [param platform].
 func _carousel(platform := "gba") -> Carousel:
 	var carousel: Carousel = await Fixtures.shown_carousel(self)
-	while carousel._shelves[carousel._shelf].platform_id != platform:
+	for i in carousel._shelves.size():
+		if carousel._shelves[carousel._shelf].platform_id == platform:
+			break
 		Fixtures.press(carousel, &"carousel_right")
+	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal(platform)
 	Fixtures.press(carousel, &"ui_accept")
 	Fixtures.step_until(carousel, Carousel.Screen.GAMES)
 	return carousel
@@ -313,10 +316,11 @@ func _assert_on_the_console_spindle(carousel: Carousel) -> void:
 	var console: ConsoleModel = carousel._consoles.selected().model
 	var place: ShelfRow.Place = row._placed[row.selected_index()]
 	var seat := row.global_transform.affine_inverse() * console.global_transform * console.seat()
-	assert_bool(place.transform.origin.is_equal_approx(seat.origin)).is_true()
+	var model: Node3D = place.shown._label_mesh.get_parent()
+	var on_console := console.global_transform * console.seat()
+	assert_bool(model.global_position.is_equal_approx(on_console.origin)).is_true()
 	assert_float(place.transform.basis.z.normalized().dot(seat.basis.z.normalized())).is_equal_approx(1.0, 0.0001)
 	# At its real size, whatever its size in the row: as large as its console has it.
-	var model: Node3D = place.shown._label_mesh.get_parent()
 	assert_vector(model.global_basis.get_scale()).is_equal_approx(console.global_basis.get_scale(), Vector3.ONE * 0.0001)
 
 
@@ -372,12 +376,14 @@ func _assert_as_before_the_launch(carousel: Carousel, as_it_was: Dictionary[Canv
 	var row := carousel._row
 	assert_bool(row._launched).is_false()
 	var place: ShelfRow.Place = row._placed[row.selected_index()]
-	var offset: float = CarouselLayout.offsets(row._games.size(), row._scroll)[row.selected_index()]
-	var laid_out := CarouselLayout.place(offset)
+	var offset: float = GamesLayout.offsets(row._games.size(), row._scroll)[row.selected_index()]
+	var model := row._models[row.selected_game().medium]
+	var layout := GamesLayout.new(ConsoleManifest.folder_of(model))
+	var laid_out := layout.standing(offset)
 	assert_bool(place.shown.transform.is_equal_approx(Transform3D.IDENTITY)).is_true()
 	assert_float(place.transform.origin.x).is_equal_approx(laid_out.origin.x, 0.0001)
 	assert_float(place.transform.origin.z).is_equal_approx(laid_out.origin.z, 0.0001)
-	assert_float(place.shown._fade.amount).is_equal_approx(CarouselLayout.fade(offset), 0.0001)
+	assert_float(place.shown._fade.amount).is_equal_approx(0.0, 0.0001)
 	for control: CanvasItem in carousel._game_launch.controls:
 		assert_float(control.modulate.a).is_equal(as_it_was[control])
 	assert_bool(carousel._game_launch.blackout.visible).is_false()

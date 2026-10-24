@@ -8,6 +8,7 @@ import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.ParsedSerializer
 import app.cartouche.core.files.FileFacts
+import app.cartouche.core.files.Shell
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
@@ -28,6 +29,7 @@ import arrow.core.separateEither
 import arrow.core.serialization.NonEmptyListSerializer
 import arrow.core.serialization.OptionSerializer
 import arrow.core.toNonEmptyListOrNone
+import arrow.core.toOption
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -156,6 +158,10 @@ public data class Game(
     @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     public val displayName: Option<DisplayName> = None,
+    /** The shell its first file's header tells; left out of the stored library while unknown, as it is for most games. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val shell: Shell = Shell.UNKNOWN,
 ) {
     /** Whether the reference list knows the game: as an exact disc, or by the serials of its release. */
     public val identified: Boolean get() = redumpName.isSome() || serials.isNotEmpty()
@@ -279,6 +285,7 @@ public data class Scan(
             val name: GameName,
             val byContent: Option<Identification>,
             val byName: Option<Identification>,
+            val shell: Shell,
         )
 
         private val FILE_ORDER = compareBy<ListedFile>({ it.name.value }, { it.uri.value })
@@ -309,7 +316,8 @@ public data class Scan(
             val tooSmall = file.sizeBytes.isSome { it < platform.profile.minimumGameBytes }
             // A known game is kept whatever its name or size (a Redump title may mention a SCPH accessory).
             ensure(known || !(tooSmall || BIOS.containsMatchIn(file.name.value))) { IgnoredFile(file, IgnoreReason.NOT_A_GAME) }
-            Candidate(file, name, byContent, byName)
+            val shell = (facts[file.uri] as? FileFacts.Print).toOption().fold({ Shell.UNKNOWN }, FileFacts.Print::shell)
+            Candidate(file, name, byContent, byName, shell)
         }
 
         /**
@@ -332,9 +340,82 @@ public data class Scan(
                 serials = known.toList().flatMap { disc -> disc.fold({ emptyList() }, Identification::serials) }.distinct(),
                 redumpName = exact.map(KnownTitle::text),
                 discs = discs.map { Disc(it.name.disc, it.file) },
+                shell = first.shell,
             )
         }
     }
+}
+
+/** The models a supported console can show. The first of each platform is its base model. */
+@Serializable
+public enum class ConsoleVariant(public val platform: PlatformId, public val wire: String) {
+    @SerialName("ps2_slim")
+    PS2_SLIM(PlatformId("ps2"), "ps2_slim"),
+
+    @SerialName("ps2_fat")
+    PS2_FAT(PlatformId("ps2"), "ps2_fat"),
+
+    @SerialName("gba")
+    GBA(PlatformId("gba"), "gba"),
+
+    @SerialName("gba_sp")
+    GBA_SP(PlatformId("gba"), "gba_sp"),
+
+    @SerialName("gb")
+    GB(PlatformId("gb"), "gb"),
+
+    @SerialName("gbc")
+    GBC(PlatformId("gbc"), "gbc"),
+
+    @SerialName("gc")
+    GC(PlatformId("gc"), "gc"),
+
+    @SerialName("n64")
+    N64(PlatformId("n64"), "n64"),
+
+    @SerialName("nes")
+    NES(PlatformId("nes"), "nes"),
+
+    @SerialName("snes")
+    SNES(PlatformId("snes"), "snes"),
+
+    @SerialName("psx")
+    PSX(PlatformId("psx"), "psx"),
+
+    @SerialName("wii")
+    WII(PlatformId("wii"), "wii"),
+
+    @SerialName("xbox")
+    XBOX(PlatformId("xbox"), "xbox"),
+
+    @SerialName("xbox360")
+    XBOX360(PlatformId("xbox360"), "xbox360"),
+    ;
+
+    public companion object {
+        public fun base(platform: PlatformId): Option<ConsoleVariant> = entries.firstOrNone { it.platform == platform }
+
+        public fun of(platform: PlatformId, id: String): Either<VariantError, ConsoleVariant> = either {
+            entries
+                .firstOrNone { it.platform == platform && it.wire == id }
+                .getOrElse { raise(VariantError.Unknown(platform, id)) }
+        }
+    }
+}
+
+/** A variant belongs to its console and can only change once that console is set up. */
+public sealed interface VariantError {
+    public data class Unknown(public val platform: PlatformId, public val id: String) : VariantError
+
+    public data class NotInLibrary(public val platform: PlatformId) : VariantError
+}
+
+/** Why a console was not placed. [NotInLibrary]: it is not set up, has no games yet or is not among the platforms shown. */
+public sealed interface PlacementError {
+    public data class NotInLibrary(public val platform: PlatformId) : PlacementError
+
+    /** [gap] is not from 0 to [consoles], the number of the other consoles. */
+    public data class GapOutOfRange(public val gap: Int, public val consoles: Int) : PlacementError
 }
 
 /**
@@ -358,8 +439,22 @@ public data class Library(
     @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     public val consoleOrder: List<PlatformId> = emptyList(),
+    /** Each console's chosen model; libraries without choices keep the base models. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val consoleVariants: Map<PlatformId, ConsoleVariant> = emptyMap(),
 ) {
     public fun setup(platform: PlatformId): PlatformSetup = setups.getOrElse(platform) { PlatformSetup() }
+
+    public fun variantOf(platform: PlatformId): Option<ConsoleVariant> =
+        consoleVariants.getOrNone(platform).fold({ ConsoleVariant.base(platform) }, ::Some)
+
+    /** Changes only the model of a console already set up; unknown or foreign ids leave it unchanged. */
+    public fun withVariant(platform: PlatformId, id: String): Either<VariantError, Library> = either {
+        ensure(platform in setups) { VariantError.NotInLibrary(platform) }
+        val variant = ConsoleVariant.of(platform, id).bind()
+        copy(consoleVariants = consoleVariants + (platform to variant))
+    }
 
     public fun game(id: GameId): Option<Game> = games.firstOrNone { it.id == id }
 
@@ -406,18 +501,35 @@ public data class Library(
         skippedFolders = skippedFolders - platform,
         consoleNames = consoleNames - platform,
         consoleOrder = consoleOrder - platform,
+        consoleVariants = consoleVariants - platform,
     )
 
-    /** [platform]'s console shown as [name], or under its own name, [own], again when none or when [name] is it. */
-    public fun withConsoleName(platform: PlatformId, name: Option<DisplayName>, own: String): Library =
-        copy(consoleNames = name.filter { it.text != own }.fold({ consoleNames - platform }) { consoleNames + (platform to it) })
-
-    /** Consoles shown in [order] from now on; those put somewhere before and not in it follow, in their order. */
+    /**
+     * Consoles shown in [order] from now on; those put somewhere before and not in it follow, in their order. A
+     * console without games is not shown ([shown]), so a position given to one only takes effect once it has games.
+     */
     public fun withConsoleOrder(order: List<PlatformId>): Library = copy(consoleOrder = (order + consoleOrder).distinct())
 
     /** [platforms] in the order the user put their consoles in: those put somewhere first, then the others as given. */
     public fun inConsoleOrder(platforms: List<PlatformId>): List<PlatformId> =
         (consoleOrder.filter { it in platforms } + platforms).distinct()
+
+    /** The consoles with games of [platforms] as the carousel shows them: [inConsoleOrder], those without games left out. */
+    public fun shown(platforms: List<PlatformId>): List<PlatformId> =
+        inConsoleOrder(platforms).filter { platform -> games.any { it.platform == platform } }
+
+    /**
+     * [platform]'s console, which must be shown (set up, with games, among [platforms]), put between the consoles of [shown] ([platforms] as [inConsoleOrder] takes
+     * them) at `gap - 1` and `gap`, the others keeping their order; [gap] counts from 0 to the number of
+     * the other consoles, which the end of the row reaches.
+     */
+    public fun withConsoleAt(platform: PlatformId, gap: Int, platforms: List<PlatformId>): Either<PlacementError, Library> = either {
+        val consoles = shown(platforms)
+        ensure(platform in setups && platform in consoles) { PlacementError.NotInLibrary(platform) }
+        val others = consoles - platform
+        ensure(gap in 0..others.size) { PlacementError.GapOutOfRange(gap, others.size) }
+        withConsoleOrder(others.take(gap) + platform + others.drop(gap))
+    }
 
     /** Records [disc] (an index into the game's discs, kept within them) as the one launched last. */
     public fun withLastDisc(id: GameId, disc: Int): Library = withGame(id) { it.copy(lastDisc = disc.coerceIn(it.discs.indices)) }

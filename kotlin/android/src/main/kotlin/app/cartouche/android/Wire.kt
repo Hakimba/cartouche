@@ -28,9 +28,11 @@ import app.cartouche.core.library.GameId
 import app.cartouche.core.library.IgnoredCount
 import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.Library
+import app.cartouche.core.library.PlacementError
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.SkipReason
 import app.cartouche.core.library.SkippedFolder
+import app.cartouche.core.library.VariantError
 import app.cartouche.core.platforms.Candidate
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.LaunchError
@@ -89,6 +91,9 @@ internal enum class ErrorCode(val wire: String) {
     NO_PLAYER("no_player"),
     GAME_MISSING("game_missing"),
     UNKNOWN_PLATFORM("unknown_platform"),
+    UNKNOWN_VARIANT("unknown_variant"),
+    NOT_IN_LIBRARY("not_in_library"),
+    GAP_OUT_OF_RANGE("gap_out_of_range"),
     UNKNOWN_GAME("unknown_game"),
     NO_FOLDER("no_folder"),
     ACTIVITY_NOT_FOUND("activity_not_found"),
@@ -185,6 +190,22 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
     is LibraryFailure.UnknownGame -> failure(ErrorCode.UNKNOWN_GAME, message)
     is LibraryFailure.NoDisc -> failure(ErrorCode.INVALID_REQUEST, message)
     is LibraryFailure.UnknownPlatform -> failure(ErrorCode.UNKNOWN_PLATFORM, message)
+    is LibraryFailure.Placement ->
+        failure(
+            when (error) {
+                is PlacementError.NotInLibrary -> ErrorCode.NOT_IN_LIBRARY
+                is PlacementError.GapOutOfRange -> ErrorCode.GAP_OUT_OF_RANGE
+            },
+            message,
+        )
+    is LibraryFailure.Variant ->
+        failure(
+            when (error) {
+                is VariantError.Unknown -> ErrorCode.UNKNOWN_VARIANT
+                is VariantError.NotInLibrary -> ErrorCode.NOT_IN_LIBRARY
+            },
+            message,
+        )
     is LibraryFailure.TooManyEntries -> failure(ErrorCode.TOO_MANY_FILES, message)
 }
 
@@ -205,7 +226,12 @@ internal fun Library.toWireJson(shelves: Option<Shelves>, catalog: Catalog): Str
     put("not_games", notGames.toJson(PlatformId::value) { files -> files.toJson { JsonPrimitive(it.name.value) } })
     put("ignored_counts", ignoredCounts.toJson(PlatformId::value) { counts -> counts.toJson({ it.wire }) { it.toJson() } })
     put("skipped_folders", skippedFolders.toJson(PlatformId::value) { folders -> folders.toJson { it.toJson() } })
-    put("console_names", consoleNames.toJson(PlatformId::value) { JsonPrimitive(it.text) })
+    put(
+        "console_variants",
+        buildJsonObject {
+            setups.keys.forEach { platform -> variantOf(platform).onSome { put(platform.value, it.wire) } }
+        },
+    )
     shelves.onSome { put("shelves", it.toJson(games.withIndex().associate { (at, game) -> game.id to at })) }
 }.toString()
 
@@ -327,13 +353,14 @@ internal val EdgeSmoothing.wire: String
         }
 
 /**
- * `{"first_launch", "button_style"?, "edge_smoothing", "preferred_region"?, "preferred_regions"}`:
+ * `{"first_launch", "button_style"?, "edge_smoothing", "games_float", "preferred_region"?, "preferred_regions"}`:
  * the style and the region are absent until one is chosen; the regions are those a preference can
  * name, as [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes.
  */
 internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
     "first_launch" to firstLaunch,
     "edge_smoothing" to edgeSmoothing.wire,
+    "games_float" to gamesFloat,
     "preferred_regions" to PreferredRegion.entries.map { it.region }.toTypedArray(),
 ).putSome("button_style", buttonStyle.map { it.wire })
     .putSome("preferred_region", preferredRegion.map { it.region })
@@ -443,9 +470,13 @@ internal data class Rescraped(val games: Int, val labels: Int, val failures: Lis
 
 internal fun Rescraped.toWire(): Dictionary = dictionary("games" to games, "labels" to labels, "failures" to failures.toTypedArray())
 
+internal fun Catalog.offeredToWire(): Array<Any> =
+    offered.toWireArray { dictionary("id" to it.platform.value, "model" to it.model).putSome("maker", it.maker) }
+
 internal fun Catalog.toWire(): Dictionary = dictionary(
     "platforms" to platforms.toWireArray { dictionary("id" to it.id.value, "name" to it.name, "media" to it.profile.media.wire) },
     "rejected" to rejected.toWireArray { dictionary("source" to it.source, "detail" to it.message) },
+    "offered" to offeredToWire(),
 )
 
 internal fun Player.toWire(): Dictionary = dictionary("player_id" to id.value, "player_name" to name)

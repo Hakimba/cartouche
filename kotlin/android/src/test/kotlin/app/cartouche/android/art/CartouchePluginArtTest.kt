@@ -19,6 +19,7 @@ import app.cartouche.core.art.texture
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.Library
+import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.game
 import app.cartouche.core.platforms.ArtKind
 import app.cartouche.core.platforms.Catalog
@@ -237,7 +238,7 @@ class CartouchePluginArtTest {
         val plugin = CartouchePlugin(godot)
 
         // Godot's instance, made once, keeps the context of the first test: the plugin's files are there.
-        private val files = godot.context.filesDir
+        val files = godot.context.filesDir
         val store = ArtStore(File(files, "art"))
         val told = mutableListOf<LabelNews>()
         val scraper = Scraper(store, FakeFetch(emptyMap()), scope, Textures.NONE, { _, _ -> }) { _, news -> told += news.toList() }
@@ -285,6 +286,34 @@ class CartouchePluginArtTest {
         h.planned()
         h.store.asked(okage.id).shouldBeSome()
         h.waiting() shouldContain okage.id
+        h.scope.cancel()
+    }
+
+    @Test
+    fun `INV-E12-C1-02 games float is stored once saved, and read back with the settings`() {
+        val h = Planned(okage)
+        ReflectionHelpers.callInstanceMethod<AppSettings>(h.plugin, "storedSettings").gamesFloat shouldBe false
+        h.plugin.saveGamesFloat(1, true)
+        h.scope.runCurrent()
+        ReflectionHelpers.callInstanceMethod<AppSettings>(h.plugin, "storedSettings").gamesFloat shouldBe true
+        h.plugin.saveGamesFloat(2, false)
+        h.scope.runCurrent()
+        ReflectionHelpers.callInstanceMethod<AppSettings>(h.plugin, "storedSettings").gamesFloat shouldBe false
+        h.scope.cancel()
+    }
+
+    @Test
+    fun `INV-E12-C1-03 a console is placed once asked, kept after a restart, and a gap out of range changes nothing`() {
+        val h = Planned(okage)
+        val store = LibraryStore(File(h.files, "library.json"))
+        val setUp = store.load().shouldBeRight().library.withSetup(PlatformId("ps2"), PlatformSetup())
+        store.save(setUp).shouldBeRight()
+        h.plugin.placeConsole(1, "ps2", 5)
+        h.scope.runCurrent()
+        store.load().shouldBeRight().library.consoleOrder.shouldBeEmpty()
+        h.plugin.placeConsole(2, "ps2", 0)
+        h.scope.runCurrent()
+        store.load().shouldBeRight().library.consoleOrder shouldBe listOf(PlatformId("ps2"))
         h.scope.cancel()
     }
 

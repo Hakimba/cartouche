@@ -85,7 +85,7 @@ The same words are used in the code, the tests and this document.
   from 2 s in Godot's low processor mode, its loop running about 30 times a second (the engine's
   frame rate is never capped: lifting a cap leaves frames slow for about a second), then
   **still** from 6.2 s, drawn only when something on screen changes, until the next press. What moves
-  by itself (the backdrop's dots, the pose's float and sway, the welcome's worm) joins the group
+  by itself (the pose's float and sway, the welcome's worm) joins the group
   `paced` and goes at its **pace**, from 1 awake down to 0 still.
 - **Consoles screen**: the first screen, one **console** per platform with games (its 3D model,
   or its media until it has one), in a row laid out like the games'. **Going in** (A) and **going
@@ -174,9 +174,11 @@ The same words are used in the code, the tests and this document.
   order they are tried; the choice keeps both), or a **picture of their own**, picked with
   the system's picker and **framed** on the label (`LabelFraming`: a zoom and a centre, standing for a
   rectangle of the picture of the label's proportions), which no scraping replaces.
-- **Display name**: a name the user gave a game or a console (`DisplayName`, typed on the
-  properties' gamepad keyboard), shown in place of its own; identification and art keep using a
-  game's title, and its shelf its title's order.
+- **Display name**: a game's name entered on the properties' gamepad keyboard (`DisplayName`),
+  shown in place of its own; identification and art keep using its title, and its shelf its title's
+  order. Console names saved by older versions remain in the library; console properties show a
+  logo and offer no name editor. The old library format still reads; the plugin no longer exposes a
+  console rename operation.
 - **Tap, long press, drag, swipe**: what a finger does: `Finger` reads a tap (a short press that
   barely moves), a long press (one held still) and a drag (one that moved past the slop); the
   carousel reads a drag on the consoles screen, or beside the game in the middle, as a swipe,
@@ -204,16 +206,26 @@ The same words are used in the code, the tests and this document.
 - **Screens**: what shows in front of the carousel, over its background alone: the **welcome** at each
   start, a title screen that waits for a button while the app loads; on the **first launch** (no
   controller set up and no platform), the **button style** (how buttons are drawn: Nintendo, Xbox or
-  PlayStation) and the **curtain permission**; while no console has games, **no console** and the
-  **form** adding one, whose **count** (the compatible games of the chosen folder) is a scan that
-  saves nothing; then the **discovery** of the console added. Y opens the **settings** over the
-  consoles screen or the games screen: the **platforms** set up, each opened in the same form to
+  PlayStation), the **preferred region of images** (None or the same regions as in settings), then
+  the **curtain permission**. Region and button style use the settings' plugin calls; the style is
+  saved after that choice. A failed first-region save is traced once and setup continues with the
+  choice kept in memory for this run. While no
+  console has games, **no console** and the **form** adding one show. Its **count** (the compatible
+  games of the chosen folder) is a scan that saves nothing. Add leaves the form immediately while
+  saving and scanning show “Adding console…”; failure restores the filled form. Start does not
+  submit. The first two consoles glide from the plinth to the hero without a reward or placing ring;
+  the third and later use the placing ring when another console has a model, otherwise the same glide. Y opens the **settings** over the consoles screen or the
+  games screen: the **platforms** set up, on a dedicated satin logo grid, each opened in the same form to
   **edit** it (saved and scanned again) or **remove** it after a confirmation, the button style, and
   **Graphics**: the edges' smoothing (4×, 2× or none), each card showing a close-up of an edge drawn
   with it, and the **preferred region of images**, chosen in a list (`ChoiceList`) of the regions the settings answer names (`preferred_regions`).
   Above the console, a **"+" ball**: holding up turns it into "Add a platform" (its strokes
   spreading into the button's outline), and A adds one more console, the consoles screen coming back
   on it.
+- **Settings transition**: `SettingsTransition` samples the source model and all chrome, including the
+  rail frame, grounds and games logo. Restoring after an added console preserves its
+  arrival fade. Desktop setting saves use one fallback and keep each choice in memory; desktop variant
+  storage leaves model and setup validation to the Kotlin core.
 - **Settings**: the app's own choices, apart from the library: the button style, the edges'
   smoothing (`EdgeSmoothing`: the 3D's multisampling, 4× unless the user chooses less) and the
   preferred region of labels' images (`PreferredRegion`, none unless the user chooses one).
@@ -221,6 +233,19 @@ The same words are used in the code, the tests and this document.
   the game files stay.
 - **Demo library**: a made-up library of any size, in debug builds, for measuring at scale.
 - **Wire format**: what crosses the JNI bridge between the plugin and GDScript.
+- **Studio**: the app's design: every screen a small lit photo studio, its pieces in satin or frost
+  taking the same light, its text in Plus Jakarta Sans and IBM Plex Mono. Its values are
+  `StudioTokens` (`app/studio/studio_tokens.gd`, generated from the design, never edited by hand).
+- **Cyclorama**: the backdrop of every screen (`Cyclorama`): a paper wall curving into a floor under
+  one warm key light, with the selected console's gel glowing on the wall and the floor.
+- **Gel**: the colour of a console (`StudioTokens.GEL`, by its folder), in which the backdrop's glows,
+  the focus ring and every tinted piece are drawn; it changes with the console in 0.38 s.
+- **Satin**: the design's light opaque material, a gradient from top to bottom with a white edge on top
+  and two soft warm shadows (cards, buttons, fields, the focused card).
+- **Frost**: the design's translucent material, for what lies over the backdrop: the clock and battery
+  pills and the hint row.
+- **Hint row**: the one row of button hints of every screen (`HintRow`), bottom left at one place
+  (INV-E12-09): each hint a key and its label, a thin line between two.
 
 ## Components
 
@@ -274,7 +299,10 @@ The same words are used in the code, the tests and this document.
     games; `LibraryFormat` stores it as versioned JSON and reads earlier formats, which the plugin
     then saves again, upgraded.
 - **`files/`** reads what a game file itself tells about which game it is (`FileFacts`: a serial, a
-  print, or `Silent`). `FileReading.facts` picks the decoder by platform and extension, and every
+  print, or `Silent`). A `Print` also carries the cartridge's `Shell` (Game Boy
+  Color exclusive, GB-compatible or unknown), read from header byte 0x143 for the gb and gbc
+  platforms only; a zipped ROM tells no shell, and its label is cut as before. `Game.shell` keeps
+  its first file's, and `LabelCut` takes the profile's `exclusives` front for an exclusive. `FileReading.facts` picks the decoder by platform and extension, and every
   decoder reads through the `ByteSource` port (the file's size and positional reads, no way to
   write): the Android plugin opens the file, tests hold bytes in memory (`InMemoryBytes`, which can
   also stand for a file of gigabytes). Whatever the bytes, the answer is a `FileFacts`; only the
@@ -460,10 +488,11 @@ The same words are used in the code, the tests and this document.
   form adding a console (`AddConsole`) to edit one. `Controls` holds the button style that
   `ButtonGlyph`, `ButtonHint` and `ButtonMark` draw; the edges' smoothing is the root viewport's
   `msaa_3d`, set at start from the settings and by `EdgeSmoothingScreen`. The theme
-  (`carousel/carousel_theme.tres`) holds the buttons, fields, toggles and focus ring of every
-  screen; the font is Fredoka throughout (`fonts/`, two weights of its variable font). The app's
-  icon is `icon.svg` (the name in Fredoka SemiBold with the titles' white outline, on the
-  carousel's dotted backdrop); `icons/` holds the launcher layers rendered from it, which
+  (`carousel/carousel_theme.tres`) holds the buttons, fields, toggles and focus card of every
+  screen in the Studio design (see "The Studio design" below); the games' labels keep Fredoka
+  (`fonts/fredoka_medium.tres`), every other text is Plus Jakarta Sans or IBM Plex Mono. The app's
+  icon is `icon.svg` (the name in Fredoka SemiBold with the titles' white outline, on a dotted
+  ground); `icons/` holds the launcher layers rendered from it, which
   `export_presets.cfg` names: the full icon, the adaptive background and foreground (the tile
   scaled so the launcher's visible two thirds show all of it), and the monochrome letters.
 - **Controller buttons** (`adapters/android/android_buttons.gd`): on Android, A confirms and B goes
@@ -489,7 +518,7 @@ The same words are used in the code, the tests and this document.
   and band from `appearance.json`), plain until `GameArt.is_absent`, and a `ProgressRing` drawn in
   the label's viewport while its image downloads (centred, at the shape's `progress_ring_radius`: on a disc
   between the hub and the label's edge; in the band's colour, else the ink): the viewport is drawn
-  again only at each progress told, every frame only while a ring of unknown size turns. `CarouselLayout` holds the mechanics as pure functions.
+  again only at each progress told, every frame only while a ring of unknown size turns. `CarouselLayout` holds the consoles row's legacy mechanics and the held-button repeat delays. `GamesLayout` holds the games' presentation geometry.
   `GameSearch` (`carousel/search/`) is the ribbon: the carousel hands it ↓, L1, R1 and, while
   what is found is kept, B; open, it takes every press. It asks the plugin for each view and shows
   it with `ShelfRow.show_games` (the same models, another list) and `ShelfRow.jump`; the pill
@@ -514,8 +543,7 @@ The same words are used in the code, the tests and this document.
   its platform), its moments as metadata; `ConsoleSequence` has the `AnimationPlayer` sample it at
   the times it is given, puts the chosen disc between the row and the console's seat, and draws the
   consoles apart while they blur behind the games (`ConsoleLayer`: a second view of the consoles
-  alone, blurred by `console_layer.gdshader`), the backdrop's dots blurred as much in their own shader
-  (`background.gdshader`'s `blur`), and the consoles leaving as the games come (`Carousel` caps
+  alone, blurred by `console_layer.gdshader`), and the consoles leaving as the games come (`Carousel` caps
   `behind_amount` by the games' `neighbours`). The PS2 slim (`ps2_slim/`) is a `Ps2SlimModel`: its
   `Ps2SlimShape` gives its body, lid, well and strip (`Ps2SlimGeometry`, on `ShapeGeometry`'s
   rounded blocks, shared with the cartridge), its lid turns about its hinge, the drive's
@@ -523,29 +551,55 @@ The same words are used in the code, the tests and this document.
   parts use `carousel/models/solid.gdshader`, colours and finishes as its parameters, rather than
   standard materials: every distinct material is a shader (and its fading copy) that the graphics
   driver keeps in memory, several megabytes each on a handheld.
-- **Console order** (`carousel/consoles/`): `ConsoleOrder` puts the consoles in order on a ring:
-  `ConsoleRow.wheel` takes them from the row to it, each sliding to its slot; `ConsoleWheel` is the
-  ring's rule (no end, the console held trading places as it goes, B giving the old order back),
-  pure and tested alone. The ring's dashed track is drawn on a layer of the backdrop (a
-  `CanvasLayer` at or under the environment's `background_canvas_max_layer`), which the 3D view
-  draws behind it: the consoles stand in front of the track. `ConsoleSticker` draws the console held as a sticker: alone in a view of
-  its own (render layer `ConsoleLayer.STICKER`, which the carousel's camera leaves out; the sun
-  lights that layer too), drawn again only when it moves, then outlined and shadowed by
+- **Console order** (`carousel/consoles/`): `ConsoleOrder` puts the consoles in order on a ring: the consoles with a
+  model stand at even angles on an ellipse (`RingFit`, `studio/ring/ring_fit.gd`, pure: each console at its real size
+  against the PS2's, all on the one scale, the largest at which no two silhouette boxes touch with 15.36 px of room),
+  and a platform without a model has no place on it and keeps its place in the order the plugin keeps. `ConsoleRow`
+  stands each model where `ConsoleRow._stand` says: its silhouette box (`Hero`, the model's mesh projected through
+  the camera at its consoles-screen pose, once per model) lands on its ring place at the size the fit gave it, the
+  console pointed at gliding from the hero's place (`wheel`) and the others coming from the rail (`others_wheel`).
+  Its ellipse is centred at (640, 471.04), with radii (390.4, 325.12), leaving room for the top arrow and its glow.
+  `ConsoleWheel` is the ring's rule (no end, the console held trading places as it goes, B giving the old order back),
+  pure and tested alone. No circle and no name is drawn: the middle shows the pointed console's logo (and, while one
+  is held, "in its place" or "between" two logos), an ink arrow stands outside the pointed console with a gel spot
+  behind it, and each console has its contact shadow (`ContactShadow`) on a layer of the backdrop, which the 3D view
+  draws behind it. Everything follows its target at 14 per second (`RingFit.FOLLOW`). `ConsoleSticker` draws the
+  console held as a sticker: alone in a view of its own (render layer `ConsoleLayer.STICKER`, which the carousel's
+  camera leaves out; the sun lights that layer too), drawn again only when it moves, then outlined and shadowed by
   `sticker.gdshader` only round it.
-- **Properties** (`carousel/properties/`): `PropertiesScreen` holds what a game's and a console's
-  properties share (the staging under the light, the three-part moves, the name's fitting);
-  `NameEditor` is the name's field and keyboard (`GamepadKeyboard`), used by both.
-  `ConsoleProperties` stages the selected console (`ConsoleRow.stage`), its name with a callout on
-  its right, and "Change place" (or Y), which leaves for `ConsoleOrder`. `DiscProperties` stages the selected disc
-  (`ShelfRow.stage` and `staged`, the neighbours fading), shows its zones
-  (`LabelZone`, a black ring drawn as it has the focus, `FocusCallout` naming it with an arrow) and
-  its images (`LabelCard`, `label_thumbnail.gdshader`) and frames a picture of the user's
-  own (`LabelFraming`, the same rule as the core's `LabelFraming`, at the proportions of the model's
-  label face, shown through the label shader's `label_window` without cutting the picture). Any
+- **Placing a console** (`studio/ring/placing.gd`, `ConsoleOrder.place`): from the third console, a console added with the form's Add is placed on the
+  ring of the others before the consoles screen opens on it, unless no other console has a model. `Placing` is the flow's rule, pure: its states (form,
+  arriving, choosing a gap, flying, landing, morphing, flying back, done), the presses each takes and ignores, and the
+  geometry of the gap (`angles`, `arrow_angle`, `landed`, `flight`, `bounce`). `ConsoleOrder` plays it with the ordering
+  ring's parts: `ConsoleRow` stands the others on `ring_angles` (instead of its even slots), each coming in by
+  `ring_arrival`, and the console placed free of the ring (`flier`, `flier_stand`); the morph is the ordering ring's way
+  out. The plugin keeps the order (`place_console`, gap = the ring's g + 1 among every other console shown). The screens
+  hand over through `ScreenFlow.place` (the carousel's `_place_console`): the form goes (`AddConsole.leave`) as the ring comes, and comes
+  back once (`AddConsole.resume`, Add enabled and focused) when B, or a refusal of the plugin, flies the console back; the
+  gap the ring chose maps to `place_console`'s by `Placing.shown_gap`, counting the consoles without a model. `FormEntry` (`studio/transitions/form_entry.gd`) is the
+  consoles screen's half of the "+" button to form transition: the card flying between the button and the form's first
+  field. The first two consoles instead use `ConsoleArrival` (`studio/transitions/console_arrival.gd`),
+  which moves the stand returned by `ConsoleRow.begin_arrival` from the form's plinth position and size
+  to the selected hero in 420 ms, then calls `end_arrival`. Its tween is bound to the row, and removing
+  the row cancels the flight and releases its caller with false, propagated through the carousel. With no other model to place against, the same
+  glide applies regardless of shelf count. Removing a placing ring releases its caller with false.
+- **Properties** (`carousel/properties/`): `PropertiesScreen` holds the shared staging under the
+  light and three-part moves. `DiscProperties` owns the name field and keyboard (`NameEditor`,
+  `GamepadKeyboard`) and its rename signal.
+  `ConsoleProperties` stages the selected console (`ConsoleRow.stage`), its logo, and "Change place"
+  (or Y), which leaves for `ConsoleOrder`; B returns it to the consoles screen.
+  `DiscProperties` lends the selected medium to `MediaView` for its still staging, preserving the
+  original label material and viewport for previews and framing. `LabelZone` outlines the projected
+  label face plus 10 px: a circle for a disc, or a rectangle with 20.48 px corners for a cartridge.
+  `FocusCallout` names the label or name focus on a frost pill with a dot and lead. Projected extents
+  are cached until the medium, camera or viewport changes. The opening and return profiles use
+  typed interval tables and one reversible clock; closing returns the model to its original parent.
+  Its images use `LabelCard` and `label_thumbnail.gdshader`; `LabelFraming` keeps a user's own
+  picture at the model label's proportions through the label shader's `label_window`. Any
   image shows on a label through `label_window` covering its face, centred: one of another shape
   (a Famicom's label on an NES cartridge) is cut, never stretched; each move from one screen to the
-  next plays in three parts (`Move`: what leaves, the 3D moving from one `Staging` to the next, what
-  comes), no press counting meanwhile. Images are read by an `ImageReader` (a worker thread, one
+  next editor plays in three parts (`Move`: what leaves, the 3D moving from one `Staging` to the
+  next, what comes), no press counting meanwhile. Images are read by an `ImageReader` (a worker thread, one
   texture a frame), as `GameArt` reads the games' art. `OperatingLight` (`operating_light.gdshader`)
   draws the light between the backdrop and the 3D.
 - **Launches**: `GameLaunch` (`carousel/launch/`) runs a launch from A to the carousel shown again,
@@ -605,6 +659,13 @@ The same words are used in the code, the tests and this document.
   `bin/dependencies.txt` to Android exports. Gradle writes that file, so versions are only declared
   in `kotlin/gradle/libs.versions.toml`.
 
+The settings card uses `StudioText` over a `SatinPanel`, with its own unscaled rows and a reversible
+clock for the card, dim and hints. `SettingsTransition` presents the source rows through their public
+calls. `ScreenFlow` keeps the floating choice read at startup and updates it after a successful save,
+so opening the card never waits for the plugin. Reads place the switch at once; toggles and failed-save
+rollbacks animate it. During a save, B becomes available after two seconds. The desktop demo keeps
+Games float and the button style in memory for reopening; exports omit that demo.
+
 ## Working on the code
 
 - Build and test commands are in the README. On a device, `dev/logs.sh` follows a debug build's
@@ -624,11 +685,12 @@ The same words are used in the code, the tests and this document.
   how busy the GPU is and at which clock. Every scenario starts on the PS2's games; the device's own
   art is set aside while the scans are downloaded again, then put back as it was.
 - **Keeping it frugal**: left alone, the app rests (`Resting`): from 2 s Godot's low-processor
-  mode draws only what changes, its loop running about 30 times a second; from 5 s what moves by
-  itself (the nodes of the `paced` group, each at its `pace`: the backdrop's dots, the rows' float
+  mode draws only what changes, its loop running about 30 times a second. Optional games floating keeps
+  normal frame pacing until it stops (`Resting.smooth_motion`); from 5 s what moves by
+  itself (the nodes of the `paced` group, each at its `pace`: the rows' float
   and sway, the welcome's worm) slows to a stop, and nothing more is drawn. Anything that moves on its own must join that group,
   or keep the app awake while it plays (`Resting.moving`: labels downloading, a launch, the way into
-  or out of a console, a discovery); other animations (a message) play on at rest, drawn as they
+  or out of a console, a pending add, a direct arrival or the order ring moving or placing); other animations (a message) play on at rest, drawn as they
   change. The screens in front hide the
   carousel under them; on the games screen the consoles behind are not drawn, brought back
   as a game goes into its console or to go out; the media's models are loaded and made ready as a
@@ -684,6 +746,124 @@ The same words are used in the code, the tests and this document.
   (`untyped_declaration`, `unsafe_*`…) set in `project.godot`.
 - Every guarantee in [INVARIANTS.md](INVARIANTS.md) has a test named after its id.
 
+## The Studio design
+
+One idiom per need, for every screen:
+- **Values**: `StudioTokens`, generated by the design's tool from its tokens; a test fails on a hand edit,
+  and the private hook checks it against a fresh generation.
+- **Materials**: `SatinPanel` (a Container; `look` is a `StudioMaterial.Look`: `SATIN`, `FROST`, `KEY`,
+  `PLUS`, `FOCUS`) draws the material behind its children with `satin_panel.gdshader`: the design's
+  gradient, its CSS box-shadows (Gaussian, standard deviation blur / 2, cut out under the box) and its
+  insets. A control drawing its own pieces keeps a `SatinPanel.Backing` and `place`s it on a box.
+  Godot's own controls take `SatinStyle`, the same material as a StyleBox drawn with polygons (a
+  control's StyleBox goes into its own canvas item, where no shader can go); the theme's focus card is
+  `studio/focus.tres`, its ring in the gel of the console a screen in front opens from. The frost's
+  backdrop blur is not drawn, too costly on a handheld.
+- **Backdrop**: `Cyclorama.show_gel(color)` crossfades the gel; `Cyclorama.gel_of(console)` gives a
+  console's. The wall and floor are a baked picture (`studio/cyclorama.png`, a quarter size, smooth
+  enough to stretch), the glows gradient quads over it; nothing moves at rest.
+- **Hints**: `ButtonHint` children of a `HintRow` (`studio/hint_row.tscn`); never a row of their own.
+- **Text**: `StudioText.of(StudioTokens.Role.HINT, text)` (or `StudioText.new(text, face, px,
+  tracking_em, tabular)`) lays a line out to the browser's width at a fractional size and em
+  tracking; `fit(room)` cuts it with an ellipsis; `draw(canvas, at, color)`. `StudioPill` is a line on a
+  frost pill. The theme's Labels and Buttons draw at whole sizes with whole-pixel tracking (a
+  `FontVariation` per tracked size): untracked text lands within half a pixel of the browser's ink, but
+  tracked text drifts with its length (a 15-letter title by some 7 px, a note by 10). Text that must
+  keep the design's width, a title, a kicker, a note or a count, draws through `StudioText`. The screens
+  the redesign has not reached keep theme Labels in tracked roles: the welcome, no console,
+  permission, platform grid, removal, button style, preferred region and edge smoothing screens, the choice list and the
+  field button.
+- **Plinth**: the form, `StudioChooser` and `VariantChooser` show a console as one still picture on a
+  `Plinth` (upright, facing front at its start pose in `data/turntable.json`). `Plinth.request_still`
+  renders it once per model folder in a throw-away `SubViewport` (`get_texture().get_image()` into an
+  `ImageTexture`, the viewport freed), one at a time and the latest asked first, and keeps it for the app's
+  life; until it exists the plinth shows nothing and the picture then rises in. Nothing turns. `plinth_test.gd`
+  puts a stand-in drawer (`Plinth._drawer`) where there is no renderer (headless) and renders for real
+  otherwise; `studio_chooser_test.gd` checks reuse across openings.
+- **Shared values**: `ConsoleManifest.folder_of` reads the containing folder of a manifest or scene;
+  `CarouselLayout.FRAME` is the shared 1280×960 frame. `SatinStyle.apply_to` gives native buttons the
+  same four satin states and focus gel.
+- **Motion**: `Motion.Spring` (presses move its `target`; `step(delta)` until it rests), and
+  `Motion.curve(Motion.Easing.EASE)` for a tween's `set_custom_interpolator`; `Motion.eased` gives a
+  curve's value. No `TRANS_*` easing for a new animation.
+- **Logos**: `LogoView.show_logo(LogoView.Slot.RAIL_TILE, "ps2_slim")`, the pictures made for each slot.
+- **Tests**: `dev/test_godot.sh res://test/studio`. The glyph drawer's ink is checked against the
+  browser's in a window: `$GODOT --path app -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a
+  res://test/studio/fonts_test.gd` (skipped by the headless run).
+
+### Console variants
+
+`ConsoleVariant` in the Kotlin library names each supported model and its platform. `Library.withVariant`
+rejects an unknown model or a model of another platform, and `variantOf` supplies the base model when an older
+library has no saved choice. `LibraryService` writes the choice atomically; setup and variant can be saved
+together by the add-console form. The wire carries effective choices as `console_variants` and reports an
+unknown model as `unknown_variant`.
+
+A base `ConsoleManifest` lists its other model folders in `variants`. Each folder carries its own scene, launch,
+model code and licence. `Appearance.use_variants` selects those manifests and invalidates the changed console's
+cached scene and animations. The row, ring and launch then use the same selected model.
+
+Left and right on a field of `AddConsole` preview its models; Add or Save keeps the choice, Cancel gives it up.
+The switches and the Add/Cancel buttons keep their horizontal navigation. R3, or F3 on a keyboard, opens
+`VariantChooser` on the consoles screen. Left and right preview, A chooses and B cancels. Its plinth belongs to
+the resting group and stops drawing at rest. The desktop demo stores choices in `user://console-variants.json`.
+
+The fat PS2 and the Game Boy Advance SP use their supplied models and launch proposals, with the existing light
+until a light is designed for them. They share their platform's logo. The SP stands open at rest; the fat PS2's
+tray bezel stands slightly in front of the shell. Their exact rest boxes are pinned in `console_folders_test.gd`.
+
+### The consoles screen, its rail and the posed hero
+
+The consoles screen shows the selected console alone, in the pose decided for it, above `ConsoleRail` (`app/studio/rail`), a
+ring of satin `RailTile`s holding each console's `rail-tile` logo. The pose is each console's rest: it is written in
+the first step of its `launch.json` (position and size fitted from its model's box, then corrected against
+the decided pose by offset and size, never the angles; the 83.2 px raise, `ConsoleRow.RAISE_PX`,
+is in the position; sway and bob are 0), so the launch starts from the posed console. `ConsoleRow` keeps the ring's
+position unbounded (`target()`), swaps the console in and out on a step (leavers keep fading from where they were if
+a press comes mid-swap) and moves the floor reflection of each console (no shadow under it) with it (`grounds`). The rail
+follows `ConsoleRow.selection_changed` through `go_to`: the spring (280 / 25) moves the tiles, the frame pops, the gel
+crossfades; at rest the rail draws nothing. `sink` and `rise` move it 51.2 px down and clear. A ring of up to 7 consoles shows whole,
+as a strip (`is_strip`): each console once, side by side, and none ever crosses the rail. The games
+logo is hidden when the games screen starts leaving and shown in place with the games screen; nothing flies. A platform shown by its medium has no tile, hero or ground. A
+console with a light designed for the consoles screen (`StudioLights`) is drawn in `ConsoleRow.HERO` and lit by that
+rig alone; the carousel's Sun does not cull that layer. The baked ground fades across the first 15 degrees
+of inspection and returns as the console returns to its pose. A console leaving during inspection keeps its
+ground's opacity through the swap. Covered screens and empty libraries show neither rail nor ground.
+After ordering, the rail takes the row's new order and selected console before it reappears. A tap on a
+moving rail counts from its target; a hidden or fully sunk rail takes no tap. A swap back to a console
+still leaving starts from that console's current position, size and opacity.
+
+### The games screen
+
+`ShelfRow` recycles five places regardless of library size. `GamesLayout.offsets` uses the media view's
+drawing order on a bounded segment of the ring. The selected game's decided pose, the straight neighbours,
+their sizes and the parabola come from `GamesLayout`, through `MediaView.standing`. Each displayed place
+owns one `MediaView` of the fitted `LabelledModel`. The same labelled model returns to the main world
+for inspection in properties and insertion, so its label, progress ring and real-size transform stay intact.
+`frame_origin` compensates the launch tracks' shared row height to match the design camera.
+
+`Motion.Spring` follows each press with stiffness 280 and damping 25. The row passes the blank-light
+share and the distance softness to every view, redraws labels when they change, and places each medium
+once more when it settles. The row sets the room energy on the games and their properties; other screens keep the scene's own.
+`games_float` is off by default, read at startup and after settings close. Closing the card invalidates
+an outstanding save: a late answer changes neither the hidden knob nor the last confirmed value in
+this run; a later startup reads whatever the plugin stored. When enabled, the chosen game
+only rises and sways, at `Resting`'s pace and normal frame rate until still. Neighbours remain still.
+Only its view redraws while floating; unchanged softness does not rebuild the lighting.
+A settled view is framed once, then left alone until its pose or canvas changes.
+
+`TitlePlace` fits the model to a 1.2-unit face, centred on its bounds, and projects every mesh vertex.
+The title's top is its lowest projected vertex plus 20.48 px. `ShelfRow.title_top` caches that result per
+model and canvas size through the screen camera, using the 1280 by 960 frame when no camera is attached. `GameTitlePill` draws the title through `StudioText`, with the
+38.4 px key and radius, one-line ellipsis at 1152 px, search matches, and a 300 ms glide between heights.
+`LogoView` (games top slot) draws its native 416 by 101 picture at scale 1, including the transparent
+outline and shadow margins. The flight stays transparent while the console opens and appears with the games.
+The games hints fade in after entry.
+The search ribbon, letter leaps, filter and launch sequence keep their actions.
+
+Targeted checks are `dev/test_godot.sh res://test/studio/games res://test/carousel/shelf_row_test.gd`.
+The title projection test checks all fifteen medium models against the actual Godot camera.
+
 ## Adding a console
 
 A console is one folder, `app/carousel/consoles/<id>/` (`ps2_slim/` is the example); adding one
@@ -705,7 +885,7 @@ touches no other file.
   value)`, the one way a part changes a material: on the mesh's own material
   and on the copy it fades through, before the model is ready or after (a material a part changes
   is `resource_local_to_scene`, on the mesh instance, so that two consoles of a kind light apart).
-  A console's light is the contract's own `light_energy`, the glow of its scene's `%Light` mesh:
+  A console's light is the contract's own `light_energy`, the glow of its `_lights()` (its scene's `%Light` mesh by default):
   a console with one lists it among its moving parts as a `LIGHT`.
   `moving_parts()`, `seat()`,
   `approach()` and `presented()` depend only on the shape and the parts' properties, never on the
@@ -732,6 +912,17 @@ touches no other file.
   console shows; a node per moving part, its origin the part's pivot), `<id>_model.gd`
   (`<Id>Model extends ConsoleModel`), `console.tres` (the manifest) and, once animated,
   `launch.json`. Without it the console plays the placeholder.
+- **A console drawn from a glb** (the NES, the Game Boy Color, the Super Nintendo) holds `<id>.glb` (a
+  credited CC-BY model), its `LICENSE.txt` and its credit
+  line in the README's "3D models" list (a test fails without both), instead of `<id>_geometry.gd` and
+  the SVG logos, which the glb's atlas holds. Its scene instances the glb as `Model` (editable, only
+  to give the light's mesh `resource_local_to_scene` solid material) and its model moves the glb's
+  nodes by name, from the rest the glb gives them (`$Model/<id>/door`: Godot wraps the glb's root).
+  The glb's `.import` sets `nodes/root_scale=10` (the app's unit is 10 cm, a glb's the metre), no lods
+  and no shadow meshes (no carousel light casts shadows), and has no embedded images: its three textures sit beside it as PNG files the glb names, imported
+  VRAM-compressed with mipmaps, the normal map flagged, so that they are stored once. The shape extends `GlbShape`: it
+  builds no mesh, and holds only what the launch reads (the seat, the parts' travel). The model
+  overrides `_lights()` to name the glowing meshes, as a glb's nodes are not the scene's own.
 - **A logo** is drawn by us as an SVG in the folder (never copied from a file), imported with
   `mipmaps/generate` on, uncompressed, at an `svg/scale` that gives it 8 pixels a millimetre at
   least, its background the colour of the surface it lies on. Its face is

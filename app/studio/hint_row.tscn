@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://studio/hint_row.gd" id="1"]
+
+[node name="HintRow" type="Container"]
+offset_left = 40.0
+offset_top = 878.0
+offset_right = 40.0
+offset_bottom = 922.0
+mouse_filter = 2
+script = ExtResource("1")

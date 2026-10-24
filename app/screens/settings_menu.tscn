@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://screens/settings_menu.gd" id="1"]
-[ext_resource type="PackedScene" path="res://screens/menu_row.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://screens/settings_row.tscn" id="2"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 [ext_resource type="PackedScene" path="res://screens/choice_list.tscn" id="4"]
 
 [node name="SettingsMenu" type="Control"]
@@ -23,60 +24,57 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.094, 0.102, 0.125, 0.42)
+color = Color(0.235294, 0.172549, 0.117647, 0.16)
 
-[node name="Panel" type="PanelContainer" parent="."]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -300.0
-offset_right = 300.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_type_variation = &"FormPanel"
+[node name="Panel" type="Control" parent="."]
+layout_mode = 0
+offset_left = 294.4
+offset_top = 172.8
+offset_right = 985.6
+offset_bottom = 788.48
+mouse_filter = 2
 
-[node name="Items" type="VBoxContainer" parent="Panel"]
-layout_mode = 2
-theme_override_constants/separation = 14
+[node name="Items" type="Control" parent="Panel"]
+layout_mode = 0
+offset_left = 33.28
+offset_top = 143.64
+offset_right = 657.92
+offset_bottom = 585.0
+mouse_filter = 2
 
 [node name="Title" type="Label" parent="Panel/Items"]
-layout_mode = 2
-theme_type_variation = &"PanelTitle"
+visible = false
 text = "Settings"
-horizontal_alignment = 1
 
 [node name="Platforms" parent="Panel/Items" instance=ExtResource("2")]
 unique_name_in_owner = true
-layout_mode = 2
+layout_mode = 0
 label = "Platforms"
 
 [node name="ButtonStyle" parent="Panel/Items" instance=ExtResource("2")]
 unique_name_in_owner = true
-layout_mode = 2
+layout_mode = 0
 label = "Button style"
 
 [node name="Graphics" parent="Panel/Items" instance=ExtResource("2")]
 unique_name_in_owner = true
-layout_mode = 2
+layout_mode = 0
 label = "Graphics"
+
+[node name="GamesFloat" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 0
+label = "Games float"
 
 [node name="Region" parent="Panel/Items" instance=ExtResource("2")]
 unique_name_in_owner = true
-layout_mode = 2
+layout_mode = 0
 label = "Preferred region of images"
 
-[node name="Gap" type="Control" parent="Panel/Items"]
-custom_minimum_size = Vector2(0, 12)
-layout_mode = 2
-mouse_filter = 2
+[node name="Hints" parent="." instance=ExtResource("hint_row")]
 
-[node name="Hint" type="PanelContainer" parent="Panel/Items"]
+[node name="Hint" type="Control" parent="Hints"]
 layout_mode = 2
-size_flags_horizontal = 0
-theme_type_variation = &"PlainHint"
 script = ExtResource("3")
 button = &"b"
 text = "Close"
@@ -90,3 +88,5 @@ layout_mode = 1
 
 [connection signal="pressed" from="Panel/Items/Graphics" to="." method="_on_graphics_pressed"]
 [connection signal="pressed" from="Panel/Items/Region" to="." method="_on_region_pressed"]
+
+[connection signal="pressed" from="Panel/Items/GamesFloat" to="." method="_on_games_float_pressed"]

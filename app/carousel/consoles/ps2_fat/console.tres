@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "ps2"
+version = &"scph-50004"
+is_default = false
+name = "PlayStation 2"
+model_name = "Fat"
+scene = "res://carousel/consoles/ps2_fat/ps2_fat.tscn"
+launch = "res://carousel/consoles/ps2_fat/launch.json"
+triangle_budget = 12000

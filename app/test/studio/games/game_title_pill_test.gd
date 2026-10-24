@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+extends GdUnitTestSuite
+
+
+func test_the_title_pill_uses_the_studio_line_and_never_grows_past_its_screen_margins() -> void:
+	var parent: Control = auto_free(Control.new())
+	parent.size = Vector2(1280, 960)
+	add_child(parent)
+	var pill := GameTitlePill.new()
+	parent.add_child(pill)
+	for text: String in ["Crystal Knights", "A very long game title ".repeat(30)]:
+		pill.show_title(text, [])
+		assert_float(pill.size.x).is_less_equal(1152.0)
+		assert_float(pill.position.x).is_equal_approx((1280.0 - pill.size.x) / 2.0, 1e-5)
+		assert_float(pill.size.y).is_equal_approx(59.52, 1e-5)
+		assert_float(pill._line.height).is_equal_approx(44.16, 1e-5)
+		assert_float(pill._line.width + 84.48).is_equal_approx(pill.size.x, 0.001)
+		var drawn := pill._line.placements(Vector2.ZERO)
+		assert_int(drawn.size()).is_greater(0)
+
+
+func test_a_new_medium_glides_from_the_current_title_height_and_a_new_press_replaces_the_text_fade() -> void:
+	var parent: Control = auto_free(Control.new())
+	parent.size = Vector2(1280, 960)
+	add_child(parent)
+	var pill := GameTitlePill.new()
+	parent.add_child(pill)
+	pill.move_top(690.0)
+	assert_float(pill.position.y).is_equal(690.0)
+	pill.move_top(575.0)
+	pill._move.pause()
+	pill._move.custom_step(0.15)
+	var halfway := 690.0 + (575.0 - 690.0) * Motion.eased(Motion.Easing.GLIDE, 0.5)
+	assert_float(pill.position.y).is_equal_approx(halfway, 0.01)
+	pill.move_top(565.0)
+	assert_float(pill.position.y).is_equal_approx(halfway, 0.01)
+	pill._move.pause()
+	pill._move.custom_step(0.3)
+	assert_float(pill.position.y).is_equal_approx(565.0, 0.01)
+	pill.show_title("Crystal Knights", [Vector2i(0, 7)], 1)
+	assert_float(pill._text_x).is_equal(10.24)
+	pill._text_move.pause()
+	pill._text_move.custom_step(0.1)
+	assert_float(pill._text_alpha).is_between(0.0, 1.0)
+	pill.show_title("Iron Valley", [], -1)
+	assert_float(pill._text_x).is_equal(-10.24)
+	assert_float(pill._text_alpha).is_equal(0.0)
+	pill._text_move.pause()
+	pill._text_move.custom_step(0.2)
+	assert_float(pill._text_alpha).is_equal_approx(1.0, 1e-5)
+	assert_float(pill._text_x).is_equal_approx(0.0, 1e-5)

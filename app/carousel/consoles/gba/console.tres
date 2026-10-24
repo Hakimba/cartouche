@@ -12,3 +12,4 @@ model_name = "AGB-001"
 scene = "res://carousel/consoles/gba/gba.tscn"
 launch = "res://carousel/consoles/gba/launch.json"
 triangle_budget = 11000
+variants = PackedStringArray("gba_sp")

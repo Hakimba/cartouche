@@ -53,8 +53,11 @@ msgstr "Aucune console pour l’instant"
 msgid "Add a console"
 msgstr "Ajouter une console"
 
-msgid "Type"
-msgstr "Type"
+msgid "Console"
+msgstr "Console"
+
+msgid "No console"
+msgstr "Aucune console"
 
 msgid "Emulator"
 msgstr "Émulateur"
@@ -315,14 +318,17 @@ msgstr "Terminé"
 msgid "Put down"
 msgstr "Poser"
 
+msgctxt "ring"
 msgid "in its place"
 msgstr "à sa place"
 
+msgctxt "ring"
 msgid "between {before} and {after}"
 msgstr "entre {before} et {after}"
 
-msgid "next to {other}"
-msgstr "à côté de {other}"
+msgctxt "ring"
+msgid "next to {name}"
+msgstr "à côté de {name}"
 
 msgid "This order could not be kept."
 msgstr "Cet ordre n’a pas pu être gardé."
@@ -403,3 +409,21 @@ msgid "{count} game"
 msgid_plural "{count} games"
 msgstr[0] "{count} jeu"
 msgstr[1] "{count} jeux"
+
+msgid "Games float"
+msgstr "Les jeux flottent"
+
+msgid "The selected game gently rises and falls"
+msgstr "Le jeu choisi monte et descend doucement"
+
+msgid "Variant"
+msgstr "Variante"
+
+msgid "This variant could not be kept."
+msgstr "Cette variante n’a pas pu être enregistrée."
+
+msgid "Used when a game's region is unknown."
+msgstr "Utilisée lorsque la région du jeu est inconnue."
+
+msgid "Adding console…"
+msgstr "Ajout de la console…"

@@ -1,0 +1,44 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://test/studio/views/views_scene.gd" id="1"]
+[ext_resource type="Script" path="res://studio/cyclorama.gd" id="2"]
+[ext_resource type="PackedScene" path="res://studio/views/plinth.tscn" id="3"]
+
+[node name="ViewsScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Backdrop" type="CanvasLayer" parent="."]
+layer = -1
+
+[node name="Cyclorama" type="Control" parent="Backdrop"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("2")
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 3.7)
+fov = 32.0
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+
+[node name="Plinth" parent="." instance=ExtResource("3")]
+offset_left = 57.6
+offset_top = 570.88
+offset_right = 480.0
+offset_bottom = 798.72
+
+[node name="Media" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2

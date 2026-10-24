@@ -18,6 +18,7 @@ import app.cartouche.core.launch.TemplateError
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
+import arrow.core.getOrElse
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
@@ -29,6 +30,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.choice
+import io.kotest.property.arbitrary.element
+import io.kotest.property.arbitrary.set
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
@@ -60,6 +63,58 @@ class CatalogTest {
             FileNamePattern.of(it).shouldBeSome().extensions shouldBe None
         }
     }
+
+    private val supportedTwelve =
+        listOf("xbox", "xbox360", "gb", "gba", "gbc", "gc", "n64", "nes", "wii", "psx", "ps2", "snes").map(::PlatformId)
+
+    @Test
+    fun `INV-E12-C1-01 offered is exactly the platforms with a model, in the Type chooser's order with its maker and model split`() {
+        val offered = Catalog.parse(shipped, Shipped.profiles, supportedTwelve.toSet()).offered
+        offered.map { it.platform } shouldBe supportedTwelve
+        offered.map { it.maker.getOrElse { "" } to it.model } shouldBe
+            listOf(
+                "Microsoft" to "Xbox",
+                "Microsoft" to "Xbox 360",
+                "Nintendo" to "Game Boy",
+                "Nintendo" to "Game Boy Advance",
+                "Nintendo" to "Game Boy Color",
+                "Nintendo" to "GameCube",
+                "Nintendo" to "Nintendo 64",
+                "Nintendo" to "Nintendo Entertainment System",
+                "Nintendo" to "Wii",
+                "Sony" to "PlayStation",
+                "Sony" to "PlayStation 2",
+                "Nintendo" to "Super Nintendo Entertainment System",
+            )
+    }
+
+    @Test
+    fun `INV-E12-C1-01 a platform whose name holds no maker is offered under its whole name, with no maker`() {
+        val profiles = """{"test": {"media": "dvd", "medium": {"default": "d"}, "minimumGameBytes": 1}}"""
+        val catalog =
+            Catalog.parse(
+                listOf(definition(platform = "test")),
+                DefinitionSource("profiles.json", profiles),
+                setOf(PlatformId("test")),
+            )
+        catalog.offered shouldBe listOf(OfferedConsole(PlatformId("test"), None, "test"))
+    }
+
+    @Test
+    fun `INV-E12-C1-01 offered holds the catalog platforms that have a model and nothing else, whatever the models named`() =
+        runBlocking<Unit> {
+            val known = shippedCatalog.platforms.map { it.id }
+            // The chooser's order: names compared in lower case, as the rule says, not taken from the code's own output.
+            val byName = shippedCatalog.platforms.sortedBy { it.name.lowercase() }.map { it.id }
+            checkAll(Arb.set(Arb.element(known + PlatformId("dreamcast-without-definition")), 0..known.size)) { named ->
+                val catalog = Catalog.parse(shipped, Shipped.profiles, named)
+                catalog.offered.map { it.platform }.toSet() shouldBe named.intersect(known.toSet())
+                // Whatever is named, the ones offered keep the order the whole set has.
+                catalog.offered.map { it.platform } shouldBe byName.filter { it in named }
+                catalog.offered.map { it.platform }.shouldBeUnique()
+                catalog.platforms shouldBe shippedCatalog.platforms
+            }
+        }
 
     @Test
     fun `a player's emulator name leaves out the platform the definitions put first`() {

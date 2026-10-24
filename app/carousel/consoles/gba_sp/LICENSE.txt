@@ -1,0 +1,12 @@
+Model Information:
+* title: Gameboy Advance SP
+* source: https://sketchfab.com/3d-models/gameboy-advance-sp-18c9688eaa8f4903a940c105242df15f
+* author: thegraphicsgeek (https://sketchfab.com/thegraphicsgeek)
+
+Model License:
+* license type: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements: Author must be credited. Commercial use is allowed.
+
+This work is based on "Gameboy Advance SP" (https://sketchfab.com/3d-models/gameboy-advance-sp-18c9688eaa8f4903a940c105242df15f) by thegraphicsgeek (https://sketchfab.com/thegraphicsgeek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: console isolated, geometry reduced, textures cleaned and rebaked, movable parts separated, screen and power light switched off where present.

@@ -1,282 +1,137 @@
-[gd_resource type="Theme" load_steps=38 format=3 uid="uid://voyem7672a04"]
+[gd_resource type="Theme" load_steps=30 format=3 uid="uid://voyem7672a04"]
 
 [ext_resource type="FontVariation" path="res://fonts/fredoka_medium.tres" id="1"]
-[ext_resource type="FontVariation" path="res://fonts/fredoka_semibold.tres" id="2"]
-[ext_resource type="Texture2D" path="res://screens/toggle_on.svg" id="3"]
-[ext_resource type="Texture2D" path="res://screens/toggle_off.svg" id="4"]
+[ext_resource type="FontFile" path="res://fonts/plus-jakarta-sans/PlusJakartaSans-Medium.ttf" id="5"]
+[ext_resource type="FontFile" path="res://fonts/plus-jakarta-sans/PlusJakartaSans-Bold.ttf" id="6"]
+[ext_resource type="FontFile" path="res://fonts/plus-jakarta-sans/PlusJakartaSans-ExtraBold.ttf" id="7"]
+[ext_resource type="FontFile" path="res://fonts/ibm-plex-mono/IBMPlexMono-SemiBold.ttf" id="8"]
+[ext_resource type="Script" path="res://studio/satin_style.gd" id="satin"]
+[ext_resource type="StyleBox" path="res://studio/focus.tres" id="focus"]
+
+[sub_resource type="FontVariation" id="title"]
+base_font = ExtResource("7")
+spacing_glyph = -2
+
+[sub_resource type="FontVariation" id="count"]
+base_font = ExtResource("8")
+spacing_glyph = 2
 
 [sub_resource type="StyleBoxFlat" id="pill"]
 content_margin_left = 10.0
 content_margin_top = 8.0
 content_margin_right = 28.0
 content_margin_bottom = 8.0
-bg_color = Color(1, 1, 1, 0.92)
+bg_color = Color(0.988235, 0.980392, 0.964706, 0.92)
 corner_radius_top_left = 32
 corner_radius_top_right = 32
 corner_radius_bottom_right = 32
 corner_radius_bottom_left = 32
-shadow_color = Color(0, 0, 0, 0.12)
+shadow_color = Color(0.27451, 0.203922, 0.133333, 0.12)
 shadow_size = 6
 shadow_offset = Vector2(0, 2)
 
-[sub_resource type="StyleBoxFlat" id="glyph"]
-content_margin_left = 10.0
-content_margin_top = 1.0
-content_margin_right = 10.0
-content_margin_bottom = 1.0
-bg_color = Color(0.13, 0.14, 0.17, 1)
-corner_radius_top_left = 15
-corner_radius_top_right = 15
-corner_radius_bottom_right = 15
-corner_radius_bottom_left = 15
-
-[sub_resource type="StyleBoxFlat" id="hint"]
+[sub_resource type="StyleBox" id="hint"]
+script = ExtResource("satin")
+look = 2
 content_margin_left = 10.0
 content_margin_top = 2.0
 content_margin_right = 10.0
 content_margin_bottom = 2.0
-bg_color = Color(0.16, 0.17, 0.2, 0.85)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
 
-[sub_resource type="StyleBoxFlat" id="chip"]
+[sub_resource type="StyleBox" id="chip"]
+script = ExtResource("satin")
 content_margin_left = 14.0
 content_margin_top = 2.0
 content_margin_right = 14.0
 content_margin_bottom = 2.0
-bg_color = Color(1, 1, 1, 0.9)
-corner_radius_top_left = 20
-corner_radius_top_right = 20
-corner_radius_bottom_right = 20
-corner_radius_bottom_left = 20
-shadow_color = Color(0, 0, 0, 0.12)
-shadow_size = 5
-shadow_offset = Vector2(0, 1)
+look = 1
 
 [sub_resource type="StyleBoxFlat" id="art_track"]
-bg_color = Color(0.13, 0.14, 0.16, 0.14)
+bg_color = Color(0.141176, 0.12549, 0.105882, 0.14)
 corner_radius_top_left = 5
 corner_radius_top_right = 5
 corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
 
 [sub_resource type="StyleBoxFlat" id="art_fill"]
-bg_color = Color(0.13, 0.14, 0.16, 1)
+bg_color = Color(0.141176, 0.12549, 0.105882, 1)
 corner_radius_top_left = 5
 corner_radius_top_right = 5
 corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
 
 [sub_resource type="StyleBoxFlat" id="art_fill_stalled"]
-bg_color = Color(0.6, 0.62, 0.66, 1)
+bg_color = Color(0.521569, 0.478431, 0.427451, 1)
 corner_radius_top_left = 5
 corner_radius_top_right = 5
 corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
 
-[sub_resource type="StyleBoxFlat" id="button"]
+[sub_resource type="StyleBox" id="button"]
+script = ExtResource("satin")
 content_margin_left = 28.0
 content_margin_top = 12.0
 content_margin_right = 28.0
 content_margin_bottom = 12.0
-bg_color = Color(1, 1, 1, 0.96)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.13, 0.14, 0.17, 0.1)
-corner_radius_top_left = 32
-corner_radius_top_right = 32
-corner_radius_bottom_right = 32
-corner_radius_bottom_left = 32
-shadow_color = Color(0, 0, 0, 0.1)
-shadow_size = 3
-shadow_offset = Vector2(0, 1)
 
 [sub_resource type="StyleBoxFlat" id="button_pressed"]
 content_margin_left = 28.0
 content_margin_top = 12.0
 content_margin_right = 28.0
 content_margin_bottom = 12.0
-bg_color = Color(0.92, 0.93, 0.95, 1)
+bg_color = Color(0.956863, 0.937255, 0.905882, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.13, 0.14, 0.17, 0.14)
+border_color = Color(0.141176, 0.12549, 0.105882, 0.14)
 corner_radius_top_left = 32
 corner_radius_top_right = 32
 corner_radius_bottom_right = 32
 corner_radius_bottom_left = 32
 
-[sub_resource type="StyleBoxFlat" id="button_focus"]
-draw_center = false
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.13, 0.14, 0.17, 1)
-corner_radius_top_left = 39
-corner_radius_top_right = 39
-corner_radius_bottom_right = 39
-corner_radius_bottom_left = 39
-expand_margin_left = 7.0
-expand_margin_top = 7.0
-expand_margin_right = 7.0
-expand_margin_bottom = 7.0
-
-[sub_resource type="StyleBoxFlat" id="field"]
+[sub_resource type="StyleBox" id="field"]
+script = ExtResource("satin")
 content_margin_left = 26.0
 content_margin_top = 8.0
 content_margin_right = 22.0
 content_margin_bottom = 8.0
-bg_color = Color(1, 1, 1, 0.96)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.13, 0.14, 0.17, 0.08)
-corner_radius_top_left = 16
-corner_radius_top_right = 16
-corner_radius_bottom_right = 16
-corner_radius_bottom_left = 16
 
 [sub_resource type="StyleBoxFlat" id="field_pressed"]
 content_margin_left = 26.0
 content_margin_top = 8.0
 content_margin_right = 22.0
 content_margin_bottom = 8.0
-bg_color = Color(0.92, 0.93, 0.95, 1)
+bg_color = Color(0.956863, 0.937255, 0.905882, 1)
 corner_radius_top_left = 16
 corner_radius_top_right = 16
 corner_radius_bottom_right = 16
 corner_radius_bottom_left = 16
 
-[sub_resource type="StyleBoxFlat" id="field_focus"]
-draw_center = false
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.13, 0.14, 0.17, 1)
-corner_radius_top_left = 23
-corner_radius_top_right = 23
-corner_radius_bottom_right = 23
-corner_radius_bottom_left = 23
-expand_margin_left = 7.0
-expand_margin_top = 7.0
-expand_margin_right = 7.0
-expand_margin_bottom = 7.0
-
-[sub_resource type="StyleBoxFlat" id="form_panel"]
-content_margin_left = 50.0
-content_margin_top = 34.0
-content_margin_right = 50.0
-content_margin_bottom = 40.0
-bg_color = Color(1, 1, 1, 0.97)
-corner_radius_top_left = 28
-corner_radius_top_right = 28
-corner_radius_bottom_right = 28
-corner_radius_bottom_left = 28
-shadow_color = Color(0, 0, 0, 0.22)
-shadow_size = 40
-shadow_offset = Vector2(0, 10)
-
-[sub_resource type="StyleBoxEmpty" id="plain_hint"]
-
-[sub_resource type="StyleBoxFlat" id="button_hint"]
-content_margin_left = 8.0
-content_margin_top = 6.0
-content_margin_right = 16.0
-content_margin_bottom = 6.0
-bg_color = Color(1, 1, 1, 0.9)
-corner_radius_top_left = 22
-corner_radius_top_right = 22
-corner_radius_bottom_right = 22
-corner_radius_bottom_left = 22
-shadow_color = Color(0, 0, 0, 0.12)
-shadow_size = 5
-shadow_offset = Vector2(0, 1)
-
 [sub_resource type="StyleBoxEmpty" id="name_plain"]
 content_margin_left = 22.0
 content_margin_right = 22.0
 
-[sub_resource type="StyleBoxFlat" id="name_focus"]
-draw_center = false
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.13, 0.14, 0.17, 1)
-corner_radius_top_left = 29
-corner_radius_top_right = 29
-corner_radius_bottom_right = 29
-corner_radius_bottom_left = 29
-expand_margin_left = 7.0
-expand_margin_top = 7.0
-expand_margin_right = 7.0
-expand_margin_bottom = 7.0
-
-[sub_resource type="StyleBoxFlat" id="card"]
+[sub_resource type="StyleBox" id="card"]
+script = ExtResource("satin")
 content_margin_left = 14.0
 content_margin_top = 14.0
 content_margin_right = 14.0
 content_margin_bottom = 12.0
-bg_color = Color(1, 1, 1, 0.95)
-corner_radius_top_left = 22
-corner_radius_top_right = 22
-corner_radius_bottom_right = 22
-corner_radius_bottom_left = 22
-shadow_color = Color(0, 0, 0, 0.12)
-shadow_size = 8
-shadow_offset = Vector2(0, 2)
-
-[sub_resource type="StyleBoxFlat" id="card_focus"]
-draw_center = false
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.13, 0.14, 0.17, 1)
-corner_radius_top_left = 29
-corner_radius_top_right = 29
-corner_radius_bottom_right = 29
-corner_radius_bottom_left = 29
-expand_margin_left = 7.0
-expand_margin_top = 7.0
-expand_margin_right = 7.0
-expand_margin_bottom = 7.0
 
 [sub_resource type="StyleBoxEmpty" id="card_text"]
 
-[sub_resource type="StyleBoxFlat" id="key"]
+[sub_resource type="StyleBox" id="key"]
+script = ExtResource("satin")
 content_margin_left = 10.0
 content_margin_top = 6.0
 content_margin_right = 10.0
 content_margin_bottom = 6.0
-bg_color = Color(1, 1, 1, 0.95)
-corner_radius_top_left = 22
-corner_radius_top_right = 22
-corner_radius_bottom_right = 22
-corner_radius_bottom_left = 22
-shadow_color = Color(0, 0, 0, 0.12)
-shadow_size = 8
-shadow_offset = Vector2(0, 2)
 
-[sub_resource type="StyleBoxFlat" id="ribbon"]
+[sub_resource type="StyleBox" id="ribbon"]
+script = ExtResource("satin")
 content_margin_left = 12.0
 content_margin_right = 12.0
-bg_color = Color(1, 1, 1, 0.95)
-corner_radius_top_left = 30
-corner_radius_top_right = 30
-corner_radius_bottom_right = 30
-corner_radius_bottom_left = 30
-shadow_color = Color(0, 0, 0, 0.14)
-shadow_size = 10
-shadow_offset = Vector2(0, 2)
 
 [sub_resource type="StyleBoxEmpty" id="ribbon_key"]
 content_margin_left = 9.0
@@ -285,160 +140,112 @@ content_margin_right = 9.0
 [sub_resource type="StyleBoxFlat" id="ribbon_key_on"]
 content_margin_left = 9.0
 content_margin_right = 9.0
-bg_color = Color(0.13, 0.14, 0.17, 1)
+bg_color = Color(0.141176, 0.12549, 0.105882, 1)
 corner_radius_top_left = 22
 corner_radius_top_right = 22
 corner_radius_bottom_right = 22
 corner_radius_bottom_left = 22
 
-[sub_resource type="StyleBoxFlat" id="search_chip"]
+[sub_resource type="StyleBox" id="search_chip"]
+script = ExtResource("satin")
 content_margin_left = 16.0
 content_margin_top = 4.0
 content_margin_right = 16.0
 content_margin_bottom = 4.0
-bg_color = Color(1, 1, 1, 0.95)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-shadow_color = Color(0, 0, 0, 0.12)
-shadow_size = 8
-shadow_offset = Vector2(0, 1)
+look = 1
 
-[sub_resource type="StyleBoxFlat" id="big_letter"]
+[sub_resource type="StyleBox" id="big_letter"]
+script = ExtResource("satin")
 content_margin_left = 40.0
 content_margin_top = 12.0
 content_margin_right = 40.0
 content_margin_bottom = 12.0
-bg_color = Color(1, 1, 1, 0.95)
-corner_radius_top_left = 36
-corner_radius_top_right = 36
-corner_radius_bottom_right = 36
-corner_radius_bottom_left = 36
-shadow_color = Color(0, 0, 0, 0.18)
-shadow_size = 24
-shadow_offset = Vector2(0, 6)
 
-[sub_resource type="StyleBoxFlat" id="filter_pill"]
+[sub_resource type="StyleBox" id="filter_pill"]
+script = ExtResource("satin")
+look = 2
 content_margin_left = 16.0
 content_margin_top = 2.0
 content_margin_right = 16.0
 content_margin_bottom = 2.0
-bg_color = Color(0.13, 0.14, 0.17, 0.9)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-shadow_color = Color(0, 0, 0, 0.14)
-shadow_size = 5
-shadow_offset = Vector2(0, 1)
 
 [resource]
-default_font = ExtResource("1")
+default_font = ExtResource("6")
 default_font_size = 26
-Label/colors/font_color = Color(0.13, 0.14, 0.17, 1)
+Label/colors/font_color = Color(0.141176, 0.12549, 0.105882, 1)
+Label/constants/line_spacing = 6
 Label/colors/font_outline_color = Color(1, 1, 1, 1)
-Button/colors/font_color = Color(0.13, 0.14, 0.17, 1)
-Button/colors/font_disabled_color = Color(0.13, 0.14, 0.17, 0.45)
-Button/colors/font_focus_color = Color(0.13, 0.14, 0.17, 1)
-Button/colors/font_hover_color = Color(0.13, 0.14, 0.17, 1)
-Button/colors/font_pressed_color = Color(0.13, 0.14, 0.17, 1)
-Button/colors/font_hover_pressed_color = Color(0.13, 0.14, 0.17, 1)
+Button/colors/font_color = Color(0.141176, 0.12549, 0.105882, 1)
+Button/colors/font_disabled_color = Color(0.141176, 0.12549, 0.105882, 0.45)
+Button/colors/font_focus_color = Color(0.141176, 0.12549, 0.105882, 1)
+Button/colors/font_hover_color = Color(0.141176, 0.12549, 0.105882, 1)
+Button/colors/font_pressed_color = Color(0.141176, 0.12549, 0.105882, 1)
+Button/colors/font_hover_pressed_color = Color(0.141176, 0.12549, 0.105882, 1)
 Button/constants/h_separation = 12
 Button/font_sizes/font_size = 26
-Button/fonts/font = ExtResource("2")
+Button/fonts/font = ExtResource("7")
 Button/styles/disabled = SubResource("button")
-Button/styles/focus = SubResource("button_focus")
+Button/styles/focus = ExtResource("focus")
 Button/styles/hover = SubResource("button")
 Button/styles/normal = SubResource("button")
 Button/styles/pressed = SubResource("button_pressed")
 Field/base_type = &"Button"
 Field/styles/disabled = SubResource("field")
-Field/styles/focus = SubResource("field_focus")
+Field/styles/focus = ExtResource("focus")
 Field/styles/hover = SubResource("field")
 Field/styles/normal = SubResource("field")
 Field/styles/pressed = SubResource("field_pressed")
-Toggle/base_type = &"CheckButton"
-Toggle/colors/font_color = Color(0.13, 0.14, 0.17, 1)
-Toggle/colors/font_focus_color = Color(0.13, 0.14, 0.17, 1)
-Toggle/colors/font_hover_color = Color(0.13, 0.14, 0.17, 1)
-Toggle/colors/font_pressed_color = Color(0.13, 0.14, 0.17, 1)
-Toggle/colors/font_hover_pressed_color = Color(0.13, 0.14, 0.17, 1)
-Toggle/fonts/font = ExtResource("1")
-Toggle/font_sizes/font_size = 26
-Toggle/icons/checked = ExtResource("3")
-Toggle/icons/unchecked = ExtResource("4")
-Toggle/styles/focus = SubResource("field_focus")
-Toggle/styles/hover = SubResource("field")
-Toggle/styles/hover_pressed = SubResource("field")
-Toggle/styles/normal = SubResource("field")
-Toggle/styles/pressed = SubResource("field")
-FormPanel/base_type = &"PanelContainer"
-FormPanel/styles/panel = SubResource("form_panel")
-FieldLabel/base_type = &"Label"
-FieldLabel/colors/font_color = Color(0.41, 0.43, 0.48, 1)
-FieldLabel/font_sizes/font_size = 18
 FieldValue/base_type = &"Label"
 FieldValue/font_sizes/font_size = 26
-FieldValue/fonts/font = ExtResource("2")
+FieldValue/fonts/font = ExtResource("7")
 ScreenTitle/base_type = &"Label"
 ScreenTitle/constants/outline_size = 40
 ScreenTitle/font_sizes/font_size = 48
-ScreenTitle/fonts/font = ExtResource("2")
+ScreenTitle/fonts/font = SubResource("title")
 ScreenText/base_type = &"Label"
-ScreenText/colors/font_color = Color(0.23, 0.24, 0.27, 1)
+ScreenText/colors/font_color = Color(0.141176, 0.12549, 0.105882, 1)
 ScreenText/constants/outline_size = 24
-ScreenText/constants/line_spacing = 4
+ScreenText/constants/line_spacing = 6
 ScreenText/font_sizes/font_size = 23
 PanelTitle/base_type = &"Label"
 PanelTitle/font_sizes/font_size = 40
-PanelTitle/fonts/font = ExtResource("2")
-PanelNote/base_type = &"Label"
-PanelNote/colors/font_color = Color(0.41, 0.43, 0.48, 1)
-PanelNote/font_sizes/font_size = 21
+PanelTitle/fonts/font = SubResource("title")
 Chip/base_type = &"Label"
 Chip/font_sizes/font_size = 24
 Chip/styles/normal = SubResource("chip")
 ConsoleName/base_type = &"Label"
 ConsoleName/constants/outline_size = 16
 ConsoleName/font_sizes/font_size = 46
-ConsoleName/fonts/font = ExtResource("2")
+ConsoleName/fonts/font = ExtResource("7")
 ConsoleModel/base_type = &"Label"
-ConsoleModel/colors/font_color = Color(0.36, 0.38, 0.43, 1)
+ConsoleModel/colors/font_color = Color(0.521569, 0.478431, 0.427451, 1)
 ConsoleModel/constants/outline_size = 10
 ConsoleModel/font_sizes/font_size = 26
-RingName/base_type = &"ConsoleName"
-RingName/constants/outline_size = 12
-RingName/font_sizes/font_size = 34
 RingPlace/base_type = &"ConsoleModel"
 RingPlace/constants/outline_size = 9
 RingPlace/font_sizes/font_size = 24
 Pill/base_type = &"PanelContainer"
 Pill/styles/panel = SubResource("pill")
-Glyph/base_type = &"PanelContainer"
-Glyph/styles/panel = SubResource("glyph")
-GlyphText/base_type = &"Label"
-GlyphText/colors/font_color = Color(1, 1, 1, 1)
-GlyphText/font_sizes/font_size = 20
-GlyphText/fonts/font = ExtResource("2")
 LabelPlatform/base_type = &"Label"
+LabelPlatform/fonts/font = ExtResource("1")
 LabelPlatform/colors/font_color = Color(1, 1, 1, 1)
 LabelPlatform/colors/font_outline_color = Color(0, 0, 0, 0.6)
 LabelPlatform/font_sizes/font_size = 28
 LabelTitle/base_type = &"Label"
+LabelTitle/fonts/font = ExtResource("1")
 LabelTitle/colors/font_color = Color(1, 1, 1, 1)
 LabelTitle/colors/font_outline_color = Color(0, 0, 0, 0.6)
 LabelTitle/font_sizes/font_size = 48
 Hint/base_type = &"Label"
 Hint/colors/font_color = Color(1, 1, 1, 1)
 Hint/font_sizes/font_size = 18
-Hint/fonts/font = ExtResource("2")
+Hint/fonts/font = ExtResource("7")
 Hint/styles/normal = SubResource("hint")
 Title/base_type = &"Label"
 Title/font_sizes/font_size = 30
-Title/fonts/font = ExtResource("2")
+Title/fonts/font = ExtResource("7")
 Status/base_type = &"Label"
-Status/colors/font_color = Color(0.23, 0.24, 0.27, 1)
+Status/colors/font_color = Color(0.141176, 0.12549, 0.105882, 1)
 Status/font_sizes/font_size = 20
 ArtBar/base_type = &"ProgressBar"
 ArtBar/styles/background = SubResource("art_track")
@@ -446,40 +253,33 @@ ArtBar/styles/fill = SubResource("art_fill")
 ArtBarStalled/base_type = &"ProgressBar"
 ArtBarStalled/styles/background = SubResource("art_track")
 ArtBarStalled/styles/fill = SubResource("art_fill_stalled")
-ButtonHint/base_type = &"PanelContainer"
-ButtonHint/styles/panel = SubResource("button_hint")
-PlainHint/base_type = &"PanelContainer"
-PlainHint/styles/panel = SubResource("plain_hint")
-HintText/base_type = &"Label"
-HintText/font_sizes/font_size = 22
-HintText/fonts/font = ExtResource("2")
 RowValue/base_type = &"Label"
-RowValue/colors/font_color = Color(0.41, 0.43, 0.48, 1)
+RowValue/colors/font_color = Color(0.521569, 0.478431, 0.427451, 1)
 RowValue/font_sizes/font_size = 24
 NameButton/base_type = &"Button"
 NameButton/colors/font_outline_color = Color(1, 1, 1, 1)
 NameButton/constants/outline_size = 16
 NameButton/font_sizes/font_size = 44
-NameButton/fonts/font = ExtResource("2")
+NameButton/fonts/font = SubResource("title")
 NameButton/styles/disabled = SubResource("name_plain")
-NameButton/styles/focus = SubResource("name_focus")
+NameButton/styles/focus = ExtResource("focus")
 NameButton/styles/hover = SubResource("name_plain")
 NameButton/styles/normal = SubResource("name_plain")
 NameButton/styles/pressed = SubResource("name_plain")
 Card/base_type = &"Button"
 Card/styles/disabled = SubResource("card")
-Card/styles/focus = SubResource("card_focus")
+Card/styles/focus = ExtResource("focus")
 Card/styles/hover = SubResource("card")
 Card/styles/normal = SubResource("card")
 Card/styles/pressed = SubResource("card")
 CardText/base_type = &"Label"
 CardText/font_sizes/font_size = 22
-CardText/fonts/font = ExtResource("2")
+CardText/fonts/font = ExtResource("7")
 CardText/styles/normal = SubResource("card_text")
 Prompt/base_type = &"Label"
 Prompt/constants/outline_size = 12
 Prompt/font_sizes/font_size = 26
-Prompt/fonts/font = ExtResource("1")
+Prompt/fonts/font = ExtResource("6")
 Key/base_type = &"Card"
 Key/font_sizes/font_size = 28
 Key/styles/disabled = SubResource("key")
@@ -490,7 +290,7 @@ NameField/base_type = &"PanelContainer"
 NameField/styles/panel = SubResource("card")
 NameFieldText/base_type = &"Label"
 NameFieldText/font_sizes/font_size = 36
-NameFieldText/fonts/font = ExtResource("2")
+NameFieldText/fonts/font = ExtResource("7")
 Ribbon/base_type = &"PanelContainer"
 Ribbon/styles/panel = SubResource("ribbon")
 RibbonKey/base_type = &"PanelContainer"
@@ -499,22 +299,23 @@ RibbonKeyOn/base_type = &"PanelContainer"
 RibbonKeyOn/styles/panel = SubResource("ribbon_key_on")
 RibbonText/base_type = &"Label"
 RibbonText/font_sizes/font_size = 26
-RibbonText/fonts/font = ExtResource("2")
+RibbonText/fonts/font = ExtResource("7")
 RibbonTextOn/base_type = &"RibbonText"
 RibbonTextOn/colors/font_color = Color(1, 1, 1, 1)
 SearchChip/base_type = &"PanelContainer"
 SearchChip/styles/panel = SubResource("search_chip")
 SearchText/base_type = &"Label"
 SearchText/font_sizes/font_size = 28
-SearchText/fonts/font = ExtResource("2")
+SearchText/fonts/font = ExtResource("7")
+SearchCount/fonts/font = SubResource("count")
 SearchCount/base_type = &"Label"
-SearchCount/colors/font_color = Color(0.36, 0.38, 0.43, 1)
+SearchCount/colors/font_color = Color(0.521569, 0.478431, 0.427451, 1)
 SearchCount/font_sizes/font_size = 22
 BigLetter/base_type = &"PanelContainer"
 BigLetter/styles/panel = SubResource("big_letter")
 BigLetterText/base_type = &"Label"
 BigLetterText/font_sizes/font_size = 190
-BigLetterText/fonts/font = ExtResource("2")
+BigLetterText/fonts/font = ExtResource("7")
 FilterPill/base_type = &"PanelContainer"
 FilterPill/styles/panel = SubResource("filter_pill")
 FilterText/base_type = &"Label"

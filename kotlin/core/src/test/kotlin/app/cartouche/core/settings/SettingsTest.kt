@@ -42,4 +42,9 @@ class SettingsTest {
     fun `INV-E8-02 a fresh install smooths the edges 4x`() {
         Settings().edgeSmoothing shouldBe EdgeSmoothing.FOUR_TIMES
     }
+
+    @Test
+    fun `INV-E12-C1-02 games float off by default`() {
+        Settings().gamesFloat shouldBe false
+    }
 }

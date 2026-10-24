@@ -43,11 +43,18 @@ const _SCREENSCRAPER := "res://data/screenscraper"
 ## The catalog and a demo library as the plugin sends them, for running without it: see
 ## `DesktopDemoTest.kt`, which keeps it up to date.
 const DESKTOP_DEMO := "res://dev/demo/desktop.json"
+const _DESKTOP_VARIANTS := "user://console-variants.json"
+
+var _demo_settings := {"ok": true, "first_launch": false, "games_float": false}
 
 ## The catalog, loaded when the app starts.
 var catalog := CatalogSummary.new({})
 
 var _plugin: Object
+## The desktop demo's form story, read once.
+var _story := {}
+var _story_read := false
+var _desktop_current := {}
 var _last_request_id := 0
 
 
@@ -66,7 +73,11 @@ func _ready() -> void:
 
 
 func is_available() -> bool:
-	return _plugin != null
+	return not _on_desktop()
+
+
+func _on_desktop() -> bool:
+	return _plugin == null
 
 
 # Getters
@@ -84,18 +95,24 @@ func _load_catalog() -> void:
 	var cartridge_prints := _files_in(_PRINTS, ".tsv", true)
 	var textures := _files_in(_SCREENSCRAPER, ".tsv", true)
 	var read := Time.get_ticks_usec()
+	# The platforms with a console model, the one source of what a person may add.
+	var supported := PackedStringArray(Appearance.defaults(ConsoleManifest.found()).keys())
 	var summary: Dictionary = _query(&"loadCatalog",
-		[definitions, profiles, titles, data_folders, curtains, art, cartridge_prints, textures], _desktop_demo("catalog"))
+		[definitions, profiles, titles, data_folders, curtains, art, cartridge_prints, textures, supported],
+		_desktop_demo("catalog"))
 	catalog = CatalogSummary.new(summary)
 	if Diagnostics.enabled:
 		Diagnostics.trace("plugin", "catalog read in %.1f ms, loaded in %.1f ms" % [(read - started) / 1000.0,
 			(Time.get_ticks_usec() - read) / 1000.0])
 
 
-## Installed players of [param platform_id], in definition order.
+## Installed players of [param platform_id], in definition order. Without the plugin, those of the
+## desktop demo's form story for its type.
 func installed_players(platform_id: String) -> Array[Player]:
 	var found: Array[Player] = []
-	for item: Dictionary in _query(&"installedPlayers", [platform_id], []):
+	var story := _desktop_form()
+	var fallback: Array = story.get("players", []) if story.get("type") == platform_id else []
+	for item: Dictionary in _query(&"installedPlayers", [platform_id], fallback):
 		found.append(Player.new(item))
 	return found
 
@@ -143,8 +160,9 @@ func curtain_allowed() -> bool:
 	return granted
 
 
+## The battery; without the plugin, the desktop demo's (a full one, charging, as the design draws it).
 func battery() -> Battery:
-	var state: Dictionary = _query(&"battery", [], {})
+	var state: Dictionary = _query(&"battery", [], _desktop_demo("battery"))
 	return Battery.new(state)
 
 
@@ -172,7 +190,7 @@ func request_curtain_permission() -> Result:
 
 ## Opens the system folder picker; answers once the user granted a folder or gave up.
 func pick_folder() -> Pick:
-	return Pick.new(await _request(&"pickFolder"))
+	return Pick.new(await _request(&"pickFolder", [], _form_answer({"folder": _desktop_form().get("folder", {})})))
 
 
 ## Folders whose access survived until now.
@@ -215,7 +233,46 @@ func library() -> LibraryAnswer:
 
 ## Stores the choices made for [param platform_id].
 func set_up_platform(platform_id: String, setup: PlatformSetup) -> LibraryAnswer:
-	return LibraryAnswer.new(await _request(&"setUpPlatform", [platform_id, setup.to_wire()]))
+	var answer := LibraryAnswer.new(await _request(&"setUpPlatform", [platform_id, setup.to_wire()],
+		_form_answer({"library": _desktop_form().get("library", "{}")})))
+	if answer.ok and _on_desktop():
+		var story: String = _desktop_form().get("library", "{}")
+		_desktop_current = JSON.parse_string(story)
+		if not setup.variant_id.is_empty():
+			return await set_variant(platform_id, setup.variant_id)
+	return answer
+
+
+## Keeps the selected model of a set-up console; the desktop stores it beside its other user files.
+func set_variant(platform_id: String, variant: String) -> LibraryAnswer:
+	var fallback := {}
+	if _on_desktop():
+		var library_data := _desktop_current.duplicate(true)
+		if library_data.is_empty():
+			library_data = _desktop_demo("library")
+		var kept := _desktop_variants()
+		kept[platform_id] = variant
+		var file := FileAccess.open(_DESKTOP_VARIANTS, FileAccess.WRITE)
+		if file == null:
+			fallback = {"ok": false, "code": "permission_denied"}
+		else:
+			file.store_string(JSON.stringify(kept))
+			file.close()
+			library_data["console_variants"] = kept
+			_desktop_current = library_data
+			fallback = {"ok": true, "library": JSON.stringify(library_data)}
+	var answer := LibraryAnswer.new(await _request(&"setVariant", [platform_id, variant], fallback))
+	if answer.ok:
+		Diagnostics.trace("console", "variant=%s of %s" % [variant, platform_id])
+	return answer
+
+
+
+static func _desktop_variants() -> Dictionary:
+	if not FileAccess.file_exists(_DESKTOP_VARIANTS):
+		return {}
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(_DESKTOP_VARIANTS))
+	return data if data is Dictionary else {}
 
 
 ## Looks for the art of [param games] (the game on screen and its neighbours) before the others'.
@@ -235,36 +292,54 @@ func prepare_titles() -> void:
 ## How many games a scan of [param platform_id] with [param setup] would find, without saving
 ## anything; its scan after [method set_up_platform] finds the same.
 func preview_platform(platform_id: String, setup: PlatformSetup) -> PreviewAnswer:
-	return PreviewAnswer.new(await _request(&"previewPlatform", [platform_id, setup.to_wire()]))
+	return PreviewAnswer.new(await _request(&"previewPlatform", [platform_id, setup.to_wire()],
+		_form_answer({"report": _demo_report()})))
 
 
-## The app's settings. Without the plugin: no first launch, no button style chosen.
+## The app's settings. The desktop demo keeps saved choices in memory until the process exits.
 func settings() -> SettingsAnswer:
-	if not is_available():
-		return SettingsAnswer.new({"ok": true, "first_launch": false})
+	if _on_desktop():
+		return SettingsAnswer.new(_demo_settings)
 	return SettingsAnswer.new(await _request(&"settings"))
 
 
 ## Stores the button style the user chose, [param style] as [SettingsAnswer] names it.
 func save_button_style(style: StringName) -> Result:
-	return Result.new(await _request(&"saveButtonStyle", [style]))
+	return await _save_setting(&"saveButtonStyle", "button_style", style)
+
 
 
 ## Stores the edge smoothing the user chose, [param smoothing] as [SettingsAnswer] names it.
 func save_edge_smoothing(smoothing: StringName) -> Result:
-	return Result.new(await _request(&"saveEdgeSmoothing", [smoothing]))
+	return await _save_setting(&"saveEdgeSmoothing", "edge_smoothing", smoothing)
+
+
+
+## Stores whether the selected game sways and bobs ([param floating]); the consoles never do.
+func save_games_float(floating: bool) -> Result:
+	return await _save_setting(&"saveGamesFloat", "games_float", floating)
+
 
 
 ## Stores the region labels' images prefer, [param region] one of
 ## [member SettingsAnswer.preferred_regions] (empty for none); the labels it changes are looked for
 ## again, as [signal art_changed] tells.
 func save_preferred_region(region: String) -> Result:
-	return Result.new(await _request(&"savePreferredRegion", [region]))
+	return await _save_setting(&"savePreferredRegion", "preferred_region", region)
+
+
+
+func _save_setting(request: StringName, key: String, value: Variant) -> Result:
+	if _on_desktop():
+		_demo_settings[key] = value
+		return Result.new({"ok": true})
+	return Result.new(await _request(request, [value]))
 
 
 ## Scans the folder of [param platform_id] and replaces its games.
 func scan_platform(platform_id: String) -> ScanAnswer:
-	return ScanAnswer.new(await _request(&"scanPlatform", [platform_id]))
+	return ScanAnswer.new(await _request(&"scanPlatform", [platform_id],
+		_form_answer({"library": _desktop_form().get("library", "{}"), "report": _demo_report()})))
 
 
 ## Removes [param platform_id] from the library: its choices, games and art, and the access to its
@@ -282,8 +357,11 @@ func select_game(game: Game) -> Result:
 ## the platforms or all on [param platform_id], stored apart from the user's, for measuring at
 ## scale. Without the plugin, the desktop demo's, whatever [param games].
 func use_demo_library(games: int, platform_id := "") -> LibraryAnswer:
-	if not is_available():
-		return LibraryAnswer.new({"ok": true, "library": JSON.stringify(_desktop_demo("library"))})
+	if _on_desktop():
+		var demo := _desktop_current.duplicate(true) if not _desktop_current.is_empty() else _desktop_demo("library")
+		demo["console_variants"] = _desktop_variants()
+		_desktop_current = demo
+		return LibraryAnswer.new({"ok": true, "library": JSON.stringify(demo)})
 	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games, platform_id]))
 
 
@@ -292,7 +370,7 @@ func use_demo_library(games: int, platform_id := "") -> LibraryAnswer:
 ## image); answers once every label was looked for, so not while offline or while a game is played.
 ## Without the plugin, the desktop demo's library, none of whose games has a label.
 func rescrape() -> RescrapeAnswer:
-	if not is_available():
+	if _on_desktop():
 		var demo := _desktop_demo("library")
 		var games: Array = demo.get("games", [])
 		return RescrapeAnswer.new({"ok": true, "library": JSON.stringify(demo), "games": games.size(), "labels": 0})
@@ -318,15 +396,22 @@ func rename_game(game: Game, shown: String) -> Renamed:
 	return Renamed.new(await _request(&"renameGame", [game.id, shown]))
 
 
-## Shows [param platform_id]'s console as [param shown] from now on (trimmed, cut at 80 characters),
-## or under its own name, [param own], again when [param shown] is blank or is it.
-func rename_console(platform_id: String, shown: String, own: String) -> ConsoleRenamed:
-	return ConsoleRenamed.new(await _request(&"renameConsole", [platform_id, shown, own]))
-
 
 ## Shows the consoles of [param platform_ids] in that order from now on, after a restart too.
 func order_consoles(platform_ids: PackedStringArray) -> Result:
 	return Result.new(await _request(&"orderConsoles", [platform_ids]))
+
+
+## Puts [param platform_id]'s console at [param gap] among the others as the consoles screen
+## shows them, the others keeping their order: [param gap] counts from 0 to their number. The
+## answer carries the order of all the consoles; a gap out of range or a console not in the library
+## keeps the order (codes `gap_out_of_range`, `not_in_library`). Without the plugin, the order the
+## desktop demo's form story holds for that gap.
+func place_console(platform_id: String, gap: int) -> Placed:
+	var orders: Dictionary = _desktop_form().get("placing", {})
+	var order: Array = orders.get(str(gap), [])
+	var story := {"order": PackedStringArray(order)} if orders.has(str(gap)) else {"ok": false, "code": "gap_out_of_range"}
+	return Placed.new(await _request(&"placeConsole", [platform_id, gap], _form_answer(story)))
 
 
 ## Opens the system's picker on images, for a picture of the user's own to put on a label; the app
@@ -345,7 +430,7 @@ func keep_own_label(game: Game, framing: LabelFraming) -> ArtAnswer:
 ## there), with the failure [method launch_game] would give; starts and stops nothing. Without the
 ## plugin, or rehearsing (see [method launch_game]), every game can: the insertion plays.
 func check_launch(game: Game, disc: int) -> Result:
-	if not is_available() or _rehearsing():
+	if _on_desktop() or _rehearsing():
 		return Result.new({"ok": true})
 	return Result.new(await _request(&"checkLaunch", [{"game_id": game.id, "disc": disc}]))
 
@@ -381,12 +466,57 @@ static func _files_in(folder: String, extension: String, by_base_name := false) 
 	return texts
 
 
+## The desktop demo's form story, in the plugin's wire shape (see `DesktopDemoTest.kt`):
+## the installed players of its type, the folder picked, how many games
+## it holds, the library once its console is added, and the console order for each gap of
+## [method place_console]. Empty where the demo has none, which is how the generated demo is.
+func _desktop_form() -> Dictionary:
+	if not _on_desktop() or not FileAccess.file_exists(DESKTOP_DEMO):
+		return {}
+	if not _story_read:
+		var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DESKTOP_DEMO))
+		_story = _story_of(demo)
+		_story_read = true
+	return _story
+
+
+## The form story of [param demo], its lists of texts as the plugin sends them (PackedStringArrays,
+## where JSON has Arrays).
+static func _story_of(demo: Dictionary) -> Dictionary:
+	var story: Dictionary = demo.get("form", {})
+	for player: Dictionary in story.get("players", []):
+		var extensions: Array = player.get("extensions", [])
+		player["extensions"] = PackedStringArray(extensions)
+	var folder: Dictionary = story.get("folder", {})
+	if folder.has("place"):
+		var place: Dictionary = folder["place"]
+		var folders: Array = place.get("folders", [])
+		place["folders"] = PackedStringArray(folders)
+	return story
+
+
+## The games the form story's folder holds, as a scan or a preview reports them.
+func _demo_report() -> Dictionary:
+	var games: int = _desktop_form().get("games", 0)
+	return {"games": games, "files": games}
+
+
+## [param story] as the answer of an operation without the plugin, when the desktop demo holds a
+## form story; none, and the operation fails as unavailable, when it does not.
+func _form_answer(story: Dictionary) -> Dictionary:
+	if _desktop_form().is_empty():
+		return {}
+	var answer := {"ok": true}
+	answer.merge(story, true)
+	return answer
+
+
 ## Part [param key] of the desktop demo; none where it is not shipped (exports leave it out).
 static func _desktop_demo(key: String) -> Dictionary:
 	if not FileAccess.file_exists(DESKTOP_DEMO):
 		return {}
 	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DESKTOP_DEMO))
-	return demo[key]
+	return demo.get(key, {})
 
 
 ## The texts listed under [param key] of [param item]; none when it is absent.
@@ -397,7 +527,7 @@ static func _strings(item: Dictionary, key: String) -> PackedStringArray:
 
 ## Asks the plugin itself, even where a fake stands for its operations alone ([method is_available]).
 func _query(method: StringName, args: Array, fallback: Variant) -> Variant:
-	var value: Variant = _plugin.callv(method, args) if _plugin else fallback
+	var value: Variant = _plugin.callv(method, args) if not _on_desktop() else fallback
 	# The catalog's arguments are the whole data files, a shelf's view thousands of positions: not
 	# worth formatting (the plugin traces the view's size).
 	if Diagnostics.enabled and method not in [&"loadCatalog", &"browse"]:
@@ -406,9 +536,10 @@ func _query(method: StringName, args: Array, fallback: Variant) -> Variant:
 
 
 ## Calls an operation (its first argument is the request id) and waits for its answer.
-func _request(method: StringName, args: Array = []) -> Dictionary:
-	if not is_available():
-		return {"ok": false, "code": &"unavailable", "detail": "Android plugin not loaded"}
+## Without the plugin the answer is [param without_plugin] when it has one, else a failure.
+func _request(method: StringName, args: Array = [], without_plugin := {}) -> Dictionary:
+	if _on_desktop():
+		return without_plugin if without_plugin else {"ok": false, "code": &"unavailable", "detail": "Android plugin not loaded"}
 	_last_request_id += 1
 	var id := _last_request_id
 	var started := Time.get_ticks_msec()
@@ -568,14 +699,42 @@ class Player:
 
 class CatalogSummary:
 	var platforms: Array[Platform] = []
+	## The platforms a person may add, those with a console model, in the order of the Type chooser;
+	## none from a catalog that did not name them (the desktop demo as generated).
+	var offered: Array[OfferedConsole] = []
 	## One line per rejected definition: `source: detail`.
 	var rejected := PackedStringArray()
 
 	func _init(payload: Dictionary) -> void:
 		for item: Dictionary in payload.get("platforms", []):
 			platforms.append(Platform.new(item))
+		for item: Dictionary in payload.get("offered", []):
+			offered.append(OfferedConsole.new(item))
 		for rejection: Dictionary in payload.get("rejected", []):
 			rejected.append("%s: %s" % [rejection["source"], rejection["detail"]])
+
+
+## A platform of the Type chooser: its maker, shown small above its model (empty when the name has no
+## maker in it), and its model name.
+class OfferedConsole:
+	var id: String
+	var maker: String
+	var model: String
+
+	func _init(item: Dictionary) -> void:
+		id = item["id"]
+		maker = item.get("maker", "")
+		model = item["model"]
+
+
+class Placed extends Result:
+	## The platform ids of all the consoles after placing, first to last; empty when not [member ok].
+	var order := PackedStringArray()
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		if ok:
+			order = payload.get("order", PackedStringArray())
 
 
 class Pick extends Result:
@@ -626,6 +785,7 @@ class PlatformSetup:
 	var disc_grouping: String
 	## `top_level` or `subfolders`.
 	var folder_depth: String
+	var variant_id: String
 
 	func _init(item: Dictionary = {}) -> void:
 		has_folder = item.has("folder_uri")
@@ -634,9 +794,12 @@ class PlatformSetup:
 		player_id = item.get("player_id", "")
 		disc_grouping = item.get("disc_grouping", "grouped")
 		folder_depth = item.get("folder_depth", "top_level")
+		variant_id = item.get("variant", "")
 
 	func to_wire() -> Dictionary:
 		var item := {"disc_grouping": disc_grouping, "folder_depth": folder_depth}
+		if not variant_id.is_empty():
+			item["variant"] = variant_id
 		if has_folder:
 			item["folder_uri"] = folder_uri
 		if has_player:
@@ -802,16 +965,16 @@ class Library:
 	var _not_games: Dictionary[String, Array] = {}
 	var _ignored_counts: Dictionary[String, Dictionary] = {}
 	var _skipped: Dictionary[String, Array] = {}
-	## The names the user gave consoles, by platform id.
-	var console_names: Dictionary[String, String] = {}
+	var console_variants: Dictionary[String, String] = {}
 
 	func _init(item: Dictionary) -> void:
-		var names: Dictionary = item.get("console_names", {})
-		console_names.assign(names)
+		var variants: Dictionary = item.get("console_variants", {})
+		console_variants.assign(variants)
 		var setups: Dictionary = item.get("setups", {})
 		for platform_id: String in setups:
 			var setup: Dictionary = setups[platform_id]
 			_setups[platform_id] = PlatformSetup.new(setup)
+			_setups[platform_id].variant_id = console_variants.get(platform_id, "")
 		for game: Dictionary in item.get("games", []):
 			games.append(Game.new(game))
 		var not_games: Dictionary = item.get("not_games", {})
@@ -917,6 +1080,8 @@ class SettingsAnswer extends Result:
 	var button_style: StringName
 	## `4x`, `2x` or `off`: how smooth the 3D's edges are drawn.
 	var edge_smoothing: StringName
+	## Whether the selected game sways and bobs; the consoles never do.
+	var games_float: bool
 	## The region labels' images prefer, one of [member preferred_regions]; empty for none.
 	var preferred_region: String
 	## The regions labels' images can prefer, as the plugin names them, the only ones it saves.
@@ -928,6 +1093,7 @@ class SettingsAnswer extends Result:
 		has_button_style = payload.has("button_style")
 		button_style = payload.get("button_style", &"")
 		edge_smoothing = payload.get("edge_smoothing", &"4x")
+		games_float = payload.get("games_float", false)
 		preferred_region = payload.get("preferred_region", "")
 		preferred_regions = payload.get("preferred_regions", PackedStringArray())
 
@@ -1060,16 +1226,6 @@ class Renamed extends Result:
 
 
 ## The name a console was given, when it was given one ([member has_name]).
-class ConsoleRenamed extends Result:
-	var has_name: bool
-	var name: String
-
-	func _init(payload: Dictionary) -> void:
-		super(payload)
-		has_name = payload.has("name")
-		name = payload.get("name", "")
-
-
 ## A picture of the user's own being framed: the app's copy at [member path], [member size] pixels.
 class LabelPicture extends Result:
 	var path: String

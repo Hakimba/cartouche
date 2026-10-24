@@ -8,6 +8,7 @@ import app.cartouche.android.art.OwnPicture
 import app.cartouche.android.art.StoredArt
 import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.LaunchFailure
+import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.ScanReport
 import app.cartouche.android.storage.DocumentEntry
 import app.cartouche.android.storage.EntryKind
@@ -21,6 +22,7 @@ import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.art.web
 import app.cartouche.core.library.ArtSource
+import app.cartouche.core.library.ConsoleVariant
 import app.cartouche.core.library.Disc
 import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderPath
@@ -36,6 +38,7 @@ import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.Scan
 import app.cartouche.core.library.SkipReason
 import app.cartouche.core.library.SkippedFolder
+import app.cartouche.core.library.VariantError
 import app.cartouche.core.library.game
 import app.cartouche.core.library.listed
 import app.cartouche.core.platforms.Catalog
@@ -74,6 +77,22 @@ import java.io.File
 import app.cartouche.core.settings.Settings as AppSettings
 
 class WireTest {
+    @Test
+    fun `the library sends effective model choices including the base for old setups`() {
+        val ps2Id = PlatformId("ps2")
+        val gbaId = PlatformId("gba")
+        val library =
+            Library(
+                setups = mapOf(ps2Id to PlatformSetup(), gbaId to PlatformSetup()),
+                consoleVariants = mapOf(ps2Id to ConsoleVariant.PS2_FAT),
+            )
+        val sent = Json.parseToJsonElement(library.toWireJson(None, ps2)).jsonObject
+        sent.getValue("console_variants").jsonObject.mapValues { it.value.jsonPrimitive.content } shouldBe
+            mapOf("ps2" to "ps2_fat", "gba" to "gba")
+        LibraryFailure.Variant(VariantError.Unknown(ps2Id, "gba_sp")).toWire()["code"] shouldBe "unknown_variant"
+        LibraryFailure.Variant(VariantError.NotInLibrary(ps2Id)).toWire()["code"] shouldBe "not_in_library"
+    }
+
     /** The `ps2` platform, whose games are all one medium. */
     private val ps2 = catalog(definition())
 
@@ -108,7 +127,7 @@ class WireTest {
                     ),
                     listOf(SkippedFolder(FolderPath(".Trash"), SkipReason.HIDDEN)),
                 ),
-            ).withConsoleName(PlatformId("ps2"), DisplayName.of("Ma PS2"), "PlayStation 2")
+            )
 
     @Test
     fun `INV-E0-16 everything sent to Godot is a value its bridge converts`() {
@@ -127,7 +146,11 @@ class WireTest {
             Scraping.NONE.toWire(Some(AbsentArt(listOf(GameId("ps2/b"))))),
             LabelDownload.Running(Some(0.5)).toWire(GameId("ps2/b")),
             success("library" to library.toWireJson(None, ps2), "art" to listOf(found).artWireJson(), "absent" to arrayOf("ps2/b")),
-            AppSettings(Some(ButtonStyle.NINTENDO)).toWire(false),
+            AppSettings(Some(ButtonStyle.NINTENDO), gamesFloat = true).toWire(false),
+            success("order" to arrayOf("ps2", "gba")),
+            failure(ErrorCode.GAP_OUT_OF_RANGE, "x"),
+            failure(ErrorCode.NOT_IN_LIBRARY, "x"),
+            dictionary("offered" to ps2.copy(supported = ps2.platforms.map { it.id }.toSet()).offeredToWire()),
             success("folder" to placed.toWire()),
             BatteryState(Some(57), plugged = true).toWire(),
             BatteryState.NONE.toWire(),
@@ -142,9 +165,11 @@ class WireTest {
 
     @Test
     fun `the settings and a folder's place reach Godot with the keys the GDScript adapter reads`() {
-        AppSettings().toWire(true) - "preferred_regions" shouldBe dictionary("first_launch" to true, "edge_smoothing" to "4x")
+        AppSettings().toWire(true) - "preferred_regions" shouldBe
+            dictionary("first_launch" to true, "edge_smoothing" to "4x", "games_float" to false)
         AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) - "preferred_regions" shouldBe
-            dictionary("first_launch" to false, "button_style" to "playstation", "edge_smoothing" to "2x")
+            dictionary("first_launch" to false, "button_style" to "playstation", "edge_smoothing" to "2x", "games_float" to false)
+        AppSettings(gamesFloat = true).toWire(false)["games_float"] shouldBe true
         AppSettings(edgeSmoothing = EdgeSmoothing.OFF).toWire(false)["edge_smoothing"] shouldBe "off"
         AppSettings(preferredRegion = Some(PreferredRegion.NORTH_AMERICA)).toWire(false)["preferred_region"] shouldBe "North America"
         (AppSettings().toWire(false)["preferred_regions"] as Array<*>).toList() shouldBe PreferredRegion.entries.map { it.region }
@@ -262,7 +287,7 @@ class WireTest {
                 "ps2": {"unsupported": {"count": 1, "examples": ["a.json"]}, "hidden": {"count": 1, "examples": ["._G.chd"]}}
             },
             "skipped_folders": {"ps2": [{"path": ".Trash", "reason": "hidden"}]},
-            "console_names": {"ps2": "Ma PS2"},
+            "console_variants": {"ps2": "ps2_slim"},
             "shelves": {"shelves": [{"platform": "ps2", "games": [0], "selected": 0}], "selected": 0}
         }"""
     }

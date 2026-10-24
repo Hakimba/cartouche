@@ -1,14 +1,36 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name PlatformList
 extends Control
-## "Platforms": one line per platform set up, to open it and change or remove it. B goes back.
+## The configured consoles, as logo tiles on their own screen. A opens the existing editor; B returns.
 
-## The platform at [param index] in the list was opened; -1 for back.
 signal chosen(index: int)
 
-const _ROW := preload("res://screens/menu_row.tscn")
+const COLUMNS := 4
 
-@onready var _rows: VBoxContainer = %Rows
+@onready var _rows: GridContainer = %Rows
+
+
+class Tile:
+	extends Button
+	var platform_id: String
+	var logo := LogoView.new()
+
+	func _init(platform: AndroidServices.Platform, folder: String) -> void:
+		platform_id = platform.id
+		name = platform.id
+		text = platform.name
+		clip_text = true
+		add_theme_constant_override(&"outline_size", 0)
+		auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+		custom_minimum_size = Vector2(230.4, 153.6)
+		var tint: Color = StudioTokens.GEL.get(StringName(folder), StudioTokens.NEUTRAL)
+		SatinStyle.apply_to(self, tint)
+		for state: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color", &"font_hover_pressed_color", &"font_disabled_color"]:
+			add_theme_color_override(state, Color.TRANSPARENT)
+		logo.show_logo(LogoView.Slot.RAIL_TILE, folder)
+		add_child(logo)
+		logo.size = logo.texture.get_size()
+		resized.connect(func() -> void: logo.position = (size - logo.size) / 2.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -17,17 +39,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		chosen.emit(-1)
 
 
-## Lists [param platforms] (at least one) by name, the focus on the one at [param focus].
 func open(platforms: Array[AndroidServices.Platform], focus: int) -> void:
 	for row in _rows.get_children():
-		# At once: the focus must not land on a line about to go.
 		_rows.remove_child(row)
 		row.queue_free()
+	var models := Appearance.defaults(ConsoleManifest.found())
 	for i in platforms.size():
-		var row: FieldButton = _ROW.instantiate()
-		row.label = platforms[i].name
-		# A name, never translated.
-		row.auto_translate_mode = AUTO_TRANSLATE_MODE_DISABLED
-		row.pressed.connect(chosen.emit.bind(i))
-		_rows.add_child(row)
+		var manifest: ConsoleManifest = models.get(platforms[i].id)
+		var tile := Tile.new(platforms[i], ConsoleManifest.folder_of(manifest))
+		tile.pressed.connect(chosen.emit.bind(i))
+		_rows.add_child(tile)
+	for i in platforms.size():
+		var tile := _rows.get_child(i) as Control
+		var left := i - 1 if i % COLUMNS > 0 else i
+		var right := i + 1 if i % COLUMNS < COLUMNS - 1 and i + 1 < platforms.size() else i
+		tile.focus_neighbor_left = tile.get_path_to(_rows.get_child(left))
+		tile.focus_neighbor_right = tile.get_path_to(_rows.get_child(right))
+		tile.focus_neighbor_top = tile.get_path_to(_rows.get_child(maxi(i - COLUMNS, i % COLUMNS)))
+		var below := i - i % COLUMNS + COLUMNS
+		var down := mini(i + COLUMNS, platforms.size() - 1) if below < platforms.size() else i
+		tile.focus_neighbor_bottom = tile.get_path_to(_rows.get_child(down))
 	(_rows.get_child(clampi(focus, 0, platforms.size() - 1)) as Control).grab_focus()

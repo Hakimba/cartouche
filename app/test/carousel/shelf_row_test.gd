@@ -254,7 +254,7 @@ func test_INV_E11_09_a_ring_shows_only_on_a_blank_never_over_an_image() -> void:
 	(row.label_images as Fixtures.FakeArt).arrive(row._games[1], image)
 	_frames(row, ShelfRow._PLACES, 0.016)
 	var selected: ShelfRow.Place = row._placed[1]
-	assert_bool(selected.shown._blank).is_false()
+	assert_bool(selected.shown.is_blank()).is_false()
 	selected.shown._view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	row.downloading("test/1", 0.5)
 	assert_int(selected.shown._view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
@@ -262,10 +262,11 @@ func test_INV_E11_09_a_ring_shows_only_on_a_blank_never_over_an_image() -> void:
 
 ## A row showing [param count] test games from [param selected], moved only by the test, with no
 ## label images whatever the developer's own folder holds.
-func _row(count: int, selected: int, pose := ShelfRow.Pose.new()) -> ShelfRow:
+func _row(count: int, selected: int, floating := false) -> ShelfRow:
 	var row: ShelfRow = auto_free(ShelfRow.new())
 	row.label_images = auto_free(Fixtures.FakeArt.new())
-	row.pose = pose
+	if floating:
+		row.games_float = true
 	add_child(row)
 	row.show_shelf(Fixtures.games(count), selected, Fixtures.DVDS, ShelfRow.LabelLook.new())
 	row.set_process(false)
@@ -290,12 +291,12 @@ func _assert_twins(row: ShelfRow, twin: ShelfRow) -> void:
 ## The visible places show each game in view once, where the layout puts it, with its own label
 ## once drawn.
 func _assert_places(row: ShelfRow, count: int) -> void:
-	var offsets := CarouselLayout.offsets(count, row._scroll)
+	var offsets := GamesLayout.offsets(count, row._scroll)
 	var shown := []
 	for place: ShelfRow.Place in row.get_children():
 		if place.visible:
 			shown.append(place.game)
-			assert_float(place.transform.origin.x).is_equal_approx(CarouselLayout.place(offsets[place.game]).origin.x, 0.0001)
+			assert_float(place.transform.origin.x).is_equal_approx(GamesLayout.new("ps2_dvd").standing(offsets[place.game]).origin.x, 0.0001)
 			var label: ShaderMaterial = place.shown._label_mesh.get_active_material(0)
 			if label.get_shader_parameter(&"has_label"):
 				var game := row._games[place.game]
@@ -399,7 +400,7 @@ func test_with_anything_of_it_showing_the_row_stands_each_frame_where_a_row_neve
 
 
 func test_a_game_standing_still_is_not_placed_again_and_its_parts_hear_nothing() -> void:
-	var row := _row(5, 2)
+	var row := _row(5, 2, true)
 	_frames(row, 2, Fixtures.FRAME_S)
 	await await_idle_frame()
 	# A neighbour stands still; the selected game floats, as a guard that probes do hear.
@@ -435,20 +436,17 @@ func test_INV_E2_5_06_the_pose_is_the_selected_game_s_alone_within_its_angles() 
 func test_INV_E2_5_06_on_a_stopped_row_the_selected_game_is_posed_and_the_others_stand_as_laid_out() -> void:
 	var random := Fixtures.cases(52)
 	for i in 100:
-		var row := _row(random.randi_range(1, 20), 0, _pose(random))
+		var row := _row(random.randi_range(1, 20), 0)
 		_frames(row, random.randi_range(1, 300), Fixtures.FRAME_S)
-		var offsets := CarouselLayout.offsets(row._games.size(), row._scroll)
+		var offsets := GamesLayout.offsets(row._games.size(), row._scroll)
 		for place: ShelfRow.Place in row.get_children():
 			if place.visible:
-				var laid_out := CarouselLayout.place(offsets[place.game]).basis
-				if place.game == row.selected_index():
-					laid_out *= row.pose.at(row._pose_s, 1.0)
+				var laid_out := GamesLayout.new("ps2_dvd").standing(offsets[place.game]).basis
 				assert_bool(place.transform.basis.is_equal_approx(laid_out)).is_true()
 
 
 func test_at_rest_the_selected_game_stops_floating_and_swaying_and_goes_on_from_there() -> void:
-	var random := Fixtures.cases(81)
-	var row := _row(9, 4, _pose(random))
+	var row := _row(9, 4, true)
 	_frames(row, 30, Fixtures.FRAME_S)
 	var centre := _centre(row)
 	row.pace = 0.0
@@ -460,7 +458,7 @@ func test_at_rest_the_selected_game_stops_floating_and_swaying_and_goes_on_from_
 	row.pace = 0.5
 	_frames(row, 1, Fixtures.FRAME_S)
 	assert_bool(centre.transform == stood).is_false()
-	var twin := _row(9, 4, row.pose)
+	var twin := _row(9, 4, true)
 	_frames(twin, 30, Fixtures.FRAME_S)
 	twin._process(Fixtures.FRAME_S / 2.0)
 	assert_bool(centre.transform.is_equal_approx(_centre(twin).transform)).is_true()
@@ -477,7 +475,7 @@ func test_INV_E2_5_07_the_stick_turns_the_selected_game_any_way_up_to_its_back()
 		_frames(row, 120, Fixtures.FRAME_S)
 		var turned := _centre(row).transform.basis
 		# Its back faces the camera, turned about the axis the stick pushes on.
-		assert_float(turned.z.dot(front.z)).is_equal_approx(-1.0, 0.02)
+		assert_float(turned.z.normalized().dot(front.z.normalized())).is_equal_approx(-1.0, 0.02)
 		var axis := Vector3.UP if stick.y == 0.0 else Vector3.RIGHT
 		assert_vector(turned * axis).is_equal_approx(front * axis, Vector3.ONE * 0.02)
 
@@ -496,10 +494,10 @@ func test_INV_E2_5_07_the_stick_turns_the_selected_game_which_stays_turned_until
 		_frames(row, 60, Fixtures.FRAME_S)
 		var let_go := _centre(row).transform.basis
 		assert_bool(let_go.is_equal_approx(front)).override_failure_message("the game turned back when the stick was let go").is_false()
-		var offsets := CarouselLayout.offsets(row._games.size(), row._scroll)
+		var offsets := GamesLayout.offsets(row._games.size(), row._scroll)
 		for place: ShelfRow.Place in row.get_children():
 			if place.visible and place.game != row.selected_index():
-				assert_bool(place.transform.basis.is_equal_approx(CarouselLayout.place(offsets[place.game]).basis)) \
+				assert_bool(place.transform.basis.is_equal_approx(GamesLayout.new("ps2_dvd").standing(offsets[place.game]).basis)) \
 					.override_failure_message("the stick turned a game beside the selected one").is_true()
 		_frames(row, random.randi_range(60, 600), Fixtures.FRAME_S)
 		assert_bool(_centre(row).transform.basis.is_equal_approx(let_go)) \
@@ -511,10 +509,10 @@ func test_INV_E2_5_07_the_stick_turns_the_selected_game_which_stays_turned_until
 		_frames(row, 120, Fixtures.FRAME_S)
 		# The game turned is front again as it leaves, and the one arriving is front.
 		assert_bool(_centre(row).transform.basis.is_equal_approx(front)).override_failure_message("not front again").is_true()
-		var laid_out := CarouselLayout.offsets(row._games.size(), row._scroll)
+		var laid_out := GamesLayout.offsets(row._games.size(), row._scroll)
 		for place: ShelfRow.Place in row.get_children():
 			if place.visible and place.game == turned_game:
-				assert_bool(place.transform.basis.is_equal_approx(CarouselLayout.place(laid_out[place.game]).basis)) \
+				assert_bool(place.transform.basis.is_equal_approx(GamesLayout.new("ps2_dvd").standing(laid_out[place.game]).basis)) \
 					.override_failure_message("the game turned did not turn back as it left").is_true()
 
 
@@ -529,7 +527,7 @@ func test_INV_E2_5_07_a_game_just_selected_turns_from_the_front_whatever_the_las
 	row.inspect(Vector2(1.0, 0.0))
 	_frames(row, 3, Fixtures.FRAME_S)
 	# Three frames of stick: a small turn, from where the row stands it now.
-	var standing := CarouselLayout.place(CarouselLayout.offsets(5, row._scroll)[row.selected_index()]).basis
+	var standing := GamesLayout.new("ps2_dvd").standing(MediaView.offset(row.selected_index(), row._scroll, 5)).basis
 	var turned := _centre(row).transform.basis
 	assert_float(turned.z.angle_to(standing.z)).is_less(3.0 * Fixtures.FRAME_S * StickTurn.SPEED + 0.01)
 
@@ -550,3 +548,239 @@ func _centre(row: ShelfRow) -> ShelfRow.Place:
 		if place.game == row.selected_index():
 			return place
 	return null
+
+
+func test_INV_E12_06_the_chosen_game_floats_only_when_games_float_is_on() -> void:
+	var row := _row(5, 2)
+	var at := row.selected_stand()
+	_frames(row, 30, Fixtures.FRAME_S)
+	assert_bool(row.games_float).is_false()
+	assert_bool(row.selected_stand() == at).is_true()
+	row.games_float = true
+	_frames(row, 30, Fixtures.FRAME_S)
+	assert_bool(row.selected_stand().is_equal_approx(at)).is_false()
+	assert_float(row.selected_stand().origin.y).is_greater_equal(at.origin.y)
+	for place: ShelfRow.Place in row._places:
+		if place.visible and place.game != row.selected_index():
+			assert_bool(place.basis.orthonormalized().is_equal_approx(Basis.IDENTITY)).is_true()
+	row.games_float = false
+	_frames(row, 1, Fixtures.FRAME_S)
+	assert_bool(row.selected_stand() == at).is_true()
+
+
+func test_twenty_fast_presses_keep_their_target_and_settle_on_the_twentieth_game() -> void:
+	var row := _row(50, 0)
+	for press in 20:
+		row.hold(1)
+		row.release(1)
+		row._process(0.03)
+	assert_int(row.selected_index()).is_equal(20)
+	_frames(row, 120, Fixtures.FRAME_S)
+	assert_float(row._scroll).is_equal(20.0)
+	assert_float(row._spring.velocity).is_equal(0.0)
+	_assert_places(row, 50)
+
+
+func test_the_row_uses_the_studio_spring_without_retargeting_its_position_on_a_press() -> void:
+	var row := _row(5, 0)
+	row.step(1)
+	assert_float(row._scroll).is_equal(0.0)
+	row._process(1.0 / 60.0)
+	assert_float(row._scroll).is_equal_approx(280.0 / 3600.0, 1e-6)
+	assert_float(row._spring.velocity).is_equal_approx(280.0 / 60.0, 1e-6)
+
+
+func test_fast_selection_keeps_the_title_available_and_launching_brings_that_game_into_view() -> void:
+	var row := _row(50, 0)
+	for press in 20:
+		row.step(1)
+		assert_float(row.title_top()).is_between(680.0, 700.0)
+	row.freeze()
+	assert_int(row.selected_index()).is_equal(20)
+	assert_bool(row._placed.has(20)).is_true()
+	assert_bool(row.selected_stand().is_equal_approx(GamesLayout.new("ps2_dvd").chosen)).is_true()
+
+
+func test_a_live_media_view_keeps_labels_through_turning_launch_and_return_and_freezes_at_rest() -> void:
+	var row := _row(5, 2)
+	var camera: Camera3D = auto_free(Camera3D.new())
+	add_child(camera)
+	camera.position = Vector3(0.0, 0.1, 3.7)
+	camera.fov = 32.0
+	row.camera = camera
+	_frames(row, 8, Fixtures.FRAME_S)
+	var place := _centre(row)
+	var shown := place.shown
+	assert_object(place.media_view).is_not_null()
+	assert_object(shown.get_parent()).is_same(place.media_view.holder())
+
+	assert_bool(shown.is_blank()).is_true()
+	place.media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_frames(row, 2, Fixtures.FRAME_S)
+	assert_int(place.media_view.view().render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
+	row.hide()
+	assert_bool(place.media_view.visible).is_false()
+	row.show()
+	_frames(row, 1, Fixtures.FRAME_S)
+	assert_bool(place.media_view.visible).is_true()
+	var stand := row.selected_stand()
+	row.stand_selected(stand, 0.4, 0.1)
+	_frames(row, 1, Fixtures.FRAME_S)
+	assert_object(shown.get_parent()).is_same(place)
+	assert_bool(place.media_view.visible).is_false()
+	row.pose_selected()
+	_frames(row, 2, Fixtures.FRAME_S)
+	assert_object(place.shown).is_same(shown)
+	assert_object(shown.get_parent()).is_same(place.media_view.holder())
+	assert_bool(place.media_view.visible).is_true()
+	row.stage = 1.0
+	row.staged = stand
+	_frames(row, 1, Fixtures.FRAME_S)
+	assert_object(shown.get_parent()).is_same(place)
+	row.stage = 0.0
+	_frames(row, 1, Fixtures.FRAME_S)
+	assert_object(shown.get_parent()).is_same(place.media_view.holder())
+
+
+func test_a_scan_arriving_at_rest_redraws_its_view_and_replaces_the_blank_light_without_moving_any_game() -> void:
+	var row := _row(5, 2)
+	var camera: Camera3D = auto_free(Camera3D.new())
+	add_child(camera)
+	camera.position = Vector3(0.0, 0.1, 3.7)
+	camera.fov = 32.0
+	row.camera = camera
+	_frames(row, 8, Fixtures.FRAME_S)
+	var place := _centre(row)
+	var before_stand := place.transform
+	assert_float(place.media_view.environment().ambient_light_energy).is_equal_approx(place.blank.room, 1e-6)
+	place.media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
+	var image := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGB8))
+	(row.label_images as Fixtures.FakeArt).arrive(row.selected_game(), image)
+	_frames(row, 1, Fixtures.FRAME_S)
+	assert_bool(place.shown.is_blank()).is_false()
+	assert_bool(place.transform == before_stand).is_true()
+	assert_int(place.media_view.view().render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	assert_float(place.media_view.environment().ambient_light_energy).is_equal_approx(place.lit.room, 1e-6)
+	assert_float(row.room_energy).is_equal(place.lit.room)
+
+
+## [param row] drawn through a screen camera, as in the app.
+func _with_camera(row: ShelfRow) -> Camera3D:
+	var camera: Camera3D = auto_free(Camera3D.new())
+	add_child(camera)
+	camera.position = Vector3(0.0, 0.1, 3.7)
+	camera.fov = 32.0
+	row.camera = camera
+	_frames(row, 8, Fixtures.FRAME_S)
+	return camera
+
+
+func test_a_spring_in_flight_on_a_shelf_of_two_is_not_cut_short_by_a_freeze() -> void:
+	var row := _row(2, 0)
+	row.step(1)
+	_frames(row, 3, Fixtures.FRAME_S)
+	var scroll := row._scroll
+	assert_float(scroll).is_between(0.0, 1.0)
+	row.freeze()
+	assert_float(row._scroll).is_equal(scroll)
+	assert_bool(row._placed.has(row.selected_index())).is_true()
+	assert_int(row._placed.size()).is_equal(2)
+
+
+func test_a_launch_of_a_shelf_of_one_or_two_games_takes_the_selected_one_out_and_brings_it_back() -> void:
+	for count: int in [1, 2]:
+		var row := _row(count, 0)
+		_with_camera(row)
+		var place := _centre(row)
+		var stand := Transform3D(Basis.IDENTITY, Vector3(0.1, 0.2, 0.3))
+		row.stand_selected(stand, 0.4, 0.1)
+		_frames(row, 2, Fixtures.FRAME_S)
+		assert_bool(place.transform.is_equal_approx(stand)).is_true()
+		assert_object(place.shown.get_parent()).is_same(place)
+		assert_bool(place.media_view.visible).is_false()
+		assert_int(row._placed.size()).is_equal(count)
+		row.pose_selected()
+		_frames(row, 2, Fixtures.FRAME_S)
+		assert_object(place.shown.get_parent()).is_same(place.media_view.holder())
+		assert_bool(place.media_view.visible).is_true()
+
+
+func test_a_filter_change_keeps_every_view_bound_to_its_own_model_and_makes_no_new_ones() -> void:
+	var row := _row(5, 2)
+	_with_camera(row)
+	var all := Fixtures.games(5)
+	var views := row.find_children("*", "MediaView", true, false).size()
+	assert_int(views).is_equal(5)
+	var models := ShelfRow.LabelledModel.alive
+	for kept: Array in [[1, 2], [0, 3, 4], [4], [0, 1, 2, 3, 4]]:
+		var games: Array[AndroidServices.Game] = []
+		for index: int in kept:
+			games.append(all[index])
+		row.show_games(games, 0)
+		_frames(row, 3, Fixtures.FRAME_S)
+		assert_int(row.find_children("*", "MediaView", true, false).size()).is_equal(views)
+		for place: ShelfRow.Place in row._places:
+			if place.game >= 0:
+				assert_object(place.media_view).is_not_null()
+				assert_object(place.shown.get_parent()).is_same(place.media_view.holder())
+		assert_int(ShelfRow.LabelledModel.alive).is_equal(models)
+
+
+func test_the_pill_top_is_the_title_place_top_of_the_selected_games_own_model() -> void:
+	var row := _row(5, 2)
+	var camera := _with_camera(row)
+	var place := _centre(row)
+	var layout := GamesLayout.new("ps2_dvd")
+	var expected := TitlePlace.top(TitlePlace.vertices(place.shown.get_child(0) as Node3D), layout.chosen,
+		camera.global_transform, camera.get_viewport().get_visible_rect().size, camera.fov)
+	assert_float(row.title_top()).is_equal_approx(expected, 0.001)
+
+
+func test_a_shelf_without_its_model_shown_yet_gives_a_pill_top_without_failing() -> void:
+	var row: ShelfRow = auto_free(ShelfRow.new())
+	row.label_images = auto_free(Fixtures.FakeArt.new())
+	add_child(row)
+	row.show_shelf(Fixtures.games(3), 0, Fixtures.DVDS, ShelfRow.LabelLook.new())
+	row._placed.clear()
+	assert_float(row.title_top()).is_equal(0.0)
+
+
+func test_a_blank_weight_moving_by_less_than_one_percent_does_not_relight_but_reaches_its_ends() -> void:
+	var row := _row(5, 2)
+	_with_camera(row)
+	var place := _centre(row)
+	var at := place.transform
+	place.draw_at(at, 0.0, 0.5, ShelfRow.Place.Draw.SHOWN, 0)
+	place.draw_at(at, 0.0, 0.504, ShelfRow.Place.Draw.SHOWN, 0)
+	assert_float(place._blank_weight).is_equal(0.5)
+	place.draw_at(at, 0.0, 0.52, ShelfRow.Place.Draw.SHOWN, 0)
+	assert_float(place._blank_weight).is_equal(0.52)
+	place.draw_at(at, 0.0, 0.998, ShelfRow.Place.Draw.SHOWN, 0)
+	place.draw_at(at, 0.0, 1.0, ShelfRow.Place.Draw.SHOWN, 0)
+	assert_float(place._blank_weight).is_equal(1.0)
+
+
+func test_the_room_energy_follows_the_blank_share_of_the_games_in_view_by_how_centred_each_is() -> void:
+	var row := _row(5, 2)
+	_with_camera(row)
+	var lit := _centre(row).lit.room
+	var blank := _centre(row).blank.room
+	assert_float(lit).is_not_equal(blank)
+	row.step(1)
+	_frames(row, 4, Fixtures.FRAME_S)
+	var share := 0.0
+	for game: int in GamesLayout.offsets(5, row._scroll):
+		share += 1.0 - MediaView.softness(GamesLayout.offsets(5, row._scroll)[game])
+	assert_float(share).is_between(0.0, 1.0)
+	assert_float(row.room_energy).is_equal_approx(lerpf(lit, blank, share), 1e-6)
+
+
+func test_a_jump_takes_the_shorter_way_round_the_ring_and_the_forward_one_at_half() -> void:
+	var row := _row(10, 0)
+	row.jump(9, 1, 0.0)
+	assert_int(row._position).is_equal(-1)
+	row.jump(2, 1, 0.0)
+	assert_int(row._position).is_equal(2)
+	row.jump(7, 1, 0.0)
+	assert_int(row._position).is_equal(7)
+	assert_int(row.selected_index()).is_equal(7)

@@ -4,6 +4,7 @@ package app.cartouche.android.storage
 import android.util.AtomicFile
 import app.cartouche.core.ContentUri
 import app.cartouche.core.files.FileFacts
+import app.cartouche.core.files.Shell
 import app.cartouche.core.platforms.PlatformId
 import arrow.core.Either
 import arrow.core.None
@@ -32,7 +33,7 @@ internal data class KnownFacts(val stamp: FileStamp, val facts: FileFacts)
  */
 internal class FactsStore(private val folder: File) {
     fun load(platform: PlatformId): Map<ContentUri, KnownFacts> =
-        atomic(platform).read(emptyMap(), { it }) { decode(it).right() }.getOrElse { emptyMap() }
+        atomic(platform).read(emptyMap(), { it }) { decode(platform, it).right() }.getOrElse { emptyMap() }
 
     /** Keeps [known] as all that [platform]'s files told: the files of its last scan. */
     fun save(platform: PlatformId, known: Map<ContentUri, KnownFacts>): Either<StorageFailure, Unit> {
@@ -61,37 +62,48 @@ internal class FactsStore(private val folder: File) {
         get() =
             when (this) {
                 is FileFacts.Serial -> "serial:$code"
-                is FileFacts.Print -> "print:$hex"
+                is FileFacts.Print -> "print:$hex:${shell.key}"
                 FileFacts.Silent -> "silent"
             }
 
-    private fun decode(text: String): Map<ContentUri, KnownFacts> = text.lines().let { lines ->
-        if (lines.firstOrNone() != Some(HEADER)) emptyMap() else lines.drop(1).map(::entry).filterOption().toMap()
+    private fun decode(platform: PlatformId, text: String): Map<ContentUri, KnownFacts> = text.lines().let { lines ->
+        if (lines.firstOrNone() != Some(HEADER)) emptyMap() else lines.drop(1).map { entry(platform, it) }.filterOption().toMap()
     }
 
-    private fun entry(line: String): Option<Pair<ContentUri, KnownFacts>> = option {
+    private fun entry(platform: PlatformId, line: String): Option<Pair<ContentUri, KnownFacts>> = option {
         val fields = line.split('\t')
         ensure(fields.size == 4)
         val (uri, size, modified, facts) = fields
-        ContentUri.parse(uri).bind() to KnownFacts(FileStamp(number(size), number(modified)), decoded(facts))
+        ContentUri.parse(uri).bind() to KnownFacts(FileStamp(number(size), number(modified)), decoded(platform, facts))
     }
 
     /** None for an empty field. */
     private fun SingletonRaise<None>.number(text: String): Option<Long> =
         if (text.isEmpty()) None else Some(text.toLongOrNull().toOption().bind())
 
-    private fun SingletonRaise<None>.decoded(text: String): FileFacts {
+    /** A Game Boy print kept before the shell was told has none: it is read again, the other platforms' prints keep their facts. */
+    private fun SingletonRaise<None>.decoded(platform: PlatformId, text: String): FileFacts {
         val value = text.substringAfter(':')
         return when (text.substringBefore(':')) {
             "serial" -> FileFacts.Serial(value)
-            "print" -> FileFacts.Print(value.toUIntOrNull(16).toOption().bind())
+            "print" ->
+                FileFacts.Print(value.substringBefore(':').toUIntOrNull(16).toOption().bind(), shellOf(platform, value).bind())
             else -> FileFacts.Silent.also { ensure(text == "silent") }
         }
+    }
+
+    /** The shell a print's text tells: a Game Boy print without one is none, to be read again. */
+    private fun shellOf(platform: PlatformId, print: String): Option<Shell> = when {
+        ':' in print -> Shell.entries.firstOrNone { it.key == print.substringAfter(':') }
+        platform in GAME_BOYS -> None
+        else -> Some(Shell.UNKNOWN)
     }
 
     private companion object {
         /** Raised when the readers come to tell more of some files: those read before are read again. */
         const val VERSION = 1
+
+        val GAME_BOYS = setOf(PlatformId("gb"), PlatformId("gbc"))
 
         const val HEADER = "cartouche-facts\t$VERSION"
     }
