@@ -4,8 +4,7 @@ extends Control
 ## Console chooser has it, and a row of five games of a medium as the games screen stands them, the
 ## middle one sharp and its neighbours softened. `--console=<folder>` (ps2_slim), `--medium=<medium>`
 ## (ps2_dvd), `--row=<place>` the row standing that many places on (0),
-## `--views=plinth`, `--views=media` or `--views=ground` (a console's contact shadow and reflection over the
-## whole frame) only one of them, `--plates` also each shot's 3D alone (its views' pictures where they
+## `--views=plinth` or `--views=media` only one of them, `--plates` also each shot's 3D alone (its views' pictures where they
 ## lie, `<frame>.alpha.png`), `--msaa=<0|1|2>` the edge smoothing, `--hide=<frame>` hides the plinth at that frame,
 ## `--shots=<dir> --frames=<n,n,...>` saves the screen at those frames and quits.
 
@@ -30,13 +29,7 @@ func _ready() -> void:
 	var console := _argument("console", "ps2_slim")
 	_plinth.visible = views.contains("plinth")
 	($Media as Control).visible = views.contains("media")
-	if views.contains("ground"):
-		var ground := ContactShadow.new()
-		ground.set_anchors_preset(Control.PRESET_FULL_RECT)
-		add_child(ground)
-		ground.show_ground(console)
 	_plinth.show_console(console)
-	($Backdrop/Cyclorama as Cyclorama).show_gel(Cyclorama.gel_of(ConsoleManifest.of(console)), false)
 	if views.contains("media"):
 		_views = CarouselBench.media_row(5, _medium, _camera, $Media)
 		CarouselBench.place_row(_views, float(_argument("row", "0")), _medium)

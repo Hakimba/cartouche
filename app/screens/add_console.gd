@@ -55,20 +55,30 @@ const _PILL_RING_RADIUS := 3.5 * _CQW
 const _CARD_S := 0.24
 const _CARD_MOTIONS: Array[StringName] = [&"card_position", &"card_size"]
 const _LINE_MOTIONS: Array[StringName] = [&"enter", &"lines", &"leave"]
-const _CARD_FLIGHT_S := 0.32
+static var _CARD_FLIGHT_S: float:
+	get: return StudioTokens.TR_CHOOSER_CARD_S
 ## The form's own motion, in seconds and px: the "+" ball to form transition (its form half), and the form to
 ## chooser transition (its form half).
-const _ENTER_AT_S := 0.06
-const _ENTER_FADE_S := 0.3
+static var _ENTER_AT_S: float:
+	get: return StudioTokens.TR_FORM_AT_S
+static var _ENTER_FADE_S: float:
+	get: return StudioTokens.TR_FORM_FADE_S
 const _ENTER_S := 0.32
-const _ENTER_LIFT := 4.0 * _CQW
-const _ENTER_SLIDE := 5.0 * _CQW
-const _ENTER_RISE := 0.8 * _CQW
+static var _ENTER_LIFT: float:
+	get: return StudioTokens.TR_FORM_LIFT_PX
+static var _ENTER_SLIDE: float:
+	get: return StudioTokens.TR_FORM_SLIDE_PX
+static var _ENTER_RISE: float:
+	get: return StudioTokens.TR_FORM_CHOOSER_TITLE_PX
 const _LEAVE_FADE_S := 0.3
-const _LEAVE_S := 0.26
-const _ASIDE_S := 0.15
-const _ASIDE_SHIFT := 3.0 * _CQW
-const _ASIDE_MODEL_S := 0.08
+static var _LEAVE_S: float:
+	get: return StudioTokens.TR_FORM_LEAVE_S
+static var _ASIDE_S: float:
+	get: return StudioTokens.TR_CHOOSER_OUT_S
+static var _ASIDE_SHIFT: float:
+	get: return StudioTokens.TR_CHOOSER_SHIFT_PX
+static var _ASIDE_MODEL_S: float:
+	get: return StudioTokens.TR_CHOOSER_MODEL_S
 const _COME_BACK_S := 0.23
 ## The model rising again after a chooser: from this far down (px), in this time, as the plinth's own rise.
 const _MODEL_RISE := 1.6 * _CQW
@@ -562,10 +572,9 @@ func _gel() -> Color:
 	return StudioTokens.GEL.get(StringName(_folders[platform_id] if _folders.has(platform_id) else ""), StudioTokens.NEUTRAL)
 
 
-## The gel of the console chosen on the backdrop and on everything the form paints with it.
+## The gel of the console chosen on everything the form paints with it.
 func _show_gel(animated: bool) -> void:
 	var gel := _gel()
-	_backdrop.show_gel(gel, animated)
 	if not animated:
 		_paint(gel)
 		return
@@ -744,7 +753,7 @@ func _step_aside() -> void:
 	motion.tween_property(_plinth.get_node("Turntable"), ^"modulate:a", 0.0, _ASIDE_MODEL_S)
 	var from := Rect2(_card.position, _card.size)
 	var from_radius := _card.radius
-	_animate(&"card_position", _CARD_FLIGHT_S, Motion.Easing.GLIDE, func(p: float) -> void:
+	_animate(&"card_position", _CARD_FLIGHT_S, StudioTokens.TR_CHOOSER_CARD_S_CURVE, func(p: float) -> void:
 		var to := _choice.cursor_rect()
 		_card.position = from.position.lerp(to.position - _list.global_position, p)
 		_card.size = from.size.lerp(to.size, p)
@@ -776,7 +785,7 @@ func _come_back(cursor: Rect2, rise: bool) -> void:
 	_card.radius = StudioTokens.FOCUS_RADIUS
 	var field := get_viewport().gui_get_focus_owner()
 	if field in _fields:
-		_glide_card(Rect2(field.position, field.size), StudioTokens.FOCUS_RADIUS, _CARD_FLIGHT_S, Motion.Easing.GLIDE, Motion.Easing.GLIDE)
+		_glide_card(Rect2(field.position, field.size), StudioTokens.FOCUS_RADIUS, _CARD_FLIGHT_S, StudioTokens.TR_CHOOSER_CARD_S_CURVE, StudioTokens.TR_CHOOSER_CARD_S_CURVE)
 
 
 func _draw_title() -> void:

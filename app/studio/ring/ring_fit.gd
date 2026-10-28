@@ -21,12 +21,6 @@ const WIDEST := 12.5
 const PS2_BOX := Rect2(0.256, 0.298, 0.552, 0.376)
 ## How fast everything on the ring follows its target, per second.
 const FOLLOW := 14.0
-## The lowest edge of each console's silhouette in the design's picture, a fraction of its height: where its contact
-## shadow starts.
-const FLOORS: Dictionary[String, float] = {
-	"ps2_slim": 0.674, "psx": 0.802, "nes": 0.698, "snes": 0.729, "n64": 0.744, "gc": 0.775, "wii": 0.779,
-	"xbox": 0.760, "xbox360": 0.806, "gb": 0.760, "gbc": 0.725, "gba": 0.702,
-}
 const _BISECTIONS := 26
 ## Each console's real size over its fitted pose, and the depth its pose pushed it back to.
 const _SIZES: Dictionary[String, Vector2] = {

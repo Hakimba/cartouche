@@ -7,14 +7,16 @@ extends Control
 signal chosen(choice: StringName)
 signal transition_frame(subject: float, rail: float, chrome: float)
 
-const DURATION_S := 0.36
+static var DURATION_S: float:
+	get: return maxf(StudioTokens.TR_SETTINGS_OPEN_S, StudioTokens.TR_SETTINGS_CARD_AT_S + StudioTokens.TR_SETTINGS_CARD_S)
 const _PITCH := 89.6 # Row height plus the 7.68 px gap.
 const _ROW_SIZE := Vector2(624.64, 81.92)
 const _CARD_TOP := 172.8
 const _HEADING_INSET := Vector2(43.52, 37.4)
 ## The first row's top in the card: the design's line boxes put its text and frame a px higher than centring does.
 const _ITEMS_TOP := 143.64
-const _ENTER_DROP := 38.4
+static var _ENTER_DROP: float:
+	get: return StudioTokens.TR_SETTINGS_RISE_PX
 const _KNOB_TRAVEL := 38.4
 const _KNOB_MIDDLE := Color("#f4efe7")
 const _KNOB_EDGE := Color("#e2d9cc")
@@ -65,7 +67,6 @@ var _ink: Control
 @onready var _graphics: FieldButton = %Graphics
 @onready var _floating: FieldButton = %GamesFloat
 @onready var _region: FieldButton = %Region
-@onready var _choice: ChoiceList = %Choice
 
 
 func _ready() -> void:
@@ -104,7 +105,7 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or _choice.visible:
+	if not is_visible_in_tree():
 		return
 	if saving:
 		if event.is_action_pressed(&"screen_back") and Time.get_ticks_msec() - _save_started_ms >= SAVE_ESCAPE_MS:
@@ -121,7 +122,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if is_visible_in_tree() and not _choice.visible and event.is_action_pressed(&"screen_back"):
+	if is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
 		_reverse(false)
 
@@ -144,27 +145,31 @@ func _reverse(opening: bool) -> void:
 
 
 func _process(delta: float) -> void:
-	_time = clampf(_time + minf(delta, 0.1) * _direction, 0.0, DURATION_S)
+	_time = clampf(_time + minf(delta, 0.1) * _direction, 0.0, _duration())
 	_sample()
-	if _time > 0.0 and _time < DURATION_S:
+	if _time > 0.0 and _time < _duration():
 		return
-	var opened := (_time == DURATION_S) != _closing
+	var opened := (_time == _duration()) != _closing
 	state = State.OPEN if opened else State.CLOSED
 	set_process(false)
 	if not opened:
 		chosen.emit(&"close")
 
 
+func _duration() -> float:
+	return StudioTokens.TR_SETTINGS_CLOSE_S if _closing else DURATION_S
+
+
 func _sample() -> void:
-	var card := _portion(0.0, 0.18, Motion.Easing.EASE_IN) if _closing else 1.0 - _portion(0.12, 0.24, Motion.Easing.ARRIVE)
+	var card := _portion(0.0, StudioTokens.TR_SETTINGS_CARD_OUT_S, StudioTokens.TR_SETTINGS_CARD_OUT_S_CURVE) if _closing else 1.0 - _portion(StudioTokens.TR_SETTINGS_CARD_AT_S, StudioTokens.TR_SETTINGS_CARD_S, StudioTokens.TR_SETTINGS_CARD_S_CURVE)
 	_panel.modulate.a = 1.0 - card
 	_panel.position.y = _CARD_TOP + card * (25.6 if _closing else _ENTER_DROP)
 	_panel.scale = Vector2.ONE * lerpf(1.0, 0.98 if _closing else 0.97, card)
-	($Dim as ColorRect).modulate.a = 1.0 - _portion(0.06, 0.2, Motion.Easing.EASE_IN) if _closing else _portion(0.08, 0.2, Motion.Easing.EASE_OUT)
-	($Hints as Control).modulate.a = 1.0 - _portion(0.0, 0.12, Motion.Easing.LINEAR) if _closing else _portion(0.21, 0.15, Motion.Easing.LINEAR)
-	var subject := _portion(0.14, 0.22, Motion.Easing.ARRIVE) if _closing else 1.0 - _portion(0, 0.18, Motion.Easing.EASE_IN)
-	var rail := _portion(0.14, 0.22, Motion.Easing.ARRIVE) if _closing else 1.0 - _portion(0, 0.24, Motion.Easing.SINK)
-	var chrome := _portion(0.21, 0.15, Motion.Easing.LINEAR) if _closing else 1.0 - _portion(0, 0.15, Motion.Easing.LINEAR)
+	($Dim as ColorRect).modulate.a = 1.0 - _portion(0.06, 0.2, Motion.Easing.EASE_IN) if _closing else _portion(StudioTokens.TR_SETTINGS_VEIL_AT_S, StudioTokens.TR_SETTINGS_VEIL_S, Motion.Easing.EASE_OUT)
+	($Hints as Control).modulate.a = 1.0 - _portion(0.0, 0.12, Motion.Easing.LINEAR) if _closing else _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
+	var subject := _portion(StudioTokens.TR_SETTINGS_BACK_AT_S, maxf(0.001, StudioTokens.TR_SETTINGS_CLOSE_S - StudioTokens.TR_SETTINGS_BACK_AT_S), Motion.Easing.ARRIVE) if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_LEAVE_S, StudioTokens.TR_SETTINGS_LEAVE_S_CURVE)
+	var rail := _portion(StudioTokens.TR_SETTINGS_BACK_AT_S, maxf(0.001, StudioTokens.TR_SETTINGS_CLOSE_S - StudioTokens.TR_SETTINGS_BACK_AT_S), Motion.Easing.ARRIVE) if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_SINK_S, StudioTokens.TR_SETTINGS_SINK_S_CURVE)
+	var chrome := _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR) if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
 	transition_frame.emit(subject, rail, chrome)
 
 
@@ -317,18 +322,6 @@ func open(platforms: int, focus: StringName, region: String) -> void:
 	if state == State.OPENING:
 		_sample()
 		set_process(true)
-
-
-## The region chosen among none and [param regions], as the plugin names them, the focus first on
-## [param current]; [param current] when given up.
-func choose_region(current: String, regions: PackedStringArray) -> String:
-	var choices := PackedStringArray([""]) + regions
-	var names := PackedStringArray()
-	for region in choices:
-		names.append(_region_name(region))
-	var index := await _choice.choose(tr("Preferred region of images"), names, choices.find(current))
-	_region.grab_focus()
-	return current if index < 0 else choices[index]
 
 
 func _region_name(region: String) -> String:

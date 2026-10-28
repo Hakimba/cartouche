@@ -34,7 +34,7 @@ func test_each_source_of_each_designed_light_is_built_as_its_kind_with_its_value
 func test_a_screen_without_a_designed_light_keeps_the_carousel_s_sun_and_room() -> void:
 	var sun: Transform3D = Fixtures.property("res://carousel/carousel.tscn", &"Sun", &"transform")
 	var environment := Fixtures.app_environment()
-	for unlisted: Array in [["ps2_slim", &"consoles"], ["xbox", &"plinth"], ["no_such_model", &"games"]]:
+	for unlisted: Array in [["no_such_model", &"consoles"], ["xbox", &"plinth"], ["no_such_model", &"games"]]:
 		var model: String = unlisted[0]
 		var screen: StringName = unlisted[1]
 		var rig := StudioLights.rig_of(model, screen)
@@ -76,8 +76,10 @@ func test_only_the_games_screen_s_sources_light_the_chosen_medium_or_its_neighbo
 func test_a_kind_s_light_without_a_picture_is_its_own_but_for_the_ps2_s_and_the_ps1_s() -> void:
 	var blank: Dictionary = _data()["blank"]
 	var lights: Dictionary = _data()["lights"]
+	# Every medium lit on the games screen has one; a console's light (on the consoles screen) has none.
 	assert_array(blank.keys()).contains_exactly_in_any_order(lights.keys().filter(func(m: String) -> bool:
-		return m not in ["nes", "gbc"]))
+		var screens: Dictionary = lights[m]
+		return screens.has("games")))
 	for medium: String in blank:
 		var same := JSON.stringify(blank[medium]) == JSON.stringify(lights[medium])
 		assert_bool(same).override_failure_message(medium).is_equal(medium not in ["ps2_dvd", "ps1_cd"])

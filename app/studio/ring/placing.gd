@@ -28,14 +28,10 @@ enum Press { LEFT, RIGHT, A, B }
 ## What a press asks the screen to do.
 enum Action { IGNORED, MOVE, FLY, LEAVE }
 
-## How long each timed state plays (seconds): the console's arrival, its flight, its bounce, the pause after it, the
-## morph, and the flight back.
-const ARRIVE_S := 0.42
-const FLY_S := 0.46
-const BOUNCE_S := 0.2
-const PAUSE_S := 0.12
-const MORPH_S := 0.62
-const BACK_S := 0.4
+## How long the flight back plays (seconds); the other timed states (the console's arrival, its flight, its bounce, the
+## pause after it, the morph) are the design's, in [StudioTokens].
+static var BACK_S: float:
+	get: return StudioTokens.TR_PLACE_BACK_S
 ## The gap the ring opens (radians), how much bigger the new console stands in the middle and where its silhouette's
 ## centre stands there, in px of the 1280 × 960 frame (4 cqw above the ring's centre).
 const OPENING := 0.34
@@ -45,7 +41,8 @@ const MIDDLE := Vector2(640.0, 419.84)
 const PLINTH := Vector2(263.68, 588.8)
 const PLINTH_WIDTH := 40.0
 ## How high (px) the console is lifted along its arrival, its flight and its flight back, at the most.
-const ARRIVE_LIFT := 38.4
+static var ARRIVE_LIFT: float:
+	get: return StudioTokens.TR_PLACE_ARC_PX
 const FLY_LIFT := 64.0
 const BOUNCE := 0.12
 ## The room the middle's text keeps under the console (px).

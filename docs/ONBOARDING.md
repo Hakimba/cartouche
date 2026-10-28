@@ -68,8 +68,8 @@ The same words are used in the code, the tests and this document.
   **group**; a key typed starts a **search**: the carousel keeps the games **found**, those whose
   title has, for each word typed, another word starting with it, in any order. A key is **lit**
   when typing it still finds a game. What is found can be **kept** while browsing it (the
-  **filter** shown at the top). L1 and R1 **leap** to the next group, or once keys are typed to
-  the next lit key.
+  **filter** shown at the top). In the ribbon only, L1 and R1 **leap** to the next letter, or once
+  keys are typed to the next lit key; the games screen leaves them free.
 - **Place**: one of the carousel's recycled slots, showing a game's **model** (the 3D media of
   its platform) with a **label** on it: an image of the real one, or the game's title drawn on the
   platform's label colour.
@@ -124,7 +124,7 @@ The same words are used in the code, the tests and this document.
   **steps**: each a whole state of the scene (console, its parts, disc, rows, blur, controls, black),
   reached from the previous one in `dur` seconds along its `ease`, then held `hold` seconds. Its
   **moments** name where it comes to the games screen, the launch, the disc seated, the black.
-  The steps file is the contract between the tuning tool and the app: `model_hash` (the console's
+  The steps file is the contract between whatever edits the steps and the app: `model_hash` (the console's
   fingerprint they were tuned on), `choice` (the step the game is chosen at) and `steps`, each a
   group per part (`console`, `consoles`, `parts`, `disc`, `row`, `look`, `ui`, `fx`), distances in
   centimetres, angles in degrees, the blur in pixels of the screen, `parts` the console's moving
@@ -218,12 +218,12 @@ The same words are used in the code, the tests and this document.
   games screen: the **platforms** set up, on a dedicated satin logo grid, each opened in the same form to
   **edit** it (saved and scanned again) or **remove** it after a confirmation, the button style, and
   **Graphics**: the edges' smoothing (4×, 2× or none), each card showing a close-up of an edge drawn
-  with it, and the **preferred region of images**, chosen in a list (`ChoiceList`) of the regions the settings answer names (`preferred_regions`).
+  with it, and the **preferred region of images**, chosen on its own page (`PreferredRegionScreen`, the same as at first launch): a grid of cards, the region chosen now ticked, among the regions the settings answer names (`preferred_regions`).
   Above the console, a **"+" ball**: holding up turns it into "Add a platform" (its strokes
   spreading into the button's outline), and A adds one more console, the consoles screen coming back
   on it.
 - **Settings transition**: `SettingsTransition` samples the source model and all chrome, including the
-  rail frame, grounds and games logo. Restoring after an added console preserves its
+  rail frame and games logo. Restoring after an added console preserves its
   arrival fade. Desktop setting saves use one fallback and keep each choice in memory; desktop variant
   storage leaves model and setup validation to the Kotlin core.
 - **Settings**: the app's own choices, apart from the library: the button style, the edges'
@@ -518,11 +518,11 @@ The same words are used in the code, the tests and this document.
   and band from `appearance.json`), plain until `GameArt.is_absent`, and a `ProgressRing` drawn in
   the label's viewport while its image downloads (centred, at the shape's `progress_ring_radius`: on a disc
   between the hub and the label's edge; in the band's colour, else the ink): the viewport is drawn
-  again only at each progress told, every frame only while a ring of unknown size turns. `CarouselLayout` holds the consoles row's legacy mechanics and the held-button repeat delays. `GamesLayout` holds the games' presentation geometry.
-  `GameSearch` (`carousel/search/`) is the ribbon: the carousel hands it ↓, L1, R1 and, while
-  what is found is kept, B; open, it takes every press. It asks the plugin for each view and shows
+  again only at each progress told, every frame only while a ring of unknown size turns. `CarouselLayout` holds the consoles row's legacy mechanics and the held-button repeat delays. `GamesLayout` holds the games' presentation geometry; the chosen medium's pose (position, rotation in degrees, scale, per medium) is read from `data/media_poses.json`.
+  `GameSearch` (`carousel/search/`) is the ribbon: the carousel hands it ↓ and, while what is
+  found is kept, B; open, it takes every press. It asks the plugin for each view and shows
   it with `ShelfRow.show_games` (the same models, another list) and `ShelfRow.jump`; the pill
-  underlines the words typed (`TitleMarks`), the hints tell where L1 and R1 lead. Without the
+  underlines the words typed (`TitleMarks`), the ribbon's hints tell where L1 and R1 lead. Without the
   plugin (a desktop run) nothing is found, and the index is empty.
   Scraping's progress is a bar at the bottom right, beside the hints, where a message shows too: it moves to each count, greys with the reason while
   the run waits, fades once full, hides for a launch's message, and shows and fades with the pill
@@ -561,9 +561,9 @@ The same words are used in the code, the tests and this document.
   Its ellipse is centred at (640, 471.04), with radii (390.4, 325.12), leaving room for the top arrow and its glow.
   `ConsoleWheel` is the ring's rule (no end, the console held trading places as it goes, B giving the old order back),
   pure and tested alone. No circle and no name is drawn: the middle shows the pointed console's logo (and, while one
-  is held, "in its place" or "between" two logos), an ink arrow stands outside the pointed console with a gel spot
-  behind it, and each console has its contact shadow (`ContactShadow`) on a layer of the backdrop, which the 3D view
-  draws behind it. Everything follows its target at 14 per second (`RingFit.FOLLOW`). `ConsoleSticker` draws the
+  is held, "in its place" or "between" two logos), an ink arrow stands outside the pointed console; no spot or
+  shadow is drawn about the consoles.
+  Everything follows its target at 14 per second (`RingFit.FOLLOW`). `ConsoleSticker` draws the
   console held as a sticker: alone in a view of its own (render layer `ConsoleLayer.STICKER`, which the carousel's
   camera leaves out; the sun lights that layer too), drawn again only when it moves, then outlined and shadowed by
   `sticker.gdshader` only round it.
@@ -586,8 +586,9 @@ The same words are used in the code, the tests and this document.
 - **Properties** (`carousel/properties/`): `PropertiesScreen` holds the shared staging under the
   light and three-part moves. `DiscProperties` owns the name field and keyboard (`NameEditor`,
   `GamepadKeyboard`) and its rename signal.
-  `ConsoleProperties` stages the selected console (`ConsoleRow.stage`), its logo, and "Change place"
-  (or Y), which leaves for `ConsoleOrder`; B returns it to the consoles screen.
+  `ConsoleProperties` stages the selected console (`ConsoleRow.stage`: the middle of its silhouette at
+  `ConsoleRow.STAGE_CENTRE`, whatever its pose) and "Change place" (A), which leaves for `ConsoleOrder`; B
+  returns it to the consoles screen.
   `DiscProperties` lends the selected medium to `MediaView` for its still staging, preserving the
   original label material and viewport for previews and framing. `LabelZone` outlines the projected
   label face plus 10 px: a circle for a disc, or a rectangle with 20.48 px corners for a cartridge.
@@ -771,10 +772,13 @@ One idiom per need, for every screen:
   tracked text drifts with its length (a 15-letter title by some 7 px, a note by 10). Text that must
   keep the design's width, a title, a kicker, a note or a count, draws through `StudioText`. The screens
   the redesign has not reached keep theme Labels in tracked roles: the welcome, no console,
-  permission, platform grid, removal, button style, preferred region and edge smoothing screens, the choice list and the
+  permission, platform grid, removal, button style, preferred region and edge smoothing screens and the
   field button.
-- **Plinth**: the form, `StudioChooser` and `VariantChooser` show a console as one still picture on a
-  `Plinth` (upright, facing front at its start pose in `data/turntable.json`). `Plinth.request_still`
+- **Plinth**: the form and `StudioChooser` show a console as one still picture on a
+  `Plinth` (upright, facing front at its start pose in `data/turntable.json`: `yaw` and `roll` in degrees, and
+  once posed by hand `pitch`, `position` in world units and `size`; `Plinth.stand_at`
+  leans and rolls the model, sets it on the plinth fitted as the tilt leaves it, then turns, moves and sizes
+  it, the turns applied Y, X then Z as a Node3D's). `Plinth.request_still`
   renders it once per model folder in a throw-away `SubViewport` (`get_texture().get_image()` into an
   `ImageTexture`, the viewport freed), one at a time and the latest asked first, and keeps it for the app's
   life; until it exists the plinth shows nothing and the picture then rises in. Nothing turns. `plinth_test.gd`
@@ -804,9 +808,11 @@ model code and licence. `Appearance.use_variants` selects those manifests and in
 cached scene and animations. The row, ring and launch then use the same selected model.
 
 Left and right on a field of `AddConsole` preview its models; Add or Save keeps the choice, Cancel gives it up.
-The switches and the Add/Cancel buttons keep their horizontal navigation. R3, or F3 on a keyboard, opens
-`VariantChooser` on the consoles screen. Left and right preview, A chooses and B cancels. Its plinth belongs to
-the resting group and stops drawing at rest. The desktop demo stores choices in `user://console-variants.json`.
+The switches and the Add/Cancel buttons keep their horizontal navigation. On the consoles screen, a console with
+other models has its model focused first in its properties (`ConsoleProperties`), a callout naming it; A shows
+every model as a mosaic of still pictures (`Plinth.request_still`), and the console in the row turns into the one
+under the cursor (`ConsoleRow.replace_selected`, the library's choice untouched); A keeps it (`set_variant`), B
+brings back the one it had. The desktop demo stores choices in `user://console-variants.json`.
 
 The fat PS2 and the Game Boy Advance SP use their supplied models and launch proposals, with the existing light
 until a light is designed for them. They share their platform's logo. The SP stands open at rest; the fat PS2's
@@ -820,15 +826,14 @@ the first step of its `launch.json` (position and size fitted from its model's b
 the decided pose by offset and size, never the angles; the 83.2 px raise, `ConsoleRow.RAISE_PX`,
 is in the position; sway and bob are 0), so the launch starts from the posed console. `ConsoleRow` keeps the ring's
 position unbounded (`target()`), swaps the console in and out on a step (leavers keep fading from where they were if
-a press comes mid-swap) and moves the floor reflection of each console (no shadow under it) with it (`grounds`). The rail
+a press comes mid-swap) and draws nothing under the console. Only the right stick's or the finger's left and right turn a console
+(`StickTurn.new(true)`): it stays upright. The rail
 follows `ConsoleRow.selection_changed` through `go_to`: the spring (280 / 25) moves the tiles, the frame pops, the gel
 crossfades; at rest the rail draws nothing. `sink` and `rise` move it 51.2 px down and clear. A ring of up to 7 consoles shows whole,
 as a strip (`is_strip`): each console once, side by side, and none ever crosses the rail. The games
-logo is hidden when the games screen starts leaving and shown in place with the games screen; nothing flies. A platform shown by its medium has no tile, hero or ground. A
+logo is hidden when the games screen starts leaving and shown in place with the games screen; nothing flies. A platform shown by its medium has no tile or hero. A
 console with a light designed for the consoles screen (`StudioLights`) is drawn in `ConsoleRow.HERO` and lit by that
-rig alone; the carousel's Sun does not cull that layer. The baked ground fades across the first 15 degrees
-of inspection and returns as the console returns to its pose. A console leaving during inspection keeps its
-ground's opacity through the swap. Covered screens and empty libraries show neither rail nor ground.
+rig alone; the carousel's Sun does not cull that layer. Covered screens and empty libraries show no rail.
 After ordering, the rail takes the row's new order and selected console before it reappears. A tap on a
 moving rail counts from its target; a hidden or fully sunk rail takes no tap. A swap back to a console
 still leaving starts from that console's current position, size and opacity.
@@ -1073,3 +1078,129 @@ a property that filters its cases also checks that enough of them reach the code
 - **Both:**
   - Comments explain *why*, on code people read often; no comment restates the code.
   - Every source file starts with `SPDX-License-Identifier: GPL-3.0-or-later`.
+
+
+## The dev bridge
+
+A remote control for debugging and automation: a local client (a test harness, a screenshot script, a tuning
+page) drives a running debug build over a WebSocket, takes pictures, presses buttons and changes lights, poses,
+launch steps and design values live. It is never part of a release build. Its first message, `hello`, carries
+the device, the screen and `protocol` (`Bridge.PROTOCOL`), raised whenever a command or an answer changes shape.
+
+A debug build started with `--bridge` connects to `ws://127.0.0.1:5201`; `--bridge-port=<n>` picks another
+port, so several clients can run side by side on a desktop, each with its own packs folder (`user://dev/<n>/`,
+`default` without a port). Without the flag the app adds no bridge node and opens no connection.
+`Diagnostics` loads the optional bridge by path; release exports exclude every file under `dev/bridge/`.
+`dev/check_release.sh` inspects a real Android release pack, and `dev/build.sh` runs that check.
+
+The bridge is debug-only and may read private members of the app's classes (the carousel's screen, the
+launch's stage, a view's tweens): a documented exception to the rule that nothing reaches into another
+class's privates. A rename that leaves one behind fails `bridge_scripts_test.gd`, which compiles every
+script under `dev/bridge/` against the classes they read (strings passed to `call` are the exception:
+`commands_test.gd` covers those).
+
+Requests are JSON objects with `id`, `cmd`, and the command's arguments. Answers keep `id` and `cmd`, with
+`ok` or an `error`. `shot` answers with `size`, `w`, and `h`, followed by one binary PNG or JPEG message.
+Commands are processed in order, including commands that wait for frames.
+
+- `state` reports the route, screen, focus, selected console and game, frame timing, pause state, and `rig`:
+  the model, screen and blank flag of the lights shown (empty when none).
+- `go {route}` reloads the current scene and plays the route's `press`, `push`, `release`, and `wait` steps
+  (`wait` counts frames of 20 ms of game time), at eight times the speed it was recorded at, except the
+  stretch between a `push` and its `release`, which plays at the recorded speed (a held direction repeats at
+  most once a frame, so it would repeat too little). It answers an error if the scene does not settle after
+  600 frames. A last step marked `hold` pauses the app once that step's wait is over, so with a `wait` of 0
+  it stops on the first frame of what the step started (the press registers with the clock stopped). A last `push`
+  with `keep: true` retains the action until an explicit input release or the next route; this previews the add ball's held ↑.
+  `step
+  {frames}` then plays the transition frame by frame.
+- `reload {files}` loads base64 resources through an overlay pack, forgets their caches, reloads the scene,
+  and replays the route as `go` does. A file read only as the app starts is refused, and so is a font (its
+  shapes stay in caches): `restart {files}` prepares them for the next start as `start_next.pck` in the
+  instance's folder; at the next start with `--bridge` that file becomes `start.pck` and is mounted, so the
+  pack the running app has mounted is never removed or renamed over. The caller restarts the process;
+  `restart` without files leaves a marker that removes the start pack at the next start. Scripts are refused
+  by both: the engine compiles every named script before any of them runs, so no pack can replace one.
+- `tune` changes a shown light by index, the shown room's ambient energy (`room`), the shown model's pose,
+  or a Control by path. Light positions and targets use the rig's model-centred coordinates, and colours use
+  RGB. A console with no designed light on the consoles screen is tuned through the scene's Sun (index 0)
+  and environment. Poses use three-component positions, rotations in radians, and scales. Controls accept
+  position, size, rotation, corner radius, RGBA colour, and font size. A pose answer (an empty `values` only
+  reads) gives the model's current `pose`, the screen `rect` its box covers, and its `space`, what a pose
+  editor draws handles on the model with: the camera's `projection` (16 numbers, column by column) and
+  `camera` transform, the screen rectangle `view` the camera's picture is drawn in (the plinth's turntable,
+  else the whole screen), the `model`'s and its `parent`'s transforms in that camera's world (12 numbers,
+  basis columns then origin) and the model's box `centre`. `tune {target: "turntable", values: {rotation,
+  position, size}}` stands a plinth's live model at that start (degrees, world units) through
+  `Plinth.stand_at`, as its still picture would be drawn. Changes stay in memory. The plinth retains a
+  temporary live viewport while tuned; its normal cached rendering is unchanged.
+- `tune {target: "launch", values: {steps, choice, t, handles?, console?}}` puts the carousel in a launch of those
+  steps on the selected console, held at `t` seconds with the black drawn (`resume` plays it on in real
+  time, and past its end `GameLaunch.end_preview` gives the carousel back); it is refused while a real
+  launch runs, and answers the animation's `length`, `moments`, model fingerprint, and moving-part endpoints; with `handles`, also where the console,
+  the disc (once out of the row) and each moving part stand in the picture, in pixels, with each one's
+  movement on the picture for one centimetre (or one unit of the part's property) and a part's limits.
+- `tune {target: "motion", values: {<NAME>: value}}` changes the values that `StudioTokens.LIVE` lists (they are `static var`s of the generated tokens, read when a tween
+  starts) until the app starts again. Durations use seconds, distances use design pixels, and curves use `Motion.Easing`. Unknown names and negative numbers are refused.
+- `tune {target: "speed", value}` sets engine speed above zero and at most 20. `resume` and `go` reset it to 1.
+  `tune {target: "input", values: {action, pressed}}` holds or releases a known input action.
+- `pause` holds the tree and engine time and disables viewport input. `resume` restores them. `step
+  {frames}` advances the shell's process callbacks, animation players, and running tweens by 1/60 second per
+  frame, then stays paused. SceneTree timers and physics are not manually advanced. `scrub {t}` samples the
+  selected console's launch animation at an absolute time and holds it, including the disc and console
+  staging. `tune {target: "launch", values: {stop: true}}` ends only a bridge preview and resumes engine time.
+- `sound {data, format, gain_db}` plays base64 bytes (`wav` 16-bit PCM or `ogg`) on a temporary player freed
+  when it ends and answers the sound's `length`. `sound {stop: true}` stops and frees those temporary players. `sounds {map}` plays sounds as the app's actions and
+  screens happen: `map` is `{<input action or "screen:<name>">: [{data, format, gain_db, screens?}]}`, an
+  action matched as `Diagnostics` sees it (pressed, not echoed) and a screen as `state` names it; an entry
+  with `screens` is for those screens only and wins over one without. An empty map stops it; a map with an
+  unreadable entry is refused whole. Neither changes anything the app does.
+- `pick {x,y}` reports the visible Control under a viewport point (`control`), every visible control under
+  it, the topmost first (`stack`), and the console folder or medium id under it, when present. `snapshot`
+  returns the plugin's library and settings answers and the library's console variants.
+
+On desktop debug builds, `--snapshot=<directory>` reads `snapshot.json` from that directory. It supplies the
+library, settings, and variants instead of the demo, with label paths rooted under `<directory>/files/art/`.
+Settings and variant edits stay in memory. The snapshot and the user's variant file are never written by
+this mode. The bridge's packs stay under `user://dev/`.
+
+The runtime JSON caches are listed in `dev/bridge/commands.gd`. Lights invalidate both the rig cache and the
+console row's rig-presence cache, plus plinth pictures. Turntable edits invalidate start poses and pictures.
+Media pose edits (`data/media_poses.json`, read by `GamesLayout`) invalidate its read poses. An in-flight
+old picture cannot populate a newly forgotten cache. `Appearance` and `LaunchAnimation` read their JSON each
+time a scene builds them; they have no static file cache. Console and medium manifests are ResourceLoader
+resources; a changed cached resource is replaced before the scene reloads. The adapter's catalog inputs are
+loaded into the plugin at startup and are outside live visual editing.
+
+
+### Saved visual overrides
+
+The generated `StudioTokens.CONTROL_EDITS` dictionary holds screen overrides by element id.
+Each record names a Control path pattern, a shared style, and optional geometry, font, text, and RGBA colours.
+`CONTROL_STYLES` holds the shared values. `ControlTokens` applies a record when its matching Control appears.
+With no records, the node does no per-frame work. At rest it reapplies geometry after container layout.
+It leaves ongoing screen transitions free to move. `SatinPanel.Backing` retains its overrides across gel changes.
+`StudioText` reads font and colour overrides from its drawing node and its ancestors.
+The bridge refuses a text replacement on a Control that uses translations.
+
+Transition values remain live static variables. Their initial values keep the app's previous timings and distances.
+The optional games logo flight starts disabled with a zero duration.
+The ring and chooser sample their opening moves from one clock, which a return press can run backwards.
+A form card retargets from its current rectangle. `TR_REVERSE` controls return presses during opening.
+`TR_SETTLE_S` bounds the wait for an ongoing console swap or games scroll before a transition press.
+Its zero default preserves immediate starts.
+
+`transition_values_test.gd` checks all sixty recorded defaults, independent live settings durations,
+property intervals, a card turned back mid-flight, and the wait for a moving start.
+`control_tokens_test.gd` checks empty overrides, element isolation, and appearance retained across a gel change.
+
+The `go` route's `library: "adding"` uses debug-only responses from `route_fixture.gd`.
+The fixture keeps all state in memory and never calls the Android plugin.
+It shows two supported consoles, then lets the real form add PS2 and enter the placing ring.
+A route without that fixture returns to the app's usual service.
+`route_fixture_test.gd` drives the real bridge through both choosers, placing, and the held add-ball preview.
+Control batches validate every target before changing any control.
+A control tune with `values: {"reset": true}` restores its captured state: geometry, theme overrides,
+text metadata and the satin gradient recipe. Comparison uses this reset so its original picture keeps
+shared resources and gradients. A reset is also valid inside an atomic control batch.
+`control_tokens_test.gd` checks that an invalid batch changes nothing and that reset restores those originals.

@@ -31,6 +31,7 @@ status=0
 [ "$status" -eq 0 ] || exit "$status"
 mkdir -p build
 GODOT="$GODOT" dev/test_godot.sh
+GODOT="$GODOT" bash dev/check_release.sh
 # The export packs scripts that fail to compile: run the project briefly to catch them first.
 ${bounded:+"$bounded" -k 10 120} "$GODOT" --headless --path app --quit-after 30 > build/run.log 2>&1 || status=$?
 [ "$status" -ne 124 ] || fail "the project did not stop within 120 s (full log: build/run.log)"

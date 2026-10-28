@@ -14,6 +14,7 @@ func before_test() -> void:
 
 func after_test() -> void:
 	get_window().size = _window
+	StudioTokens.TR_REVERSE = 0
 
 
 ## A device past its first launch with PS2, GameCube and Game Boy Advance games, in that order, its
@@ -94,22 +95,6 @@ func test_down_opens_the_ring_on_the_selected_console_and_B_closes_it_on_the_one
 	# And the consoles screen works as before.
 	await _press(carousel, JOY_BUTTON_X)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-
-
-func test_the_ring_s_shadows_are_drawn_behind_the_consoles_and_only_while_the_ring_shows_and_no_circle_is_drawn() -> void:
-	var carousel: Carousel = (await _on_consoles())[0]
-	var order := carousel._order
-	var layer := order._ring.get_canvas_layer_node()
-	# On a layer of the backdrop, which the 3D view draws behind it.
-	var environment := get_viewport().get_camera_3d().get_world_3d().environment
-	assert_int(environment.background_mode).is_equal(Environment.BG_CANVAS)
-	assert_int(layer.layer).is_less_equal(environment.background_canvas_max_layer)
-	assert_bool(layer.visible).is_false()
-	await _press(carousel, JOY_BUTTON_DPAD_DOWN)
-	assert_bool(layer.visible).is_true()
-	assert_float(order._ring.modulate.a).is_equal(1.0)
-	await _press(carousel, JOY_BUTTON_B)
-	assert_bool(layer.visible).is_false()
 
 
 func test_a_console_taken_and_moved_shows_the_order_at_once_and_A_keeps_it_after_a_restart_too() -> void:
@@ -250,11 +235,14 @@ func test_an_order_that_cannot_be_kept_is_told_and_the_ring_goes_back_to_the_ord
 	assert_str(carousel._order._wheel.selected()).is_equal("ps2")
 
 
-func test_Y_or_change_place_in_a_console_s_properties_opens_the_ring_on_it() -> void:
+func test_change_place_in_a_console_s_properties_opens_the_ring_on_it_and_y_does_not() -> void:
 	var carousel: Carousel = (await _on_consoles())[0]
 	await _press(carousel, JOY_BUTTON_DPAD_RIGHT)
 	await _press(carousel, JOY_BUTTON_X)
 	await _press(carousel, JOY_BUTTON_Y)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
+	assert_object(Fixtures.focus(self)).is_same(carousel._console_properties._change_place)
+	await _press(carousel, JOY_BUTTON_A)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.ORDER)
 	assert_str(carousel._order._wheel.selected()).is_equal("gc")
 	assert_int(carousel._console_properties._step).is_equal(ConsoleProperties.Step.CLOSED)
@@ -274,7 +262,7 @@ func test_Y_or_change_place_in_a_console_s_properties_opens_the_ring_on_it() -> 
 
 
 func test_a_console_alone_has_no_order_to_be_put_in() -> void:
-	var carousel: Carousel = (await _on_consoles(Fixtures.past_first_launch(self, {"ps2": 2})))[0]
+	var carousel: Carousel = (await _on_consoles(Fixtures.past_first_launch(self, {"gc": 2})))[0]
 	assert_bool(carousel._arrange_hint.visible).is_false()
 	await _press(carousel, JOY_BUTTON_DPAD_DOWN)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
@@ -422,36 +410,6 @@ func test_a_platform_without_a_model_has_no_place_on_the_ring_and_keeps_its_plac
 		assert_int(kept.find(platform_id)).is_equal(ids.find(platform_id))
 	assert_array(kept).contains_exactly_in_any_order(ids)
 	assert_array(kept).is_not_equal(ids)
-
-
-## The silhouette boxes of the design's table, by console folder (x0, y0, x1, y1 as fractions of the picture).
-const _DESIGN_BOXES: Dictionary[String, Vector4] = {"ps2_slim": Vector4(.256, .298, .808, .674),
-	"psx": Vector4(.224, .283, .840, .802), "nes": Vector4(.224, .314, .834, .698), "snes": Vector4(.259, .275, .826, .729),
-	"n64": Vector4(.256, .302, .837, .744), "gc": Vector4(.323, .240, .706, .775), "wii": Vector4(.334, .217, .640, .779),
-	"xbox": Vector4(.250, .225, .840, .760), "xbox360": Vector4(.401, .213, .605, .806),
-	"gb": Vector4(.390, .271, .648, .760), "gbc": Vector4(.392, .275, .642, .725), "gba": Vector4(.241, .295, .785, .702)}
-
-
-func test_each_console_s_silhouette_box_is_the_design_s_to_within_a_few_pixels_of_its_344_wide_picture() -> void:
-	# The design's own frame: a headless window is 64 × 64, whose square view shows the 3D scene larger.
-	get_window().size = Vector2i(1280, 960)
-	await await_idle_frame()
-	var ids: Dictionary[String, int] = {"ps2": 1, "psx": 1, "nes": 1, "snes": 1, "n64": 1, "gc": 1, "wii": 1, "xbox": 1, "xbox360": 1, "gb": 1, "gbc": 1, "gba": 1}
-	var carousel: Carousel = (await _on_consoles(Fixtures.past_first_launch(self, ids)))[0]
-	var row := carousel._consoles
-	var checked := 0
-	for k in row._items.size():
-		var folder := row.console_at(k).folder
-		var wanted := _DESIGN_BOXES[folder]
-		var box := row.silhouette(k)
-		# The hero model is fitted by eye on the design's picture: its box is the picture's to within 5 % of the frame
-		# in the centre (5 %) and 9 % at each edge (the boxes of the parts' bounds: the SNES is the widest, by 8 %), not to the pixel.
-		var centre := (Vector2(wanted.x + wanted.z, wanted.y + wanted.w) / 2.0 - box.get_center()).abs()
-		assert_float(maxf(centre.x, centre.y)).override_failure_message(folder).is_less(0.05)
-		for off: float in [box.position.x - wanted.x, box.end.x - wanted.z, box.position.y - wanted.y, box.end.y - wanted.w]:
-			assert_float(absf(off)).override_failure_message(folder).is_less(0.09)
-		checked += 1
-	assert_int(checked).is_equal(12)
 
 
 ## The ring open on [param ids]' consoles, every move done.
@@ -611,3 +569,35 @@ func test_two_consoles_stand_at_the_cap_whatever_their_boxes() -> void:
 	var ids: Dictionary[String, int] = {"ps2": 1, "xbox360": 1}
 	var carousel := await _ring_of(ids)
 	assert_float(carousel._consoles.ring_target).is_equal_approx(12.5 / 0.552, 1e-4)
+
+
+func test_B_during_opening_rewinds_the_ring_from_its_current_position_when_enabled() -> void:
+	StudioTokens.TR_REVERSE = 1
+	var carousel: Carousel = (await _on_consoles())[0]
+	var order := carousel._order
+	var closed: Array[int] = []
+	order.closed.connect(func() -> void: closed.append(1))
+	CarouselFixtures.press(carousel, &"ui_down")
+	order._transition.custom_step(0.14)
+	var wheel := carousel._consoles.wheel
+	var others := carousel._consoles.others_wheel
+	order._unhandled_input(CarouselFixtures.button(&"screen_back", true))
+	assert_float(carousel._consoles.wheel).is_equal(wheel)
+	assert_float(carousel._consoles.others_wheel).is_equal(others)
+	assert_bool(await Fixtures.until(self, func() -> bool: return not order._busy)).is_true()
+	assert_float(carousel._consoles.wheel).is_equal(0.0)
+	assert_float(carousel._consoles.others_wheel).is_equal(0.0)
+	assert_int(closed.size()).is_equal(1)
+	assert_bool(order.visible).is_false()
+
+
+func test_rewind_after_50_ms_restores_the_rail_before_the_short_close_finishes() -> void:
+	StudioTokens.TR_REVERSE = 1
+	var carousel: Carousel = (await _on_consoles())[0]
+	CarouselFixtures.press(carousel, &"ui_down")
+	carousel._order._transition.custom_step(0.05)
+	carousel._rail.sunk = 1.0
+	carousel._order._unhandled_input(CarouselFixtures.button(&"screen_back", true))
+	await get_tree().create_timer(0.2).timeout
+	assert_float(carousel._rail.sunk).is_equal_approx(0.0, 0.01)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)

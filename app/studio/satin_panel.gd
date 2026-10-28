@@ -40,8 +40,10 @@ class Backing:
 	var _grow := 0.0
 	var _box := Rect2()
 	var _radius := -1.0
+	var _tuning := {}
 
 	func _init(owner: CanvasItem, shown: StudioTokens.Look) -> void:
+		owner.set_meta(&"studio_backing", weakref(self))
 		_material.shader = preload("res://studio/satin_panel.gdshader")
 		RenderingServer.canvas_item_set_parent(_item, owner.get_canvas_item())
 		RenderingServer.canvas_item_set_draw_behind_parent(_item, true)
@@ -53,6 +55,17 @@ class Backing:
 		var parameters := Backing.recipe(shown, tint)
 		for parameter in parameters:
 			_material.set_shader_parameter(parameter, parameters[parameter])
+		if _tuning.has("colour"):
+			var fill := ControlTokens._colour(_tuning["colour"])
+			_material.set_shader_parameter(&"colors", [Vector4(fill.r, fill.g, fill.b, fill.a)])
+			_material.set_shader_parameter(&"stop_count", 1)
+		if _tuning.has("border_colour"):
+			var border := ControlTokens._colour(_tuning["border_colour"])
+			var colours: Array[Vector4] = []
+			for shadow in shown.shadows:
+				var colour := shadow.shown(tint)
+				colours.append(Vector4(border.r, border.g, border.b, colour.a) if shadow.inset else Vector4(colour.r, colour.g, colour.b, colour.a))
+			_material.set_shader_parameter(&"shadow_colors", colours)
 		_grow = shown.reach()
 		place(_box, _radius)
 
@@ -68,11 +81,16 @@ class Backing:
 		var quad := box.grow(_grow)
 		_material.set_shader_parameter(&"box_position", box.position - quad.position)
 		_material.set_shader_parameter(&"box_size", box.size)
+		radius = _tuning.get("corner_radius", radius)
 		if radius >= 0.0:
 			_material.set_shader_parameter(&"radius", radius)
 		RenderingServer.canvas_item_clear(_item)
 		RenderingServer.canvas_item_set_transform(_item, Transform2D(0.0, quad.position))
 		RenderingServer.canvas_item_add_rect(_item, Rect2(Vector2.ZERO, quad.size), Color.WHITE)
+
+	func tune(values: Dictionary) -> void:
+		_tuning.merge(values, true)
+		_paint()
 
 	## The shader's parameters drawing [param shown], its shadows tinted by [param gel].
 	static func recipe(shown: StudioMaterial, gel := StudioTokens.NEUTRAL) -> Dictionary[StringName, Variant]:

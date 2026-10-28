@@ -4,7 +4,8 @@ extends RefCounted
 ## How the right stick turns the selected one of a row of models: pushed, it turns it any way, up to
 ## its back; let go, it stays exactly as it was left; once another is selected, the one turned turns
 ## back to the front as it leaves, and the one arriving turns from its front. A finger turns the
-## selected one too, but it comes back to the front once let go ([constant BACK_S]).
+## selected one too, but it comes back to the front once let go ([constant BACK_S]). A row made
+## with [code]upright[/code] only turns its models left and right, never toward or away from the eye.
 
 ## Radians a second, the stick pushed all the way; radians a pixel dragged; how long a model turned
 ## by a finger takes to come back to the front once let go, in seconds.
@@ -24,6 +25,13 @@ var _touched := Vector2.ZERO
 var _touched_at := -1
 var _touching := false
 var _selected := -1
+## The share of each stick or finger axis that turns the model: no up and down for an upright row.
+var _axes := Vector2.ONE
+
+
+func _init(upright := false) -> void:
+	if upright:
+		_axes = Vector2.RIGHT
 
 
 ## Follows [param stick] (each axis from -1 to 1) for [param delta] seconds, [param selected] being
@@ -36,7 +44,7 @@ func follow(stick: Vector2, selected: int, delta: float) -> void:
 		if index != selected:
 			_shown = Basis.IDENTITY
 			index = selected
-		var push := stick * SPEED * delta
+		var push := stick * _axes * SPEED * delta
 		turned = (Basis.from_euler(Vector3(push.y, push.x, 0.0)) * turned).orthonormalized()
 	_shown = _shown.slerp(turned, 1.0 - exp(-10.0 * delta))
 	# Then exactly there: a model let go stays still.
@@ -56,7 +64,7 @@ func touch(pixels: Vector2) -> void:
 		_touched = Vector2.ZERO
 		_touched_at = _selected
 	_touching = true
-	_touched += pixels * PER_PIXEL
+	_touched += pixels * _axes * PER_PIXEL
 
 
 ## The finger is lifted: the model comes back to the front.

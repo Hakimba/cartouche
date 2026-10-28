@@ -5,7 +5,7 @@ extends RefCounted
 ## design's tokens: never edited by hand (a test fails on a hand edit).
 ## The whole of the design's set is kept, used or not yet: the screens built after the foundation read it.
 
-const SHA256 := "454e81371df8458caa62f6355577360865f588842d008b9ee32b1762e9aefe7c"
+const SHA256 := "94a97956d768fb8e70a975129c131afb754f60464f310aa1e828870af317bf17"
 
 const INK := Color("#24201b")
 const MUTE := Color("#857a6d")
@@ -15,8 +15,98 @@ const NEUTRAL := Color("#a07850")
 ## Each console's gel, by its folder under res://carousel/consoles.
 const GEL: Dictionary[StringName, Color] = {&"ps2_slim": Color("#2f6fc6"), &"psx": Color("#e09a12"), &"nes": Color("#d62b2b"), &"snes": Color("#6f5bc4"), &"n64": Color("#1e9e4a"), &"gc": Color("#7a5bd0"), &"wii": Color("#22a8e0"), &"xbox": Color("#4fa82a"), &"xbox360": Color("#93b92e"), &"gb": Color("#3a3fa0"), &"gbc": Color("#e2408a"), &"gba": Color("#3d4fc4")}
 const MAKER: Dictionary[String, Color] = {"Atari": Color("#c8541e"), "Microsoft": Color("#2d9c3c"), "Nintendo": Color("#e4000f"), "Sega": Color("#1f64c8"), "Sony": Color("#2a3a6e")}
-## The gel's change, eased by the CSS curve `ease`.
-const GEL_FADE_S := 0.38
+## The gel's change, eased by the CSS curve `ease`. The live timings are `static var`s that only the dev
+## bridge's `try_timing` sets at run time; the app reads them as it would a constant.
+static var GEL_FADE_S := 0.38
+static var ARRIVE_S := 0.42
+static var FLY_S := 0.46
+static var BOUNCE_S := 0.2
+static var PAUSE_S := 0.12
+const MORPH_S := 0.62
+static var TR_GAMES_FADE_S := 0.2
+static var TR_GAMES_RAIL_S := 0.3
+static var TR_GAMES_DROP_PX := 51.2
+static var TR_GAMES_LOGO_S := 0.0
+static var TR_GAMES_LOGO_S_CURVE := 4
+static var TR_GAMES_RAIL_BACK_S := 0.31
+static var TR_GAMES_HINTS_S := 0.2
+static var TR_RING_OPEN_S := 0.4
+static var TR_RING_OPEN_S_CURVE := 4
+static var TR_RING_SINK_S := 0.24
+static var TR_RING_RISE_S := 0.36
+static var TR_RING_RISE_S_CURVE := 6
+static var TR_RING_RISE_AT_S := 0.04
+static var TR_RING_MARKS_S := 0.2
+static var TR_RING_MARKS_AT_S := 0.2
+static var TR_RING_MIDDLE_AT_S := 0.16
+static var TR_RING_MIDDLE_S := 0.24
+static var TR_RING_MIDDLE_S_CURVE := 3
+static var TR_RING_CLOSE_S := 0.62
+static var TR_RING_CLOSE_S_CURVE := 4
+static var TR_FORM_OPEN_S := 0.38
+static var TR_FORM_OPEN_S_CURVE := 4
+static var TR_FORM_AT_S := 0.06
+static var TR_FORM_FADE_S := 0.3
+static var TR_FORM_OUT_S := 0.2
+static var TR_FORM_SLIDE_PX := 64.0
+static var TR_FORM_LIFT_PX := 51.2
+static var TR_FORM_BACK_S := 0.38
+static var TR_FORM_BACK_S_CURVE := 4
+static var TR_FORM_LEAVE_S := 0.26
+static var TR_CHOOSER_OPEN_S := 0.38
+static var TR_CHOOSER_AT_S := 0.06
+static var TR_CHOOSER_OUT_S := 0.15
+static var TR_CHOOSER_LINES_AT_S := 0.15
+static var TR_CHOOSER_LAYER_S := 0.2
+static var TR_CHOOSER_MODEL_S := 0.08
+static var TR_CHOOSER_CARD_S := 0.32
+static var TR_CHOOSER_CARD_S_CURVE := 4
+static var TR_CHOOSER_SHIFT_PX := 38.4
+static var TR_CHOOSER_TITLE_PX := 10.24
+static var TR_CHOOSER_IN_S := 0.23
+static var TR_FORM_CHOOSER_TITLE_PX := 10.24
+static var TR_PLACE_BACK_S := 0.4
+static var TR_PLACE_ARC_PX := 38.4
+static var TR_PLACE_OTHERS_S := 0.2
+static var TR_PLACE_MARKS_S := 0.16
+static var TR_PLACE_AT_S := 0.08
+static var TR_SETTINGS_OPEN_S := 0.36
+static var TR_SETTINGS_OPEN_S_CURVE := 6
+static var TR_SETTINGS_LEAVE_S := 0.18
+static var TR_SETTINGS_LEAVE_S_CURVE := 2
+static var TR_SETTINGS_RECEDE := 0.96
+static var TR_SETTINGS_DROP_PX := 51.2
+static var TR_SETTINGS_SINK_S := 0.24
+static var TR_SETTINGS_SINK_S_CURVE := 12
+static var TR_SETTINGS_VEIL_AT_S := 0.08
+static var TR_SETTINGS_VEIL_S := 0.2
+static var TR_SETTINGS_CARD_AT_S := 0.12
+static var TR_SETTINGS_RISE_PX := 38.4
+static var TR_SETTINGS_HINTS_S := 0.15
+static var TR_SETTINGS_CLOSE_S := 0.36
+static var TR_SETTINGS_CARD_OUT_S := 0.18
+static var TR_SETTINGS_CARD_OUT_S_CURVE := 2
+static var TR_SETTINGS_BACK_AT_S := 0.14
+static var TR_SETTINGS_CARD_S := 0.24
+static var TR_SETTINGS_CARD_S_CURVE := 6
+static var TR_PROPERTIES_OPEN_S := 0.4
+static var TR_PROPERTIES_TRAVEL_S := 0.36
+static var TR_PROPERTIES_TRAVEL_S_CURVE := 4
+static var TR_PROPERTIES_FADE_S := 0.15
+static var TR_PROPERTIES_POOL_S := 0.36
+static var TR_PROPERTIES_POOL_S_CURVE := 3
+static var TR_PROPERTIES_ZONE_AT_S := 0.24
+static var TR_PROPERTIES_NAME_AT_S := 0.2
+static var TR_PROPERTIES_RISE_PX := 20.48
+static var TR_PROPERTIES_CALLOUT_AT_S := 0.28
+static var TR_PROPERTIES_BACK_S := 0.38
+static var TR_BALL_MORPH_S := 0.34
+static var TR_REVERSE := 0
+static var TR_SETTLE_S := 0.0
+const LIVE: Array[StringName] = [&"GEL_FADE_S", &"ARRIVE_S", &"FLY_S", &"BOUNCE_S", &"PAUSE_S", &"TR_GAMES_FADE_S", &"TR_GAMES_RAIL_S", &"TR_GAMES_DROP_PX", &"TR_GAMES_LOGO_S", &"TR_GAMES_LOGO_S_CURVE", &"TR_GAMES_RAIL_BACK_S", &"TR_GAMES_HINTS_S", &"TR_RING_OPEN_S", &"TR_RING_OPEN_S_CURVE", &"TR_RING_SINK_S", &"TR_RING_RISE_S", &"TR_RING_RISE_S_CURVE", &"TR_RING_RISE_AT_S", &"TR_RING_MARKS_S", &"TR_RING_MARKS_AT_S", &"TR_RING_MIDDLE_AT_S", &"TR_RING_MIDDLE_S", &"TR_RING_MIDDLE_S_CURVE", &"TR_RING_CLOSE_S", &"TR_RING_CLOSE_S_CURVE", &"TR_FORM_OPEN_S", &"TR_FORM_OPEN_S_CURVE", &"TR_FORM_AT_S", &"TR_FORM_FADE_S", &"TR_FORM_OUT_S", &"TR_FORM_SLIDE_PX", &"TR_FORM_LIFT_PX", &"TR_FORM_BACK_S", &"TR_FORM_BACK_S_CURVE", &"TR_FORM_LEAVE_S", &"TR_CHOOSER_OPEN_S", &"TR_CHOOSER_AT_S", &"TR_CHOOSER_OUT_S", &"TR_CHOOSER_LINES_AT_S", &"TR_CHOOSER_LAYER_S", &"TR_CHOOSER_MODEL_S", &"TR_CHOOSER_CARD_S", &"TR_CHOOSER_CARD_S_CURVE", &"TR_CHOOSER_SHIFT_PX", &"TR_CHOOSER_TITLE_PX", &"TR_CHOOSER_IN_S", &"TR_FORM_CHOOSER_TITLE_PX", &"TR_PLACE_BACK_S", &"TR_PLACE_ARC_PX", &"TR_PLACE_OTHERS_S", &"TR_PLACE_MARKS_S", &"TR_PLACE_AT_S", &"TR_SETTINGS_OPEN_S", &"TR_SETTINGS_OPEN_S_CURVE", &"TR_SETTINGS_LEAVE_S", &"TR_SETTINGS_LEAVE_S_CURVE", &"TR_SETTINGS_RECEDE", &"TR_SETTINGS_DROP_PX", &"TR_SETTINGS_SINK_S", &"TR_SETTINGS_SINK_S_CURVE", &"TR_SETTINGS_VEIL_AT_S", &"TR_SETTINGS_VEIL_S", &"TR_SETTINGS_CARD_AT_S", &"TR_SETTINGS_RISE_PX", &"TR_SETTINGS_HINTS_S", &"TR_SETTINGS_CLOSE_S", &"TR_SETTINGS_CARD_OUT_S", &"TR_SETTINGS_CARD_OUT_S_CURVE", &"TR_SETTINGS_BACK_AT_S", &"TR_SETTINGS_CARD_S", &"TR_SETTINGS_CARD_S_CURVE", &"TR_PROPERTIES_OPEN_S", &"TR_PROPERTIES_TRAVEL_S", &"TR_PROPERTIES_TRAVEL_S_CURVE", &"TR_PROPERTIES_FADE_S", &"TR_PROPERTIES_POOL_S", &"TR_PROPERTIES_POOL_S_CURVE", &"TR_PROPERTIES_ZONE_AT_S", &"TR_PROPERTIES_NAME_AT_S", &"TR_PROPERTIES_RISE_PX", &"TR_PROPERTIES_CALLOUT_AT_S", &"TR_PROPERTIES_BACK_S", &"TR_BALL_MORPH_S", &"TR_REVERSE", &"TR_SETTLE_S"]
+
+const CONTROL_EDITS: Dictionary = {}
+const CONTROL_STYLES: Dictionary = {}
 
 ## The chrome every screen shares.
 const CLOCK := Rect2(29.0, 29.0, 94.0, 35.0)
@@ -113,6 +203,186 @@ const SIDE_SHADOW := Vector3(8.0, 14.0, 0.28)
 ## The rail and games row's spring: stiffness and damping, unit mass.
 const SPRING_STIFFNESS := 280.0
 const SPRING_DAMPING := 25.0
+
+
+## Sets one of [constant LIVE] in its declared unit; false when [param timing] is not one.
+static func try_timing(timing: StringName, seconds: float) -> bool:
+	if str(timing).ends_with("_CURVE") and (not is_finite(seconds) or seconds != floor(seconds) or seconds < 0.0 or seconds >= Motion.Easing.size()):
+		return false
+	match timing:
+		&"GEL_FADE_S":
+			GEL_FADE_S = seconds
+		&"ARRIVE_S":
+			ARRIVE_S = seconds
+		&"FLY_S":
+			FLY_S = seconds
+		&"BOUNCE_S":
+			BOUNCE_S = seconds
+		&"PAUSE_S":
+			PAUSE_S = seconds
+		&"TR_GAMES_FADE_S":
+			TR_GAMES_FADE_S = seconds
+		&"TR_GAMES_RAIL_S":
+			TR_GAMES_RAIL_S = seconds
+		&"TR_GAMES_DROP_PX":
+			TR_GAMES_DROP_PX = seconds
+		&"TR_GAMES_LOGO_S":
+			TR_GAMES_LOGO_S = seconds
+		&"TR_GAMES_LOGO_S_CURVE":
+			TR_GAMES_LOGO_S_CURVE = int(seconds)
+		&"TR_GAMES_RAIL_BACK_S":
+			TR_GAMES_RAIL_BACK_S = seconds
+		&"TR_GAMES_HINTS_S":
+			TR_GAMES_HINTS_S = seconds
+		&"TR_RING_OPEN_S":
+			TR_RING_OPEN_S = seconds
+		&"TR_RING_OPEN_S_CURVE":
+			TR_RING_OPEN_S_CURVE = int(seconds)
+		&"TR_RING_SINK_S":
+			TR_RING_SINK_S = seconds
+		&"TR_RING_RISE_S":
+			TR_RING_RISE_S = seconds
+		&"TR_RING_RISE_S_CURVE":
+			TR_RING_RISE_S_CURVE = int(seconds)
+		&"TR_RING_RISE_AT_S":
+			TR_RING_RISE_AT_S = seconds
+		&"TR_RING_MARKS_S":
+			TR_RING_MARKS_S = seconds
+		&"TR_RING_MARKS_AT_S":
+			TR_RING_MARKS_AT_S = seconds
+		&"TR_RING_MIDDLE_AT_S":
+			TR_RING_MIDDLE_AT_S = seconds
+		&"TR_RING_MIDDLE_S":
+			TR_RING_MIDDLE_S = seconds
+		&"TR_RING_MIDDLE_S_CURVE":
+			TR_RING_MIDDLE_S_CURVE = int(seconds)
+		&"TR_RING_CLOSE_S":
+			TR_RING_CLOSE_S = seconds
+		&"TR_RING_CLOSE_S_CURVE":
+			TR_RING_CLOSE_S_CURVE = int(seconds)
+		&"TR_FORM_OPEN_S":
+			TR_FORM_OPEN_S = seconds
+		&"TR_FORM_OPEN_S_CURVE":
+			TR_FORM_OPEN_S_CURVE = int(seconds)
+		&"TR_FORM_AT_S":
+			TR_FORM_AT_S = seconds
+		&"TR_FORM_FADE_S":
+			TR_FORM_FADE_S = seconds
+		&"TR_FORM_OUT_S":
+			TR_FORM_OUT_S = seconds
+		&"TR_FORM_SLIDE_PX":
+			TR_FORM_SLIDE_PX = seconds
+		&"TR_FORM_LIFT_PX":
+			TR_FORM_LIFT_PX = seconds
+		&"TR_FORM_BACK_S":
+			TR_FORM_BACK_S = seconds
+		&"TR_FORM_BACK_S_CURVE":
+			TR_FORM_BACK_S_CURVE = int(seconds)
+		&"TR_FORM_LEAVE_S":
+			TR_FORM_LEAVE_S = seconds
+		&"TR_CHOOSER_OPEN_S":
+			TR_CHOOSER_OPEN_S = seconds
+		&"TR_CHOOSER_AT_S":
+			TR_CHOOSER_AT_S = seconds
+		&"TR_CHOOSER_OUT_S":
+			TR_CHOOSER_OUT_S = seconds
+		&"TR_CHOOSER_LINES_AT_S":
+			TR_CHOOSER_LINES_AT_S = seconds
+		&"TR_CHOOSER_LAYER_S":
+			TR_CHOOSER_LAYER_S = seconds
+		&"TR_CHOOSER_MODEL_S":
+			TR_CHOOSER_MODEL_S = seconds
+		&"TR_CHOOSER_CARD_S":
+			TR_CHOOSER_CARD_S = seconds
+		&"TR_CHOOSER_CARD_S_CURVE":
+			TR_CHOOSER_CARD_S_CURVE = int(seconds)
+		&"TR_CHOOSER_SHIFT_PX":
+			TR_CHOOSER_SHIFT_PX = seconds
+		&"TR_CHOOSER_TITLE_PX":
+			TR_CHOOSER_TITLE_PX = seconds
+		&"TR_CHOOSER_IN_S":
+			TR_CHOOSER_IN_S = seconds
+		&"TR_FORM_CHOOSER_TITLE_PX":
+			TR_FORM_CHOOSER_TITLE_PX = seconds
+		&"TR_PLACE_BACK_S":
+			TR_PLACE_BACK_S = seconds
+		&"TR_PLACE_ARC_PX":
+			TR_PLACE_ARC_PX = seconds
+		&"TR_PLACE_OTHERS_S":
+			TR_PLACE_OTHERS_S = seconds
+		&"TR_PLACE_MARKS_S":
+			TR_PLACE_MARKS_S = seconds
+		&"TR_PLACE_AT_S":
+			TR_PLACE_AT_S = seconds
+		&"TR_SETTINGS_OPEN_S":
+			TR_SETTINGS_OPEN_S = seconds
+		&"TR_SETTINGS_OPEN_S_CURVE":
+			TR_SETTINGS_OPEN_S_CURVE = int(seconds)
+		&"TR_SETTINGS_LEAVE_S":
+			TR_SETTINGS_LEAVE_S = seconds
+		&"TR_SETTINGS_LEAVE_S_CURVE":
+			TR_SETTINGS_LEAVE_S_CURVE = int(seconds)
+		&"TR_SETTINGS_RECEDE":
+			TR_SETTINGS_RECEDE = seconds
+		&"TR_SETTINGS_DROP_PX":
+			TR_SETTINGS_DROP_PX = seconds
+		&"TR_SETTINGS_SINK_S":
+			TR_SETTINGS_SINK_S = seconds
+		&"TR_SETTINGS_SINK_S_CURVE":
+			TR_SETTINGS_SINK_S_CURVE = int(seconds)
+		&"TR_SETTINGS_VEIL_AT_S":
+			TR_SETTINGS_VEIL_AT_S = seconds
+		&"TR_SETTINGS_VEIL_S":
+			TR_SETTINGS_VEIL_S = seconds
+		&"TR_SETTINGS_CARD_AT_S":
+			TR_SETTINGS_CARD_AT_S = seconds
+		&"TR_SETTINGS_RISE_PX":
+			TR_SETTINGS_RISE_PX = seconds
+		&"TR_SETTINGS_HINTS_S":
+			TR_SETTINGS_HINTS_S = seconds
+		&"TR_SETTINGS_CLOSE_S":
+			TR_SETTINGS_CLOSE_S = seconds
+		&"TR_SETTINGS_CARD_OUT_S":
+			TR_SETTINGS_CARD_OUT_S = seconds
+		&"TR_SETTINGS_CARD_OUT_S_CURVE":
+			TR_SETTINGS_CARD_OUT_S_CURVE = int(seconds)
+		&"TR_SETTINGS_BACK_AT_S":
+			TR_SETTINGS_BACK_AT_S = seconds
+		&"TR_SETTINGS_CARD_S":
+			TR_SETTINGS_CARD_S = seconds
+		&"TR_SETTINGS_CARD_S_CURVE":
+			TR_SETTINGS_CARD_S_CURVE = int(seconds)
+		&"TR_PROPERTIES_OPEN_S":
+			TR_PROPERTIES_OPEN_S = seconds
+		&"TR_PROPERTIES_TRAVEL_S":
+			TR_PROPERTIES_TRAVEL_S = seconds
+		&"TR_PROPERTIES_TRAVEL_S_CURVE":
+			TR_PROPERTIES_TRAVEL_S_CURVE = int(seconds)
+		&"TR_PROPERTIES_FADE_S":
+			TR_PROPERTIES_FADE_S = seconds
+		&"TR_PROPERTIES_POOL_S":
+			TR_PROPERTIES_POOL_S = seconds
+		&"TR_PROPERTIES_POOL_S_CURVE":
+			TR_PROPERTIES_POOL_S_CURVE = int(seconds)
+		&"TR_PROPERTIES_ZONE_AT_S":
+			TR_PROPERTIES_ZONE_AT_S = seconds
+		&"TR_PROPERTIES_NAME_AT_S":
+			TR_PROPERTIES_NAME_AT_S = seconds
+		&"TR_PROPERTIES_RISE_PX":
+			TR_PROPERTIES_RISE_PX = seconds
+		&"TR_PROPERTIES_CALLOUT_AT_S":
+			TR_PROPERTIES_CALLOUT_AT_S = seconds
+		&"TR_PROPERTIES_BACK_S":
+			TR_PROPERTIES_BACK_S = seconds
+		&"TR_BALL_MORPH_S":
+			TR_BALL_MORPH_S = seconds
+		&"TR_REVERSE":
+			TR_REVERSE = int(seconds)
+		&"TR_SETTLE_S":
+			TR_SETTLE_S = seconds
+		_:
+			return false
+	return true
 
 
 ## The window's pixels to the design's: the 1280 px frame stretched to the window's width.

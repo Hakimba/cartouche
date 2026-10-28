@@ -121,6 +121,12 @@ func is_inserting() -> bool:
 	return _stage not in [Stage.READY, Stage.CHECKING, Stage.SHOWING]
 
 
+## Ends a launch that no game follows, such as the dev bridge's preview of the animation, and shows the
+## carousel again.
+func end_preview() -> void:
+	_show_carousel()
+
+
 ## Makes the players of [param insertions]' sounds, once, rather than as a launch starts.
 func prepare(insertions: Array[Insertion]) -> void:
 	for insertion in insertions:

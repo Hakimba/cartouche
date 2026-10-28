@@ -24,7 +24,8 @@ const _POOL_ALPHA := 0.32
 const POP_S := 0.32
 const _POP_KEYS: Array[Vector2] = [Vector2(0.0, 1.0), Vector2(0.3, 0.95), Vector2(0.65, 1.025), Vector2(1.0, 1.0)]
 ## How far the rail sinks, in px, when it leaves.
-const SINK_PX := 51.2
+static var SINK_PX: float:
+	get: return StudioTokens.TR_GAMES_DROP_PX
 ## What [method slot_under] says for a point off the rail.
 const NO_TILE := 1 << 30
 ## How far the rail has sunk: 0 at rest, 1 down and gone. [method sink] and [method rise] move it.

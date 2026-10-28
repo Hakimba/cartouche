@@ -114,3 +114,8 @@ static func _coordinate(a: float, b: float, u: float) -> float:
 
 static func _slope(a: float, b: float, u: float) -> float:
 	return 3.0 * (1.0 - 3.0 * b + 3.0 * a) * u * u + 2.0 * (3.0 * b - 6.0 * a) * u + 3.0 * a
+
+
+## A timed part of a shared transition clock, at rest before its start and after its end.
+static func phase(seconds: float, start: float, duration: float, easing := Easing.LINEAR) -> float:
+	return eased(easing, clampf((seconds - start) / maxf(duration, 0.001), 0.0, 1.0))

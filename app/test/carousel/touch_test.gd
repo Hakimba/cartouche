@@ -197,12 +197,16 @@ func test_a_drag_over_a_game_s_or_a_console_s_properties_turns_what_they_stage()
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
 	await _settled(carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
+	# A console stays upright: a drag up or down leaves it, a drag sideways turns it.
+	var selected := carousel._consoles.selected_index()
 	await Fixtures.finger(self, start, true)
 	await Fixtures.finger_to(self, start + Vector2(0.0, 150.0))
 	await await_idle_frame()
-	var selected := carousel._consoles.selected_index()
+	assert_bool(carousel._consoles._turn.of(selected).is_equal_approx(Basis.IDENTITY)).is_true()
+	await Fixtures.finger_to(self, start + Vector2(150.0, 150.0))
+	await await_idle_frame()
 	assert_bool(carousel._consoles._turn.of(selected).is_equal_approx(Basis.IDENTITY)).is_false()
-	await Fixtures.finger(self, start + Vector2(0.0, 150.0), false)
+	await Fixtures.finger(self, start + Vector2(150.0, 150.0), false)
 
 
 func test_a_finger_down_as_the_app_pauses_is_forgotten() -> void:
@@ -305,7 +309,8 @@ func test_the_system_s_back_is_B_on_the_games_the_ring_and_both_properties_scree
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
 	await _settled(carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-	await Fixtures.touch(self, [carousel._console_properties._logo.get_global_rect().get_center()])
+	# A tap beside the console and its action does nothing.
+	await Fixtures.touch(self, [Vector2(120.0, 300.0)])
 	await _settled(carousel)
 	assert_int(carousel._console_properties._step).is_equal(ConsoleProperties.Step.PROPERTIES)
 	await _back(carousel)

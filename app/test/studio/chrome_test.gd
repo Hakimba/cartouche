@@ -32,28 +32,12 @@ func test_a_console_s_gel_is_its_folder_s() -> void:
 	assert_that(Cyclorama.gel_of(ps2)).is_equal(Color("#2f6fc6"))
 
 
-func test_the_gel_crossfades_eased_in_its_time_and_lands_on_the_new_colour() -> void:
+func test_the_lights_lie_where_the_design_paints_them() -> void:
 	var backdrop: Cyclorama = auto_free(Cyclorama.new())
 	add_child(backdrop)
-	var gel := StudioTokens.GEL[&"gbc"]
-	backdrop.show_gel(gel)
-	backdrop._fade.custom_step(StudioTokens.GEL_FADE_S / 2.0)
-	var shown: Color = backdrop._glows.get_shader_parameter(&"gel")
-	var halfway := StudioTokens.NEUTRAL.lerp(gel, Motion.eased(Motion.Easing.EASE, 0.5))
-	assert_float(shown.r).is_equal_approx(halfway.r, 1e-3)
-	backdrop._fade.custom_step(StudioTokens.GEL_FADE_S)
-	assert_that(backdrop._glows.get_shader_parameter(&"gel")).is_equal(gel)
-
-
-func test_the_glows_lie_where_the_design_paints_them_the_gels_under_the_lights() -> void:
-	var backdrop: Cyclorama = auto_free(Cyclorama.new())
-	add_child(backdrop)
-	# Paint order: the floor gel, the wall gel, then the key light and the floor's light over them.
-	assert_array(backdrop._glows.get_shader_parameter(&"tinted")).is_equal([1.0, 1.0, 0.0, 0.0])
-	assert_array(backdrop._glows.get_shader_parameter(&"centres")).is_equal([Vector2(640, 716.8), Vector2(921.6, 192),
-		Vector2(640, 288), Vector2(640, 678.4)])
-	assert_array(backdrop._glows.get_shader_parameter(&"radii")).is_equal([Vector2(435.2, 89.6), Vector2(512, 384),
-		Vector2(742.4, 409.6), Vector2(563.2, 115.2)])
+	# Paint order: the key light, then the floor's light over it.
+	assert_array(backdrop._glows.get_shader_parameter(&"centres")).is_equal([Vector2(640, 288), Vector2(640, 678.4)])
+	assert_array(backdrop._glows.get_shader_parameter(&"radii")).is_equal([Vector2(742.4, 409.6), Vector2(563.2, 115.2)])
 
 
 func test_no_shader_moves_with_the_engine_s_time() -> void:
@@ -102,45 +86,13 @@ func test_every_console_has_its_logo_in_every_slot() -> void:
 			assert_bool(ResourceLoader.exists(path)).override_failure_message(path).is_true()
 
 
-func test_the_backdrop_follows_the_selected_console() -> void:
-	var device := ScreenFixtures.past_first_launch(self, {"ps2": 2, "gc": 1})
-	var carousel := ScreenFixtures.fresh_carousel(self, device)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._shown)).is_true()
-	# Each console's gel, as the design gives it.
-	var gels: Dictionary[String, Color] = {"ps2": Color("#2f6fc6"), "gc": Color("#7a5bd0")}
-	var seen: Array[String] = []
-	for press in 2:
-		var platform := carousel._shelves[carousel._shelf].platform_id
-		seen.append(platform)
-		if carousel._cyclorama._fade:
-			carousel._cyclorama._fade.custom_step(StudioTokens.GEL_FADE_S)
-		var shown: Color = carousel._cyclorama._glows.get_shader_parameter(&"gel")
-		assert_str(shown.to_html()).override_failure_message("%s: %s" % [platform, shown.to_html()]).is_equal(gels[platform].to_html())
-		Fixtures.press(carousel, &"carousel_right")
-		Fixtures.step_frames(carousel, 60)
-	assert_array(seen).contains_exactly_in_any_order(["ps2", "gc"])
-
-
-func test_a_gel_changed_again_mid_fade_turns_from_where_it_is_and_lands_on_the_last() -> void:
+func test_the_backdrop_shows_no_console_colour_only_the_designs_untinted_lights() -> void:
 	var backdrop: Cyclorama = auto_free(Cyclorama.new())
 	add_child(backdrop)
-	backdrop.show_gel(StudioTokens.GEL[&"gbc"])
-	backdrop._fade.custom_step(StudioTokens.GEL_FADE_S / 3.0)
-	var under_way: Color = backdrop._glows.get_shader_parameter(&"gel")
-	var last := StudioTokens.GEL[&"n64"]
-	backdrop.show_gel(last)
-	assert_that(backdrop._glows.get_shader_parameter(&"gel")).is_equal(under_way)
-	backdrop._fade.custom_step(StudioTokens.GEL_FADE_S / 2.0)
-	var halfway: Color = backdrop._glows.get_shader_parameter(&"gel")
-	var expected := under_way.lerp(last, Motion.eased(Motion.Easing.EASE, 0.5))
-	for channel in 3:
-		var shown: float = halfway[channel]
-		var wanted: float = expected[channel]
-		assert_float(shown).is_equal_approx(wanted, 1e-3)
-	backdrop._fade.custom_step(StudioTokens.GEL_FADE_S)
-	var landed: Color = backdrop._glows.get_shader_parameter(&"gel")
-	assert_str(landed.to_html()).is_equal(last.to_html())
-	assert_bool(backdrop._fade.is_running()).is_false()
+	var untinted := StudioTokens.BACKDROP_GLOWS.filter(func(glow: Array) -> bool: return not glow[4])
+	assert_int(untinted.size()).is_less(StudioTokens.BACKDROP_GLOWS.size())
+	assert_int(backdrop._glows.get_shader_parameter(&"count")).is_equal(untinted.size())
+	assert_object(backdrop._glows.get_shader_parameter(&"gel")).is_null()
 
 
 func test_the_wall_and_floor_are_a_quarter_size_smooth_picture_stretched_by_linear_filtering() -> void:

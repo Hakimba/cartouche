@@ -45,6 +45,8 @@ const _SCREENSCRAPER := "res://data/screenscraper"
 const DESKTOP_DEMO := "res://dev/demo/desktop.json"
 const _DESKTOP_VARIANTS := "user://console-variants.json"
 
+var _snapshot := {}
+
 var _demo_settings := {"ok": true, "first_launch": false, "games_float": false}
 
 ## The catalog, loaded when the app starts.
@@ -69,6 +71,7 @@ func _ready() -> void:
 		_plugin.connect(&"battery_changed", func(payload: Dictionary) -> void: battery_changed.emit(Battery.new(payload)))
 	if OS.has_feature("android"):
 		AndroidButtons.follow_android()
+	load_snapshot(Diagnostics.argument("snapshot"))
 	_load_catalog()
 
 
@@ -121,9 +124,15 @@ func installed_players(platform_id: String) -> Array[Player]:
 ## [param typed], or with nothing typed the index by `title` or `region` ([param order]). Without
 ## the plugin, nothing.
 func browse(platform_id: String, order: StringName, typed: String) -> Browse:
-	var text: String = _query(&"browse", [platform_id, String(order), typed], "{}")
-	var view: Dictionary = JSON.parse_string(text)
+	var view: Dictionary = JSON.parse_string(browse_text(platform_id, order, typed))
 	return Browse.new(view)
+
+
+## [method browse]'s answer as the plugin gives it. Without the plugin, a snapshot's shelf unfiltered.
+func browse_text(platform_id: String, order: StringName, typed: String) -> String:
+	var shelves: Dictionary = _snapshot.get("browse", {})
+	var recorded: Dictionary = shelves.get(platform_id, {}) if typed.is_empty() else {}
+	return _query(&"browse", [platform_id, String(order), typed], recorded.get(String(order), "{}"))
 
 
 ## Where the words of [param typed] are in the title of the game at [param position] of
@@ -174,6 +183,8 @@ func device_name() -> String:
 
 ## Debug builds: the arguments the app was started with (see `launchArguments` in the plugin).
 func launch_arguments() -> PackedStringArray:
+	if _plugin == null and Engine.has_singleton(_SINGLETON):
+		return Engine.get_singleton(_SINGLETON).call(&"launchArguments")
 	return _query(&"launchArguments", [], PackedStringArray())
 
 
@@ -228,7 +239,7 @@ func launch_file(player_id: String, file: Entry) -> Result:
 ## The library, read from its file on first use, with the art stored for its games; looking for
 ## the others' art starts, as [signal art_changed] tells.
 func library() -> LibraryAnswer:
-	return LibraryAnswer.new(await _request(&"library"))
+	return LibraryAnswer.new(await _request(&"library", [], desktop_library() if not _snapshot.is_empty() else {}))
 
 
 ## Stores the choices made for [param platform_id].
@@ -252,6 +263,10 @@ func set_variant(platform_id: String, variant: String) -> LibraryAnswer:
 			library_data = _desktop_demo("library")
 		var kept := _desktop_variants()
 		kept[platform_id] = variant
+		if not _snapshot.is_empty():
+			_snapshot["variants"] = kept
+			_desktop_current["console_variants"] = kept
+			return LibraryAnswer.new(desktop_library())
 		var file := FileAccess.open(_DESKTOP_VARIANTS, FileAccess.WRITE)
 		if file == null:
 			fallback = {"ok": false, "code": "permission_denied"}
@@ -268,7 +283,9 @@ func set_variant(platform_id: String, variant: String) -> LibraryAnswer:
 
 
 
-static func _desktop_variants() -> Dictionary:
+func _desktop_variants() -> Dictionary:
+	if not _snapshot.is_empty():
+		return _snapshot.get("variants", {})
 	if not FileAccess.file_exists(_DESKTOP_VARIANTS):
 		return {}
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(_DESKTOP_VARIANTS))
@@ -357,6 +374,8 @@ func select_game(game: Game) -> Result:
 ## the platforms or all on [param platform_id], stored apart from the user's, for measuring at
 ## scale. Without the plugin, the desktop demo's, whatever [param games].
 func use_demo_library(games: int, platform_id := "") -> LibraryAnswer:
+	if _on_desktop() and not _snapshot.is_empty():
+		return LibraryAnswer.new(desktop_library())
 	if _on_desktop():
 		var demo := _desktop_current.duplicate(true) if not _desktop_current.is_empty() else _desktop_demo("library")
 		demo["console_variants"] = _desktop_variants()
@@ -398,8 +417,16 @@ func rename_game(game: Game, shown: String) -> Renamed:
 
 
 ## Shows the consoles of [param platform_ids] in that order from now on, after a restart too.
+## Without the plugin, the desktop's library takes that order until the app quits.
 func order_consoles(platform_ids: PackedStringArray) -> Result:
-	return Result.new(await _request(&"orderConsoles", [platform_ids]))
+	if _on_desktop() and not _desktop_current.is_empty():
+		var found: Dictionary = _desktop_current["shelves"]
+		var shelves: Array = found["shelves"]
+		var selected: Variant = shelves[found["selected"]] if not shelves.is_empty() else null
+		shelves.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return platform_ids.find(str(a["platform"])) < platform_ids.find(str(b["platform"])))
+		found["selected"] = maxi(shelves.find(selected), 0)
+	return Result.new(await _request(&"orderConsoles", [platform_ids], {"ok": true}))
 
 
 ## Puts [param platform_id]'s console at [param gap] among the others as the consoles screen
@@ -517,6 +544,78 @@ static func _desktop_demo(key: String) -> Dictionary:
 		return {}
 	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DESKTOP_DEMO))
 	return demo.get(key, {})
+
+
+## Whether a desktop snapshot of a device's data is loaded (see [method load_snapshot]).
+func has_snapshot() -> bool:
+	return not _snapshot.is_empty()
+
+
+## Debug desktop data copied from a plugin snapshot, with pictures rooted in that copy.
+func load_snapshot(folder: String) -> bool:
+	if not OS.is_debug_build() or not _on_desktop() or folder.is_empty():
+		return false
+	var path := folder.path_join("snapshot.json")
+	if not FileAccess.file_exists(path):
+		return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if parsed is not Dictionary:
+		return false
+	var snapshot: Dictionary = parsed
+	if snapshot.get("library") is not Dictionary or snapshot.get("settings") is not Dictionary \
+			or snapshot.get("variants", {}) is not Dictionary:
+		return false
+	var answer: Dictionary = snapshot["library"]
+	var content: Variant = JSON.parse_string(str(answer.get("library", "")))
+	if content is not Dictionary:
+		return false
+	_snapshot = _map_snapshot(snapshot, folder)
+	var mapped_answer: Dictionary = _snapshot["library"]
+	var library_text: String = mapped_answer["library"]
+	_desktop_current = JSON.parse_string(library_text)
+	_desktop_current["console_variants"] = _snapshot.get("variants", {})
+	var snapshot_settings: Dictionary = _snapshot["settings"]
+	_demo_settings = snapshot_settings.duplicate(true)
+	var locale: String = _snapshot.get("locale", "")
+	if locale:
+		TranslationServer.set_locale(locale)
+	return true
+
+
+## The library as the desktop shows it: the snapshot's answer with the library as it now stands, or the
+## current desktop library, or the demo's.
+func desktop_library() -> Dictionary:
+	if _snapshot.is_empty():
+		return {"ok": true, "library": JSON.stringify(_desktop_current if _desktop_current else _desktop_demo("library"))}
+	var original: Dictionary = _snapshot["library"]
+	var answer := original.duplicate(true)
+	answer["library"] = JSON.stringify(_desktop_current)
+	return answer
+
+
+static func _map_snapshot(value: Variant, folder: String, field := "") -> Variant:
+	if value is Dictionary:
+		var mapped := {}
+		for key: String in value:
+			mapped[key] = _map_snapshot(value[key], folder, key)
+		return mapped
+	if value is Array:
+		var mapped: Array = []
+		for entry: Variant in value:
+			mapped.append(_map_snapshot(entry, folder))
+		return mapped
+	if value is String:
+		var text: String = value
+		if field in ["library", "art"] and (text.begins_with("{") or text.begins_with("[")):
+			var parsed: Variant = JSON.parse_string(text)
+			if parsed is Dictionary or parsed is Array:
+				return JSON.stringify(_map_snapshot(parsed, folder))
+		var marker := text.find("/files/art/")
+		if field in ["path", "label_path"] and marker >= 0:
+			var relative := text.substr(marker + 1)
+			if relative.simplify_path() == relative and "\\" not in relative:
+				return folder.path_join(relative)
+	return value
 
 
 ## The texts listed under [param key] of [param item]; none when it is absent.

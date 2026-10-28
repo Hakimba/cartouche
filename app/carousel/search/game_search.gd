@@ -12,8 +12,8 @@ extends Control
 ## before; up or Start close it keeping what is found, told at the top, which B on the games screen
 ## clears. A key tapped is typed.
 ##
-## The carousel hands its presses over while the ribbon is open ([method take]), and L1, R1 and B
-## while what is found is kept ([method leap], [method clear]).
+## The carousel hands its presses over while the ribbon is open ([method take]), and B while what
+## is found is kept ([method clear]).
 
 ## The ribbon opened or closed: the carousel makes room for it.
 signal opened(open: bool)
@@ -27,9 +27,8 @@ const SPACE := " "
 const RISE_S := 0.18
 const _RISE_PX := 140.0
 ## A jump of the index, or of L1 and R1 once keys are typed, slides the carousel in from this many
-## places; a jump of L1 or R1 from letter to letter, from these.
+## places.
 const _INDEX_SLIDE := 0.6
-const _LEAP_SLIDE := 0.5
 ## The big letter shows this long, then fades in this time; longer than two characters, it is smaller.
 const _BIG_S := 0.7
 const _BIG_FADE_S := 0.12
@@ -179,31 +178,6 @@ func clear() -> void:
 	_refresh()
 
 
-## L1 or R1 on the games screen, the ribbon open or not: to the previous or next group of the
-## index, or once keys are typed to the previous or next key that still finds a game.
-func leap(direction: int) -> void:
-	if _open and _typed.is_empty():
-		_move(direction)
-		return
-	var leap_to := _leap(direction)
-	if leap_to.at < 0:
-		return
-	if not _typed.is_empty():
-		_cursor = leap_to.key
-	row.jump(leap_to.at, direction, _INDEX_SLIDE if not _typed.is_empty() else _LEAP_SLIDE)
-	_show_big(leap_to.label)
-	_refresh()
-
-
-## Where L1 ([param direction] -1) or R1 (1) leads, for the hints; empty for nowhere, or when the
-## ribbon's index has them move its cursor.
-func leap_label(direction: int) -> String:
-	if _open and _typed.is_empty():
-		return ""
-	var leap_to := _leap(direction)
-	return leap_to.label if leap_to.at >= 0 else ""
-
-
 ## Takes [param event] while the ribbon is open; [param held] is the carousel's direction, which
 ## the event pressed or released when [param moved].
 func take(event: InputEvent, held: HeldDirection, moved: bool) -> void:
@@ -224,9 +198,9 @@ func take(event: InputEvent, held: HeldDirection, moved: bool) -> void:
 	elif event.is_action_pressed(&"ui_down") and _typed.is_empty():
 		_switch_index()
 	elif event.is_action_pressed(&"previous_letter"):
-		leap(-1)
+		_leap(-1)
 	elif event.is_action_pressed(&"next_letter"):
-		leap(1)
+		_leap(1)
 	elif event.is_action_pressed(&"open_settings") and not _by_region:
 		_type(SPACE)
 
@@ -339,22 +313,31 @@ func _letters_view() -> AndroidServices.Browse:
 	return _letters
 
 
-## Where L1 or R1 lead from the game shown.
-func _leap(direction: int) -> Leap:
-	if not _typed.is_empty():
-		var word := _typed.get_slice(SPACE, _typed.get_slice_count(SPACE) - 1)
-		# Every key but the space.
-		var letters := KEYS.length() - 1
-		for step in range(1, letters + 1):
-			var key := posmod(_cursor + direction * step, letters)
-			if _is_lit(KEYS[key]):
-				return Leap.new(_view.keys[KEYS[key]], (word + KEYS[key]).to_upper(), key)
-		return Leap.new()
-	var groups := _view.groups if is_filtered() or _open else _letters_view().groups
-	if groups.size() < 2:
-		return Leap.new()
-	var next := groups[posmod(_group_at(row.selected_index(), groups) + direction, groups.size())]
-	return Leap.new(next.start, tr(next.label))
+## L1 ([param direction] -1) or R1 (1): to the previous or next letter of the index, or once keys are
+## typed to the previous or next key that still finds a game.
+func _leap(direction: int) -> void:
+	if _typed.is_empty():
+		_move(direction)
+		return
+	var leap_to := _leap_target(direction)
+	if leap_to.at < 0:
+		return
+	_cursor = leap_to.key
+	row.jump(leap_to.at, direction, _INDEX_SLIDE)
+	_show_big(leap_to.label)
+	_refresh()
+
+
+## Where L1 or R1 lead once keys are typed: the next key that still finds a game.
+func _leap_target(direction: int) -> Leap:
+	var word := _typed.get_slice(SPACE, _typed.get_slice_count(SPACE) - 1)
+	# Every key but the space.
+	var letters := KEYS.length() - 1
+	for step in range(1, letters + 1):
+		var key := posmod(_cursor + direction * step, letters)
+		if _is_lit(KEYS[key]):
+			return Leap.new(_view.keys[KEYS[key]], (word + KEYS[key]).to_upper(), key)
+	return Leap.new()
 
 
 ## The index in [param groups] of the group holding row index [param at].
@@ -466,8 +449,8 @@ func _show_hints() -> void:
 		shown.append(PackedStringArray(["b", tr("Go back")]))
 	else:
 		shown.append(PackedStringArray(["a", tr("Type the key")]))
-		shown.append(PackedStringArray(["l1", leap_label(-1)]))
-		shown.append(PackedStringArray(["r1", leap_label(1)]))
+		shown.append(PackedStringArray(["l1", _leap_target(-1).label]))
+		shown.append(PackedStringArray(["r1", _leap_target(1).label]))
 		if _is_lit(SPACE):
 			shown.append(PackedStringArray(["y", tr("Space")]))
 		shown.append(PackedStringArray(["b", tr("Erase")]))

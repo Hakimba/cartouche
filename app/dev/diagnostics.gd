@@ -50,6 +50,7 @@ static func _rate() -> int:
 
 
 func _ready() -> void:
+	start_bridge()
 	set_process(enabled)
 	if enabled:
 		trace("app", "engine ready %d ms after it started" % Time.get_ticks_msec())
@@ -118,6 +119,28 @@ func argument(option: String) -> String:
 		if given.begins_with(prefix):
 			return given.trim_prefix(prefix)
 	return ""
+
+
+## A debug-only switch without a value, read from desktop or Android launch arguments.
+func flag(option: String) -> bool:
+	if not enabled:
+		return false
+	var arguments := OS.get_cmdline_user_args()
+	arguments.append_array(Android.launch_arguments())
+	return "--%s" % option in arguments
+
+
+## Mounts the start pack the bridge's last restart prepared, then adds the bridge; nothing without the
+## `--bridge` flag, a debug build and the bridge's files (a release build has none).
+func start_bridge() -> void:
+	var path := "res://dev/bridge/bridge.gd"
+	if not enabled or not flag("bridge") or not ResourceLoader.exists(path) or has_node("Bridge"):
+		return
+	(load("res://dev/bridge/packs.gd") as GDScript).call(&"mount_start")
+	var bridge := Node.new()
+	bridge.set_script(load(path))
+	bridge.name = "Bridge"
+	add_child(bridge)
 
 
 # Every event reaches this signal before any node handles it, including those a page consumes.

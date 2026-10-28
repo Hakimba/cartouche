@@ -25,6 +25,7 @@ static var _stills: Dictionary[String, ImageTexture] = {}
 ## The folders waiting for their picture, each with those asking for it (called with the picture).
 static var _waiting: Dictionary[String, Array] = {}
 static var _drawing := false
+static var _generation := 0
 ## Draws the picture of a folder; the tests put a stand-in where there is no renderer.
 static var _drawer := _render
 
@@ -43,15 +44,41 @@ static func create() -> Plinth:
 	return (load("res://studio/views/plinth.tscn") as PackedScene).instantiate()
 
 
-## The yaw and the roll, in degrees, the model of the console in [param folder] starts at.
-static func start_of(folder: String) -> Vector2:
+## Drops the starts and pictures read or drawn so far, so that the next ones follow a file the debug bridge
+## reloaded; a picture still being drawn is thrown away.
+static func forget() -> void:
+	_generation += 1
+	_starts.clear()
+	_stills.clear()
+	_waiting.clear()
+
+
+## The pose the model of the console in [param folder] starts at; a console the file gives only a yaw and a
+## roll is neither leaned, moved nor sized.
+static func start_of(folder: String) -> Start:
 	if _starts.is_empty():
 		var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TURNTABLE_FILE))
 		_starts = data["consoles"]
 	var pose: Dictionary = _starts[folder]
-	var start_yaw: float = pose["yaw"]
+	var pitch: float = pose.get("pitch", 0.0)
+	var yaw: float = pose["yaw"]
 	var roll: float = pose["roll"]
-	return Vector2(start_yaw, roll)
+	var at: PackedFloat32Array = pose.get("position", [0.0, 0.0, 0.0])
+	var sized: float = pose.get("size", 1.0)
+	return Start.new(Vector3(pitch, yaw, roll), StudioLights._vector(at), sized)
+
+
+## Stands [param model], a child of [param stand] under [param spin], at [param start]: leaned and rolled, set
+## on the plinth's centre and fitted as the tilt leaves it, then turned about the vertical, moved and sized.
+## Returns the model's box centre in the world, which its lights stand about.
+static func stand_at(spin: Node3D, stand: Node3D, model: Node3D, start: Start) -> Vector3:
+	var turn := start.rotation * PI / 180.0
+	stand.transform = Transform3D(Basis.from_euler(Vector3(turn.x, 0.0, turn.z)), Vector3.ZERO)
+	var box := bounds(model, spin)
+	stand.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z)
+	spin.transform = Transform3D(Basis(Vector3.UP, turn.y).scaled(Vector3.ONE * start.size
+		* minf(_FIT_DIAMETER / Vector2(box.size.x, box.size.z).length(), _HEIGHT / box.size.y)), start.position)
+	return spin.transform * bounds(stand, spin).get_center()
 
 
 ## The box holding every mesh under [param root], in the space of [param space], one of its
@@ -115,7 +142,10 @@ static func _draw_waiting() -> void:
 		var live := askers.filter(func(ask: Callable) -> bool: return ask.is_valid())
 		if live.is_empty():
 			continue
+		var generation := _generation
 		var picture: ImageTexture = await _drawer.call(folder)
+		if generation != _generation:
+			continue
 		if picture:
 			_stills[_key(folder)] = picture
 		for ask: Callable in live:
@@ -158,14 +188,8 @@ static func _render(folder: String) -> ImageTexture:
 	spin.add_child(stand)
 	stand.add_child(model)
 	view.add_child(spin)
-	var start := start_of(folder)
-	stand.transform = Transform3D(Basis(Vector3.BACK, deg_to_rad(start.y)), Vector3.ZERO)
-	var box := bounds(model, spin)
-	stand.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z)
-	spin.scale = Vector3.ONE * minf(_FIT_DIAMETER / Vector2(box.size.x, box.size.z).length(), _HEIGHT / box.size.y)
-	spin.rotation.y = deg_to_rad(start.x)
-	StudioLights.new(view, StudioLights.rig_of(folder, &"plinth"),
-		spin.transform * bounds(stand, spin).get_center(), environment.environment)
+	StudioLights.new(view, StudioLights.rig_of(folder, &"plinth"), stand_at(spin, stand, model, start_of(folder)),
+		environment.environment)
 	root.add_child(view)
 	camera.look_at_from_position(_CAMERA, _CAMERA_TARGET)
 	await RenderingServer.frame_post_draw
@@ -252,3 +276,17 @@ func _place_logo() -> void:
 	var logo := _plate.texture.get_size()
 	_plate.size = logo
 	_plate.global_position = (global_position + StudioTokens.PLINTH_PLATE.get_center() - logo / 2.0).round()
+
+
+## A console's start on the turntable, as it is posed by hand: its turns in degrees (x leans
+## it, y turns it about the vertical, z rolls it; applied y, x then z, as a Node3D's), its move in world units
+## and its size, both after the model is fitted on the plinth.
+class Start:
+	var rotation: Vector3
+	var position: Vector3
+	var size: float
+
+	func _init(turns: Vector3, move := Vector3.ZERO, scale := 1.0) -> void:
+		rotation = turns
+		position = move
+		size = scale

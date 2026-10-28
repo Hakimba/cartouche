@@ -183,6 +183,13 @@ func tune(rig: Rig) -> void:
 	_environment.ambient_light_energy = rig.room
 
 
+## Takes the lights away, for a rig built again in their place.
+func dispose() -> void:
+	for light in _lights:
+		light.queue_free()
+	_lights.clear()
+
+
 ## The lights built, in the rig's order.
 func lights() -> Array[Light3D]:
 	return _lights
@@ -197,6 +204,11 @@ static func _aimed(direction: Vector3) -> Basis:
 
 static func _vector(xyz: PackedFloat32Array) -> Vector3:
 	return Vector3(xyz[0], xyz[1], xyz[2])
+
+
+## Drops the file read, so that the next rig follows a file the debug bridge reloaded.
+static func forget() -> void:
+	_data.clear()
 
 
 static func _file() -> Dictionary:

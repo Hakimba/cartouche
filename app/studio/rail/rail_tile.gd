@@ -61,6 +61,8 @@ func _init(mirrored := false) -> void:
 ## The tile holding the logo of the console in [param folder] (under res://carousel/consoles).
 static func of(folder: String) -> RailTile:
 	var tile := RailTile.new()
+	if not folder.is_empty():
+		tile.name = folder
 	tile.show_console(folder)
 	return tile
 

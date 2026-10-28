@@ -14,7 +14,7 @@ extends Control
 ## two consoles of the others, A flies it into that gap and the consoles screen opens on it, B flies it back.
 
 ## The ring starts closing: the consoles screen comes back as it does.
-signal closing
+signal closing(duration: float)
 ## The ring is closed, the consoles back in their row.
 signal closed
 ## The consoles are in [param order] (platform ids) from now on.
@@ -27,24 +27,27 @@ signal form_wanted
 signal placing_over(placed: bool)
 
 ## The ring opens in this time, the console pointed at gliding from the hero's place; the others come from the
-## rail a little after, in their own time; the arrow and the spot, the middle and the hints follow, each from its
+## rail a little after, in their own time; the arrow, the middle and the hints follow, each from its
 ## moment, in its time (seconds).
-const _OPEN_S := 0.4
-const _RISE_AFTER_S := 0.04
-const _RISE_S := 0.36
-const _MARKS_AFTER_S := 0.2
-const _MARKS_S := 0.2
-const _MIDDLE_AFTER_S := 0.16
-const _MIDDLE_S := 0.24
+static var _OPEN_S: float:
+	get: return StudioTokens.TR_RING_OPEN_S
+static var _RISE_AFTER_S: float:
+	get: return StudioTokens.TR_RING_RISE_AT_S
+static var _RISE_S: float:
+	get: return StudioTokens.TR_RING_RISE_S
+static var _MARKS_AFTER_S: float:
+	get: return StudioTokens.TR_RING_MARKS_AT_S
+static var _MARKS_S: float:
+	get: return StudioTokens.TR_RING_MARKS_S
+static var _MIDDLE_AFTER_S: float:
+	get: return StudioTokens.TR_RING_MIDDLE_AT_S
+static var _MIDDLE_S: float:
+	get: return StudioTokens.TR_RING_MIDDLE_S
 const _HINTS_AFTER_S := 0.25
 const _HINTS_S := 0.15
-## The hero's reflection leaves in this time as the ring opens, and comes back after this long, in this time, as it
-## closes.
-const _REFLECTION_S := 0.08
-const _REFLECTION_BACK_AFTER_S := 0.403
-const _REFLECTION_BACK_S := 0.217
 ## It closes in this time, the others sinking towards the rail in theirs, the rest fading in theirs.
-const _CLOSE_S := 0.62
+static var _CLOSE_S: float:
+	get: return StudioTokens.TR_RING_CLOSE_S
 const _SINK_S := 0.372
 const _MARKS_OUT_S := 0.186
 const _HINTS_OUT_S := 0.15
@@ -52,7 +55,7 @@ const _HINTS_OUT_S := 0.15
 const _MIDDLE_Y := 419.2
 const _MIDDLE_RISE_PX := 12.8
 ## Placing a console, the ring comes in as the form goes: the others one after another from this moment, each in this
-## time (seconds), the arrow, the spot and the hints in theirs, the middle after it all.
+## time (seconds), the arrow and the hints in theirs, the middle after it all.
 const _COMING_AFTER_S := 0.06
 const _COMING_EACH_S := 0.018
 const _COMING_S := 0.3
@@ -61,9 +64,12 @@ const _PLACE_MIDDLE_AFTER_S := 0.252
 ## Flying into the gap, the middle goes in this time; flying back the others go in the first, the marks in the second,
 ## the ring as a whole after this long in the third, and the form comes back as the ring leaves.
 const _MIDDLE_OUT_S := 0.16
-const _OTHERS_OUT_S := 0.2
-const _BACK_MARKS_S := 0.16
-const _BACK_FADE_AFTER_S := 0.08
+static var _OTHERS_OUT_S: float:
+	get: return StudioTokens.TR_PLACE_OTHERS_S
+static var _BACK_MARKS_S: float:
+	get: return StudioTokens.TR_PLACE_MARKS_S
+static var _BACK_FADE_AFTER_S: float:
+	get: return StudioTokens.TR_PLACE_AT_S
 const _BACK_FADE_S := 0.32
 ## A console peels off, and is put back down, in these times, springing a little.
 const _PEEL_S := 0.24
@@ -87,13 +93,7 @@ const _GLOW_STEP_PX := 2.0
 const _ARROW_STROKE := Color("#fffdf9")
 const _ARROW_SHINE := Color(1.0, 1.0, 1.0, 0.22)
 const _ARROW_DROP := Color(60.0 / 255.0, 40.0 / 255.0, 20.0 / 255.0, 0.35)
-## The softening of a console's shadow on the screen, in px (0.3 cqw), and the shader that applies it: a 5 x 5 Gaussian whose
-## taps are 0.75 of a standard deviation apart (`sigma`, in the picture's UV), dark as the shadow is.
-const _SHADOW_BLUR_PX := 3.84
-## How much of its shadow a console held keeps.
-const _HELD_SHADOW := 0.3
 
-static var _shadow_blur := _blur_shader()
 static var _sentence_slots := RegEx.create_from_string("\\{(before|after|name)\\}")
 
 var android: AndroidServices = Android
@@ -108,6 +108,11 @@ var _row: Array[String] = []
 var _open := false
 ## No press counts while the ring comes or goes, nor while the plugin keeps an order.
 var _busy := false
+var _transition: Tween
+var _opening_s := 0.0:
+	set(value):
+		_opening_s = value
+		_place_opening()
 var _peeling: Tween
 var _finger := Finger.new()
 ## How many steps the finger's drag has made.
@@ -117,9 +122,9 @@ var _arrow_angle := 0.0
 var _arrow_out := 0.0
 var _arrow_to := 0.0
 var _arrow_out_to := 0.0
-## The gel of the console pointed at, which the arrow's glow and the spot take.
+## The gel of the console pointed at, which the arrow's glow takes.
 var _rim := Color.WHITE
-## How far the middle has risen, from 0 (gone, lower) to 1; how opaque the arrow and the spot are.
+## How far the middle has risen, from 0 (gone, lower) to 1; how opaque the arrow is.
 var _middle_in := 0.0:
 	set(value):
 		_middle_in = value
@@ -144,13 +149,7 @@ var _bounce := 0.0
 var _from := ConsoleRow.Stand.new()
 var _arriving: Tween
 var _tweens: Array[Tween] = []
-## Each console's shadow on the ring, by its index in the row.
-var _shadows: Array[ContactShadow] = []
 @onready var _sticker: ConsoleSticker = %Sticker
-## The shadows and the spot, on a layer of the backdrop: the consoles stand in front of them.
-@onready var _behind: CanvasLayer = %Behind
-@onready var _ring: Control = %Ring
-@onready var _spot: TextureRect = %Spot
 @onready var _frame: Control = %Frame
 @onready var _arrow: Control = %Arrow
 @onready var _middle: Control = %Middle
@@ -168,7 +167,6 @@ func _ready() -> void:
 	# Before the consoles, which stand where the placing says this frame.
 	process_priority = -1
 	_arrow.draw.connect(_draw_arrow)
-	visibility_changed.connect(func() -> void: _behind.visible = visible)
 
 
 func _process(delta: float) -> void:
@@ -179,7 +177,6 @@ func _process(delta: float) -> void:
 	if _placing:
 		_follow_placing(follow)
 	_place_marks()
-	_place_shadows()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -194,6 +191,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_press_placing(direction, accept)
 		return
 	if _busy:
+		if _transition and event.is_action_pressed(&"screen_back") and StudioTokens.TR_REVERSE:
+			_close()
 		return
 	if direction:
 		_step(direction)
@@ -248,7 +247,6 @@ func open(platform_ids: Array[String], at: int) -> void:
 	_finger = Finger.new()
 	_sticker.consoles = consoles
 	_sticker.watch(true)
-	_build_shadows()
 	_show()
 	consoles.snap_ring()
 	_arrow_angle = _arrow_to
@@ -261,8 +259,12 @@ func open(platform_ids: Array[String], at: int) -> void:
 	set_process(true)
 	Diagnostics.trace("order", "ring open on %s" % _wheel.selected())
 	_busy = true
-	await _tween_in().finished
-	_busy = false
+	var opening := _tween_in()
+	_transition = opening
+	await opening.finished
+	if _transition == opening:
+		_transition = null
+		_busy = false
 
 
 ## The consoles of [param platform_ids] that have a model: the ones the ring holds.
@@ -275,17 +277,26 @@ func _ring_ids(platform_ids: Array[String]) -> Array[String]:
 
 
 func _close() -> void:
+	var rewind := _transition != null
+	if _transition:
+		var interrupted := _transition
+		_transition = null
+		interrupted.kill()
+		interrupted.finished.emit()
 	_open = false
 	_busy = true
 	Diagnostics.trace("order", "ring closed on %s" % _wheel.selected())
 	# The row comes back round the console the cursor was on.
 	consoles.select(_row.find(_wheel.selected()))
-	closing.emit()
-	await _tween_out().finished
+	var duration := maxf(_opening_s, 0.001) if rewind else _CLOSE_S
+	closing.emit(duration)
+	var leaving := create_tween() if rewind else _tween_out()
+	if rewind:
+		leaving.tween_property(self, ^"_opening_s", 0.0, duration)
+	await leaving.finished
 	consoles.pointed = -1
 	consoles.held = -1
 	_sticker.watch(false)
-	_free_shadows()
 	set_process(false)
 	hide()
 	_busy = false
@@ -295,26 +306,31 @@ func _close() -> void:
 ## What the ring plays opening: the console pointed at glides from the hero's place, the others rise from the rail,
 ## the arrow, the middle and the hints come in after them.
 func _tween_in() -> Tween:
-	var moves := create_tween().set_parallel()
-	moves.tween_property(consoles, ^"wheel", 1.0, _OPEN_S).from(0.0) \
-		.set_custom_interpolator(Motion.curve(Motion.Easing.GLIDE))
-	moves.tween_property(consoles, ^"others_wheel", 1.0, _RISE_S).from(0.0).set_delay(_RISE_AFTER_S) \
-		.set_custom_interpolator(Motion.curve(Motion.Easing.ARRIVE))
-	moves.tween_property(consoles, ^"reflection", 0.0, _REFLECTION_S).from(1.0)
-	moves.tween_property(self, ^"_marks", 1.0, _MARKS_S).from(0.0).set_delay(_MARKS_AFTER_S)
-	moves.tween_property(self, ^"_middle_in", 1.0, _MIDDLE_S).from(0.0).set_delay(_MIDDLE_AFTER_S) \
-		.set_custom_interpolator(Motion.curve(Motion.Easing.EASE_OUT))
-	moves.tween_property(_hints(), ^"modulate:a", 1.0, _HINTS_S).from(0.0).set_delay(_HINTS_AFTER_S)
+	var moves := create_tween()
+	_opening_s = 0.0
+	moves.tween_property(self, ^"_opening_s", _opening_length(), _opening_length())
 	return moves
 
 
-## What it plays closing: the console pointed at glides back to the hero's place, the others sink towards the
+func _opening_length() -> float:
+	return [ _OPEN_S, _RISE_AFTER_S + _RISE_S, _MARKS_AFTER_S + _MARKS_S,
+		_MIDDLE_AFTER_S + _MIDDLE_S, _HINTS_AFTER_S + _HINTS_S ].max()
+
+
+func _place_opening() -> void:
+	consoles.wheel = Motion.phase(_opening_s, 0.0, _OPEN_S, StudioTokens.TR_RING_OPEN_S_CURVE)
+	consoles.others_wheel = Motion.phase(_opening_s, _RISE_AFTER_S, _RISE_S, StudioTokens.TR_RING_RISE_S_CURVE)
+	_marks = Motion.phase(_opening_s, _MARKS_AFTER_S, _MARKS_S)
+	_middle_in = Motion.phase(_opening_s, _MIDDLE_AFTER_S, _MIDDLE_S, StudioTokens.TR_RING_MIDDLE_S_CURVE)
+	_hints().modulate.a = Motion.phase(_opening_s, _HINTS_AFTER_S, _HINTS_S)
+
+
+## What it plays closing: the console pointed at glides back to the hero’s place, the others sink towards the
 ## rail, the arrow, the middle and the hints leave.
 func _tween_out() -> Tween:
 	var moves := create_tween().set_parallel()
-	moves.tween_property(consoles, ^"wheel", 0.0, _CLOSE_S).set_custom_interpolator(Motion.curve(Motion.Easing.GLIDE))
+	moves.tween_property(consoles, ^"wheel", 0.0, _CLOSE_S).set_custom_interpolator(Motion.curve(StudioTokens.TR_RING_CLOSE_S_CURVE))
 	moves.tween_property(consoles, ^"others_wheel", 0.0, _SINK_S).set_custom_interpolator(Motion.curve(Motion.Easing.SINK))
-	moves.tween_property(consoles, ^"reflection", 1.0, _REFLECTION_BACK_S).from(0.0).set_delay(_REFLECTION_BACK_AFTER_S)
 	moves.tween_property(self, ^"_marks", 0.0, _MARKS_OUT_S)
 	moves.tween_property(self, ^"_middle_in", 0.0, _HINTS_OUT_S)
 	moves.tween_property(_hints(), ^"modulate:a", 0.0, _HINTS_OUT_S)
@@ -345,13 +361,11 @@ func place(platform_ids: Array[String], platform_id: String) -> bool:
 	_busy = false
 	_finger = Finger.new()
 	_sticker.consoles = consoles
-	_build_shadows()
 	_rim = StudioTokens.GEL.get(StringName(_folder_of(platform_id)), StudioTokens.NEUTRAL)
 	consoles.wheel_slots = _ring_slots()
 	consoles.pointed = -1
 	consoles.held = -1
 	consoles.flier = _row.find(platform_id)
-	consoles.reflection = 0.0
 	consoles.wheel = 1.0
 	consoles.others_wheel = 1.0
 	_others_in = 1.0
@@ -415,7 +429,7 @@ func _kill_tweens() -> void:
 
 
 ## What the ring plays as the form goes: the console flies from the plinth to the middle, the others come onto
-## the ring one after another, the arrow, the spot and the hints fade in, then the middle.
+## the ring one after another, the arrow and the hints fade in, then the middle.
 func _play_arrival() -> void:
 	var motion := _tween().set_parallel()
 	motion.tween_property(self, ^"_coming", 1.0, 1.0).from(0.0)
@@ -425,7 +439,7 @@ func _play_arrival() -> void:
 	motion.tween_property(self, ^"_middle_in", 1.0, _MIDDLE_S).from(0.0).set_delay(_PLACE_MIDDLE_AFTER_S) \
 		.set_custom_interpolator(in_out)
 	_arriving = _tween()
-	_arriving.tween_property(self, ^"_move", 1.0, Placing.ARRIVE_S).from(0.0)
+	_arriving.tween_property(self, ^"_move", 1.0, StudioTokens.ARRIVE_S).from(0.0)
 	_arriving.tween_callback(_placing.done)
 
 
@@ -581,9 +595,9 @@ func _fly_in(stood: ConsoleRow.Stand) -> void:
 	_move = 0.0
 	_bounce = 0.0
 	var flight := _tween()
-	flight.tween_property(self, ^"_move", 1.0, Placing.FLY_S)
+	flight.tween_property(self, ^"_move", 1.0, StudioTokens.FLY_S)
 	flight.tween_callback(_placing.done)
-	flight.tween_property(self, ^"_bounce", 1.0, Placing.BOUNCE_S)
+	flight.tween_property(self, ^"_bounce", 1.0, StudioTokens.BOUNCE_S)
 	flight.tween_callback(_landed.bind(gap))
 	var out := _tween()
 	out.tween_property(self, ^"_middle_in", 0.0, _MIDDLE_OUT_S)
@@ -591,7 +605,7 @@ func _fly_in(stood: ConsoleRow.Stand) -> void:
 
 ## The console is in its gap: the order is saved with it, then, after the pause, the morph onto the consoles screen.
 func _landed(gap: int) -> void:
-	var pause := get_tree().create_timer(Placing.PAUSE_S)
+	var pause := get_tree().create_timer(StudioTokens.PAUSE_S)
 	var answer := await android.place_console(_placed_id, gap)
 	if not answer.ok:
 		# The ring stays as it was: the console flies back to the form, as on B.
@@ -608,7 +622,6 @@ func _landed(gap: int) -> void:
 	# The consoles are in their new order: the console placed and the places on the ring follow it.
 	consoles.flier = _row.find(_placed_id)
 	consoles.wheel_slots = _ring_slots()
-	_build_shadows()
 	if pause.time_left > 0.0:
 		await pause.timeout
 	_placing.done()
@@ -622,7 +635,7 @@ func _morph() -> void:
 	consoles.flier = -1
 	consoles.pointed = _row.find(_placed_id)
 	_write_ring()
-	closing.emit()
+	closing.emit(_CLOSE_S)
 	await _tween_out().finished
 	_placing.done()
 	_end_placing(true)
@@ -655,8 +668,6 @@ func _end_placing(placed: bool) -> void:
 	if not placed:
 		consoles.wheel = 0.0
 		consoles.others_wheel = 0.0
-		consoles.reflection = 1.0
-	_free_shadows()
 	_kill_tweens()
 	_middle_y = _MIDDLE_Y
 	set_process(false)
@@ -780,9 +791,8 @@ func _show() -> void:
 
 ## The ring's parts stand in the design's frame as the viewport shows it.
 func _fit_view() -> void:
-	for placed: Control in [_frame, _ring]:
-		placed.position = consoles.view_origin()
-		placed.scale = Vector2.ONE * consoles.view_scale()
+	_frame.position = consoles.view_origin()
+	_frame.scale = Vector2.ONE * consoles.view_scale()
 
 
 ## The scale every console stands on, for the order the ring is in.
@@ -880,57 +890,13 @@ func _place_middle() -> void:
 
 func _tint_marks() -> void:
 	_arrow.modulate.a = _marks
-	_spot.modulate = Color(_rim, _marks)
 
 
-## The arrow and the spot where the ring's marks stand this frame.
+## The arrow where the ring's marks stand this frame.
 func _place_marks() -> void:
 	var radial := Vector2(RingFit.RADII.x * sin(_arrow_angle), RingFit.RADII.y * cos(_arrow_angle)).normalized()
 	_arrow.position = RingFit.place(_arrow_angle) + radial * _arrow_out - Vector2(_arrow.pivot_offset.x, 0.0)
 	_arrow.rotation = atan2(-radial.x, radial.y)
-	_spot.position = RingFit.place(_arrow_angle) - _spot.size / 2.0
-
-
-## A shadow for each console of the row, under the ring's consoles.
-func _build_shadows() -> void:
-	_free_shadows()
-	for k in _row.size():
-		var shadow := ContactShadow.new()
-		shadow.size = CarouselLayout.FRAME
-		if consoles.console_at(k).modelled:
-			shadow.show_ground(consoles.console_at(k).folder, true, false)
-		var blur := ShaderMaterial.new()
-		blur.shader = _shadow_blur
-		shadow.layers()[0].material = blur
-		_ring.add_child(shadow)
-		_shadows.append(shadow)
-
-
-func _free_shadows() -> void:
-	for shadow in _shadows:
-		shadow.queue_free()
-	_shadows.clear()
-
-
-## Each shadow under its console: its picture's frame as large and as far as the console's own, as faint as the
-## console is transparent, fainter while the console is held.
-func _place_shadows() -> void:
-	for k in _shadows.size():
-		var shadow := _shadows[k]
-		shadow.visible = consoles.wheel_slots[k] >= 0
-		if not shadow.visible:
-			continue
-		var stand := consoles.ring_stand(k)
-		var peeled := consoles.peel if k == consoles.pointed else 0.0
-		shadow.scale = Vector2.ONE * stand.size
-		# Its picture's floor lands on the model's own lowest edge, not on where the picture's silhouette would be.
-		var box := consoles.silhouette(k)
-		var floor_y: float = RingFit.FLOORS.get(consoles.console_at(k).folder, box.end.y)
-		shadow.position = Vector2(stand.centre.x - stand.size * box.get_center().x * CarouselLayout.FRAME.x,
-			stand.centre.y + stand.size * (box.size.y / 2.0 - floor_y) * CarouselLayout.FRAME.y)
-		var blur := shadow.layers()[0].material as ShaderMaterial
-		blur.set_shader_parameter(&"sigma", Vector2.ONE * _SHADOW_BLUR_PX / stand.size / CarouselLayout.FRAME)
-		blur.set_shader_parameter(&"opacity", stand.opacity * lerpf(1.0, _HELD_SHADOW, peeled))
 
 
 ## The arrow, as the design draws it: an ink head with a white edge and a shine, a shadow and a glow of the pointed
@@ -993,25 +959,3 @@ class Word:
 
 	func _draw() -> void:
 		_line.draw(self, Vector2(0.0, (size.y - _line.height) / 2.0), StudioTokens.MUTE)
-
-
-static func _blur_shader() -> Shader:
-	var blur := Shader.new()
-	blur.code = """shader_type canvas_item;
-uniform vec2 sigma = vec2(0.002);
-uniform float opacity = 1.0;
-void fragment() {
-	float alpha = 0.0;
-	float total = 0.0;
-	for (int i = -2; i <= 2; i++) {
-		for (int j = -2; j <= 2; j++) {
-			vec2 tap = vec2(float(i), float(j)) * 0.75;
-			float weight = exp(-0.5 * dot(tap, tap));
-			alpha += texture(TEXTURE, UV + tap * sigma).a * weight;
-			total += weight;
-		}
-	}
-	COLOR = vec4(0.17, 0.118, 0.067, alpha / total * opacity);
-}
-"""
-	return blur

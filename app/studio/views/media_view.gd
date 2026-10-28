@@ -150,6 +150,16 @@ func show_medium(model: Node3D, lit: StudioLights.Rig, blank: StudioLights.Rig) 
 	set_process(true)
 
 
+## Lit again by [param lit] and [param blank] (the light file reloaded), whatever their number of lights.
+func relight(lit: StudioLights.Rig, blank: StudioLights.Rig) -> void:
+	_lights.dispose()
+	_lit = lit
+	_blank = blank
+	_lights = StudioLights.new(_view, StudioLights.mixed(lit, blank, 0.0), Vector3.ZERO, _environment.environment)
+	_light()
+	redraw()
+
+
 ## The share of the light for a game without a picture, from 0 (the light with one) to 1, as the focus
 ## comes to such a game or leaves it; the medium is drawn again in it, moving or not.
 func crossfade(blank_weight: float) -> void:
@@ -179,16 +189,16 @@ func place(at: Transform3D, s: float) -> void:
 			_settled = true
 		return
 	_settled = false
-	var relight := not _framed or s != _softness
+	var lit_again := not _framed or s != _softness
 	_at = at
 	_softness = s
 	_holder.global_transform = at
-	if relight:
+	if lit_again:
 		_light()
 	else:
 		_lights.place(_at * _box.get_center())
 	_frame(false)
-	if not relight and not canvas_changed:
+	if not lit_again and not canvas_changed:
 		return
 	var at_s := look(s)
 	var shader := material as ShaderMaterial

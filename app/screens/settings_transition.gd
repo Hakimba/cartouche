@@ -11,7 +11,7 @@ var _menu: SettingsMenu
 
 func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 		title: Control, pill: Control, hints: Control, search: Control,
-		sequence: ConsoleSequence, console_rail: ConsoleRail, grounds: Control, games_logo: Control, tweens: Array[Tween]) -> void:
+		sequence: ConsoleSequence, console_rail: ConsoleRail, games_logo: Control, tweens: Array[Tween]) -> void:
 	_menu = menu
 	row.settle()
 	consoles.settle()
@@ -25,7 +25,6 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 	var title_alpha := title.modulate.a
 	var pill_alpha := pill.modulate.a
 	var rail_alpha := console_rail.ground_alpha
-	var ground_alpha := grounds.modulate.a
 	var logo_alpha := games_logo.modulate.a
 	var row_presence := Vector2(row.selected_presence, row.neighbours)
 	_sample = func(presence: float, rail: float, chrome: float) -> void:
@@ -36,19 +35,18 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 		pill.visible = drawn
 		search.visible = drawn
 		hints.visible = drawn
-		subject.scale = subject_scale * lerpf(0.96, 1.0, presence)
+		subject.scale = subject_scale * lerpf(StudioTokens.TR_SETTINGS_RECEDE, 1.0, presence)
 		if games:
 			row.selected_presence = row_presence.x * presence
 			row.neighbours = row_presence.y * presence
 		else:
 			consoles.fade_to(presence)
-		title.position.y = title_position.y + 51.2 * (1.0 - rail)
+		title.position.y = title_position.y + StudioTokens.TR_SETTINGS_DROP_PX * (1.0 - rail)
 		title.modulate.a = title_alpha * chrome
 		pill.modulate.a = pill_alpha * chrome
 		hints.modulate.a = chrome
 		search.modulate.a = chrome
 		console_rail.ground_alpha = rail_alpha * chrome
-		grounds.modulate.a = ground_alpha * chrome
 		games_logo.modulate.a = logo_alpha * chrome
 		if not drawn:
 			sequence.behind_amount = 0.0
@@ -58,7 +56,6 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 		if not arrived:
 			title.modulate.a = title_alpha
 			console_rail.ground_alpha = rail_alpha
-			grounds.modulate.a = ground_alpha
 		games_logo.modulate.a = logo_alpha
 		pill.modulate.a = pill_alpha
 		hints.modulate.a = 1.0

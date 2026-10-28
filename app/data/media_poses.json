@@ -1,0 +1,200 @@
+{
+  "about": "each medium's pose on the games screen (position in the fitted design frame, rotation in degrees); posed by hand",
+  "media": {
+    "famicom_cart": {
+      "position": [
+        0.046,
+        0.257,
+        -0.03
+      ],
+      "rotation": [
+        -17.3,
+        20.4,
+        0
+      ],
+      "scale": 0.85
+    },
+    "gb_cart": {
+      "position": [
+        0.028,
+        0.243,
+        -0.015
+      ],
+      "rotation": [
+        -12.1,
+        18.5,
+        0
+      ],
+      "scale": 0.85
+    },
+    "gba_cart": {
+      "position": [
+        0.028,
+        0.243,
+        -0.015
+      ],
+      "rotation": [
+        -12.1,
+        18.5,
+        0
+      ],
+      "scale": 0.85
+    },
+    "gbc_cart": {
+      "position": [
+        0.028,
+        0.243,
+        -0.015
+      ],
+      "rotation": [
+        -12.1,
+        18.5,
+        0
+      ],
+      "scale": 0.85
+    },
+    "gc_mini_dvd": {
+      "position": [
+        0,
+        0.15,
+        0
+      ],
+      "rotation": [
+        -13.4,
+        21,
+        0.2
+      ],
+      "scale": 0.78
+    },
+    "n64_cart": {
+      "position": [
+        0.028,
+        0.319,
+        -0.042
+      ],
+      "rotation": [
+        -16,
+        22.3,
+        0
+      ],
+      "scale": 0.85
+    },
+    "nes_cart": {
+      "position": [
+        0.046,
+        0.257,
+        -0.03
+      ],
+      "rotation": [
+        -17.3,
+        20.4,
+        0
+      ],
+      "scale": 0.85
+    },
+    "ps1_cd": {
+      "position": [
+        0,
+        0.15,
+        0
+      ],
+      "rotation": [
+        -13.4,
+        21,
+        0.2
+      ],
+      "scale": 0.78
+    },
+    "ps2_dvd": {
+      "position": [
+        0,
+        0.15,
+        0
+      ],
+      "rotation": [
+        -13.4,
+        21,
+        0.2
+      ],
+      "scale": 0.78
+    },
+    "sfc_cart": {
+      "position": [
+        0.028,
+        0.319,
+        -0.042
+      ],
+      "rotation": [
+        -16,
+        22.3,
+        0
+      ],
+      "scale": 0.85
+    },
+    "snes_pal_cart": {
+      "position": [
+        0.028,
+        0.319,
+        -0.042
+      ],
+      "rotation": [
+        -16,
+        22.3,
+        0
+      ],
+      "scale": 0.85
+    },
+    "snes_us_cart": {
+      "position": [
+        0.028,
+        0.319,
+        -0.042
+      ],
+      "rotation": [
+        -16,
+        22.3,
+        0
+      ],
+      "scale": 0.85
+    },
+    "wii_dvd": {
+      "position": [
+        0,
+        0.15,
+        0
+      ],
+      "rotation": [
+        -13.4,
+        21,
+        0.2
+      ],
+      "scale": 0.78
+    },
+    "xbox360_dvd": {
+      "position": [
+        0,
+        0.15,
+        0
+      ],
+      "rotation": [
+        -13.4,
+        21,
+        0.2
+      ],
+      "scale": 0.78
+    },
+    "xbox_dvd": {
+      "position": [
+        0,
+        0.15,
+        0
+      ],
+      "rotation": [
+        -13.4,
+        21,
+        0.2
+      ],
+      "scale": 0.78
+    }
+  }
+}

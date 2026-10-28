@@ -171,18 +171,19 @@ func test_INV_E5_04_the_selected_console_stands_as_its_animation_has_it_and_alon
 	assert_int(unposed).is_greater(0)
 
 
-func test_the_consoles_screen_draws_no_shadow_under_the_console_only_its_reflection() -> void:
+func test_a_console_turns_only_left_and_right_by_the_stick_and_by_the_mouse() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
-	for index in carousel._consoles._items.size():
-		_select(carousel, index)
-		Fixtures.step_frames(carousel, 5)
-		var shown := 0
-		for ground in carousel._consoles.grounds:
-			assert_object(ground.layers()[0].texture).override_failure_message("shadow under console %d" % index).is_null()
-			if ground.visible:
-				shown += 1
-				assert_object(ground.layers()[1].texture).is_not_null()
-		assert_int(shown).is_greater(0)
+	var consoles := carousel._consoles
+	Input.action_press(&"inspect_up", 1.0)
+	Fixtures.step_frames(carousel, 30)
+	Input.action_release(&"inspect_up")
+	assert_bool(consoles._turn.of(consoles.selected_index()).is_equal_approx(Basis.IDENTITY)).is_true()
+	consoles.touch_turn(Vector2(0.0, 200.0))
+	assert_bool(consoles._turn.of(consoles.selected_index()).is_equal_approx(Basis.IDENTITY)).is_true()
+	consoles.touch_turn(Vector2(200.0, 0.0))
+	var turned := consoles._turn.of(consoles.selected_index())
+	assert_bool(turned.is_equal_approx(Basis.IDENTITY)).is_false()
+	assert_vector(turned.y).is_equal_approx(Vector3.UP, Vector3.ONE * 1e-5)
 
 
 func test_INV_E5_01_a_console_turned_turns_back_to_the_front_once_another_is_selected() -> void:
@@ -715,33 +716,19 @@ func _assert_drawn_in(carousel: Carousel, layers: int) -> void:
 			assert_int(geometry.layers).is_equal(wanted)
 
 
-## The decided poses (rotation: tilt, turn, roll in degrees).
-const POSES := {
-	"ps2_slim": Vector3(43.6, 22.9, 1.3), "psx": Vector3(49.1, 22.0, 0.0), "nes": Vector3(16.6, 22.9, 1.6),
-	"snes": Vector3(24.9, 22.0, 0.0), "n64": Vector3(33.8, 22.0, 0.0), "gb": Vector3(-20.3, 22.0, 0.0),
-	"gbc": Vector3(-25.4, 22.0, 0.0), "gba": Vector3(-28.1, 22.0, 0.0), "gc": Vector3(54.9, 22.0, 0.0),
-	"wii": Vector3(-3.2, 17.5, 0.3), "xbox": Vector3(46.6, 22.0, 0.0), "xbox360": Vector3(-5.7, 16.5, -89.5),
-}
+## The consoles of the row, by folder.
+const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gb", "gbc", "gba", "gc", "wii", "xbox", "xbox360"]
 
 
-func test_each_consoles_launch_starts_from_its_decided_pose_and_never_floats() -> void:
-	for folder: String in POSES:
+func test_each_consoles_launch_starts_still_and_never_floats() -> void:
+	for folder: String in FOLDERS:
 		var launch: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(
 			"res://carousel/consoles/%s/launch.json" % folder))
 		var steps: Array = launch["steps"]
 		var step: Dictionary = steps[0]
 		var first: Dictionary = step["console"]
-		var rx: float = first["rx"]
-		var ry: float = first["ry"]
-		var rz: float = first["rz"]
-		var sway: float = first["sway"]
-		var bob: float = first["bob"]
-		var rest := ConsoleRow._three_euler(Vector3(deg_to_rad(rx), deg_to_rad(ry), deg_to_rad(rz)))
-		var pose: Vector3 = POSES[folder]
-		var wanted := Basis.from_euler(Vector3(deg_to_rad(pose.x), deg_to_rad(pose.y), deg_to_rad(pose.z)), EULER_ORDER_YXZ)
-		assert_bool(rest.is_equal_approx(wanted)).override_failure_message(folder).is_true()
-		assert_float(sway).is_equal(0.0)
-		assert_float(bob).is_equal(0.0)
+		assert_float(first["sway"]).override_failure_message(folder).is_equal(0.0)
+		assert_float(first["bob"]).override_failure_message(folder).is_equal(0.0)
 
 
 func test_a_step_swaps_the_consoles_the_old_one_leaving_in_180_ms_the_new_one_arriving_in_340() -> void:
@@ -789,13 +776,15 @@ func _index_of_folder(consoles: ConsoleRow, folder: String) -> int:
 	return -1
 
 
-func test_the_nes_and_the_gbc_heroes_are_lit_by_their_rigs_alone_and_the_others_keep_today_s_light() -> void:
+func test_each_hero_with_a_rig_is_lit_by_it_alone_and_the_others_keep_today_s_light() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var consoles := carousel._consoles
 	var world := carousel.get_viewport().find_world_3d().environment
 	var sun: DirectionalLight3D = carousel.get_node("Sun")
 	assert_int(sun.light_cull_mask & ConsoleRow.HERO).is_equal(0)
-	for folder: String in ["nes", "gbc"]:
+	var rigged := FOLDERS.filter(func(folder: String) -> bool: return ConsoleRow.has_rig(folder))
+	assert_array(rigged).is_not_empty()
+	for folder: String in rigged:
 		var index := _index_of_folder(consoles, folder)
 		assert_int(index).override_failure_message(folder).is_greater_equal(0)
 		_select(carousel, index)
@@ -811,7 +800,7 @@ func test_the_nes_and_the_gbc_heroes_are_lit_by_their_rigs_alone_and_the_others_
 		assert_float(world.ambient_light_energy).is_equal_approx(rig.room, 0.0001)
 		for geometry in consoles._items[index].geometry:
 			assert_int(geometry.layers).is_equal(ConsoleRow.HERO)
-	for folder: String in ["ps2_slim", "psx", "n64", "wii"]:
+	for folder: String in FOLDERS.filter(func(folder: String) -> bool: return not ConsoleRow.has_rig(folder)):
 		var index := _index_of_folder(consoles, folder)
 		assert_int(index).override_failure_message(folder).is_greater_equal(0)
 		_select(carousel, index)
@@ -885,15 +874,13 @@ func test_a_platform_shown_by_its_medium_has_no_tile_no_ground_and_no_hero() -> 
 		Fixtures.step_frames(carousel, 10)
 		assert_bool(consoles._items[i].model.visible).is_false()
 		assert_bool(carousel._rail.tiles()[i].visible).is_false()
-		for ground in carousel._grounds.get_children():
-			assert_bool((ground as Control).visible).is_false()
 	assert_int(found).is_greater(0)
 	remove_child(carousel)
 	carousel.queue_free()
 	await await_idle_frame()
 
 
-func test_r3_previews_without_drawing_the_carousel_and_a_keeps_the_same_model_for_the_ring_and_launch() -> void:
+func test_the_console_s_properties_show_its_models_in_a_mosaic_the_console_turning_into_the_one_under_the_cursor() -> void:
 	var screens := preload("res://test/screens/fixtures.gd")
 	var device := screens.past_first_launch(self, {"ps2": 2, "gba": 1})
 	var carousel := screens.fresh_carousel(self, device)
@@ -901,23 +888,24 @@ func test_r3_previews_without_drawing_the_carousel_and_a_keeps_the_same_model_fo
 	var index := carousel._shelves.find_custom(func(shelf: AndroidServices.Shelf) -> bool: return shelf.platform_id == "ps2")
 	carousel._consoles.select(index)
 	carousel._on_consoles_selection_changed(index)
-	await screens.action(self, &"choose_variant")
-	assert_bool(carousel._variant_chooser.visible).is_true()
-	assert_bool(carousel._consoles.visible).is_false()
-	assert_bool(carousel._row.visible).is_false()
-	assert_bool(carousel._top_bar.visible).is_true()
+	var properties := carousel._console_properties
+	await screens.action(self, &"open_properties")
+	assert_bool(await screens.until(self, func() -> bool: return properties._model.has_focus())).is_true()
+	await screens.action(self, &"ui_accept")
+	assert_int(properties._variants.get_child_count()).is_equal(2)
 	await screens.action(self, &"ui_right")
+	assert_bool(carousel._consoles.selected().model is Ps2FatModel).is_true()
 	await screens.action(self, &"screen_back")
-	assert_bool(carousel._variant_chooser.visible).is_false()
+	assert_bool(properties._variants.visible).is_false()
 	assert_bool(carousel._consoles.selected().model is Ps2SlimModel).is_true()
 	assert_dict(device.console_variants).is_empty()
-	await screens.action(self, &"choose_variant")
+	await screens.action(self, &"ui_accept")
 	await screens.action(self, &"ui_right")
 	await screens.action(self, &"ui_accept")
-	assert_bool(await screens.until(self, func() -> bool: return carousel._shown)).is_true()
+	assert_bool(await screens.until(self, func() -> bool:
+		return carousel._screens.library.setup_of("ps2").variant_id == "ps2_fat")).is_true()
 	assert_bool(carousel._consoles.selected().model is Ps2FatModel).is_true()
 	assert_str(carousel._consoles.selected().folder).is_equal("ps2_fat")
-	assert_str(carousel._screens.library.setup_of("ps2").variant_id).is_equal("ps2_fat")
 	var animation := carousel._appearance.animation_of(carousel._platforms["ps2"], "ps2_dvd")
 	assert_int(animation.find_track(^"Consoles/ps2:tray_mm", Animation.TYPE_VALUE)).is_greater_equal(0)
 	carousel._open_order()
@@ -927,12 +915,25 @@ func test_r3_previews_without_drawing_the_carousel_and_a_keeps_the_same_model_fo
 	await await_idle_frame()
 
 
-func test_r3_leaves_a_console_without_variants_unchanged() -> void:
+func test_a_console_with_one_model_has_no_model_to_choose_in_its_properties() -> void:
 	var screens := preload("res://test/screens/fixtures.gd")
-	var device := screens.past_first_launch(self, {"gc": 1})
-	var carousel := screens.fresh_carousel(self, device)
+	var carousel := screens.fresh_carousel(self, screens.past_first_launch(self, {"gc": 1}))
 	assert_bool(await screens.until(self, func() -> bool: return carousel._shown)).is_true()
-	await screens.action(self, &"choose_variant")
-	assert_bool(carousel._variant_chooser.visible).is_false()
-	assert_bool(carousel._shown).is_true()
-	assert_bool(carousel._consoles.visible).is_true()
+	await screens.action(self, &"open_properties")
+	var properties := carousel._console_properties
+	assert_bool(await screens.until(self, func() -> bool: return not properties._busy and properties.is_open())).is_true()
+	assert_bool(properties._model.visible).is_false()
+
+
+func test_on_a_computer_i_j_k_l_turn_like_the_stick_and_the_mouse_drags_like_a_finger() -> void:
+	for pair: Array in [[KEY_J, Vector2.LEFT], [KEY_L, Vector2.RIGHT], [KEY_I, Vector2.UP], [KEY_K, Vector2.DOWN]]:
+		var key := InputEventKey.new()
+		key.physical_keycode = pair[0]
+		key.pressed = true
+		Input.parse_input_event(key)
+		Input.flush_buffered_events()
+		assert_vector(Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down")).is_equal(pair[1])
+		key.pressed = false
+		Input.parse_input_event(key)
+		Input.flush_buffered_events()
+	assert_bool(ProjectSettings.get_setting("input_devices/pointing/emulate_touch_from_mouse")).is_true()

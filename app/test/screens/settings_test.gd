@@ -357,7 +357,7 @@ func test_the_button_style_changes_from_the_settings_and_B_there_keeps_it() -> v
 	assert_str(_focused()).is_equal("ButtonStyle")
 
 
-func test_the_preferred_region_is_chosen_in_a_list_from_the_settings_saved_once_changed_and_B_there_keeps_it() -> void:
+func test_the_preferred_region_is_chosen_on_its_page_from_the_settings_saved_once_changed_and_B_there_keeps_it() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	device.preferred_region = "Japan"
 	var carousel := await _shown(device)
@@ -368,23 +368,23 @@ func test_the_preferred_region_is_chosen_in_a_list_from_the_settings_saved_once_
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Region")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	var choice: ChoiceList = carousel.get_node("%Screens/Settings/%Choice")
-	assert_bool(choice.visible).is_true()
-	var items := PackedStringArray()
-	for item: Button in choice.get_node("%Items").get_children():
-		items.append(item.text)
-	assert_array(items).is_equal(PackedStringArray(["None", "Europe", "North America", "Japan"]))
+	var page: PreferredRegionScreen = carousel.get_node("%Screens/PreferredRegion")
+	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
+	assert_array(_card_texts(page)).is_equal(PackedStringArray(["None", "Europe", "North America", "Japan"]))
 	await await_idle_frame()
 	assert_str((Fixtures.focus(self) as Button).text).is_equal("Japan")
-	# B gives the list up: nothing saved, the settings still open on the line.
+	# The region chosen now is the one ticked.
+	assert_int(page.find_children("*", "Control", true, false).filter(
+		func(node: Node) -> bool: return node is PreferredRegionScreen.Tick).size()).is_equal(1)
+	assert_object(Fixtures.focus(self).get_child(0)).is_instanceof(PreferredRegionScreen.Tick)
+	# B gives the page up: nothing saved, the settings open again on the line.
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(choice.visible).is_false()
 	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_focused()).is_equal("Region")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await await_idle_frame()
 	for step in 3:
-		await Fixtures.action(self, &"ui_up")
+		await Fixtures.action(self, &"ui_left")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_regions.size() == 1)).is_true()
 	assert_array(device.saved_regions).is_equal([""])
@@ -408,13 +408,10 @@ func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_n
 	for step in 4:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	var choice: ChoiceList = carousel.get_node("%Screens/Settings/%Choice")
-	var items := PackedStringArray()
-	for item: Button in choice.get_node("%Items").get_children():
-		items.append(item.text)
-	assert_array(items).is_equal(PackedStringArray(["None", "Japan", "Korea"]))
+	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
+	assert_array(_card_texts(carousel.get_node("%Screens/PreferredRegion") as PreferredRegionScreen)).is_equal(PackedStringArray(["None", "Japan", "Korea"]))
 	await await_idle_frame()
-	await Fixtures.action(self, &"ui_down")
+	await Fixtures.action(self, &"ui_right")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_regions.size() == 1)).is_true()
 	assert_array(device.saved_regions).is_equal(["Japan"])
@@ -857,3 +854,10 @@ func test_card_dim_and_hints_follow_the_specified_intervals_and_curves() -> void
 				var hidden := 1.0 - expected
 				assert_bool(is_equal_approx(node.position.y, 172.8 + hidden * (25.6 if track[0] else 38.4))).is_true()
 				assert_bool(is_equal_approx(node.scale.x, lerpf(1.0, 0.98 if track[0] else 0.97, hidden))).is_true()
+
+
+func _card_texts(page: PreferredRegionScreen) -> PackedStringArray:
+	var texts := PackedStringArray()
+	for card: Button in page._cards.get_children():
+		texts.append(card.text)
+	return texts

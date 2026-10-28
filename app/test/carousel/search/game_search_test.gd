@@ -126,20 +126,15 @@ func test_once_keys_are_typed_l1_and_r1_go_from_one_key_that_still_finds_a_game_
 	assert_array(seen).is_equal(["NU", "NI", "NU"])
 	Fixtures.press(carousel, &"previous_letter")
 	assert_str((carousel._search.get_node("%BigText") as Label).text).is_equal("NI")
-	# Closed, L1 and R1 still say where they lead from there.
-	Fixtures.press(carousel, &"ui_up")
-	assert_str(carousel._next_letter_hint.text).is_equal("NU")
-	assert_str(carousel._previous_letter_hint.text).is_equal("NU")
-	assert_bool(carousel._next_letter_hint.visible).is_true()
 	# A types the key L1 and R1 led to.
-	Fixtures.press(carousel, &"ui_down")
 	Fixtures.press(carousel, &"ui_accept")
 	assert_array(_shown_titles(carousel)).is_equal(["Nights into Dreams"])
 
 
 func test_up_keeps_what_is_found_told_at_the_top_and_b_clears_it_back_on_the_game_shown_when_typing_began() -> void:
 	var carousel := await _games_screen()
-	Fixtures.press(carousel, &"next_letter")
+	_press_direction(carousel, &"carousel_right")
+	_press_direction(carousel, &"carousel_right")
 	assert_str(_shown(carousel)).is_equal("Bouncer")
 	Fixtures.press(carousel, &"ui_down")
 	# Going to "a" on the index brings the carousel back to the first A.
@@ -148,8 +143,6 @@ func test_up_keeps_what_is_found_told_at_the_top_and_b_clears_it_back_on_the_gam
 	assert_str(_shown(carousel)).is_equal("Ace Combat Distant Thunder")
 	Fixtures.press(carousel, &"ui_up")
 	assert_bool(carousel._search.is_open()).is_false()
-	# "ace" goes on with no letter: L1 and R1 lead nowhere, and say nothing.
-	assert_bool(carousel._next_letter_hint.visible).is_false()
 	assert_bool((carousel._search.get_node("%Filter") as Control).visible).is_true()
 	assert_str((carousel._search.get_node("%FilterText") as Label).text).is_equal("“ace” — 3 of %d" % TITLES.size())
 	_press_direction(carousel, &"carousel_right")
@@ -171,15 +164,15 @@ func test_up_keeps_what_is_found_told_at_the_top_and_b_clears_it_back_on_the_gam
 	assert_bool(carousel._clear_hint.visible).is_false()
 
 
-func test_the_hints_name_where_l1_and_r1_lead_from_the_game_shown() -> void:
+func test_l1_and_r1_are_left_free_on_the_games_screen_and_named_by_no_hint() -> void:
 	var carousel := await _games_screen()
-	assert_str(carousel._previous_letter_hint.text).is_equal("Z")
-	assert_str(carousel._next_letter_hint.text).is_equal("B")
-	_press_direction(carousel, &"carousel_right")
-	_press_direction(carousel, &"carousel_right")
-	assert_str(_shown(carousel)).is_equal("Bouncer")
-	assert_str(carousel._previous_letter_hint.text).is_equal("A")
-	assert_str(carousel._next_letter_hint.text).is_equal("C")
+	var shown := _shown(carousel)
+	for action: StringName in [&"next_letter", &"previous_letter"]:
+		Fixtures.press(carousel, action)
+		assert_str(_shown(carousel)).is_equal(shown)
+	assert_bool(carousel._search.is_open()).is_false()
+	for hint: ButtonHint in carousel.get_node("GamesHints").get_children():
+		assert_array([hint.button]).not_contains([&"l1", &"r1"])
 
 
 func test_a_key_tapped_is_typed_once_and_the_carousel_behind_does_not_take_the_touch() -> void:

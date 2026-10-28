@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://screens/preferred_region_screen.gd" id="1"]
 [ext_resource type="Script" path="res://studio/studio_label.gd" id="label"]
+[ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
+[ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 
 [node name="PreferredRegion" type="Control"]
 layout_mode = 3
@@ -32,12 +34,12 @@ theme_type_variation = &"ScreenText"
 horizontal_alignment = 1
 
 [node name="Scroll" type="ScrollContainer" parent="."]
-offset_top = 308.0
+offset_top = 290.0
 offset_right = 1280.0
-offset_bottom = 602.4
+offset_bottom = 850.0
 follow_focus = true
-horizontal_scroll_mode = 3
-vertical_scroll_mode = 0
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
 
 [node name="Margin" type="MarginContainer" parent="Scroll"]
 layout_mode = 2
@@ -48,8 +50,24 @@ theme_override_constants/margin_top = 32
 theme_override_constants/margin_right = 32
 theme_override_constants/margin_bottom = 32
 
-[node name="Cards" type="HBoxContainer" parent="Scroll/Margin"]
+[node name="Cards" type="GridContainer" parent="Scroll/Margin"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 25
-alignment = 1
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 18
+columns = 4
+
+[node name="Hints" parent="." instance=ExtResource("hint_row")]
+
+[node name="Choose" type="Control" parent="Hints"]
+layout_mode = 2
+script = ExtResource("3")
+text = "Choose"
+
+[node name="Back" type="Control" parent="Hints"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("3")
+button = &"b"
+text = "Back"

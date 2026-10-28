@@ -1,11 +1,11 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://carousel/properties/console_properties.gd" id="1"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
 [ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 [ext_resource type="Script" path="res://screens/glyph_button.gd" id="6"]
 
-[ext_resource type="Script" path="res://studio/logo_view.gd" id="logo"]
+[ext_resource type="Script" path="res://carousel/properties/focus_callout.gd" id="callout"]
 
 [node name="ConsoleProperties" type="Control"]
 layout_mode = 3
@@ -28,31 +28,70 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Logo" type="TextureRect" parent="Properties"]
+[node name="Model" type="Button" parent="Properties"]
 unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_right = 460.0
+offset_bottom = 340.0
+focus_neighbor_left = NodePath(".")
+focus_neighbor_top = NodePath(".")
+focus_neighbor_right = NodePath(".")
+focus_neighbor_bottom = NodePath("../ChangePlace")
+
+[node name="Callout" type="Control" parent="Properties"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
-script = ExtResource("logo")
+script = ExtResource("callout")
+
+[node name="Caption" type="Label" parent="Properties/Callout"]
+layout_mode = 0
+auto_translate_mode = 2
+theme_type_variation = &"Chip"
+
+[node name="Variants" type="HBoxContainer" parent="Properties"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -600.0
+offset_top = -124.0
+offset_right = 600.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+theme_override_constants/separation = 24
 
 [node name="ChangePlace" type="Button" parent="Properties"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 60)
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -195.0
-offset_top = 812.0
-offset_right = 195.0
-offset_bottom = 872.0
+offset_left = -100.0
+offset_top = 836.0
+offset_right = 100.0
+offset_bottom = 880.0
+theme_override_font_sizes/font_size = 22
 grow_horizontal = 2
 focus_neighbor_left = NodePath(".")
-focus_neighbor_top = NodePath(".")
+focus_neighbor_top = NodePath("../Model")
 focus_neighbor_right = NodePath(".")
 focus_neighbor_bottom = NodePath(".")
 text = "Change place"
 script = ExtResource("6")
-shows_glyph = true
-button = &"y"
 
 [node name="Hints" parent="Properties" instance=ExtResource("hint_row")]
 

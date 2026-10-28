@@ -30,10 +30,8 @@ func test_adding_among_two_unmodelled_platforms_restores_the_whole_consoles_scre
 	assert_bool(carousel._demo).is_false()
 	assert_bool(carousel._console_title.is_visible_in_tree()).is_true()
 	assert_bool(carousel._rail.is_visible_in_tree()).is_true()
-	assert_bool(carousel._grounds.is_visible_in_tree()).is_true()
 	assert_float(carousel._rail.sunk).is_equal(0.0)
 	assert_float(carousel._rail.ground_alpha).is_equal(1.0)
-	assert_float(carousel._grounds.modulate.a).is_equal(1.0)
 
 
 func test_freeing_the_ring_mid_placing_returns_false_to_the_waiting_caller() -> void:
@@ -93,30 +91,13 @@ func test_an_arrival_stops_and_releases_its_caller_when_its_row_leaves_the_tree(
 	assert_array(answers).is_equal([false])
 
 
-func test_the_variant_action_is_declared_in_the_project_before_any_carousel() -> void:
-	assert_bool(ProjectSettings.has_setting("input/choose_variant")).is_true()
-	var events := InputMap.action_get_events(&"choose_variant")
-	assert_bool(events.any(func(event: InputEvent) -> bool:
-		return event is InputEventJoypadButton and (event as InputEventJoypadButton).button_index == JOY_BUTTON_RIGHT_STICK)).is_true()
-	assert_bool(events.any(func(event: InputEvent) -> bool:
-		return event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_F3)).is_true()
-
-
-func test_opening_variants_releases_the_inspection_stick() -> void:
-	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 1}))
-	carousel._consoles.inspect(Vector2.RIGHT)
-	carousel._open_variant()
-	assert_vector(carousel._consoles._stick).is_equal(Vector2.ZERO)
-
-
-func test_the_settings_clock_fades_the_rail_grounds_and_games_logo_with_the_other_chrome() -> void:
+func test_the_settings_clock_fades_the_rail_and_games_logo_with_the_other_chrome() -> void:
 	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 1, "gc": 1}))
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	var menu := carousel._screens._settings
 	assert_bool(await Fixtures.until(self, func() -> bool: return menu.state == SettingsMenu.State.OPEN)).is_true()
 	menu.transition_frame.emit(1.0, 1.0, 0.4)
 	assert_float(carousel._rail.ground_alpha).is_equal_approx(0.4, 1e-6)
-	assert_float(carousel._grounds.modulate.a).is_equal_approx(0.4, 1e-6)
 	assert_float(carousel._games_logo.modulate.a).is_equal_approx(0.4, 1e-6)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 

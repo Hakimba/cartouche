@@ -85,3 +85,27 @@ func test_floating_only_rises_and_sways_the_chosen_game_and_stops_at_zero_pace()
 	assert_float(high.origin.y).is_equal_approx(layout.chosen.origin.y + 0.05, 1e-5)
 	var sway := high.basis * layout.chosen.basis.inverse()
 	assert_float(sway.get_euler().y).is_equal_approx(deg_to_rad(7.0), 1e-5)
+
+
+func test_the_poses_read_from_the_data_are_the_ones_the_layout_had_before_they_moved_there() -> void:
+	var disc := [Vector3(0.0, 0.15, 0.0), Vector3(-13.4, 21.0, 0.2)]
+	var handheld := [Vector3(0.028, 0.243, -0.015), Vector3(-12.1, 18.5, 0.0)]
+	var home := [Vector3(0.028, 0.319, -0.042), Vector3(-16.0, 22.3, 0.0)]
+	var nes := [Vector3(0.046, 0.257, -0.03), Vector3(-17.3, 20.4, 0.0)]
+	var carts := {"nes_cart": nes, "famicom_cart": nes, "snes_pal_cart": home, "snes_us_cart": home, "sfc_cart": home,
+		"n64_cart": home, "gb_cart": handheld, "gbc_cart": handheld, "gba_cart": handheld}
+	var media := MediumManifest.found()
+	assert_int(media.size()).is_equal(15)
+	for medium in media:
+		var pose: Array = carts.get(medium, disc)
+		var angles: Vector3 = pose[1]
+		var origin: Vector3 = pose[0]
+		var expected := Transform3D(Basis.from_euler(angles * PI / 180.0).scaled(Vector3.ONE * (0.85 if medium in carts else 0.78)), origin)
+		var layout := GamesLayout.new(medium)
+		assert_bool(layout.chosen == expected).override_failure_message(medium).is_true()
+		assert_vector(layout.side).is_equal(Vector2(1.25, 0.02) if medium in carts else Vector2(0.96, -0.25))
+		assert_float(layout.side_size).is_equal(0.66 if medium in carts else 0.56)
+
+
+func test_a_medium_without_an_entry_stands_as_the_disc() -> void:
+	assert_bool(GamesLayout.new("unlisted_medium").chosen == GamesLayout.new("ps2_dvd").chosen).is_true()

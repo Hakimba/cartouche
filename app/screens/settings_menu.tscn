@@ -1,10 +1,9 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://screens/settings_menu.gd" id="1"]
 [ext_resource type="PackedScene" path="res://screens/settings_row.tscn" id="2"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
 [ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
-[ext_resource type="PackedScene" path="res://screens/choice_list.tscn" id="4"]
 
 [node name="SettingsMenu" type="Control"]
 layout_mode = 3
@@ -81,11 +80,6 @@ text = "Close"
 
 [connection signal="pressed" from="Panel/Items/Platforms" to="." method="_on_platforms_pressed"]
 [connection signal="pressed" from="Panel/Items/ButtonStyle" to="." method="_on_button_style_pressed"]
-[node name="Choice" parent="." instance=ExtResource("4")]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-
 [connection signal="pressed" from="Panel/Items/Graphics" to="." method="_on_graphics_pressed"]
 [connection signal="pressed" from="Panel/Items/Region" to="." method="_on_region_pressed"]
 

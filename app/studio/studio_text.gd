@@ -33,6 +33,11 @@ var baseline: float
 ## The font's ascent at this size, as the browser sets a line's baseline from its box's top: rounded.
 var ascent: float
 
+var _face_id: StudioTokens.Face
+var _tracking: float
+var _tabular: bool
+var _styled: StudioText
+var _style_key: Array = []
 var _px: float
 var _display: Font
 var _measure: Font
@@ -68,6 +73,9 @@ class _Run:
 ## [param tabular].
 func _init(shown: String, face: StudioTokens.Face, px: float, tracking_em := 0.0, tabular := false) -> void:
 	text = shown
+	_face_id = face
+	_tracking = tracking_em
+	_tabular = tabular
 	_px = px
 	var fonts := _face(face)
 	_display = fonts[0]
@@ -108,6 +116,24 @@ func fit(room: float) -> void:
 ## Draws the line in [param canvas] with its box's top left at [param at], in [param outline_color] a
 ## [param outline_size] px round each glyph first.
 func draw(canvas: CanvasItem, at: Vector2, color: Color, outline_size := 0, outline_color := Color.WHITE) -> void:
+	if not ControlTokens.has_text_edits():
+		_draw_line(canvas, at, color, outline_size, outline_color)
+		return
+	var style := ControlTokens.text_style(canvas)
+	var px: float = style.get(&"studio_font_size", _px)
+	var colour: Color = style.get(&"studio_text_colour", color)
+	if px != _px:
+		var key: Array = [px, text]
+		if key != _style_key:
+			_styled = StudioText.new(text, _face_id, px, _tracking, _tabular)
+			_styled.fit(width * px / _px)
+			_style_key = key
+		_styled._draw_line(canvas, at, colour, outline_size, outline_color)
+	else:
+		_draw_line(canvas, at, colour, outline_size, outline_color)
+
+
+func _draw_line(canvas: CanvasItem, at: Vector2, color: Color, outline_size: int, outline_color: Color) -> void:
 	var ts := TextServerManager.get_primary_interface()
 	var item := canvas.get_canvas_item()
 	var whole := roundi(_px)

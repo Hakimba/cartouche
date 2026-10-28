@@ -175,6 +175,19 @@ func test_up_and_down_go_from_the_label_to_the_name_and_back_and_nowhere_else() 
 	assert_object(Fixtures.focus(self)).is_same(properties._zone)
 
 
+func test_a_long_name_is_cut_so_the_caption_pointing_at_it_stays_on_the_screen() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var properties := carousel._properties
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _settled(carousel)
+	properties._show_name(properties._name, "Berserk - Millennium Falcon-hen - Seima Senki no Shou (Japan)")
+	await Fixtures.action(self, &"ui_down")
+	await await_idle_frame()
+	var box: Rect2 = properties._callout._target_box
+	assert_float(box.size.x).is_greater(0.0)
+	assert_float(box.end.x).is_less_equal(properties.size.x - DiscProperties._CAPTION_EDGE)
+
+
 func test_A_on_the_label_offers_its_images_by_region_the_one_shown_first_and_the_user_s_own_picture_last() -> void:
 	var carousel: Carousel = (await _on_games())[0]
 	carousel._row.selected_game().has_label_region = true

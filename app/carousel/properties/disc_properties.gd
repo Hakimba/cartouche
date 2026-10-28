@@ -19,38 +19,26 @@ enum Step { CLOSED, PROPERTIES, LABELS, FRAMING, NAMING }
 
 const _CAPTION_AWAY := 56.32
 const _NAME_GAP := 23.04
-const _NAME_RISE := 20.48
+static var _NAME_RISE: float:
+	get: return StudioTokens.TR_PROPERTIES_RISE_PX
 const _NAME_ROOM := 1098.56
+## The caption beside the name stays this far inside the screen's edge.
+const _CAPTION_EDGE := 28.8
 const _RIM_ANGLE := -0.6
 ## The glide occupies the first 360 ms of either profile's clock.
-const _TRAVEL_S := 0.36
+static var _TRAVEL_S: float:
+	get: return StudioTokens.TR_PROPERTIES_TRAVEL_S
 ## Opening lasts until the last zone and name fades finish, at 400 ms.
-const _OPEN_S := 0.4
+static var _OPEN_S: float:
+	get: return StudioTokens.TR_PROPERTIES_OPEN_S
 ## Returning lasts until the neighbours and games chrome finish arriving, at 380 ms.
-const _BACK_S := 0.38
+static var _BACK_S: float:
+	get: return StudioTokens.TR_PROPERTIES_BACK_S
 
 enum Part { MEDIUM, POOL, NEIGHBOURS, BEHIND, ZONE, NAME, CALLOUT, HINTS }
 
-static var _opening_parts: Dictionary[Part, Interval] = {
-	Part.MEDIUM: Interval.new(0.0, _TRAVEL_S, Motion.Easing.GLIDE),
-	Part.POOL: Interval.new(0.0, _TRAVEL_S, Motion.Easing.EASE_OUT),
-	Part.NEIGHBOURS: Interval.new(0.0, 0.15, Motion.Easing.LINEAR, 1.0, 0.0),
-	Part.BEHIND: Interval.new(0.0, 0.15, Motion.Easing.LINEAR, 1.0, 0.0),
-	Part.ZONE: Interval.new(0.24, 0.16, Motion.Easing.EASE_OUT),
-	Part.NAME: Interval.new(0.2, 0.2, Motion.Easing.ARRIVE),
-	Part.CALLOUT: Interval.new(0.28, 0.12),
-	Part.HINTS: Interval.new(0.2, 0.15),
-}
-static var _back_parts: Dictionary[Part, Interval] = {
-	Part.MEDIUM: Interval.new(0.0, _TRAVEL_S, Motion.Easing.GLIDE, 1.0, 0.0),
-	Part.POOL: Interval.new(0.0, 0.3, Motion.Easing.EASE_IN, 1.0, 0.0),
-	Part.NEIGHBOURS: Interval.new(0.28, 0.1),
-	Part.BEHIND: Interval.new(0.22, 0.16),
-	Part.ZONE: Interval.new(0.0, 0.1, Motion.Easing.LINEAR, 1.0, 0.0),
-	Part.NAME: Interval.new(0.0, 0.16, Motion.Easing.EASE_IN, 1.0, 0.0),
-	Part.CALLOUT: Interval.new(0.0, 0.12, Motion.Easing.LINEAR, 1.0, 0.0),
-	Part.HINTS: Interval.new(0.0, 0.15, Motion.Easing.LINEAR, 1.0, 0.0),
-}
+var _opening_parts: Dictionary[Part, Interval] = {}
+var _back_parts: Dictionary[Part, Interval] = {}
 ## How fast the stick moves a picture being framed, in label widths a second, and how many times
 ## closer L1 / R1 frame it in a second.
 const _FRAMING_SPEED := 0.6
@@ -302,6 +290,7 @@ func is_open() -> bool:
 
 ## Opens the properties of the selected game of the row.
 func open() -> void:
+	_refresh_profiles()
 	_game = row.selected_game()
 	_kind = LabelZone.Shape.RECTANGLE if _game.medium.ends_with("_cart") else LabelZone.Shape.DISC
 	var focus := get_theme_stylebox(&"focus", &"Button") as SatinStyle
@@ -436,6 +425,7 @@ func _point_at_focus(centre: Vector2, ring: float) -> void:
 
 
 func _close() -> void:
+	_refresh_profiles()
 	_busy = true
 	_release_focus()
 	_callout.timeline = true
@@ -472,6 +462,29 @@ func _tick_travel(delta: float) -> void:
 		hide()
 		Diagnostics.trace("properties", "closed")
 		closed.emit()
+
+
+func _refresh_profiles() -> void:
+	_opening_parts = {
+		Part.MEDIUM: Interval.new(0.0, _TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE),
+		Part.POOL: Interval.new(0.0, StudioTokens.TR_PROPERTIES_POOL_S, StudioTokens.TR_PROPERTIES_POOL_S_CURVE),
+		Part.NEIGHBOURS: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
+		Part.BEHIND: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
+		Part.ZONE: Interval.new(StudioTokens.TR_PROPERTIES_ZONE_AT_S, maxf(0.001, _OPEN_S - StudioTokens.TR_PROPERTIES_ZONE_AT_S), Motion.Easing.EASE_OUT),
+		Part.NAME: Interval.new(StudioTokens.TR_PROPERTIES_NAME_AT_S, maxf(0.001, _OPEN_S - StudioTokens.TR_PROPERTIES_NAME_AT_S), Motion.Easing.ARRIVE),
+		Part.CALLOUT: Interval.new(StudioTokens.TR_PROPERTIES_CALLOUT_AT_S, maxf(0.001, _OPEN_S - StudioTokens.TR_PROPERTIES_CALLOUT_AT_S)),
+		Part.HINTS: Interval.new(0.2, 0.15),
+	}
+	_back_parts = {
+		Part.MEDIUM: Interval.new(0.0, _TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE, 1.0, 0.0),
+		Part.POOL: Interval.new(0.0, 0.3, Motion.Easing.EASE_IN, 1.0, 0.0),
+		Part.NEIGHBOURS: Interval.new(0.28, 0.1),
+		Part.BEHIND: Interval.new(0.22, 0.16),
+		Part.ZONE: Interval.new(0.0, 0.1, Motion.Easing.LINEAR, 1.0, 0.0),
+		Part.NAME: Interval.new(0.0, 0.16, Motion.Easing.EASE_IN, 1.0, 0.0),
+		Part.CALLOUT: Interval.new(0.0, 0.12, Motion.Easing.LINEAR, 1.0, 0.0),
+		Part.HINTS: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
+	}
 
 
 func _part(part: Part) -> float:
@@ -513,7 +526,9 @@ func _name_drop() -> float:
 func _show_name(name_button: Button, title: String) -> void:
 	name_button.text = title
 	var line := StudioText.new(title, StudioTokens.Face.JAKARTA_800, 53.76, -0.035)
-	line.fit(_NAME_ROOM)
+	# The name is centred, so the caption pointing at its end must fit on its right.
+	var caption := StudioText.new(tr("Game name"), StudioTokens.Face.JAKARTA_700, 23.04)
+	line.fit(minf(_NAME_ROOM, size.x - 2.0 * (_CAPTION_AWAY + caption.width + 30.72 + _CAPTION_EDGE) - 61.44))
 	name_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	name_button.size = Vector2(line.width + 61.44, line.height + 12.8)
 	if _name_text:

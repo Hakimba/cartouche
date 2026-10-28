@@ -76,6 +76,10 @@ var _downloads: Dictionary[String, float] = {}
 
 
 ## Stops a row between steps at its selected position before another screen opens.
+func is_settling() -> bool:
+	return not is_equal_approx(_scroll, float(_position))
+
+
 func settle() -> void:
 	_scroll = float(_position)
 	_spring = Motion.Spring.new(_scroll)

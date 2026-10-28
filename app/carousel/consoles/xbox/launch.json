@@ -34,7 +34,7 @@
     "show": 1
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },
@@ -51,8 +51,8 @@
    "console": {
     "bob": 0,
     "pose": 1,
-    "px": 0.349,
-    "py": 3.3275,
+    "px": -0.2915,
+    "py": 3.3542,
     "pz": -4.1651,
     "rx": 48.7559,
     "ry": 14.9151,
@@ -93,7 +93,7 @@
     "show": 0
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },
@@ -152,7 +152,7 @@
     "show": 0
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },
@@ -270,7 +270,7 @@
     "show": 0
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },
@@ -329,7 +329,7 @@
     "show": 0
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },
@@ -388,7 +388,7 @@
     "show": 0
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },
@@ -447,7 +447,7 @@
     "show": 0
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },
@@ -506,7 +506,7 @@
     "show": 0
    },
    "look": {
-    "blur": 0.0,
+    "blur": 0,
     "opacity": 1,
     "sat": 1
    },

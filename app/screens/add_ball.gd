@@ -11,7 +11,8 @@ const _BUTTON := Vector2(330.0, 46.0)
 ## Half the length of each stroke of the "+", its round ends left out.
 const _ARM := (StudioTokens.PLUS_BAR.x - StudioTokens.PLUS_BAR.y) / 2.0
 const _STROKE := StudioTokens.PLUS_BAR.y
-const _MORPH_S := 0.34
+static var _MORPH_S: float:
+	get: return StudioTokens.TR_BALL_MORPH_S
 const _TEXT_SIZE := 20
 ## How far into the morph the text starts to show.
 const _TEXT_FROM := 0.85

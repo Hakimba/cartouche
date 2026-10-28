@@ -364,3 +364,38 @@ func test_reopening_the_type_chooser_keeps_its_plinth_and_its_cached_picture() -
 	await _open_types(chooser, _offered())
 	assert_object(chooser._plinth).is_same(plinth)
 	assert_object(turntable.texture).is_same(picture)
+
+
+func test_back_during_opening_cancels_immediately_when_rewind_is_disabled() -> void:
+	var original_reverse := StudioTokens.TR_REVERSE
+	StudioTokens.TR_REVERSE = 0
+	var chooser := _chooser()
+	var answers: Array[int] = []
+	chooser.chosen.connect(answers.append)
+	await _open_types(chooser, _offered())
+	var back := InputEventAction.new()
+	back.action = &"screen_back"
+	back.pressed = true
+	chooser._unhandled_input(back)
+	assert_array(answers).is_equal([-1])
+	assert_bool(chooser.visible).is_false()
+	StudioTokens.TR_REVERSE = original_reverse
+
+
+func test_rewind_after_50_ms_never_answers_after_the_chooser_is_hidden() -> void:
+	var original_reverse := StudioTokens.TR_REVERSE
+	StudioTokens.TR_REVERSE = 1
+	var chooser := _chooser()
+	var answers: Array[int] = []
+	chooser.chosen.connect(answers.append)
+	await _open_types(chooser, _offered())
+	chooser._opening.custom_step(0.05)
+	var back := InputEventAction.new()
+	back.action = &"screen_back"
+	back.pressed = true
+	chooser._unhandled_input(back)
+	chooser.hide()
+	await get_tree().create_timer(0.2).timeout
+	assert_array(answers).is_empty()
+	assert_bool(chooser._returning).is_false()
+	StudioTokens.TR_REVERSE = original_reverse

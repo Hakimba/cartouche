@@ -35,7 +35,6 @@ func _no_rail(carousel: Carousel) -> void:
 	assert_bool(carousel._rail.frame().is_visible_in_tree()).is_false()
 	assert_bool(carousel._rail.pool().is_visible_in_tree()).is_false()
 	assert_bool(carousel._rail._mirrors_root.is_visible_in_tree()).is_false()
-	assert_bool(carousel._grounds.is_visible_in_tree()).is_false()
 
 
 func test_covering_screens_and_an_empty_library_never_show_the_rail_or_its_ground() -> void:
@@ -123,45 +122,6 @@ func test_reordering_and_random_fast_wraps_keep_every_tile_and_the_games_logo_on
 		.is_equal_approx(Vector2(564.48, 711.68), Vector2.ONE * 0.01)
 
 
-func test_turning_the_hero_fades_its_ground_and_returning_to_its_pose_restores_it() -> void:
-	var carousel := await _carousel()
-	var row := carousel._consoles
-	row.set_process(false)
-	row._process(0.0)
-	var ground := row._ground_in
-	assert_float(ground.modulate.a).is_equal(1.0)
-	row.inspect(Vector2(1.0, 0.0))
-	for frame in 50:
-		row._process(1.0 / 60.0)
-	assert_float(ground.modulate.a).is_less(0.01)
-	row.inspect(Vector2.ZERO)
-	for frame in 30:
-		row._process(1.0 / 60.0)
-	assert_float(ground.modulate.a).is_less(0.01)
-	row.face_front()
-	for frame in 120:
-		row._process(1.0 / 60.0)
-	assert_float(ground.modulate.a).is_equal_approx(1.0, 0.001)
-	row.touch_turn(Vector2(150.0, 0.0))
-	row._process(1.0 / 60.0)
-	assert_float(ground.modulate.a).is_less(0.01)
-	row.let_go()
-	for frame in 180:
-		row._process(1.0 / 60.0)
-	assert_float(ground.modulate.a).is_equal_approx(1.0, 0.001)
-	row.inspect(Vector2(1.0, 0.0))
-	for frame in 50:
-		row._process(1.0 / 60.0)
-	row.step(1)
-	row.inspect(Vector2.ZERO)
-	for frame in 10:
-		row._process(1.0 / 60.0)
-		assert_float(ground.modulate.a).is_less(0.01)
-	for frame in 30:
-		row._process(1.0 / 60.0)
-	assert_float(row._ground_in.modulate.a).is_equal_approx(1.0, 0.001)
-
-
 func test_every_pointed_and_held_console_keeps_the_ring_arrow_and_middle_inside_the_frame() -> void:
 	var carousel := await _carousel()
 	Fixtures.press(carousel, &"ui_down")
@@ -175,7 +135,6 @@ func test_every_pointed_and_held_console_keeps_the_ring_arrow_and_middle_inside_
 			order._show()
 			carousel._consoles.peel = 1.0 if holding else 0.0
 			carousel._consoles._process(1.0)
-			order._place_shadows()
 			order._arrow_angle = order._arrow_to
 			order._arrow_out = order._arrow_out_to
 			order._place_marks()
@@ -191,14 +150,6 @@ func test_every_pointed_and_held_console_keeps_the_ring_arrow_and_middle_inside_
 				var stand := row.ring_stand(k)
 				var half := row.silhouette(k).size * CarouselLayout.FRAME * stand.size / 2.0
 				assert_bool(bounds.encloses(Rect2(stand.centre - half, half * 2.0))).is_true()
-				var shadow := order._shadows[k]
-				var texture := shadow.layers()[0].texture
-				var used := Rect2(texture.get_image().get_used_rect())
-				var ratio := CarouselLayout.FRAME / texture.get_size()
-				var corner := shadow.get_global_transform() * (used.position * ratio)
-				var end := shadow.get_global_transform() * (used.end * ratio)
-				assert_bool(bounds.encloses(Rect2(corner, end - corner).grow(3.84))).is_true()
 			assert_bool(bounds.encloses(order._middle.get_global_rect())).is_true()
-			assert_bool(bounds.encloses(order._spot.get_global_rect())).is_true()
 			if holding:
 				order._wheel.let_go()

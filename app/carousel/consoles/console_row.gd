@@ -22,6 +22,8 @@ signal selection_changed(index: int)
 
 ## How much of its pose a staged console keeps: enough to show its top and its front.
 const _STAGED_POSE := 0.35
+## Where the middle of the staged console's silhouette stands, in px of the design's frame, whatever its pose.
+const STAGE_CENTRE := Vector2(640.0, 440.0)
 ## How much the console pointed at grows, and how fast (a pop); the one peeled off, how much it grows,
 ## leans (radians, counter-clockwise on the screen) and rises (px).
 const _POINTED_GROWTH := 0.06
@@ -54,8 +56,6 @@ const HERO := 1 << 3
 ## One pixel of the 1280 × 960 design frame, in world units a unit of depth away (the camera's field of view
 ## being 32°).
 const _WORLD_PER_PX := 0.000597386
-## Baked grounds match the rest pose; fade them across the first 15 degrees of inspection.
-const _GROUND_TURN := PI / 12.0
 
 
 ## Which folders have a light on the consoles screen, including an empty loaded set.
@@ -78,10 +78,9 @@ var pace := 1.0
 ## other shaders, compiled on the spot).
 var arrival := 1.0
 ## How far the selected console has left the row for its properties, from 0 to 1: it stops swaying
-## and floating, keeps a little of its pose, rises [member staged_lift] world units and takes
-## [member staged_size] times its size, while the others fade out.
+## and floating, keeps a little of its pose, takes [member staged_size] times its size and moves for the middle of
+## its silhouette to stand at [constant STAGE_CENTRE], while the others fade out.
 var stage := 0.0
-var staged_lift := 0.0
 var staged_size := 1.0
 ## How far the console pointed at has gone from the hero's place to the ring, from 0 to 1, and how far the
 ## others have come from the rail's, 0 to 1.
@@ -90,8 +89,6 @@ var others_wheel := 0.0
 ## The scale every console stands on, in cqw ([method RingFit.scale]), and the one it is following.
 var ring_scale := 0.0
 var ring_target := 0.0
-## How much of the hero's floor reflection shows while the ring is open: the ring draws none of its own.
-var reflection := 1.0
 ## Each console's place round the ring, by its index in the row, -1 for none; the consoles pointed at and
 ## held there, by the same index, -1 for none.
 var wheel_slots: Array[int] = []
@@ -109,9 +106,6 @@ var pose := ShelfRow.Pose.new()
 ## Whether the consoles are drawn apart, behind the games ([ConsoleLayer]): there, they move only in
 ## the frames [ConsoleSequence] arranges them in, and stand still in the others.
 var behind := false
-## The ground (floor reflection) of the console coming in and of the one leaving, each
-## a [ContactShadow] laid over the whole frame.
-var grounds: Array[ContactShadow] = []
 
 
 var _items: Array[Item] = []
@@ -125,7 +119,7 @@ var _scroll := 0.0
 ## How far the consoles' float and sway have gone, in seconds at full pace.
 var _pose_s := 0.0
 var _stick := Vector2.ZERO
-var _turn := StickTurn.new()
+var _turn := StickTurn.new(true)
 ## Where each console stands round the ring this frame, sliding towards its slot; how many places the ring has.
 var _slid: Array[float] = []
 var _ring_places := 0
@@ -144,12 +138,14 @@ var _leavers: Array[Leaver] = []
 var _way := 0
 var _in_from := Swap.new(0.0, 1.0, 1.0)
 var _swap_s := _IN_S
-## The set of [member grounds] showing the console coming in.
-var _ground_in: ContactShadow
 var _screen_presence := 1.0
 
 
 ## Stops a row between steps at its selected position before another screen opens.
+func is_settling() -> bool:
+	return not is_equal_approx(_scroll, float(_position)) or _swap_s < _IN_S
+
+
 func settle() -> void:
 	_scroll = float(_position)
 	arrange()
@@ -195,10 +191,7 @@ func show_consoles(items: Array[Item], from: int) -> void:
 		item.model.queue_free()
 	_items = items
 	for item in _items:
-		add_child(item.model)
-		item.geometry.assign(item.model.find_children("*", "VisualInstance3D", true, false))
-		if item.model is VisualInstance3D:
-			item.geometry.append(item.model)
+		_adopt(item)
 	_peeled = -1
 	_stuck = -1
 	_stop_swap()
@@ -210,9 +203,20 @@ func show_consoles(items: Array[Item], from: int) -> void:
 	_pop.fill(0.0)
 	_position = from
 	_scroll = from
-	_turn = StickTurn.new()
-	_show_ground()
+	_turn = StickTurn.new(true)
 	set_process(true)
+	arrange()
+
+
+## The selected console shown by [param item] instead, where it stands: another model of it.
+func replace_selected(item: Item) -> void:
+	var gone := selected()
+	_unlight()
+	remove_child(gone.model)
+	gone.model.queue_free()
+	_items[selected_index()] = item
+	_adopt(item)
+	_lit = -1
 	arrange()
 
 
@@ -236,7 +240,6 @@ func select(index: int) -> void:
 	_position = CarouselLayout.nearest(_position, index, _items.size())
 	_scroll = _position
 	_stop_swap()
-	_show_ground()
 	_turn.release()
 	selection_changed.emit(index)
 
@@ -265,7 +268,6 @@ func reorder(order: Array[int]) -> void:
 	_stuck = order.find(_stuck)
 	_lit = order.find(_lit)
 	_stop_swap()
-	_show_ground()
 
 
 ## [param places] steps towards [param direction] (-1 or 1) round the ring: from the last console, the first, and
@@ -277,8 +279,6 @@ func step(direction: int, places := 1) -> void:
 	leaver.index = selected_index()
 	leaver.way = direction
 	leaver.from = _swap_in() if _swap_s < _IN_S else Swap.new(0.0, 1.0, 1.0)
-	leaver.ground_alpha = _ground_alpha(leaver.index)
-	leaver.ground = _ground_in
 	_way = direction
 	_swap_s = 0.0
 	_position += direction * places
@@ -286,8 +286,6 @@ func step(direction: int, places := 1) -> void:
 	_in_from = returning.look() if returning else Swap.new(_way * _IN_PX, _IN_SCALE, 0.0)
 	_leavers.append(leaver)
 	_leavers = _leavers.filter(func(other: Leaver) -> bool: return other.index != selected_index())
-	_ground_in = returning.ground if returning and returning.ground else _free_ground()
-	_show_ground()
 	_turn.release()
 	selection_changed.emit(selected_index())
 
@@ -301,7 +299,6 @@ func begin_arrival(centre: Vector2, width: float) -> Stand:
 	wheel_slots.fill(-1)
 	wheel_slots[flier] = 0
 	wheel = 1.0
-	reflection = 0.0
 	flier_stand = Stand.new()
 	flier_stand.centre = centre
 	flier_stand.size = width
@@ -314,7 +311,6 @@ func end_arrival() -> void:
 	flier = -1
 	pointed = -1
 	wheel = 0.0
-	reflection = 1.0
 	wheel_slots.assign(range(_items.size()))
 	flier_stand = Stand.new()
 	arrange()
@@ -364,7 +360,6 @@ func arrange() -> void:
 	_light_selected()
 	var settled := Swap.new(0.0, 1.0, 1.0)
 	var swap := _swap_in() if _swap_s < _IN_S else settled
-	_place_grounds(swap)
 	for i in _items.size():
 		var item := _items[i]
 		var chosen := i == selected_index()
@@ -389,7 +384,9 @@ func arrange() -> void:
 			* lerpf(1.0, staged_size, staged) * swapping.size
 		var posed := place.basis * pose.at(_pose_s, centred * lerpf(1.0, _STAGED_POSE, staged)) * _turn.of(i)
 		var stand := posed * turned.scaled(Vector3.ONE * size)
-		var lift := Vector3.UP * (bob + staged_lift * staged)
+		var lift := Vector3.UP * bob
+		if staged > 0.0 and item.modelled:
+			lift += _stage_shift(item, at_position + place.origin) * staged
 		var slid := Vector3.RIGHT * swapping.shift_px * _WORLD_PER_PX * (3.7 - at_position.z - global_position.z)
 		var in_row := Transform3D(stand, at_position + place.origin + lift + slid)
 		if chosen and _lights:
@@ -403,6 +400,24 @@ func arrange() -> void:
 			item.model.transform = moved
 		var presence := (1.0 if chosen else others_opacity * (1.0 - stage)) * swapping.opacity
 		item.fade.call(1.0 - ringed.opacity if on_ring else CarouselLayout.faded(offset, presence * _screen_presence))
+
+
+## The lights of the selected console, for the debug bridge to tune live.
+func lights() -> StudioLights:
+	return _lights
+
+
+## The selected console lit again from the light file as it now reads (the debug bridge reloaded it).
+func relight() -> void:
+	_unlight()
+	_lit = -1
+	_light_selected()
+
+
+## Drops what was read of the light file, so that the next read sees a file the debug bridge reloaded.
+static func forget() -> void:
+	_rigs_read = false
+	_with_rig.clear()
 
 
 ## Whether the console in [param folder] has a light designed for it on this screen (`consoles`).
@@ -425,6 +440,13 @@ static func _rigs_from(text: String) -> Dictionary[String, bool]:
 		found[model] = screens.has("consoles")
 	return found
 
+
+
+func _adopt(item: Item) -> void:
+	add_child(item.model)
+	item.geometry.assign(item.model.find_children("*", "VisualInstance3D", true, false))
+	if item.model is VisualInstance3D:
+		item.geometry.append(item.model)
 
 
 ## The lights of the selected console's own rig stand about it, the console alone drawn in their layer; a
@@ -482,56 +504,6 @@ func _leaver_of(index: int) -> Leaver:
 func _stop_swap() -> void:
 	_leavers.clear()
 	_swap_s = _IN_S
-	_ground_in = grounds[0] if not grounds.is_empty() else null
-
-
-## A set of [member grounds] no console leaving uses; the oldest leaver's when all are, which then loses its ground.
-func _free_ground() -> ContactShadow:
-	if grounds.is_empty():
-		return null
-	for ground in grounds:
-		if not _leavers.any(func(leaver: Leaver) -> bool: return leaver.ground == ground):
-			return ground
-	var oldest := _leavers[0]
-	var taken := oldest.ground
-	oldest.ground = null
-	return taken
-
-
-## Loads the ground of the selected console into the set that shows it; a platform shown by its medium has none.
-func _show_ground() -> void:
-	if _ground_in and not _items.is_empty() and selected().modelled:
-		_ground_in.show_ground(selected().folder, false)
-
-
-## The grounds go where their consoles go: the whole frame raised, slid, shrunk and faded as they are.
-func _place_grounds(swap: Swap) -> void:
-	for ground in grounds:
-		ground.visible = false
-	# The ring has a shadow of its own under each console: only the hero's reflection stays, as faded.
-	var on_ring := wheel > 0.0 or others_wheel > 0.0
-	for ground in grounds:
-		ground.layers()[1].modulate.a = reflection if on_ring else 1.0
-	if _ground_in and not _items.is_empty() and selected().modelled:
-		_place_ground(_ground_in, swap)
-		_ground_in.modulate.a *= _ground_alpha(selected_index())
-	for leaver in _leavers:
-		if leaver.ground:
-			_place_ground(leaver.ground, leaver.look())
-			leaver.ground.modulate.a *= leaver.ground_alpha
-
-
-func _ground_alpha(index: int) -> float:
-	var angle := _turn.of(index).get_rotation_quaternion().angle_to(Quaternion.IDENTITY)
-	return 1.0 - clampf(angle / _GROUND_TURN, 0.0, 1.0)
-
-
-func _place_ground(ground: ContactShadow, look: Swap) -> void:
-	ground.visible = true
-	ground.modulate.a = look.opacity
-	ground.pivot_offset = ground.size / 2.0
-	ground.scale = Vector2.ONE * look.size
-	ground.position = Vector2(look.shift_px, -RAISE_PX)
 
 
 ## Where console [param index] stands on the ring: its silhouette's centre ([member Stand.centre]) at its place,
@@ -578,6 +550,22 @@ func _on_ring(index: int, stand: Stand) -> Transform3D:
 ## How console [param index] stands on the ring this frame.
 func ring_stand(index: int) -> Stand:
 	return _stand(index)
+
+
+## The selected console's silhouette on the stage, in px of the design's frame.
+func staged_box() -> Rect2:
+	var size := _hero_of(selected()).box.size * CarouselLayout.FRAME * staged_size
+	return Rect2(STAGE_CENTRE - size / 2.0, size)
+
+
+## How far the console of [param item], standing at [param origin], moves on the stage for the middle of its
+## silhouette to stand at [constant STAGE_CENTRE]: measured on its rest pose, grown as it grows there.
+func _stage_shift(item: Item, origin: Vector3) -> Vector3:
+	var hero := _hero_of(item)
+	var camera := get_viewport().get_camera_3d()
+	var depth := -(camera.global_transform.affine_inverse() * to_global(origin)).z
+	var wanted := STAGE_CENTRE - (hero.centre - hero.origin) * staged_size
+	return to_local(camera.project_position(to_view(wanted), depth)) - origin
 
 
 ## The silhouette box of console [param index] in its picture's frame, as fractions of it: the box of what it
@@ -687,13 +675,11 @@ class Swap:
 
 
 ## A console leaving the row: from [member from], where it stood when it was left, it slides away, shrinks and
-## fades as the swap has it, [member seconds] into it; with the ground that goes with it, if it has one.
+## fades as the swap has it, [member seconds] into it.
 class Leaver:
 	var index: int
 	var way: int
 	var from: Swap
-	var ground: ContactShadow
-	var ground_alpha := 1.0
 	var seconds := 0.0
 
 	func look() -> Swap:
@@ -705,7 +691,7 @@ class Leaver:
 ## One console of the row: its model, how to fade it, and where it rests.
 class Item:
 	var model: Node3D
-	## Its folder under res://carousel/consoles, which names its ground.
+	## Its folder under res://carousel/consoles.
 	var folder: String
 	## Whether it is a console of ours, with a model: a platform shown by its medium is shown nowhere here.
 	var modelled := true

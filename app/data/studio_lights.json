@@ -21,6 +21,15 @@
 				]
 			}
 		},
+		"gb": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [-0.7336, 0.5, 0.4603], "target": [0.7336, -0.5, -0.4603], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.8142, 0.5803, -0.0168], "target": [-0.8142, -0.5803, 0.0168], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
 		"gb_cart": {
 			"games": {
 				"room": 0.55,
@@ -33,6 +42,15 @@
 				"room": 0.55,
 				"sources": [
 					{"kind": "sun", "position": [0.008936810900894439, 0.7158989429583962, 0.6981467158713652], "target": [-0.008936810900894439, -0.7158989429583962, -0.6981467158713652], "energy": 0.938, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"gba": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [-0.8213, 0.5, -0.2748], "target": [0.8213, -0.5, 0.2748], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.3448, 0.5803, 0.7378], "target": [-0.3448, -0.5803, -0.7378], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
 				]
 			}
 		},
@@ -50,6 +68,15 @@
 				"sources": [
 					{"kind": "sun", "position": [-0.9136917953652005, 0, 0.4064078039141432], "target": [0.9136917953652005, 0, -0.4064078039141432], "energy": 1.098, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
 					{"kind": "sun", "position": [0.7568080086754521, 0.580319263416477, 0.3007842923299927], "target": [-0.7568080086754521, -0.580319263416477, -0.3007842923299927], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"gba_sp": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [0.4617, 0.5, 0.7327], "target": [-0.4617, -0.5, -0.7327], "energy": 1.543, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [-0.6924, 0.5803, 0.4287], "target": [0.6924, -0.5803, -0.4287], "energy": 0.272, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
 				]
 			}
 		},
@@ -84,6 +111,16 @@
 				]
 			}
 		},
+		"gc": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [-0.834, 0.5, -0.2333], "target": [0.834, -0.5, 0.2333], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.7201, 0.5803, 0.3804], "target": [-0.7201, -0.5803, -0.3804], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "lamp", "position": [0.6108, 0.25, 1.3133], "target": [0, 0, 0], "energy": 1.2, "colour": [1, 1, 1], "range": 8, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
 		"gc_mini_dvd": {
 			"games": {
 				"room": 0.55,
@@ -96,6 +133,15 @@
 				"room": 0.55,
 				"sources": [
 					{"kind": "sun", "position": [0.011931456485481868, 0.4999727522274851, 0.8659589409297699], "target": [-0.011931456485481868, -0.4999727522274851, -0.8659589409297699], "energy": 2, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"n64": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [-0.7831, 0.5803, 0.2236], "target": [0.7831, -0.5803, -0.2236], "energy": 1.567, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "lamp", "position": [0.364, 0.25, 0.9183], "target": [0, 0, 0], "energy": 1.2, "colour": [1, 1, 1], "range": 8, "angle": 45, "softness": 1, "shadow": false}
 				]
 			}
 		},
@@ -180,6 +226,33 @@
 				]
 			}
 		},
+		"ps2_fat": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [0.6788, 0.5, 0.5378], "target": [-0.6788, -0.5, -0.5378], "energy": 2, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [-0.5363, 0.5803, 0.6128], "target": [0.5363, -0.5803, -0.6128], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"ps2_slim": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [0.643, 0.5, 0.5801], "target": [-0.643, -0.5, -0.5801], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [-0.6303, 0.5803, 0.5157], "target": [0.6303, -0.5803, -0.5157], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"psx": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [-0.865, 0.5, 0.0424], "target": [0.865, -0.5, -0.0424], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.3346, 0.5803, 0.7425], "target": [-0.3346, -0.5803, -0.7425], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
 		"sfc_cart": {
 			"games": {
 				"room": 0.55,
@@ -195,6 +268,15 @@
 					{"kind": "sun", "position": [-0.8658327848976435, 0.4999727522274865, -0.018995673888107054], "target": [0.8658327848976435, -0.4999727522274865, 0.018995673888107054], "energy": 1.046, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
 					{"kind": "sun", "position": [0.7739388952704853, 0.5803192634164772, 0.2534721659181896], "target": [-0.7739388952704853, -0.5803192634164772, -0.2534721659181896], "energy": 0.601, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
 					{"kind": "lamp", "position": [0.04666666666666667, 0.25, 0.94], "target": [0, 0, 0], "energy": 0.352, "colour": [1, 1, 1], "range": 8, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"snes": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [-0.6835, 0.5, 0.5318], "target": [0.6835, -0.5, -0.5318], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.1196, 0.5803, 0.8056], "target": [-0.1196, -0.5803, -0.8056], "energy": 1.007, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
 				]
 			}
 		},
@@ -233,6 +315,15 @@
 				]
 			}
 		},
+		"wii": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "sun", "position": [-0.8076, 0.5, -0.3128], "target": [0.8076, -0.5, 0.3128], "energy": 0.8, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.4658, 0.5803, 0.6681], "target": [-0.4658, -0.5803, -0.6681], "energy": 0.856, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
 		"wii_dvd": {
 			"games": {
 				"room": 0.55,
@@ -246,6 +337,25 @@
 				"room": 0.55,
 				"sources": [
 					{"kind": "sun", "position": [0.03693556962127288, 0.4999727522274852, 0.8652531483484043], "target": [-0.03693556962127288, -0.4999727522274852, -0.8652531483484043], "energy": 0.905, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"xbox": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "lamp", "position": [-0.5491, 0.25, 1.8565], "target": [0, 0, 0], "energy": 1.2, "colour": [1, 1, 1], "range": 8, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [-0.8051, 0.5, 0.3191], "target": [0.8051, -0.5, -0.3191], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.7617, 0.5803, 0.2882], "target": [-0.7617, -0.5803, -0.2882], "energy": 0.6, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
+				]
+			}
+		},
+		"xbox360": {
+			"consoles": {
+				"room": 0.55,
+				"sources": [
+					{"kind": "lamp", "position": [-1.8817, 0.25, 0.3751], "target": [0, 0, 0], "energy": 0.8, "colour": [1, 1, 1], "range": 8, "angle": 45, "softness": 1, "shadow": false},
+					{"kind": "sun", "position": [0.7948, 0.5, 0.3439], "target": [-0.7948, -0.5, -0.3439], "energy": 1, "colour": [1, 1, 1], "range": 5, "angle": 45, "softness": 1, "shadow": false}
 				]
 			}
 		},

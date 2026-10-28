@@ -49,6 +49,20 @@ func test_the_art_bar_follows_a_run_greys_while_it_waits_and_fades_once_it_is_ov
 	assert_bool(progress.visible).is_false()
 
 
+func test_the_battery_keeps_the_designs_distance_to_the_right_edge_on_a_wider_window() -> void:
+	var window := get_window()
+	var saved := window.size
+	window.size = Vector2i(1707, 960)
+	var carousel := await Fixtures.shown_carousel(self)
+	await await_idle_frame()
+	var chip: BatteryChip = carousel.get_node("%Battery")
+	var bar: Control = chip.get_parent()
+	assert_float(bar.size.x).is_greater(1280.0)
+	var gap := bar.size.x - chip.position.x - chip.size.x
+	window.size = saved
+	assert_float(gap).is_equal(CarouselLayout.FRAME.x - StudioTokens.BATTERY.end.x)
+
+
 func test_the_battery_shows_its_level_and_the_bolt_exactly_while_plugged_in_as_soon_as_told() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var chip: BatteryChip = carousel.get_node("%Battery")

@@ -1,4 +1,4 @@
-[gd_scene load_steps=36 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=35 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -29,7 +29,6 @@
 [ext_resource type="Script" path="res://carousel/resting.gd" id="29"]
 [ext_resource type="PackedScene" path="res://carousel/search/game_search.tscn" id="30"]
 [ext_resource type="Script" path="res://carousel/search/title_marks.gd" id="31"]
-[ext_resource type="Script" path="res://studio/views/contact_shadow.gd" id="ground"]
 [ext_resource type="PackedScene" path="res://studio/rail/console_rail.tscn" id="rail"]
 
 [sub_resource type="ShaderMaterial" id="studio_material"]
@@ -80,56 +79,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("27")
-
-[node name="Grounds" type="Control" parent="Backdrop"]
-unique_name_in_owner = true
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="Arriving" type="Control" parent="Backdrop/Grounds"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("ground")
-
-[node name="Leaving" type="Control" parent="Backdrop/Grounds"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("ground")
-
-[node name="Fading" type="Control" parent="Backdrop/Grounds"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("ground")
-
-[node name="Faded" type="Control" parent="Backdrop/Grounds"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("ground")
 
 [node name="ConsoleView" type="TextureRect" parent="Backdrop" node_paths=PackedStringArray("watched", "view", "camera")]
 visible = false
@@ -363,18 +312,6 @@ visible = false
 script = ExtResource("20")
 button = &"b"
 text = "Clear the filter"
-
-[node name="PreviousLetter" type="Control" parent="GamesHints"]
-layout_mode = 2
-unique_name_in_owner = true
-script = ExtResource("20")
-button = &"l1"
-
-[node name="NextLetter" type="Control" parent="GamesHints"]
-layout_mode = 2
-unique_name_in_owner = true
-script = ExtResource("20")
-button = &"r1"
 
 [node name="SearchHint" type="Control" parent="GamesHints"]
 layout_mode = 2

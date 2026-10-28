@@ -146,7 +146,53 @@ func test_every_console_starts_at_its_pose_s_yaw_and_roll() -> void:
 		folders.append(ConsoleManifest.folder_of(manifest))
 	assert_array(folders).contains_exactly_in_any_order(_POSED.keys())
 	for folder in _POSED:
-		assert_vector(Plinth.start_of(folder)).override_failure_message(folder).is_equal(_POSED[folder])
+		var start := Plinth.start_of(folder)
+		var posed: Vector2 = _POSED[folder]
+		assert_vector(start.rotation).override_failure_message(folder).is_equal(Vector3(0.0, posed.x, posed.y))
+		assert_vector(start.position).override_failure_message(folder).is_equal(Vector3.ZERO)
+		assert_float(start.size).override_failure_message(folder).is_equal(1.0)
+
+
+func test_INV_EX_04_a_start_of_a_yaw_and_a_roll_stands_every_console_as_before_the_full_pose() -> void:
+	for folder in _POSED:
+		var posed: Vector2 = _POSED[folder]
+		var now := _stood(folder, Plinth.start_of(folder))
+		# Before the full pose: rolled, fitted as the roll left it, then turned by the yaw.
+		var spin := Node3D.new()
+		var stand := Node3D.new()
+		var model := (load(ConsoleManifest.of(folder).scene) as PackedScene).instantiate() as Node3D
+		spin.add_child(stand)
+		stand.add_child(model)
+		stand.transform = Transform3D(Basis(Vector3.BACK, deg_to_rad(posed.y)), Vector3.ZERO)
+		var box := Plinth.bounds(model, spin)
+		stand.position = -Vector3(box.get_center().x, box.position.y, box.get_center().z)
+		spin.scale = Vector3.ONE * minf(Plinth._FIT_DIAMETER / Vector2(box.size.x, box.size.z).length(), Plinth._HEIGHT / box.size.y)
+		spin.rotation.y = deg_to_rad(posed.x)
+		var was := spin.transform * stand.transform
+		assert_bool(now.is_equal_approx(was)).override_failure_message("%s: %s, was %s" % [folder, now, was]).is_true()
+		spin.free()
+
+
+func test_INV_EX_04_a_full_start_turns_the_model_as_its_three_angles_say_then_moves_and_sizes_it() -> void:
+	var plain := _stood("ps2_fat", Plinth.Start.new(Vector3(12.0, 30.0, -8.0)))
+	var turn := Vector3(12.0, 30.0, -8.0) * PI / 180.0
+	assert_bool(plain.basis.orthonormalized().is_equal_approx(Basis.from_euler(turn))).is_true()
+	var posed := _stood("ps2_fat", Plinth.Start.new(Vector3(12.0, 30.0, -8.0), Vector3(0.1, -0.2, 0.3), 1.5))
+	assert_bool(posed.basis.is_equal_approx(plain.basis * 1.5)).is_true()
+	assert_vector(posed.origin).is_equal_approx(plain.origin * 1.5 + Vector3(0.1, -0.2, 0.3), Vector3.ONE * 1e-5)
+
+
+## The transform of [param folder]'s model's parent in its view's world once stood at [param start].
+func _stood(folder: String, start: Plinth.Start) -> Transform3D:
+	var spin := Node3D.new()
+	var stand := Node3D.new()
+	var model := (load(ConsoleManifest.of(folder).scene) as PackedScene).instantiate() as Node3D
+	spin.add_child(stand)
+	stand.add_child(model)
+	Plinth.stand_at(spin, stand, model, start)
+	var at := spin.transform * stand.transform
+	spin.free()
+	return at
 
 
 func test_the_plinth_takes_the_design_s_face_and_places_in_the_console_s_colour() -> void:

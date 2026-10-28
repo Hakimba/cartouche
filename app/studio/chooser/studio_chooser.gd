@@ -130,11 +130,16 @@ const _PLATE_FILES_WIDTH := 26.0 * _CQW
 const _FILES_LINE := 1.35 * _PLATE_KICK_PX
 const _FILES_SHARE := 0.6
 ## The chooser's own motion (the form to chooser transition, its chooser half), in seconds.
-const _OPEN_LAYER_AT := 0.06
-const _OPEN_LAYER_S := 0.2
-const _OPEN_LINES_AT := 0.15
-const _OPEN_LINES_S := 0.23
-const _LINES_SHIFT := Vector2(3.0 * _CQW, 0.8 * _CQW)
+static var _OPEN_LAYER_AT: float:
+	get: return StudioTokens.TR_CHOOSER_AT_S
+static var _OPEN_LAYER_S: float:
+	get: return StudioTokens.TR_CHOOSER_LAYER_S
+static var _OPEN_LINES_AT: float:
+	get: return StudioTokens.TR_CHOOSER_LINES_AT_S
+static var _OPEN_LINES_S: float:
+	get: return StudioTokens.TR_CHOOSER_IN_S
+static var _LINES_SHIFT: Vector2:
+	get: return Vector2(StudioTokens.TR_CHOOSER_SHIFT_PX, StudioTokens.TR_CHOOSER_TITLE_PX)
 const _DRAG_START_PX := 12.0
 const _CURSOR_S := 0.24
 const _SCROLL_S := 0.3
@@ -158,6 +163,12 @@ var _plate_name: StudioText
 var _plate_kick: StudioText
 var _title: StudioText
 var _opening: Tween
+var _return_tween: Tween
+var _open_clock := 0.0:
+	set(value):
+		_open_clock = value
+		_place_opening()
+var _returning := false
 var _choosing := false
 ## Where each line of the screen rests, and the one the plate's ink is drawn on.
 var _rests: Dictionary[Control, Vector2] = {}
@@ -242,7 +253,7 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if visible and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
-		_answer(-1)
+		_answer(-1, true)
 
 
 ## Shows the Type chooser over [param offered] (the consoles a person may add, in order), the cursor on
@@ -390,7 +401,6 @@ func _settle() -> void:
 		motion.kill()
 	_motions.clear()
 	_rim = _gel_of(_index)
-	_backdrop.show_gel(_rim, false)
 	_cursor_y = _index * _PITCH
 	_scroll = scroll_of(_index, _entries.size())
 	_place()
@@ -444,7 +454,6 @@ func _show_focus(moving: bool) -> void:
 	if not _dragging:
 		_settle_scroll()
 	var from_rim := _rim
-	_backdrop.show_gel(gel)
 	_animate(&"rim", StudioTokens.GEL_FADE_S, Motion.Easing.EASE, func(p: float) -> void:
 		_rim = from_rim.lerp(gel, p)
 		_cursor.gel = _rim
@@ -472,21 +481,24 @@ func _animate(key: StringName, seconds: float, easing: Motion.Easing, apply: Cal
 ## The chooser's half of the form to chooser transition: the screen fades in, its lines, title and count come
 ## from the right and from below, the model rises (the plinth's own).
 func _open() -> void:
-	if _opening:
+	if _return_tween and _return_tween.is_valid():
+		_return_tween.kill()
+	_return_tween = null
+	_returning = false
+	if _opening and _opening.is_valid():
 		_opening.kill()
-	var lines := _lines()
-	modulate.a = 0.0
-	for line in lines:
-		line.modulate.a = 0.0
-		line.position = _rests[line] + _LINES_SHIFT
-	_opening = create_tween().set_parallel()
-	_opening.tween_property(self, ^"modulate:a", 1.0, _OPEN_LAYER_S).set_delay(_OPEN_LAYER_AT) \
-		.set_custom_interpolator(Motion.curve(Motion.Easing.EASE_OUT))
-	for line in lines:
-		_opening.tween_property(line, ^"position", _rests[line], _OPEN_LINES_S).set_delay(_OPEN_LINES_AT) \
-			.set_custom_interpolator(Motion.curve(Motion.Easing.ARRIVE))
-		_opening.tween_property(line, ^"modulate:a", 1.0, _OPEN_LINES_S).set_delay(_OPEN_LINES_AT) \
-			.set_custom_interpolator(Motion.curve(Motion.Easing.ARRIVE))
+	_open_clock = 0.0
+	_opening = create_tween()
+	var seconds := maxf(_OPEN_LAYER_AT + _OPEN_LAYER_S, _OPEN_LINES_AT + _OPEN_LINES_S)
+	_opening.tween_property(self, ^"_open_clock", seconds, seconds)
+
+
+func _place_opening() -> void:
+	modulate.a = Motion.phase(_open_clock, _OPEN_LAYER_AT, _OPEN_LAYER_S, Motion.Easing.EASE_OUT)
+	var progress := Motion.phase(_open_clock, _OPEN_LINES_AT, _OPEN_LINES_S, Motion.Easing.ARRIVE)
+	for line in _lines():
+		line.position = _rests[line] + _LINES_SHIFT * (1.0 - progress)
+		line.modulate.a = progress
 
 
 ## The lines that come in with the screen: the plate's text only in the emulator chooser.
@@ -524,11 +536,27 @@ func _tap(at: Vector2) -> void:
 		_answer(row)
 
 
-func _answer(picked: int) -> void:
-	if not visible:
+func _answer(picked: int, turn_back := false) -> void:
+	if not visible or _returning:
 		return
-	if _opening:
+	if turn_back and picked < 0 and _opening and _opening.is_running() and StudioTokens.TR_REVERSE:
+		_returning = true
+		var seconds := _open_clock
 		_opening.kill()
+		_opening = null
+		var leaving := create_tween()
+		_return_tween = leaving
+		leaving.tween_property(self, ^"_open_clock", 0.0, maxf(seconds, 0.001))
+		await leaving.finished
+		if _return_tween != leaving:
+			return
+		_return_tween = null
+		_returning = false
+		if not visible or not _choosing:
+			return
+	if _opening and _opening.is_valid():
+		_opening.kill()
+	_opening = null
 	for motion: Tween in _motions.values():
 		motion.kill()
 	_motions.clear()

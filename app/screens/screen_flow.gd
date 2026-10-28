@@ -187,15 +187,12 @@ func _choose_edge_smoothing() -> void:
 ## The region labels' images prefer, saved once another is chosen, and shown once saved: the plugin
 ## looks again for the labels it changes.
 func _choose_preferred_region(first_launch := false) -> void:
-	var region: String
-	if first_launch:
-		_show(_region_screen)
-		_region_screen.open(_preferred_region, _preferred_regions)
-		region = await _region_screen.chosen
-	else:
-		region = await _settings.choose_region(_preferred_region, _preferred_regions)
-		if region == _preferred_region:
-			return
+	_show(_region_screen)
+	_region_screen.can_go_back = not first_launch
+	_region_screen.open(_preferred_region, _preferred_regions)
+	var region: String = await _region_screen.chosen
+	if region == _preferred_region and not first_launch:
+		return
 	_holding_presses = true
 	var saved := await android.save_preferred_region(region)
 	_holding_presses = false
