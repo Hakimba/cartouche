@@ -49,6 +49,21 @@ func test_the_art_bar_follows_a_run_greys_while_it_waits_and_fades_once_it_is_ov
 	assert_bool(progress.visible).is_false()
 
 
+
+func test_a_long_reason_of_the_art_bar_wraps_inside_its_box_on_the_screen() -> void:
+	var locale := TranslationServer.get_locale()
+	TranslationServer.set_locale("fr")
+	var carousel := await Fixtures.shown_carousel(self)
+	carousel._on_art_changed(AndroidServices.ArtChange.new({"done": 12, "total": 55, "stall": "offline"}))
+	await await_idle_frame()
+	await await_idle_frame()
+	var box := (carousel.get_node("%ArtProgress") as Control).get_global_rect()
+	var text := (carousel.get_node("%ArtText") as Control).get_global_rect()
+	TranslationServer.set_locale(locale)
+	assert_float(text.position.x).is_greater_equal(box.position.x)
+	assert_float(text.end.x).is_less_equal(box.end.x)
+	assert_bool(get_viewport().get_visible_rect().encloses(text)).is_true()
+
 func test_the_battery_keeps_the_designs_distance_to_the_right_edge_on_a_wider_window() -> void:
 	var window := get_window()
 	var saved := window.size

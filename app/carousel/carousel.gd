@@ -22,13 +22,12 @@ extends Control
 ## changes; not while labels download. On the games screen the consoles behind are not drawn: they
 ## fade out once there, back in for a launch or to go out.
 ##
-## In front of it, [ScreenFlow] shows the welcome at each start while the library loads, the first
-## launch's screens, and the screens adding a console while none has games; Y on the consoles
-## screen or the games screen opens the settings over it. On the consoles screen, holding up turns
-## the "+" ball above the console into a button ([AddBall]), until up is let go: A then adds one
-## more console, the consoles coming in again on it; down (or "Change place" in a console's
-## properties) opens the ring putting the consoles in order ([ConsoleOrder]). The carousel waits for
-## the screens in front to close.
+## In front of it, [ScreenFlow] shows the first launch's welcome and screens, and the screens adding a
+## console while none has games; Y on the consoles screen or the games screen opens the settings over
+## it. On the consoles screen, holding up turns the "+" ball above the console into a button
+## ([AddBall]), until up is let go: A then adds one more console, the consoles coming in again on it;
+## down (or "Change place" in a console's properties) opens the ring putting the consoles in order
+## ([ConsoleOrder]). The carousel waits for the screens in front to close.
 ##
 ## In debug builds, holding Select opens the device check, and command-line arguments set up
 ## measurements: `--welcome=skip` goes past the welcome without a press, `--demo-games=N` shows a
@@ -205,7 +204,7 @@ func _ready() -> void:
 			or _order.is_open() or (_console_arrival and _console_arrival.is_playing())
 	if Diagnostics.argument("welcome") == "skip":
 		_screens.welcome_waits = false
-	# The welcome shows first, without the bar.
+	# The bar waits for the first launch's welcome to be passed.
 	_top_bar.hide()
 	_show_front(true)
 	# Asked first, its art looked for as soon as it is sent: the plugin reads the library while the
@@ -414,8 +413,10 @@ func _handle_input(event: InputEvent, moved: bool) -> void:
 		_launch()
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_down"):
 		_row.freeze()
+		Sounds.play(SoundEffects.Cue.OPEN)
 		_search.open()
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"screen_back") and _search.is_filtered():
+		Sounds.play(SoundEffects.Cue.BACK)
 		_search.clear()
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"screen_back"):
 		_leave()
@@ -718,6 +719,7 @@ func _look(platform_id: String) -> ShelfRow.LabelLook:
 
 
 func _enter() -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	# A press begun before A must not act once it is let go.
 	_hold_select.stop()
 	_go(Screen.ENTERING)
@@ -730,6 +732,7 @@ func _enter() -> void:
 
 
 func _leave() -> void:
+	Sounds.play(SoundEffects.Cue.BACK)
 	_hold_select.stop()
 	_go(Screen.LEAVING)
 	_row.freeze()
@@ -781,6 +784,7 @@ func _go(screen_to: Screen) -> void:
 
 
 func _launch() -> void:
+	Sounds.play(SoundEffects.Cue.LAUNCH)
 	var game := _row.selected_game()
 	# A press begun before A must not act once it is let go.
 	_hold_select.stop()
@@ -802,6 +806,7 @@ func _remember() -> void:
 
 
 func _show_message(text: String) -> void:
+	Sounds.play(SoundEffects.Cue.ERROR)
 	_message.text = text
 	_message.show()
 	# It shows where the art bar is.
@@ -949,6 +954,7 @@ func _fade_title(alpha: float, delay_s := 0.0, fade_s := _TITLE_FADE_S) -> void:
 ## The settings over the consoles screen or the games screen, until closed; the consoles come in
 ## again if a console had to be added meanwhile, the last one removed.
 func _open_settings() -> void:
+	Sounds.play(SoundEffects.Cue.SETTINGS)
 	_cover()
 	var settings: SettingsMenu = _screens.get_node("%Settings")
 	settings.gel = _selected_gel()
@@ -993,6 +999,7 @@ func _show_variants(variants: Dictionary[String, String]) -> void:
 
 
 func _open_console_properties() -> void:
+	Sounds.play(SoundEffects.Cue.PROPERTIES)
 	_focus.gel = _selected_gel()
 	_leave_consoles(Screen.CONSOLE_PROPERTIES)
 	_console_properties.open()
@@ -1013,6 +1020,7 @@ func _on_console_properties_closed() -> void:
 
 ## The ring putting the consoles in order, on the selected one, until it closes.
 func _open_order() -> void:
+	Sounds.play(SoundEffects.Cue.RING_OPEN)
 	_leave_consoles(Screen.ORDER)
 	_order.open(_platform_ids(), _shelf)
 
@@ -1070,6 +1078,7 @@ func _on_order_closed() -> void:
 
 ## The selected game's properties, until they close.
 func _open_properties() -> void:
+	Sounds.play(SoundEffects.Cue.PROPERTIES)
 	_hold_select.stop()
 	_row.freeze()
 	_art_progress.hide()
@@ -1082,6 +1091,7 @@ func _open_properties() -> void:
 ## rail sinks, the frame, the pool and the hints leave); the consoles come in again on the one added, placed, or as they
 ## were when the form is given up, the card flying back into the ball.
 func _add_console() -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	_cover(true)
 	if _form_entry == null:
 		_form_entry = FormEntry.new()

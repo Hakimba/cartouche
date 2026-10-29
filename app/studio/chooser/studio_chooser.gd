@@ -569,6 +569,7 @@ func _answer(picked: int, turn_back := false) -> void:
 	_dragging = false
 	_choosing = false
 	hide()
+	Sounds.play(SoundEffects.Cue.SELECT if picked >= 0 else SoundEffects.Cue.BACK)
 	chosen.emit(picked)
 
 

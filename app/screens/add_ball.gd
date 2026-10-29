@@ -51,6 +51,8 @@ func _morph(to_open: bool) -> void:
 	if to_open == is_open:
 		return
 	is_open = to_open
+	if to_open:
+		Sounds.play(SoundEffects.Cue.ADD_BALL)
 	Diagnostics.trace("carousel", "add ball %s" % ("opened" if to_open else "closed"))
 	if _tween:
 		_tween.kill()

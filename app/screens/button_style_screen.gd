@@ -13,6 +13,7 @@ var can_go_back := false
 
 
 func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
 	for card: StyleCard in %Cards.get_children():
 		card.chosen.connect(_on_card_chosen)
 
@@ -20,6 +21,7 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if can_go_back and is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
+		Sounds.play(SoundEffects.Cue.BACK)
 		chosen.emit(&"")
 
 
@@ -32,4 +34,5 @@ func focus() -> void:
 
 func _on_card_chosen(style: StringName) -> void:
 	Diagnostics.trace("screens", "button style %s" % style)
+	Sounds.play(SoundEffects.Cue.SELECT)
 	chosen.emit(style)

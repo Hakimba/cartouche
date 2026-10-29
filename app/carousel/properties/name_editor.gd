@@ -49,6 +49,7 @@ func focus_keys() -> void:
 ## Erases the character before the caret.
 func erase() -> void:
 	if _caret > 0:
+		Sounds.play(SoundEffects.Cue.ERASE)
 		_typed = _typed.erase(_caret - 1)
 		_caret -= 1
 		_show()
@@ -56,7 +57,10 @@ func erase() -> void:
 
 ## Moves the caret [param by] characters, within the name.
 func move_caret(by: int) -> void:
-	_caret = clampi(_caret + by, 0, _typed.length())
+	var moved_to := clampi(_caret + by, 0, _typed.length())
+	if moved_to != _caret:
+		Sounds.play(SoundEffects.Cue.MOVE)
+	_caret = moved_to
 	_show()
 
 
@@ -66,6 +70,7 @@ func space() -> void:
 
 func _type(character: String) -> void:
 	if _typed.length() < _LONGEST:
+		Sounds.play(SoundEffects.Cue.TYPE)
 		_typed = _typed.insert(_caret, character)
 		_caret += 1
 		_show()

@@ -83,6 +83,13 @@ const _COME_BACK_S := 0.23
 ## The model rising again after a chooser: from this far down (px), in this time, as the plinth's own rise.
 const _MODEL_RISE := 1.6 * _CQW
 const _MODEL_RISE_S := 0.3
+## The arrows on both sides of the model when the console has other models (← → change it): their gap to the
+## plinth's sides, their size against the chevron's own, and the nudge outward of the one pressed.
+const _ARROW_GAP := 1.0 * _CQW
+const _ARROW_SCALE := 1.5
+const _ARROW_NUDGE := 6.0
+const _ARROW_NUDGE_S := 0.15
+const _CHEVRON := preload("res://screens/chevron.svg")
 
 var android: AndroidServices = Android
 ## The platform the form adds; empty until one is chosen.
@@ -118,6 +125,8 @@ var _folders: Dictionary[String, String] = {}
 var _variants: Array[ConsoleManifest] = []
 var _variant := 0
 var _plinth: Plinth
+## The arrows left and right of the model.
+var _arrows: Array[TextureRect] = []
 var _logo: LogoView
 var _card: FormPaint.Card
 var _dot: FormPaint.Layer
@@ -146,6 +155,7 @@ var _fields: Array[Control] = []
 
 
 func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
 	for text: Label in [_title, _note]:
 		text.add_theme_color_override(&"font_color", Color.TRANSPARENT)
 	_title.draw.connect(_draw_title)
@@ -189,6 +199,8 @@ func _input(event: InputEvent) -> void:
 		_variant = posmod(_variant + (1 if event.is_action_pressed(&"ui_right") else -1), _variants.size())
 		_folders[platform_id] = ConsoleManifest.folder_of(_variants[_variant])
 		_plinth.show_console(_folders[platform_id])
+		Sounds.play(SoundEffects.Cue.MOVE)
+		_nudge(1 if event.is_action_pressed(&"ui_right") else 0)
 
 
 ## Shows the form as new, nothing chosen, the focus on the type; the platforms already set up,
@@ -396,6 +408,7 @@ func _count(then_add: bool) -> void:
 func _on_type_pressed() -> void:
 	if _leaving:
 		return
+	Sounds.play(SoundEffects.Cue.SELECT)
 	var offered: Array[AndroidServices.OfferedConsole] = []
 	offered.assign(android.catalog.offered.filter(func(console: AndroidServices.OfferedConsole) -> bool:
 		return console.id not in _taken))
@@ -416,6 +429,7 @@ func _on_type_pressed() -> void:
 	Diagnostics.trace("console form", "platform %s" % platform_id)
 	_show_type()
 	_plinth.show_console(_folders[platform_id])
+	_show_arrows()
 	_show_gel(true)
 	_show_plate(true)
 	_read_players()
@@ -426,6 +440,7 @@ func _on_emulator_pressed() -> void:
 		return
 	if _players.is_empty():
 		return
+	Sounds.play(SoundEffects.Cue.SELECT)
 	_step_aside()
 	_choice.console_folders = _folders
 	var index := await _choice.choose_player(platform_id, _players, _player)
@@ -446,6 +461,7 @@ func _on_emulator_pressed() -> void:
 func _on_folder_pressed() -> void:
 	if _leaving:
 		return
+	Sounds.play(SoundEffects.Cue.SELECT)
 	var pick := await android.pick_folder()
 	if not pick.ok:
 		Diagnostics.trace("console form", "no folder picked (%s)" % pick.code)
@@ -456,7 +472,8 @@ func _on_folder_pressed() -> void:
 	await _count(true)
 
 
-func _on_option_toggled(_on: bool) -> void:
+func _on_option_toggled(on: bool) -> void:
+	Sounds.play(SoundEffects.Cue.TOGGLE if on else SoundEffects.Cue.UNTOGGLE)
 	var choices := setup()
 	Diagnostics.trace("console form", "%s, %s" % [choices.folder_depth, choices.disc_grouping])
 	_games = -1
@@ -469,6 +486,7 @@ func _on_cancel_pressed() -> void:
 	if _leaving:
 		return
 	if _edited_id and not _adding:
+		Sounds.play(SoundEffects.Cue.REMOVE)
 		closed.emit(Outcome.REMOVE)
 	else:
 		_give_up()
@@ -478,6 +496,7 @@ func _give_up() -> void:
 	if _adding or _leaving:
 		return
 	Diagnostics.trace("console form", "given up")
+	Sounds.play(SoundEffects.Cue.BACK)
 	_leaving = true
 	leaving.emit()
 	await _leave().finished
@@ -491,6 +510,7 @@ func _on_add_pressed() -> void:
 		return
 	_adding = true
 	_add.disabled = true
+	Sounds.play(SoundEffects.Cue.SELECT)
 	var started := Time.get_ticks_msec()
 	if not is_editing():
 		saving.emit(true)
@@ -560,12 +580,46 @@ func _present_plinth() -> void:
 		_plinth.size = StudioTokens.PLINTH.size
 		add_child(_plinth)
 		move_child(_plinth, _backdrop.get_index() + 1)
+		_add_arrows()
 	(_plinth.get_node("Plate") as Control).hide()
 	if _folders.has(platform_id):
 		_plinth.show_console(_folders[platform_id])
 		_plinth.restart()
 	else:
 		_plinth.clear()
+	_show_arrows()
+
+
+## The arrows on the plinth, beside the model's middle; the left one is the chevron turned round.
+func _add_arrows() -> void:
+	var shape := _CHEVRON.get_size() * _ARROW_SCALE
+	var y := StudioTokens.TURNTABLE.get_center().y - StudioTokens.PLINTH.position.y - shape.y / 2.0
+	for x: float in [-_ARROW_GAP - shape.x, StudioTokens.PLINTH.size.x + _ARROW_GAP]:
+		var arrow := TextureRect.new()
+		arrow.texture = _CHEVRON
+		arrow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		arrow.size = shape
+		arrow.position = Vector2(x, y)
+		arrow.flip_h = _arrows.is_empty()
+		arrow.mouse_filter = MOUSE_FILTER_IGNORE
+		_plinth.add_child(arrow)
+		_arrows.append(arrow)
+
+
+## Shown while left and right change the model: the console has other models and the focus is on a field they act on.
+func _show_arrows() -> void:
+	var shown := _variants.size() > 1 and get_viewport().gui_get_focus_owner() in [_type, _emulator, _folder_field]
+	for arrow in _arrows:
+		arrow.visible = shown
+
+
+## The arrow on [param side] (0 left, 1 right) goes out a little and back.
+func _nudge(side: int) -> void:
+	var arrow := _arrows[side]
+	var rest := StudioTokens.PLINTH.size.x + _ARROW_GAP if side == 1 else -_ARROW_GAP - arrow.size.x
+	var out := _ARROW_NUDGE * (1.0 if side == 1 else -1.0)
+	_animate(&"arrow", _ARROW_NUDGE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
+		arrow.position.x = rest + out * sin(PI * p))
 
 
 func _gel() -> Color:
@@ -615,6 +669,7 @@ func _show_plate(popping: bool) -> void:
 
 ## Where the card goes for the control that has the focus: its box, grown to a ring round a pill.
 func _aim(control: Control, animated: bool) -> void:
+	_show_arrows()
 	var pill := control is FormPill
 	var rect := Rect2(control.position, control.size).grow(_PILL_RING if pill else 0.0)
 	var radius := _PILL_RING_RADIUS if pill else StudioTokens.FOCUS_RADIUS

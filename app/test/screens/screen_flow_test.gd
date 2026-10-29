@@ -65,14 +65,20 @@ func test_the_battery_shows_as_the_carousel_starts() -> void:
 	assert_array(chip.bolt()).is_empty()
 
 
-func test_INV_E6_05_an_app_already_set_up_opens_on_its_consoles_after_the_welcome() -> void:
+func test_INV_E6_05_an_app_already_set_up_opens_straight_on_its_consoles_the_welcome_never_shown() -> void:
 	var device := _new_device()
 	device.first_launch = false
 	device.has_games = true
 	var carousel := Fixtures.carousel_for(self, device)
+	(carousel.get_node("%Screens") as ScreenFlow).welcome_waits = true
 	var seen := _shows(carousel)
 	add_child(carousel)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	var welcome: Welcome = carousel.get_node("%Screens/Welcome")
+	var welcome_seen := [false]
+	assert_bool(await Fixtures.until(self, func() -> bool:
+		welcome_seen[0] = welcome_seen[0] or (is_instance_valid(welcome) and welcome.is_visible_in_tree())
+		return carousel._shown)).is_true()
+	assert_bool(welcome_seen[0]).is_false()
 	assert_array(seen).is_empty()
 	assert_array(device.saved_styles).is_empty()
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)

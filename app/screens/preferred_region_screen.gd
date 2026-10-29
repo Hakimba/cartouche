@@ -20,9 +20,14 @@ var _current := ""
 @onready var _cards: GridContainer = %Cards
 
 
+func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if can_go_back and is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
+		Sounds.play(SoundEffects.Cue.BACK)
 		chosen.emit(_current)
 
 
@@ -41,7 +46,7 @@ func open(current: String, regions: PackedStringArray) -> void:
 		card.custom_minimum_size = _CARD_SIZE
 		card.add_theme_font_size_override(&"font_size", _CARD_FONT_PX)
 		SatinStyle.apply_to(card)
-		card.pressed.connect(chosen.emit.bind(region))
+		card.pressed.connect(_choose.bind(region))
 		if region == current:
 			card.add_child(Tick.new())
 		_cards.add_child(card)
@@ -56,6 +61,12 @@ func open(current: String, regions: PackedStringArray) -> void:
 		card.focus_neighbor_top = card.get_path_to(_cards.get_child(i - _COLUMNS if i >= _COLUMNS else i))
 		card.focus_neighbor_bottom = card.get_path_to(_cards.get_child(below))
 	(_cards.get_child(maxi(_choices.find(current), 0)) as Control).grab_focus()
+
+
+
+func _choose(region: String) -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
+	chosen.emit(region)
 
 
 ## The tick on the card of the region chosen now, drawn: fonts rarely have the sign.

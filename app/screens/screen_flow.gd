@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ScreenFlow
 extends Control
-## The screens in front of the carousel, over its background: the welcome at each start, while the
-## library loads, until a button is pressed; on a first launch the button style and image region, then the curtain
+## The screens in front of the carousel, over its background: on a first launch, the welcome until a
+## button is pressed, the button style and image region, then the curtain
 ## permission when Android does not allow it yet; while no console has games, "No console" and the
 ## form adding one and its arrival on the carousel. Later, the settings (Y): the platforms
 ## set up, each to change or remove, the button style, the edges' smoothing and the region labels'
@@ -19,7 +19,7 @@ signal covering
 ## The form adding a console, given up, starts to go.
 signal form_leaving
 
-## Whether the welcome waits for a button; off to measure starts.
+## Whether the first launch's welcome waits for a button; off to measure starts.
 @export var welcome_waits := true
 
 var android: AndroidServices = Android:
@@ -68,15 +68,16 @@ func _ready() -> void:
 		_holding_presses = pending)
 
 
-## Goes on from the welcome until the library can be used, completing setup on first launch.
+## Goes on until the library can be used, completing setup on first launch, the welcome first.
 func run(settings: AndroidServices.SettingsAnswer) -> void:
 	arrived = false
 	_games_float = settings.games_float
 	_preferred_region = settings.preferred_region
 	_preferred_regions = settings.preferred_regions
-	if welcome_waits:
+	if settings.first_launch and welcome_waits:
+		_welcome.show()
 		await _welcome.passed()
-	# Shown once per start: what it holds (its worm, its large glyphs) is let go.
+	# Shown once: what it holds (its worm, its large glyphs) is let go.
 	_welcome.queue_free()
 	welcome_closed.emit()
 	if settings.first_launch:
@@ -258,6 +259,7 @@ func _choose_games_float() -> void:
 	_float_save += 1
 	var request := _float_save
 	var target := not _games_float
+	Sounds.play(SoundEffects.Cue.TOGGLE if target else SoundEffects.Cue.UNTOGGLE)
 	_settings.saving = true
 	_settings.animate_float(target)
 	var saved := await android.save_games_float(target)

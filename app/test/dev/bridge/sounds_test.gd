@@ -2,7 +2,7 @@
 extends GdUnitTestSuite
 
 const Fixtures := preload("res://test/dev/bridge/fixtures.gd")
-const Sounds := preload("res://dev/bridge/sounds.gd")
+const BridgeSounds := preload("res://dev/bridge/sounds.gd")
 const _RATE := 8000
 
 var _commands: Fixtures.CommandHost
@@ -54,14 +54,14 @@ func _entry(seconds := 0.05, gain := 0.0, screens: Array = []) -> Dictionary:
 	return {"data": Marshalls.raw_to_base64(_wav(seconds)), "format": "wav", "gain_db": gain, "screens": screens}
 
 
-func _sounds() -> Sounds:
-	var sounds: Sounds = auto_free(Sounds.new())
+func _sounds() -> BridgeSounds:
+	var sounds: BridgeSounds = auto_free(BridgeSounds.new())
 	sounds.screen = func() -> String: return _screen
 	add_child(sounds)
 	return sounds
 
 
-func _players(sounds: Sounds) -> Array[AudioStreamPlayer]:
+func _players(sounds: BridgeSounds) -> Array[AudioStreamPlayer]:
 	var players: Array[AudioStreamPlayer] = []
 	for child in sounds.get_children():
 		if child is AudioStreamPlayer:
@@ -78,7 +78,7 @@ func _press(action: StringName) -> void:
 
 
 func test_the_wav_decoder_reads_the_samples_and_the_rate() -> void:
-	var stream := Sounds.decode(_wav(0.1), "wav") as AudioStreamWAV
+	var stream := BridgeSounds.decode(_wav(0.1), "wav") as AudioStreamWAV
 	assert_object(stream).is_not_null()
 	assert_int(stream.mix_rate).is_equal(_RATE)
 	assert_bool(stream.stereo).is_false()
@@ -90,15 +90,15 @@ func test_the_decoder_refuses_what_is_not_16_bit_pcm_wav_or_a_known_format() -> 
 	var float_wav := _wav()
 	float_wav.encode_u16(20, 3)
 	for bad: PackedByteArray in [PackedByteArray(), "RIFFxxxxWAVE".to_ascii_buffer(), float_wav, _wav().slice(0, 30)]:
-		assert_object(Sounds.decode(bad, "wav")).is_null()
-	assert_object(Sounds.decode(_wav(), "mp3")).is_null()
+		assert_object(BridgeSounds.decode(bad, "wav")).is_null()
+	assert_object(BridgeSounds.decode(_wav(), "mp3")).is_null()
 
 
 func test_the_sound_command_plays_the_bytes_on_a_temporary_player_that_frees_itself() -> void:
 	var answer := await _commands.run({"cmd": "sound", "id": 1, "data": _entry(0.1, -6.0)["data"], "format": "wav", "gain_db": -6.0})
 	assert_bool(answer["ok"]).is_true()
 	assert_float(answer["length"]).is_equal_approx(0.1, 0.001)
-	var sounds: Sounds = _commands._sounds
+	var sounds: BridgeSounds = _commands._sounds
 	assert_int(_players(sounds).size()).is_equal(1)
 	assert_float(_players(sounds)[0].volume_db).is_equal(-6.0)
 	await await_millis(600)

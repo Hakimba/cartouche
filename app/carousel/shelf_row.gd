@@ -330,6 +330,7 @@ func downloading(game_id: String, fraction: float) -> void:
 ## [param game_id]'s download is over: its ring goes.
 func downloaded(game_id: String) -> void:
 	if _downloads.erase(game_id):
+		Sounds.play(SoundEffects.Cue.ART_DONE)
 		_show_ring(game_id)
 
 
@@ -386,6 +387,7 @@ func _download(game_id: String) -> float:
 func step(direction: int) -> void:
 	if _games.size() < 2:
 		return
+	Sounds.play(SoundEffects.Cue.GAME)
 	_position += direction
 	_turn.release()
 	if Diagnostics.enabled:

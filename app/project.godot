@@ -13,10 +13,15 @@ run/low_processor_mode_sleep_usec=33333
 boot_splash/show_image=false
 boot_splash/bg_color=Color(0.114, 0.122, 0.141, 1)
 
+[audio]
+
+driver/mix_rate=48000
+
 [autoload]
 
 Diagnostics="*res://dev/diagnostics.gd"
 Android="*res://adapters/android/android_services.gd"
+Sounds="*res://audio/sound_effects.gd"
 
 [debug]
 
@@ -138,3 +143,9 @@ anti_aliasing/quality/msaa_3d=2
 rendering_device/pipeline_cache/save_chunk_size_mb=0.001
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
+
+[importer_defaults]
+
+wav={
+"compress/mode": 0
+}

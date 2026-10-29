@@ -4,7 +4,7 @@ extends Node
 const Packs := preload("res://dev/bridge/packs.gd")
 const LaunchView := preload("res://dev/bridge/launch_view.gd")
 const Views := preload("res://dev/bridge/views.gd")
-const Sounds := preload("res://dev/bridge/sounds.gd")
+const BridgeSounds := preload("res://dev/bridge/sounds.gd")
 const RouteFixture := preload("res://dev/bridge/route_fixture.gd")
 const CACHE_FILES := {
 	"res://data/studio_lights.json": [preload("res://studio/views/studio_lights.gd"), preload("res://carousel/consoles/console_row.gd"), preload("res://studio/views/plinth.gd")],
@@ -27,7 +27,7 @@ var route: Array = []
 var paused := false
 var _packs := Packs.new()
 var _views := Views.new()
-var _sounds := Sounds.new()
+var _sounds := BridgeSounds.new()
 var _held: Array[StringName] = []
 var _previous_scale := 1.0
 var _previous_pause := false

@@ -15,6 +15,10 @@ var _in_setting := false
 @onready var _open: Button = %Open
 
 
+func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_RESUMED and _in_setting:
 		_in_setting = false
@@ -27,6 +31,7 @@ func focus() -> void:
 
 
 func _on_open_pressed() -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	# Set first: the app may be back before the answer is.
 	_in_setting = true
 	var result := await android.request_curtain_permission()
@@ -38,4 +43,5 @@ func _on_open_pressed() -> void:
 
 func _on_later_pressed() -> void:
 	Diagnostics.trace("first launch", "overlay permission left for later")
+	Sounds.play(SoundEffects.Cue.BACK)
 	done.emit()

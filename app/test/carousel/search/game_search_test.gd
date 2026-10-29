@@ -410,3 +410,13 @@ class FakeSearch extends AndroidServices:
 			if w not in taken and words[w].begins_with(prefixes[0]) and _takes(words, prefixes.slice(1), more):
 				return true
 		return false
+
+
+func test_erasing_a_key_brings_the_cursor_back_on_it() -> void:
+	var carousel := await _games_screen()
+	Fixtures.press(carousel, &"ui_down")
+	_type(carousel, "di")
+	Fixtures.press(carousel, &"screen_back")
+	assert_str(GameSearch.KEYS[carousel._search._cursor]).is_equal("i")
+	Fixtures.press(carousel, &"screen_back")
+	assert_str(GameSearch.KEYS[carousel._search._cursor]).is_equal("d")

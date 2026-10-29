@@ -135,6 +135,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	super()
+	add_to_group(SoundEffects.MOVES)
 	_name.pressed.connect(_open_naming)
 	_naming.submitted.connect(_keep_name)
 	add_child(_reader)
@@ -249,6 +250,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 	if _busy:
 		return
+	Sounds.play(SoundEffects.Cue.BACK)
 	match _step:
 		Step.LABELS:
 			Diagnostics.trace("properties", "images left, the label as it was")
@@ -540,6 +542,7 @@ func _show_name(name_button: Button, title: String) -> void:
 
 ## The images the label can show, the current one with the focus.
 func _open_labels() -> void:
+	Sounds.play(SoundEffects.Cue.OPEN)
 	_busy = true
 	_release_focus()
 	_downloaded.clear()
@@ -649,6 +652,7 @@ func _choose(card: LabelCard) -> void:
 	_game.label_region = card.region
 	_game.label_source = card.source
 	_game.label_own = false
+	Sounds.play(SoundEffects.Cue.SUCCESS)
 	art.add(answer.art, card.label)
 	_back_to_properties()
 
@@ -658,6 +662,7 @@ func _choose(card: LabelCard) -> void:
 func _pick_own() -> void:
 	if _busy:
 		return
+	Sounds.play(SoundEffects.Cue.SELECT)
 	_busy = true
 	_release_focus()
 	await create_tween().tween_property(_labels, ^"modulate:a", 0.0, _TO_PICKER_S).finished
@@ -729,6 +734,7 @@ func _keep_own() -> void:
 		choice_failed.emit()
 		return
 	Diagnostics.trace("properties", "%s: own picture kept, zoom %.2f, centre %s" % [_game.title, _framing.zoom, _framing.centre])
+	Sounds.play(SoundEffects.Cue.SUCCESS)
 	_game.label_own = true
 	_game.has_label_region = false
 	# The picture as framed stays on the disc until the image the plugin cut is read.
@@ -792,6 +798,7 @@ func _renaming(request: Callable) -> AndroidServices.Result:
 func _open_naming() -> void:
 	if _busy:
 		return
+	Sounds.play(SoundEffects.Cue.OPEN)
 	_step = Step.NAMING
 	_naming.open(_game.title, _game.own_title())
 	await _move([_properties, _zone], [_naming], _on_naming, _to_naming)
@@ -806,6 +813,7 @@ func _keep_name() -> void:
 	# A name left as it was is no name to keep: the game keeps its own title.
 	var typed := _naming.typed()
 	if typed.strip_edges() == _game.title:
+		Sounds.play(SoundEffects.Cue.SELECT)
 		_back_to_properties(_naming, _from_editing, _name)
 		return
 	var answer := await _renaming(android.rename_game.bind(_game, typed)) as AndroidServices.Renamed
@@ -816,6 +824,7 @@ func _keep_name() -> void:
 	_game.has_original_title = answer.has_original_title
 	_game.original_title = answer.original_title
 	_show_name(_name, _game.title)
+	Sounds.play(SoundEffects.Cue.SUCCESS)
 	name_kept.emit()
 	_back_to_properties(_naming, _from_editing, _name)
 

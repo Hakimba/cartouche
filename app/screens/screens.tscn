@@ -25,6 +25,7 @@ script = ExtResource("1")
 
 [node name="Welcome" parent="." instance=ExtResource("2")]
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 
 [node name="ButtonStyle" parent="." instance=ExtResource("3")]

@@ -287,6 +287,7 @@ func step(direction: int, places := 1) -> void:
 	_leavers.append(leaver)
 	_leavers = _leavers.filter(func(other: Leaver) -> bool: return other.index != selected_index())
 	_turn.release()
+	Sounds.play(SoundEffects.Cue.CONSOLE)
 	selection_changed.emit(selected_index())
 
 

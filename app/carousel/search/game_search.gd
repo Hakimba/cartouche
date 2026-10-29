@@ -164,6 +164,7 @@ func open() -> void:
 ## Closes the ribbon; keeping what it found and where the carousel is when [param keep], else back on
 ## the whole shelf, on the game shown when it opened.
 func close(keep: bool) -> void:
+	Sounds.play(SoundEffects.Cue.BACK)
 	_open = false
 	let_go()
 	if not keep:
@@ -217,9 +218,10 @@ func _hold(direction: int) -> void:
 	set_process(true)
 
 
-## The cursor to the next key (or region) that leads somewhere towards [param direction]; with
-## nothing typed, the carousel jumps there.
-func _move(direction: int) -> void:
+## The cursor to the next key (or region) that leads somewhere towards [param direction], heard as
+## [param sound]; with nothing typed, the carousel jumps there.
+func _move(direction: int, sound := SoundEffects.Cue.MOVE) -> void:
+	Sounds.play(sound)
 	var count := _view.groups.size() if _by_region else KEYS.length()
 	for step in range(1, count + 1):
 		var next := posmod(_cursor + direction * step, count)
@@ -244,9 +246,12 @@ func _type(key: String) -> void:
 func _back() -> void:
 	if _by_region or _typed.is_empty():
 		close(false)
-	elif _typed.length() == 1:
+		return
+	# Back on the key erased, as if it were about to be typed again.
+	_cursor = KEYS.find(_typed[-1])
+	if _typed.length() == 1:
+		Sounds.play_narrowing(SoundEffects.Cue.ERASE, _view.games.size(), _shelf.size(), _shelf.size())
 		_show_shelf(_home)
-		_cursor = _nearest_lit(_cursor)
 		_refresh()
 	else:
 		_find(_typed.left(-1))
@@ -260,6 +265,9 @@ func _find(search: String) -> void:
 	if not _usable(found):
 		return
 	var anchor := shown_position()
+	var before := _view.games.size() if not _typed.is_empty() else _shelf.size()
+	Sounds.play_narrowing(SoundEffects.Cue.TYPE if search.length() > _typed.length() else SoundEffects.Cue.ERASE, before, found.games.size(),
+		_shelf.size())
 	_typed = search
 	_show(found, anchor)
 	_cursor = _nearest_lit(_cursor)
@@ -276,6 +284,7 @@ func _switch_index() -> void:
 		return
 	var anchor := shown_position()
 	_by_region = not _by_region
+	Sounds.play(SoundEffects.Cue.REGIONS if _by_region else SoundEffects.Cue.LETTERS)
 	if _by_region:
 		_view = index
 		var at := maxi(index.games.find(anchor), 0)
@@ -334,12 +343,13 @@ func _letters_view() -> AndroidServices.Browse:
 ## typed to the previous or next key that still finds a game.
 func _leap(direction: int) -> void:
 	if _typed.is_empty():
-		_move(direction)
+		_move(direction, SoundEffects.Cue.LETTER)
 		return
 	var leap_to := _leap_target(direction)
 	if leap_to.at < 0:
 		return
 	_cursor = leap_to.key
+	Sounds.play(SoundEffects.Cue.LETTER)
 	row.jump(leap_to.at, direction, _INDEX_SLIDE)
 	_show_big(leap_to.label)
 	_refresh()

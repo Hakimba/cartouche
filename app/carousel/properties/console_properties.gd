@@ -37,6 +37,8 @@ func _init() -> void:
 
 func _ready() -> void:
 	super()
+	add_to_group(SoundEffects.MOVES)
+	_variants.set_meta(SoundEffects.MOVE_SOUND, SoundEffects.Cue.MODEL)
 	_change_place.pressed.connect(_to_order)
 	_model.pressed.connect(_open_variants)
 	_callout.use_studio()
@@ -63,12 +65,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _step == Step.VARIANTS and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
+		Sounds.play(SoundEffects.Cue.BACK)
 		variant_shown.emit(_kept)
 		_close_variants()
 	elif _step == Step.VARIANTS:
 		return
 	elif event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
+		Sounds.play(SoundEffects.Cue.BACK)
 		_close()
 
 
@@ -96,6 +100,7 @@ func _focus_first() -> void:
 
 ## Every model of the console in a mosaic, the cursor on the one it has.
 func _open_variants() -> void:
+	Sounds.play(SoundEffects.Cue.OPEN)
 	_step = Step.VARIANTS
 	_kept = consoles.selected().folder
 	_change_place.hide()
@@ -129,6 +134,7 @@ func _variant_tile(model: ConsoleManifest) -> Button:
 
 
 func _keep_variant(folder: String) -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	if folder != _kept:
 		variant_kept.emit(folder)
 	_close_variants()

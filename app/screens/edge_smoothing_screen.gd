@@ -16,6 +16,7 @@ const NAMES: Dictionary[StringName, String] = {&"4x": "Smoothing 4×", &"2x": "S
 
 
 func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
 	for card: SmoothingCard in %Cards.get_children():
 		card.chosen.connect(_on_card_chosen)
 
@@ -23,6 +24,7 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
+		Sounds.play(SoundEffects.Cue.BACK)
 		chosen.emit(&"")
 
 
@@ -40,4 +42,5 @@ func focus() -> void:
 
 func _on_card_chosen(smoothing: StringName) -> void:
 	Diagnostics.trace("screens", "edge smoothing %s" % smoothing)
+	Sounds.play(SoundEffects.Cue.SELECT)
 	chosen.emit(smoothing)

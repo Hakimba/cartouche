@@ -277,6 +277,7 @@ func _ring_ids(platform_ids: Array[String]) -> Array[String]:
 
 
 func _close() -> void:
+	Sounds.play(SoundEffects.Cue.RING_CLOSE)
 	var rewind := _transition != null
 	if _transition:
 		var interrupted := _transition
@@ -452,6 +453,7 @@ func _press_placing(direction: int, accept: bool) -> void:
 	var stood := _flier_stand()
 	match _placing.press(pressed):
 		Placing.Action.MOVE:
+			Sounds.play(SoundEffects.Cue.CARRY)
 			_aim_placing()
 		Placing.Action.FLY:
 			_fly_in(stood)
@@ -605,6 +607,7 @@ func _fly_in(stood: ConsoleRow.Stand) -> void:
 
 ## The console is in its gap: the order is saved with it, then, after the pause, the morph onto the consoles screen.
 func _landed(gap: int) -> void:
+	Sounds.play(SoundEffects.Cue.PLACE)
 	var pause := get_tree().create_timer(StudioTokens.PAUSE_S)
 	var answer := await android.place_console(_placed_id, gap)
 	if not answer.ok:
@@ -684,11 +687,13 @@ func _hints() -> Control:
 
 ## One step round the ring towards [param direction] (-1 or 1), the console held with the cursor.
 func _step(direction: int) -> void:
+	Sounds.play(SoundEffects.Cue.CARRY if _wheel.is_holding() else SoundEffects.Cue.CONSOLE)
 	_wheel.step(direction)
 	_show()
 
 
 func _take() -> void:
+	Sounds.play(SoundEffects.Cue.PEEL)
 	_wheel.take()
 	Diagnostics.trace("order", "took %s" % _wheel.selected())
 	_peel(1.0, _PEEL_S)
@@ -698,6 +703,7 @@ func _take() -> void:
 ## Puts the console held down where it is; when that changes the order, keeps it, or goes back to
 ## the order before when it cannot be kept.
 func _put_down() -> void:
+	Sounds.play(SoundEffects.Cue.PLACE)
 	var moved := _wheel.put_down()
 	Diagnostics.trace("order", "put %s down, %s" % [_wheel.selected(), "moved" if moved else "in its place"])
 	_peel(0.0, _PUT_DOWN_S)
@@ -734,6 +740,7 @@ func _with_unmodelled(ringed: Array[String]) -> Array[String]:
 
 
 func _let_go() -> void:
+	Sounds.play(SoundEffects.Cue.PLACE)
 	_wheel.let_go()
 	Diagnostics.trace("order", "let go of %s, the order as it was" % _wheel.selected())
 	_peel(0.0, _PUT_DOWN_S)

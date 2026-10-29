@@ -1,0 +1,1557 @@
+{
+ "roles": {
+  "nav": {
+   "loudness": -36,
+   "max_s": 0.12,
+   "max_low_share": 0.15,
+   "max_attack_ms": 10,
+   "max_bright_hz": 1300,
+   "max_crest_db": 18
+  },
+  "action": {
+   "loudness": -31,
+   "max_s": 0.6,
+   "max_low_share": 0.15,
+   "max_attack_ms": 15,
+   "max_bright_hz": 1300,
+   "max_crest_db": 18
+  },
+  "feedback": {
+   "loudness": -29,
+   "max_s": 1.5,
+   "max_low_share": 0.15,
+   "max_attack_ms": 30,
+   "max_bright_hz": 1300,
+   "max_crest_db": 18
+  },
+  "mech": {
+   "loudness": -33,
+   "max_s": 1.5,
+   "max_low_share": 0.15,
+   "max_attack_ms": 100
+  },
+  "ambient": {
+   "loudness": -37,
+   "max_s": 1.5,
+   "max_low_share": 0.15,
+   "max_attack_ms": 30,
+   "max_bright_hz": 1300,
+   "max_crest_db": 18
+  },
+  "mech_light": {
+   "loudness": -39,
+   "max_s": 1.5,
+   "max_low_share": 0.15,
+   "max_attack_ms": 100
+  },
+  "scroll": {
+   "loudness": -38,
+   "max_s": 0.12,
+   "max_low_share": 0.15,
+   "max_attack_ms": 10,
+   "max_bright_hz": 1500,
+   "max_crest_db": 13,
+   "max_decay_ms": 40
+  },
+  "jump": {
+   "loudness": -33,
+   "max_s": 0.12,
+   "max_low_share": 0.15,
+   "max_attack_ms": 10,
+   "max_bright_hz": 1300,
+   "max_crest_db": 18
+  },
+  "moment": {
+   "loudness": -26,
+   "max_s": 1.5,
+   "max_low_share": 0.15,
+   "max_attack_ms": 30,
+   "max_bright_hz": 1600,
+   "max_crest_db": 18
+  },
+  "key": {
+   "loudness": -36,
+   "max_s": 0.4,
+   "max_low_share": 0.15,
+   "max_attack_ms": 15,
+   "max_bright_hz": 1300,
+   "max_crest_db": 18
+  }
+ },
+ "sounds": {
+  "step": {
+   "role": "scroll",
+   "length": 0.04,
+   "decay_s": 0.015,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       800,
+       600
+      ],
+      "decay_ms": 7,
+      "length": 0.05,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002
+    }
+   ]
+  },
+  "step_low": {
+   "role": "nav",
+   "length": 0.045,
+   "decay_s": 0.015,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       600,
+       450
+      ],
+      "decay_ms": 7,
+      "length": 0.06,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 2500,
+     "soften_s": 0.002
+    }
+   ]
+  },
+  "step_high": {
+   "role": "nav",
+   "length": 0.04,
+   "decay_s": 0.015,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       1067,
+       800
+      ],
+      "decay_ms": 6,
+      "length": 0.06,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002
+    }
+   ]
+  },
+  "jump": {
+   "role": "jump",
+   "length": 0.07,
+   "decay_s": 0.03,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       800,
+       600
+      ],
+      "decay_ms": 12,
+      "length": 0.09,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002
+    },
+    {
+     "tone": {
+      "hz": [
+       400,
+       300
+      ],
+      "decay_ms": 12,
+      "length": 0.09,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002,
+     "gain_db": -8
+    }
+   ]
+  },
+  "open": {
+   "role": "action",
+   "length": 0.12,
+   "decay_s": 0.05,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       500,
+       1000
+      ],
+      "decay_ms": 45,
+      "length": 0.14,
+      "partials": [
+       [
+        2,
+        -18
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.015
+    }
+   ]
+  },
+  "open_small": {
+   "role": "nav",
+   "length": 0.07,
+   "decay_s": 0.03,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       600,
+       900
+      ],
+      "decay_ms": 25,
+      "length": 0.09,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.01
+    }
+   ]
+  },
+  "succeeded": {
+   "role": "feedback",
+   "length": 0.2,
+   "decay_s": 0.1,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       525,
+       700
+      ],
+      "decay_ms": 22,
+      "length": 0.23,
+      "partials": [
+       [
+        2,
+        -12
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002
+    },
+    {
+     "tone": {
+      "hz": [
+       661,
+       882
+      ],
+      "decay_ms": 22,
+      "length": 0.23,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002,
+     "gain_db": -4
+    },
+    {
+     "tone": {
+      "hz": [
+       1050,
+       1400
+      ],
+      "decay_ms": 18,
+      "length": 0.23,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002,
+     "gain_db": -12
+    }
+   ]
+  },
+  "failed": {
+   "role": "feedback",
+   "length": 0.16,
+   "decay_s": 0.08,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       525,
+       394
+      ],
+      "decay_ms": 18,
+      "length": 0.19,
+      "partials": [
+       [
+        2,
+        -16
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 1100,
+     "soften_s": 0.002
+    },
+    {
+     "tone": {
+      "hz": [
+       441,
+       331
+      ],
+      "decay_ms": 18,
+      "length": 0.19,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 1100,
+     "soften_s": 0.002,
+     "gain_db": -3
+    }
+   ]
+  },
+  "carry": {
+   "role": "nav",
+   "length": 0.07,
+   "decay_s": 0.03,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       600,
+       450
+      ],
+      "decay_ms": 11,
+      "length": 0.09,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002
+    },
+    {
+     "tone": {
+      "hz": [
+       400,
+       300
+      ],
+      "decay_ms": 11,
+      "length": 0.09,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002,
+     "gain_db": -8
+    }
+   ]
+  },
+  "peel": {
+   "role": "nav",
+   "length": 0.06,
+   "decay_s": 0.025,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       700,
+       1400
+      ],
+      "decay_ms": 16,
+      "length": 0.07,
+      "partials": [
+       [
+        2,
+        -16
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.004
+    }
+   ]
+  },
+  "stick": {
+   "role": "nav",
+   "length": 0.07,
+   "decay_s": 0.03,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       1400,
+       700
+      ],
+      "decay_ms": 16,
+      "length": 0.08,
+      "partials": [
+       [
+        2,
+        -16
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.004
+    },
+    {
+     "tone": {
+      "hz": [
+       600,
+       450
+      ],
+      "decay_ms": 7,
+      "length": 0.06,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002,
+     "gain_db": -2
+    }
+   ]
+  },
+  "press_a": {
+   "role": "nav",
+   "length": 0.07,
+   "decay_s": 0.03,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       587,
+       660
+      ],
+      "decay_ms": 18,
+      "length": 0.08,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 2500,
+     "soften_s": 0.008
+    }
+   ]
+  },
+  "open_x": {
+   "role": "action",
+   "length": 0.12,
+   "decay_s": 0.04,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       587,
+       587
+      ],
+      "decay_ms": 22,
+      "length": 0.05,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.003
+    },
+    {
+     "tone": {
+      "hz": [
+       740,
+       740
+      ],
+      "decay_ms": 22,
+      "length": 0.05,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.003,
+     "delay": 0.022
+    },
+    {
+     "tone": {
+      "hz": [
+       880,
+       880
+      ],
+      "decay_ms": 30,
+      "length": 0.07,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.003,
+     "delay": 0.044
+    }
+   ]
+  },
+  "open_y": {
+   "role": "action",
+   "length": 0.15,
+   "decay_s": 0.05,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       587,
+       587
+      ],
+      "decay_ms": 30,
+      "length": 0.05,
+      "partials": [
+       [
+        2,
+        -12
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.003,
+     "delay": 0.0
+    },
+    {
+     "tone": {
+      "hz": [
+       740,
+       740
+      ],
+      "decay_ms": 30,
+      "length": 0.05,
+      "partials": [
+       [
+        2,
+        -12
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.003,
+     "delay": 0.036
+    },
+    {
+     "tone": {
+      "hz": [
+       880,
+       880
+      ],
+      "decay_ms": 40,
+      "length": 0.07,
+      "partials": [
+       [
+        2,
+        -12
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.003,
+     "delay": 0.072
+    }
+   ]
+  },
+  "switch_on": {
+   "role": "nav",
+   "length": 0.04,
+   "decay_s": 0.015,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       880,
+       880
+      ],
+      "decay_ms": 14,
+      "length": 0.05,
+      "partials": [
+       [
+        2.76,
+        -6
+       ],
+       [
+        5.4,
+        -18
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002
+    }
+   ]
+  },
+  "switch_off": {
+   "role": "nav",
+   "length": 0.04,
+   "decay_s": 0.015,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       587,
+       587
+      ],
+      "decay_ms": 14,
+      "length": 0.05,
+      "partials": [
+       [
+        2.76,
+        -6
+       ],
+       [
+        5.4,
+        -18
+       ]
+      ]
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.002
+    }
+   ]
+  },
+  "close_small": {
+   "role": "nav",
+   "length": 0.07,
+   "decay_s": 0.03,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       900,
+       600
+      ],
+      "decay_ms": 25,
+      "length": 0.09,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.01
+    }
+   ]
+  },
+  "swap": {
+   "role": "nav",
+   "length": 0.09,
+   "decay_s": 0.035,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       660,
+       494
+      ],
+      "decay_ms": 25,
+      "length": 0.1,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.006
+    },
+    {
+     "tone": {
+      "hz": [
+       494,
+       660
+      ],
+      "decay_ms": 25,
+      "length": 0.1,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 4000,
+     "soften_s": 0.006,
+     "gain_db": -2
+    }
+   ]
+  },
+  "key": {
+   "role": "key",
+   "length": 0.22,
+   "decay_s": 0.12,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       440,
+       440
+      ],
+      "decay_ms": 55,
+      "length": 0.26,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 1800,
+     "soften_s": 0.02
+    }
+   ]
+  },
+  "ring_open": {
+   "role": "action",
+   "length": 0.34,
+   "decay_s": 0.16,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       330,
+       494
+      ],
+      "decay_ms": 120,
+      "length": 0.36,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 2500,
+     "soften_s": 0.015
+    },
+    {
+     "tone": {
+      "hz": [
+       336,
+       502
+      ],
+      "decay_ms": 120,
+      "length": 0.36,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 2500,
+     "soften_s": 0.015,
+     "gain_db": -6
+    }
+   ]
+  },
+  "ring_close": {
+   "role": "action",
+   "length": 0.34,
+   "decay_s": 0.16,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       494,
+       330
+      ],
+      "decay_ms": 120,
+      "length": 0.36,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 2500,
+     "soften_s": 0.015
+    },
+    {
+     "tone": {
+      "hz": [
+       502,
+       336
+      ],
+      "decay_ms": 120,
+      "length": 0.36,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 2500,
+     "soften_s": 0.015,
+     "gain_db": -6
+    }
+   ]
+  }
+ },
+ "validated": {
+  "step": {
+   "date": "2026-10-16",
+   "by": "the user, on the device: \"absolument parfait\"",
+   "recipe_sha256": "8dcc38796f37b7d8ec02f6737ff491edea9ea7665773261b3bba2eaaf7d185a3"
+  },
+  "step_low": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "9950b816de7311b35861bc4734f92a59f25beddc3ea29197ea8e7ee3dcb77fac"
+  },
+  "step_high": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "f93802ea8e2984fc938c1e6e3b7583ea8e1c6d2b8fbf92e56dfe5247f49b9d7b"
+  },
+  "jump": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "e0ca50313953bca719078c4ca6fadaa504303fad8d3d9f25da5fa21b1cf57be3"
+  },
+  "open": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "3982e84cb2ab8b427f68f03cfecfa87a6c42d50a42dc40ac419f94eef7a4832b"
+  },
+  "open_small": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "79d787e6e036fd3bd80e966e244662f9de7861bf6fd789a0fb6ab14c9ae01a2e"
+  },
+  "succeeded": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "209ee2509ab4da92c9bc4104f4f6f7237424f4667eef8ad1c05ab69bc2612dfa"
+  },
+  "failed": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "4962d784e1726b4990ee1e78c64e490d390690dbc122ecd8ca30fe4f82ce60c4"
+  },
+  "peel": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "5b4d791c63c5757b36e37df0be3116b948c3ecc8e7274a0936aed39e83eede5b"
+  },
+  "carry": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "29c740641f09c5c073f6b575a8539e52d00be02802db82437e03a5f0aaa483df"
+  },
+  "stick": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "4e84157d592ca1bed1e13f5ff9b9a0dea5e1cf9c7913bde1e3dc0e147a067fb5"
+  },
+  "switch_on": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "826475f9b9484f61d3c626b23b3adf12e042604f3d88c32f15cf7642275dcc44"
+  },
+  "switch_off": {
+   "date": "2026-10-23",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "90b66ab05a68abd7cde268785b40bfce8d2bd58857050243effbdc47c7d0242f"
+  },
+  "open_x": {
+   "date": "2026-10-25",
+   "by": "the user, listening on the device: \"je valide A, Y et X\"",
+   "recipe_sha256": "5d2a5565301bd7a1a48b0c63030ec3cccfb15c973e71417fd9a8aa6ea38bf3fb"
+  },
+  "open_y": {
+   "date": "2026-10-25",
+   "by": "the user, listening on the device: \"je valide A, Y et X\"",
+   "recipe_sha256": "cfde4ec30ef938ec0e101f50cafe07a89a52a8254f021bb9605856b3a6e05c8e"
+  },
+  "close_small": {
+   "date": "2026-10-29",
+   "by": "the user, validating the screens before the games' shelf",
+   "recipe_sha256": "b5503bc0b1fac2094a9e5ec43a3a548e78284d8a8e6a4fc0b1f02263ed38a885"
+  },
+  "press_a": {
+   "date": "2026-10-29",
+   "by": "the user, choosing it among three: \"ok pour b\"",
+   "recipe_sha256": "de73e99c960ba46b321a03e7b12bcbc64c8e0c8ccf11990c4e52de8bccd713f8"
+  },
+  "key": {
+   "date": "2026-10-29",
+   "by": "the user, validating every screen before the ring",
+   "recipe_sha256": "4b32fb943e32d42123bdb5121d8fee87c7a6914d6d9ad75f6a4549f0eeb9e9d9"
+  }
+ },
+ "reviews": {
+  "step": {
+   "status": "validated",
+   "note": "validé sur la console : « absolument parfait »"
+  },
+  "step_low": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "step_high": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "jump": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "open": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "open_small": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "succeeded": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "failed": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "carry": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "peel": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "stick": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "press_a": {
+   "status": "validated",
+   "note": "choisi (29/10) : « ok pour b, applique le partout »"
+  },
+  "open_x": {
+   "status": "validated",
+   "note": "validé à l'écoute (25/10) : « je valide A, Y et X »"
+  },
+  "open_y": {
+   "status": "validated",
+   "note": "validé à l'écoute (25/10) : « je valide A, Y et X »"
+  },
+  "switch_on": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "switch_off": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "close_small": {
+   "status": "validated",
+   "note": "validé (29/10) avec les écrans d'avant l'étagère des jeux"
+  },
+  "swap": {
+   "status": "untreated",
+   "note": "nouveau (29/10) : passer à un autre modèle de la console"
+  },
+  "key": {
+   "status": "validated",
+   "note": "validé (29/10) avec les écrans jusqu'à la roue"
+  },
+  "ring_open": {
+   "status": "untreated",
+   "note": "nouveau (29/10) : ouvrir la roue, un son à elle"
+  },
+  "ring_close": {
+   "status": "untreated",
+   "note": "nouveau (29/10) : fermer la roue, un son à elle"
+  }
+ },
+ "cues": {
+  "move": "step_high",
+  "game": "step",
+  "console": "step_low",
+  "letter": "jump",
+  "select": "press_a",
+  "back": "close_small",
+  "open": "open",
+  "add_ball": "open_small",
+  "properties": "open_x",
+  "settings": "open_y",
+  "type": "key",
+  "erase": "key",
+  "toggle": "switch_on",
+  "untoggle": "switch_off",
+  "peel": "peel",
+  "carry": "carry",
+  "place": "stick",
+  "success": "succeeded",
+  "error": "failed",
+  "welcome": null,
+  "model": "swap",
+  "volume": "step_high",
+  "launch": null,
+  "remove": null,
+  "return": null,
+  "art_done": null,
+  "regions": "switch_on",
+  "letters": "switch_off",
+  "ring_open": "ring_open",
+  "ring_close": "ring_close"
+ },
+ "board": {
+  "categories": [
+   [
+    "Se déplacer",
+    [
+     "step",
+     "step_low",
+     "step_high",
+     "jump"
+    ]
+   ],
+   [
+    "Les boutons de la manette",
+    [
+     "press_a",
+     "open_x",
+     "open_y",
+     "close_small"
+    ]
+   ],
+   [
+    "Entrer",
+    [
+     "open",
+     "open_small"
+    ]
+   ],
+   [
+    "Cocher",
+    [
+     "switch_on",
+     "switch_off"
+    ]
+   ],
+   [
+    "Le résultat",
+    [
+     "succeeded",
+     "failed"
+    ]
+   ],
+   [
+    "La roue des consoles",
+    [
+     "ring_open",
+     "ring_close",
+     "peel",
+     "carry",
+     "stick"
+    ]
+   ],
+   [
+    "Les modèles d'une console",
+    [
+     "swap"
+    ]
+   ],
+   [
+    "Le clavier de recherche",
+    [
+     "key"
+    ]
+   ]
+  ],
+  "labels": {
+   "step": "Pas",
+   "step_low": "Pas grave",
+   "step_high": "Pas aigu",
+   "jump": "Saut",
+   "open": "Ouvrir",
+   "open_small": "Ouvrir petit",
+   "succeeded": "Réussi",
+   "failed": "Raté",
+   "carry": "Pas porté",
+   "peel": "Décoller",
+   "stick": "Recoller",
+   "press_a": "A · choisir",
+   "open_x": "X · propriétés",
+   "open_y": "Y · réglages",
+   "switch_on": "Cocher",
+   "switch_off": "Décocher",
+   "close_small": "B · revenir, fermer",
+   "swap": "Changer de modèle",
+   "key": "Touche · taper, effacer",
+   "ring_open": "Roue · ouvrir",
+   "ring_close": "Roue · fermer"
+  }
+ },
+ "candidates": {},
+ "screens": [
+  [
+   "L'écran de titre (au premier lancement seulement)",
+   [
+    [
+     "il apparaît",
+     "welcome"
+    ],
+    [
+     "un bouton pour passer",
+     "select"
+    ]
+   ]
+  ],
+  [
+   "Les premiers réglages (style de boutons, région préférée, autorisation)",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "choisir",
+     "select"
+    ],
+    [
+     "« Plus tard »",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "L'écran « Aucune console »",
+   [
+    [
+     "« Ajouter »",
+     "select"
+    ],
+    [
+     "Y, les réglages",
+     "settings"
+    ]
+   ]
+  ],
+  [
+   "Le carrousel des consoles",
+   [
+    [
+     "console suivante ou précédente",
+     "console"
+    ],
+    [
+     "maintenir ↑ : le « + » devient un bouton",
+     "add_ball"
+    ],
+    [
+     "A : entrer dans la console",
+     "select"
+    ],
+    [
+     "A sur « Ajouter une plateforme »",
+     "select"
+    ],
+    [
+     "X : les propriétés de la console",
+     "properties"
+    ],
+    [
+     "Y : les réglages",
+     "settings"
+    ],
+    [
+     "↓ : la roue pour ranger",
+     "ring_open"
+    ]
+   ]
+  ],
+  [
+   "L'étagère des jeux",
+   [
+    [
+     "jeu suivant ou précédent",
+     "game"
+    ],
+    [
+     "A : lancer le jeu",
+     "launch"
+    ],
+    [
+     "lancement refusé (pas d'émulateur, fichier introuvable)",
+     "error"
+    ],
+    [
+     "retour de l'émulateur",
+     "return"
+    ],
+    [
+     "B : retour aux consoles",
+     "back"
+    ],
+    [
+     "B : effacer le filtre gardé",
+     "back"
+    ],
+    [
+     "↓ : le clavier de recherche",
+     "open"
+    ],
+    [
+     "X : les propriétés du jeu",
+     "properties"
+    ],
+    [
+     "Y : les réglages",
+     "settings"
+    ],
+    [
+     "une étiquette téléchargée",
+     "art_done"
+    ]
+   ]
+  ],
+  [
+   "Le clavier de recherche",
+   [
+    [
+     "bouger sur les lettres ou les régions",
+     "move"
+    ],
+    [
+     "taper une lettre : la note glisse de la précédente à la nouvelle, plus haut à mesure que la liste se resserre, plus longtemps quand l'écart est grand",
+     "type"
+    ],
+    [
+     "effacer une lettre : la note redescend en glissant",
+     "erase"
+    ],
+    [
+     "L1 / R1 : lettre précédente ou suivante",
+     "letter"
+    ],
+    [
+     "↓ : passer des lettres aux régions",
+     "regions"
+    ],
+    [
+     "↓ : revenir des régions aux lettres",
+     "letters"
+    ],
+    [
+     "fermer (↑, Start, ou B quand rien n'est tapé)",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "Les propriétés d'un jeu",
+   [
+    [
+     "bouger entre l'étiquette et le nom",
+     "move"
+    ],
+    [
+     "A : voir les images",
+     "open"
+    ],
+    [
+     "image suivante",
+     "move"
+    ],
+    [
+     "image gardée",
+     "success"
+    ],
+    [
+     "image pas gardée",
+     "error"
+    ],
+    [
+     "A : « Mon image »",
+     "select"
+    ],
+    [
+     "mon image cadrée, gardée",
+     "success"
+    ],
+    [
+     "A : le clavier du nom",
+     "open"
+    ],
+    [
+     "bouger sur le clavier",
+     "move"
+    ],
+    [
+     "taper une lettre",
+     "type"
+    ],
+    [
+     "effacer",
+     "erase"
+    ],
+    [
+     "nom gardé",
+     "success"
+    ],
+    [
+     "nom pas gardé",
+     "error"
+    ],
+    [
+     "B : revenir",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "Les propriétés d'une console",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "A : « Changer de place » (la roue)",
+     "ring_open"
+    ],
+    [
+     "A : « Modèle » (la mosaïque)",
+     "open"
+    ],
+    [
+     "passer à un autre modèle",
+     "model"
+    ],
+    [
+     "A : garder ce modèle",
+     "select"
+    ],
+    [
+     "B : revenir",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "La roue pour ranger les consoles",
+   [
+    [
+     "elle s'ouvre",
+     "ring_open"
+    ],
+    [
+     "curseur sur la console suivante",
+     "console"
+    ],
+    [
+     "A : prendre la console (l'autocollant se décolle)",
+     "peel"
+    ],
+    [
+     "la déplacer en la tenant",
+     "carry"
+    ],
+    [
+     "A : la poser (il se recolle)",
+     "place"
+    ],
+    [
+     "B : la lâcher à sa place d'avant",
+     "place"
+    ],
+    [
+     "B : fermer la roue",
+     "ring_close"
+    ]
+   ]
+  ],
+  [
+   "Le formulaire d'ajout d'une console (et « Modifier la plateforme »)",
+   [
+    [
+     "bouger entre les lignes",
+     "move"
+    ],
+    [
+     "← → : un autre modèle de la console",
+     "move"
+    ],
+    [
+     "A : la liste des consoles ou des émulateurs, le dossier",
+     "select"
+    ],
+    [
+     "faire défiler la liste",
+     "move"
+    ],
+    [
+     "choisir dans la liste",
+     "select"
+    ],
+    [
+     "B : quitter la liste",
+     "back"
+    ],
+    [
+     "cocher (sous-dossiers, disques)",
+     "toggle"
+    ],
+    [
+     "décocher",
+     "untoggle"
+    ],
+    [
+     "A : « Ajouter »",
+     "select"
+    ],
+    [
+     "A : « Supprimer »",
+     "remove"
+    ],
+    [
+     "« Annuler » ou B",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "L'arrivée d'une nouvelle console",
+   [
+    [
+     "dans la roue : déplacer l'endroit où elle ira",
+     "carry"
+    ],
+    [
+     "elle se recolle à sa place dans la roue",
+     "place"
+    ]
+   ]
+  ],
+  [
+   "Les réglages",
+   [
+    [
+     "ils s'ouvrent (Y)",
+     "settings"
+    ],
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "A sur une ligne",
+     "select"
+    ],
+    [
+     "« Jeux qui flottent » : cocher",
+     "toggle"
+    ],
+    [
+     "« Jeux qui flottent » : décocher",
+     "untoggle"
+    ],
+    [
+     "le volume des sons : un cran (joué au nouveau volume)",
+     "volume"
+    ],
+    [
+     "B : fermer",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "Les écrans des réglages (style de boutons, lissage, région, plateformes)",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "choisir",
+     "select"
+    ],
+    [
+     "B : revenir",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "La confirmation de suppression",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "« Annuler » ou B",
+     "back"
+    ],
+    [
+     "« Supprimer »",
+     "remove"
+    ],
+    [
+     "suppression ratée",
+     "error"
+    ]
+   ]
+  ]
+ ]
+}

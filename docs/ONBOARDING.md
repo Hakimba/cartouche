@@ -40,6 +40,8 @@ code: it only describes what exists.
 
 The same words are used in the code, the tests and this document.
 
+- **Cue**: one gesture of a screen as it sounds (`MOVE`, `CONSOLE`, `SELECT`…), played with
+  `Sounds.play`; it plays one sound of `app/audio/sfx`, or none, as `dev/audio/sounds.json` says.
 - **Platform**: a console, as a Daijishō definition describes it (`ps2`). Its **profile** adds the
   **media** its games are shown as (DVD, cartridge, mini-disc) and the size under which an unknown
   file is not a game.
@@ -1036,6 +1038,26 @@ one touches no other file but the list of media still to be made in its test.
   `dev/export_console.sh <medium>` take a medium's folder as they take a console's (its last view
   from below, its label blank or the image given; its kind, label areas and dimensions' hash in its
   `.model.json`).
+
+## Sounds
+
+One table says which gesture of which screen plays which sound: `dev/audio/sounds.json`. Its
+`screens` list every screen with its gestures, each with its cue; `cues` give each cue its sound,
+or none (silent); `sounds` are the recipes, each a few pure tones, and `roles` their levels. A sound
+the maintainers validated by ear is locked (`validated`, the recipe's sha256).
+
+- `python3 dev/audio/sfx.py render` makes the sounds into `app/audio/sfx` and the app's table,
+  `app/audio/cues.json` (needs ffmpeg, sox, numpy, scipy).
+- `python3 dev/audio/sfx.py qa` measures each against its role (length, peak, loudness, attack,
+  softness, one event, no click) and fails on any miss; `dev/audio/test_sfx.py` proves each check.
+- `python3 dev/audio/sfx.py map` writes `build/sound-map/index.html`: every screen, its gestures and
+  their sounds, to listen to in a browser.
+
+In the app, `SoundEffects` (the `Sounds` autoload) holds one player per cue on the `UI` bus. A
+gesture's sound is one `Sounds.play(SoundEffects.Cue.X)` where the gesture happens, never more than
+one per press. A screen whose focus moves sound joins the `SoundEffects.MOVES` group: a focus moved
+by a direction then plays `MOVE`. A new gesture: add its cue to `cues` and to its screen in
+`screens`, render, then play it.
 
 ## Writing tests
 

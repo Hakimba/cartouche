@@ -221,9 +221,12 @@ mouse_filter = 2
 [node name="Content" type="VBoxContainer" parent="ArtProgress"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 12
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
 theme_override_constants/separation = 8
 
 [node name="Bar" type="ProgressBar" parent="ArtProgress/Content"]
@@ -238,6 +241,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"Status"
 horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="GamesLogo" type="TextureRect" parent="."]
 unique_name_in_owner = true

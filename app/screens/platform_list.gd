@@ -33,9 +33,14 @@ class Tile:
 		resized.connect(func() -> void: logo.position = (size - logo.size) / 2.0)
 
 
+func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
+		Sounds.play(SoundEffects.Cue.BACK)
 		chosen.emit(-1)
 
 
@@ -47,7 +52,7 @@ func open(platforms: Array[AndroidServices.Platform], focus: int) -> void:
 	for i in platforms.size():
 		var manifest: ConsoleManifest = models.get(platforms[i].id)
 		var tile := Tile.new(platforms[i], ConsoleManifest.folder_of(manifest))
-		tile.pressed.connect(chosen.emit.bind(i))
+		tile.pressed.connect(_choose.bind(i))
 		_rows.add_child(tile)
 	for i in platforms.size():
 		var tile := _rows.get_child(i) as Control
@@ -60,3 +65,8 @@ func open(platforms: Array[AndroidServices.Platform], focus: int) -> void:
 		var down := mini(i + COLUMNS, platforms.size() - 1) if below < platforms.size() else i
 		tile.focus_neighbor_bottom = tile.get_path_to(_rows.get_child(down))
 	(_rows.get_child(clampi(focus, 0, platforms.size() - 1)) as Control).grab_focus()
+
+
+func _choose(index: int) -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
+	chosen.emit(index)

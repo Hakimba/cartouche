@@ -70,6 +70,7 @@ var _ink: Control
 
 
 func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
 	_panel.pivot_offset = _panel.size / 2.0
 	_rows.assign([_platforms, _button_style, _graphics, _floating, _region])
 	_card = SatinPanel.Backing.new(_panel, StudioTokens.Look.SATIN)
@@ -136,6 +137,7 @@ func enter() -> void:
 
 
 func _reverse(opening: bool) -> void:
+	Sounds.play(SoundEffects.Cue.SETTINGS if opening else SoundEffects.Cue.BACK)
 	if state == State.OPEN:
 		_closing = true
 		_time = 0.0
@@ -329,18 +331,22 @@ func _region_name(region: String) -> String:
 
 
 func _on_platforms_pressed() -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	chosen.emit(&"platforms")
 
 
 func _on_button_style_pressed() -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	chosen.emit(&"button_style")
 
 
 func _on_graphics_pressed() -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	chosen.emit(&"graphics")
 
 
 func _on_region_pressed() -> void:
+	Sounds.play(SoundEffects.Cue.SELECT)
 	chosen.emit(&"region")
 
 

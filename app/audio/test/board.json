@@ -1,0 +1,618 @@
+{
+ "sounds": {
+  "step": {
+   "status": "validated",
+   "note": "validé sur la console : « absolument parfait »"
+  },
+  "step_low": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "step_high": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "jump": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "open": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "open_small": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "succeeded": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "failed": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "carry": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "peel": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "stick": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "press_a": {
+   "status": "validated",
+   "note": "choisi (29/10) : « ok pour b, applique le partout »"
+  },
+  "open_x": {
+   "status": "validated",
+   "note": "validé à l'écoute (25/10) : « je valide A, Y et X »"
+  },
+  "open_y": {
+   "status": "validated",
+   "note": "validé à l'écoute (25/10) : « je valide A, Y et X »"
+  },
+  "switch_on": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "switch_off": {
+   "status": "validated",
+   "note": "validé à l'écoute (23/10)"
+  },
+  "close_small": {
+   "status": "validated",
+   "note": "validé (29/10) avec les écrans d'avant l'étagère des jeux"
+  },
+  "swap": {
+   "status": "untreated",
+   "note": "nouveau (29/10) : passer à un autre modèle de la console"
+  },
+  "key": {
+   "status": "validated",
+   "note": "validé (29/10) avec les écrans jusqu'à la roue"
+  },
+  "ring_open": {
+   "status": "untreated",
+   "note": "nouveau (29/10) : ouvrir la roue, un son à elle"
+  },
+  "ring_close": {
+   "status": "untreated",
+   "note": "nouveau (29/10) : fermer la roue, un son à elle"
+  }
+ },
+ "categories": [
+  [
+   "Se déplacer",
+   [
+    "step",
+    "step_low",
+    "step_high",
+    "jump"
+   ]
+  ],
+  [
+   "Les boutons de la manette",
+   [
+    "press_a",
+    "open_x",
+    "open_y",
+    "close_small"
+   ]
+  ],
+  [
+   "Entrer",
+   [
+    "open",
+    "open_small"
+   ]
+  ],
+  [
+   "Cocher",
+   [
+    "switch_on",
+    "switch_off"
+   ]
+  ],
+  [
+   "Le résultat",
+   [
+    "succeeded",
+    "failed"
+   ]
+  ],
+  [
+   "La roue des consoles",
+   [
+    "ring_open",
+    "ring_close",
+    "peel",
+    "carry",
+    "stick"
+   ]
+  ],
+  [
+   "Les modèles d'une console",
+   [
+    "swap"
+   ]
+  ],
+  [
+   "Le clavier de recherche",
+   [
+    "key"
+   ]
+  ]
+ ],
+ "labels": {
+  "step": "Pas",
+  "step_low": "Pas grave",
+  "step_high": "Pas aigu",
+  "jump": "Saut",
+  "open": "Ouvrir",
+  "open_small": "Ouvrir petit",
+  "succeeded": "Réussi",
+  "failed": "Raté",
+  "carry": "Pas porté",
+  "peel": "Décoller",
+  "stick": "Recoller",
+  "press_a": "A · choisir",
+  "open_x": "X · propriétés",
+  "open_y": "Y · réglages",
+  "switch_on": "Cocher",
+  "switch_off": "Décocher",
+  "close_small": "B · revenir, fermer",
+  "swap": "Changer de modèle",
+  "key": "Touche · taper, effacer",
+  "ring_open": "Roue · ouvrir",
+  "ring_close": "Roue · fermer"
+ },
+ "screens": [
+  [
+   "L'écran de titre (au premier lancement seulement)",
+   [
+    [
+     "il apparaît",
+     "welcome"
+    ],
+    [
+     "un bouton pour passer",
+     "select"
+    ]
+   ]
+  ],
+  [
+   "Les premiers réglages (style de boutons, région préférée, autorisation)",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "choisir",
+     "select"
+    ],
+    [
+     "« Plus tard »",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "L'écran « Aucune console »",
+   [
+    [
+     "« Ajouter »",
+     "select"
+    ],
+    [
+     "Y, les réglages",
+     "settings"
+    ]
+   ]
+  ],
+  [
+   "Le carrousel des consoles",
+   [
+    [
+     "console suivante ou précédente",
+     "console"
+    ],
+    [
+     "maintenir ↑ : le « + » devient un bouton",
+     "add_ball"
+    ],
+    [
+     "A : entrer dans la console",
+     "select"
+    ],
+    [
+     "A sur « Ajouter une plateforme »",
+     "select"
+    ],
+    [
+     "X : les propriétés de la console",
+     "properties"
+    ],
+    [
+     "Y : les réglages",
+     "settings"
+    ],
+    [
+     "↓ : la roue pour ranger",
+     "ring_open"
+    ]
+   ]
+  ],
+  [
+   "L'étagère des jeux",
+   [
+    [
+     "jeu suivant ou précédent",
+     "game"
+    ],
+    [
+     "A : lancer le jeu",
+     "launch"
+    ],
+    [
+     "lancement refusé (pas d'émulateur, fichier introuvable)",
+     "error"
+    ],
+    [
+     "retour de l'émulateur",
+     "return"
+    ],
+    [
+     "B : retour aux consoles",
+     "back"
+    ],
+    [
+     "B : effacer le filtre gardé",
+     "back"
+    ],
+    [
+     "↓ : le clavier de recherche",
+     "open"
+    ],
+    [
+     "X : les propriétés du jeu",
+     "properties"
+    ],
+    [
+     "Y : les réglages",
+     "settings"
+    ],
+    [
+     "une étiquette téléchargée",
+     "art_done"
+    ]
+   ]
+  ],
+  [
+   "Le clavier de recherche",
+   [
+    [
+     "bouger sur les lettres ou les régions",
+     "move"
+    ],
+    [
+     "taper une lettre : la note glisse de la précédente à la nouvelle, plus haut à mesure que la liste se resserre, plus longtemps quand l'écart est grand",
+     "type"
+    ],
+    [
+     "effacer une lettre : la note redescend en glissant",
+     "erase"
+    ],
+    [
+     "L1 / R1 : lettre précédente ou suivante",
+     "letter"
+    ],
+    [
+     "↓ : passer des lettres aux régions",
+     "regions"
+    ],
+    [
+     "↓ : revenir des régions aux lettres",
+     "letters"
+    ],
+    [
+     "fermer (↑, Start, ou B quand rien n'est tapé)",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "Les propriétés d'un jeu",
+   [
+    [
+     "bouger entre l'étiquette et le nom",
+     "move"
+    ],
+    [
+     "A : voir les images",
+     "open"
+    ],
+    [
+     "image suivante",
+     "move"
+    ],
+    [
+     "image gardée",
+     "success"
+    ],
+    [
+     "image pas gardée",
+     "error"
+    ],
+    [
+     "A : « Mon image »",
+     "select"
+    ],
+    [
+     "mon image cadrée, gardée",
+     "success"
+    ],
+    [
+     "A : le clavier du nom",
+     "open"
+    ],
+    [
+     "bouger sur le clavier",
+     "move"
+    ],
+    [
+     "taper une lettre",
+     "type"
+    ],
+    [
+     "effacer",
+     "erase"
+    ],
+    [
+     "nom gardé",
+     "success"
+    ],
+    [
+     "nom pas gardé",
+     "error"
+    ],
+    [
+     "B : revenir",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "Les propriétés d'une console",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "A : « Changer de place » (la roue)",
+     "ring_open"
+    ],
+    [
+     "A : « Modèle » (la mosaïque)",
+     "open"
+    ],
+    [
+     "passer à un autre modèle",
+     "model"
+    ],
+    [
+     "A : garder ce modèle",
+     "select"
+    ],
+    [
+     "B : revenir",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "La roue pour ranger les consoles",
+   [
+    [
+     "elle s'ouvre",
+     "ring_open"
+    ],
+    [
+     "curseur sur la console suivante",
+     "console"
+    ],
+    [
+     "A : prendre la console (l'autocollant se décolle)",
+     "peel"
+    ],
+    [
+     "la déplacer en la tenant",
+     "carry"
+    ],
+    [
+     "A : la poser (il se recolle)",
+     "place"
+    ],
+    [
+     "B : la lâcher à sa place d'avant",
+     "place"
+    ],
+    [
+     "B : fermer la roue",
+     "ring_close"
+    ]
+   ]
+  ],
+  [
+   "Le formulaire d'ajout d'une console (et « Modifier la plateforme »)",
+   [
+    [
+     "bouger entre les lignes",
+     "move"
+    ],
+    [
+     "← → : un autre modèle de la console",
+     "move"
+    ],
+    [
+     "A : la liste des consoles ou des émulateurs, le dossier",
+     "select"
+    ],
+    [
+     "faire défiler la liste",
+     "move"
+    ],
+    [
+     "choisir dans la liste",
+     "select"
+    ],
+    [
+     "B : quitter la liste",
+     "back"
+    ],
+    [
+     "cocher (sous-dossiers, disques)",
+     "toggle"
+    ],
+    [
+     "décocher",
+     "untoggle"
+    ],
+    [
+     "A : « Ajouter »",
+     "select"
+    ],
+    [
+     "A : « Supprimer »",
+     "remove"
+    ],
+    [
+     "« Annuler » ou B",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "L'arrivée d'une nouvelle console",
+   [
+    [
+     "dans la roue : déplacer l'endroit où elle ira",
+     "carry"
+    ],
+    [
+     "elle se recolle à sa place dans la roue",
+     "place"
+    ]
+   ]
+  ],
+  [
+   "Les réglages",
+   [
+    [
+     "ils s'ouvrent (Y)",
+     "settings"
+    ],
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "A sur une ligne",
+     "select"
+    ],
+    [
+     "« Jeux qui flottent » : cocher",
+     "toggle"
+    ],
+    [
+     "« Jeux qui flottent » : décocher",
+     "untoggle"
+    ],
+    [
+     "le volume des sons : un cran (joué au nouveau volume)",
+     "volume"
+    ],
+    [
+     "B : fermer",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "Les écrans des réglages (style de boutons, lissage, région, plateformes)",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "choisir",
+     "select"
+    ],
+    [
+     "B : revenir",
+     "back"
+    ]
+   ]
+  ],
+  [
+   "La confirmation de suppression",
+   [
+    [
+     "bouger",
+     "move"
+    ],
+    [
+     "« Annuler » ou B",
+     "back"
+    ],
+    [
+     "« Supprimer »",
+     "remove"
+    ],
+    [
+     "suppression ratée",
+     "error"
+    ]
+   ]
+  ]
+ ],
+ "cues": {
+  "move": "step_high",
+  "game": "step",
+  "console": "step_low",
+  "letter": "jump",
+  "select": "press_a",
+  "back": "close_small",
+  "open": "open",
+  "add_ball": "open_small",
+  "properties": "open_x",
+  "settings": "open_y",
+  "type": "key",
+  "erase": "key",
+  "toggle": "switch_on",
+  "untoggle": "switch_off",
+  "peel": "peel",
+  "carry": "carry",
+  "place": "stick",
+  "success": "succeeded",
+  "error": "failed",
+  "welcome": null,
+  "model": "swap",
+  "volume": "step_high",
+  "launch": null,
+  "remove": null,
+  "return": null,
+  "art_done": null,
+  "regions": "switch_on",
+  "letters": "switch_off",
+  "ring_open": "ring_open",
+  "ring_close": "ring_close"
+ }
+}

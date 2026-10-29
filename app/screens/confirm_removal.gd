@@ -12,9 +12,14 @@ signal answered(remove: bool)
 @onready var _cancel: Button = %Cancel
 
 
+func _ready() -> void:
+	add_to_group(SoundEffects.MOVES)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
+		Sounds.play(SoundEffects.Cue.BACK)
 		answered.emit(false)
 
 
@@ -34,8 +39,10 @@ func open(platform_name: String, games: int, volume: StringName) -> void:
 
 
 func _on_cancel_pressed() -> void:
+	Sounds.play(SoundEffects.Cue.BACK)
 	answered.emit(false)
 
 
 func _on_remove_pressed() -> void:
+	Sounds.play(SoundEffects.Cue.REMOVE)
 	answered.emit(true)

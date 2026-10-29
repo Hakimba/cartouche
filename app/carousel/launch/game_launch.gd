@@ -82,6 +82,7 @@ func _notification(what: int) -> void:
 			Stage.STARTING_LEFT:
 				_enter(Stage.STARTING_BACK)
 			Stage.AWAY_LEFT:
+				Sounds.play(SoundEffects.Cue.RETURN)
 				_show_carousel()
 
 

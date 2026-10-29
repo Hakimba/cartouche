@@ -646,3 +646,18 @@ func test_the_note_s_dot_shows_only_beside_games_found_whatever_colour_the_form_
 	form._draw_note()
 	form._paint(Color.BLUE)
 	assert_bool(form._dot._box.has_area()).is_false()
+
+
+func test_arrows_beside_the_model_show_while_left_and_right_change_it_and_the_one_pressed_nudges() -> void:
+	var device := _new_device()
+	var carousel := await Fixtures.on_form(self, device)
+	var form := _the_form(carousel)
+	assert_bool(form._arrows.all(func(arrow: TextureRect) -> bool: return arrow.visible)).is_true()
+	var rest := form._arrows[1].position.x
+	await Fixtures.action(self, &"ui_right")
+	assert_float(form._arrows[1].position.x).is_greater(rest)
+	await Fixtures.action(self, &"ui_down")
+	assert_str(Fixtures.focus(self).name).is_not_equal("Folder")
+	assert_bool(form._arrows.any(func(arrow: TextureRect) -> bool: return arrow.visible)).is_false()
+	await Fixtures.action(self, &"ui_up")
+	assert_bool(form._arrows.all(func(arrow: TextureRect) -> bool: return arrow.visible)).is_true()

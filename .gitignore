@@ -10,3 +10,7 @@ app/addons/cartouche_android/bin/
 *.keystore
 app/addons/gdUnit4
 app/override.cfg
+
+# Sound QA pictures and report, made by dev/audio/sfx.py qa
+app/audio/qa/
+__pycache__/
