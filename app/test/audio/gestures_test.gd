@@ -176,3 +176,27 @@ func test_each_press_in_the_ring_plays_its_one_sound() -> void:
 		_hush()
 		await ScreenFixtures.action(self, action)
 		assert_array(_heard()).override_failure_message(action).is_equal([case[1]])
+
+
+func test_left_and_right_on_the_sounds_line_turn_them_down_and_up_heard_at_their_new_level_and_kept() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	carousel.set_process(true)
+	Fixtures.press(carousel, &"open_settings")
+	var settings: SettingsMenu = carousel.get_node("%Screens/Settings")
+	assert_bool(await ScreenFixtures.until(self, func() -> bool: return settings.state == SettingsMenu.State.OPEN)).is_true()
+	settings._sounds.grab_focus()
+	var bus := AudioServer.get_bus_index(SoundEffects.BUS)
+	for step in SoundEffects.LEVELS + 2:
+		_hush()
+		await ScreenFixtures.action(self, &"ui_left")
+	assert_int(Sounds.level).is_equal(0)
+	assert_bool(AudioServer.is_bus_mute(bus)).is_true()
+	var kept: int = carousel.android._demo_settings["sound_level"]
+	assert_int(kept).is_equal(0)
+	_hush()
+	await ScreenFixtures.action(self, &"ui_right")
+	assert_array(_heard()).is_equal([Cue.VOLUME])
+	assert_int(Sounds.level).is_equal(1)
+	assert_bool(AudioServer.is_bus_mute(bus)).is_false()
+	assert_object(ScreenFixtures.focus(self)).is_same(settings._sounds)
+	Sounds.level = SoundEffects.LEVELS

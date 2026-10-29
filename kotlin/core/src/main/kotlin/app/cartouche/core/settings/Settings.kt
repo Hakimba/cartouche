@@ -7,6 +7,7 @@ import app.cartouche.core.library.Library
 import app.cartouche.core.regions.PreferredRegion
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.serialization.OptionSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -42,9 +43,23 @@ public enum class EdgeSmoothing {
     OFF,
 }
 
+/** How loud the app's sounds play, in [steps] from none (silenced) to [MAX]. */
+@Serializable
+@JvmInline
+public value class SoundLevel private constructor(public val steps: Int) {
+    public companion object {
+        public const val MAX: Int = 10
+        public val FULL: SoundLevel = SoundLevel(MAX)
+
+        /** The level of [steps], none outside 0 to [MAX]. */
+        public fun of(steps: Int): Option<SoundLevel> = if (steps in 0..MAX) Some(SoundLevel(steps)) else None
+    }
+}
+
 /**
  * The app's own settings, apart from the library; [preferredRegion], none until the user chooses one,
- * orders labels' images; [gamesFloat] makes the selected game sway and bob (the consoles never do).
+ * orders labels' images; [gamesFloat] makes the selected game sway and bob (the consoles never do);
+ * [soundLevel] is how loud the sounds play, full until the user turns them down.
  */
 @Serializable
 public data class Settings(
@@ -52,6 +67,7 @@ public data class Settings(
     public val edgeSmoothing: EdgeSmoothing = EdgeSmoothing.FOUR_TIMES,
     public val preferredRegion: Option<PreferredRegion> = None,
     public val gamesFloat: Boolean = false,
+    public val soundLevel: SoundLevel = SoundLevel.FULL,
 ) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An

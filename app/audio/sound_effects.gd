@@ -48,6 +48,8 @@ enum Cue {
 }
 
 const BUS := &"UI"
+## The steps of [member level], from silenced to full.
+const LEVELS := 10
 const CUES := "res://audio/cues.json"
 const REPEAT_GAP_S := 0.06
 ## How far a repeated cue strays from its pitch, either way.
@@ -70,6 +72,13 @@ const _DIRECTIONS: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_r
 ## The file of the sound of each cue, by cue name, read once.
 static var _files: Dictionary = {}
 
+## How loud the sounds play, from 0 (silenced) to [constant LEVELS], on an even scale to the ear.
+var level := LEVELS:
+	set(steps):
+		level = steps
+		var bus := AudioServer.get_bus_index(BUS)
+		AudioServer.set_bus_mute(bus, steps == 0)
+		AudioServer.set_bus_volume_db(bus, linear_to_db(float(maxi(steps, 1)) / LEVELS))
 var clock := Callable(Time, &"get_ticks_msec")
 var random := RandomNumberGenerator.new()
 

@@ -427,3 +427,6 @@ msgstr "Utilisée lorsque la région du jeu est inconnue."
 
 msgid "Adding console…"
 msgstr "Ajout de la console…"
+
+msgid "Sounds"
+msgstr "Sons"

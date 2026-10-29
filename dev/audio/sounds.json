@@ -933,6 +933,16 @@
    "date": "2026-10-29",
    "by": "the user, validating every screen before the ring",
    "recipe_sha256": "4b32fb943e32d42123bdb5121d8fee87c7a6914d6d9ad75f6a4549f0eeb9e9d9"
+  },
+  "ring_open": {
+   "date": "2026-10-29",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "1c7cedc94b6dacd745bab3e18a921f152e31d759f14b9270a19566b585ebc5b6"
+  },
+  "ring_close": {
+   "date": "2026-10-29",
+   "by": "the user, listening on the device",
+   "recipe_sha256": "b7d0d7c58152fe2c78546e43e89b0eb8b982efb4926e368ea8c131c44aef7568"
   }
  },
  "reviews": {
@@ -1013,12 +1023,12 @@
    "note": "validé (29/10) avec les écrans jusqu'à la roue"
   },
   "ring_open": {
-   "status": "untreated",
-   "note": "nouveau (29/10) : ouvrir la roue, un son à elle"
+   "status": "validated",
+   "note": "validé (29/10) : « je valide tout ça, c niquel comme c'est »"
   },
   "ring_close": {
-   "status": "untreated",
-   "note": "nouveau (29/10) : fermer la roue, un son à elle"
+   "status": "validated",
+   "note": "validé (29/10) : « je valide tout ça, c niquel comme c'est »"
   }
  },
  "cues": {
@@ -1506,7 +1516,7 @@
      "untoggle"
     ],
     [
-     "le volume des sons : un cran (joué au nouveau volume)",
+     "« Sons » : ← → baisse ou monte d'un cran (de 0, coupés, à 10), joué au nouveau volume",
      "volume"
     ],
     [

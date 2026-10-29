@@ -1,17 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name SettingsMenu
 extends Control
-## The Studio settings on the plain backdrop, with the existing choices and the games floating switch.
+## The Studio settings on the plain backdrop, with the existing choices, the games floating switch and the sounds'
+## level, which left and right turn down and up.
 
 ## [param choice] names a row, or `close` (B).
 signal chosen(choice: StringName)
 signal transition_frame(subject: float, rail: float, chrome: float)
+## Left or right on the sounds' line set them to [param steps].
+signal sound_level_changed(steps: int)
 
 static var DURATION_S: float:
 	get: return maxf(StudioTokens.TR_SETTINGS_OPEN_S, StudioTokens.TR_SETTINGS_CARD_AT_S + StudioTokens.TR_SETTINGS_CARD_S)
 const _PITCH := 89.6 # Row height plus the 7.68 px gap.
 const _ROW_SIZE := Vector2(624.64, 81.92)
-const _CARD_TOP := 172.8
+const _CARD_TOP := 128.0
 const _HEADING_INSET := Vector2(43.52, 37.4)
 ## The first row's top in the card: the design's line boxes put its text and frame a px higher than centring does.
 const _ITEMS_TOP := 143.64
@@ -22,6 +25,9 @@ const _KNOB_MIDDLE := Color("#f4efe7")
 const _KNOB_EDGE := Color("#e2d9cc")
 const _TRACK_OFF := Color("#ddd4c7")
 const SAVE_ESCAPE_MS := 2000
+## The sounds' level drawn as this many steps, right on the line, each this size and this far from the next.
+const _STEP_SIZE := Vector2(10.24, 23.04)
+const _STEP_GAP := 6.4
 
 enum State { OPENING, OPEN, CLOSING, CLOSED }
 
@@ -32,6 +38,11 @@ var games_float := false:
 		games_float = value
 		if is_node_ready():
 			_snap_switch()
+var sound_level := SoundEffects.LEVELS:
+	set(value):
+		sound_level = value
+		if is_node_ready():
+			_ink.queue_redraw()
 var gel := StudioTokens.GEL[&"ps2_slim"]:
 	set(value):
 		gel = value
@@ -67,12 +78,15 @@ var _ink: Control
 @onready var _graphics: FieldButton = %Graphics
 @onready var _floating: FieldButton = %GamesFloat
 @onready var _region: FieldButton = %Region
+@onready var _sounds: FieldButton = %Sounds
 
 
 func _ready() -> void:
 	add_to_group(SoundEffects.MOVES)
 	_panel.pivot_offset = _panel.size / 2.0
-	_rows.assign([_platforms, _button_style, _graphics, _floating, _region])
+	_rows.assign([_platforms, _button_style, _graphics, _floating, _region, _sounds])
+	_sounds.focus_neighbor_left = _sounds.get_path_to(_sounds)
+	_sounds.focus_neighbor_right = _sounds.get_path_to(_sounds)
 	_card = SatinPanel.Backing.new(_panel, StudioTokens.Look.SATIN)
 	_card.place(Rect2(Vector2.ZERO, _panel.size), 28.16)
 	_cursor = SatinPanel.Backing.new(_items, StudioTokens.Look.FOCUS)
@@ -114,6 +128,12 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if state == State.OPEN:
+		if _sounds.has_focus() and (event.is_action_pressed(&"ui_left", true) or event.is_action_pressed(&"ui_right", true)):
+			get_viewport().set_input_as_handled()
+			var steps := clampi(sound_level + (1 if event.is_action_pressed(&"ui_right", true) else -1), 0, SoundEffects.LEVELS)
+			if steps != sound_level:
+				sound_level = steps
+				sound_level_changed.emit(steps)
 		return
 	if event.is_action_pressed(&"screen_back"):
 		_reverse(false)
@@ -206,6 +226,8 @@ func _draw_card() -> void:
 			var note := StudioText.new(row.shown_value() if row == _region else tr("The selected game gently rises and falls"), StudioTokens.Face.JAKARTA_500, 21.76)
 			note.fit(460.0)
 			note.draw(_ink, Vector2(61.44, y + 47.2), StudioTokens.MUTE)
+		elif row == _sounds:
+			_draw_sound_level(y)
 		else:
 			var value := StudioText.new(row.shown_value(), StudioTokens.Face.JAKARTA_700, 26.88)
 			value.fit(240.0)
@@ -214,6 +236,13 @@ func _draw_card() -> void:
 			_ink.draw_polyline(PackedVector2Array([at + Vector2(-6.88, -6.88), at, at + Vector2(-6.88, 6.88)]), StudioTokens.MUTE, 3.584, true)
 		if i < _rows.size() - 1:
 			_ink.draw_line(Vector2(61.44, y + (_ROW_SIZE.y + _PITCH) / 2.0), Vector2(_items.position.x + _ROW_SIZE.x - 17.92, y + (_ROW_SIZE.y + _PITCH) / 2.0), StudioTokens.LINE, 1.0)
+
+
+## The sounds' level on the line at [param y]: its steps, the ones it reaches in the gel.
+func _draw_sound_level(y: float) -> void:
+	for i in SoundEffects.LEVELS:
+		var at := Vector2(629.61 - (SoundEffects.LEVELS - i) * (_STEP_SIZE.x + _STEP_GAP), y + (_ROW_SIZE.y - _STEP_SIZE.y) / 2.0)
+		_ink.draw_rect(Rect2(at, _STEP_SIZE), gel if i < sound_level else StudioTokens.LINE)
 
 
 func _row_name(row: FieldButton) -> StudioText:
@@ -318,6 +347,8 @@ func open(platforms: int, focus: StringName, region: String) -> void:
 		_floating.grab_focus()
 	elif focus == &"region":
 		_region.grab_focus()
+	elif focus == &"sounds":
+		_sounds.grab_focus()
 	else:
 		(_button_style if focus == &"button_style" or _platforms.disabled else _platforms).grab_focus()
 	_ink.queue_redraw()

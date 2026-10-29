@@ -54,6 +54,7 @@ import app.cartouche.core.search.Mark
 import app.cartouche.core.search.View
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
+import app.cartouche.core.settings.SoundLevel
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.storage.DocumentId
@@ -62,6 +63,7 @@ import app.cartouche.core.storage.Volume
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
+import arrow.core.getOrElse
 import arrow.core.nonEmptyListOf
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
@@ -166,10 +168,17 @@ class WireTest {
     @Test
     fun `the settings and a folder's place reach Godot with the keys the GDScript adapter reads`() {
         AppSettings().toWire(true) - "preferred_regions" shouldBe
-            dictionary("first_launch" to true, "edge_smoothing" to "4x", "games_float" to false)
+            dictionary("first_launch" to true, "edge_smoothing" to "4x", "games_float" to false, "sound_level" to 10)
         AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) - "preferred_regions" shouldBe
-            dictionary("first_launch" to false, "button_style" to "playstation", "edge_smoothing" to "2x", "games_float" to false)
+            dictionary(
+                "first_launch" to false,
+                "button_style" to "playstation",
+                "edge_smoothing" to "2x",
+                "games_float" to false,
+                "sound_level" to 10,
+            )
         AppSettings(gamesFloat = true).toWire(false)["games_float"] shouldBe true
+        AppSettings(soundLevel = SoundLevel.of(3).getOrElse { SoundLevel.FULL }).toWire(false)["sound_level"] shouldBe 3
         AppSettings(edgeSmoothing = EdgeSmoothing.OFF).toWire(false)["edge_smoothing"] shouldBe "off"
         AppSettings(preferredRegion = Some(PreferredRegion.NORTH_AMERICA)).toWire(false)["preferred_region"] shouldBe "North America"
         (AppSettings().toWire(false)["preferred_regions"] as Array<*>).toList() shouldBe PreferredRegion.entries.map { it.region }

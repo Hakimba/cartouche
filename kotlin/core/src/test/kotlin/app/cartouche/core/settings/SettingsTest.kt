@@ -4,12 +4,14 @@ package app.cartouche.core.settings
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.setups
 import app.cartouche.core.platforms.PlatformId
+import arrow.core.None
 import arrow.core.Some
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.enum
+import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
 import io.kotest.property.checkAll
@@ -31,6 +33,13 @@ class SettingsTest {
     @Test
     fun `INV-E6-05 once a button style is chosen, the first launch is over, even with no platform yet`() = runBlocking<Unit> {
         checkAll(Arb.enum<ButtonStyle>()) { style -> Settings(Some(style)).isFirstLaunch(Library()) shouldBe false }
+    }
+
+    @Test
+    fun `a sound level is one of 0 to 10, full until turned down`() = runBlocking<Unit> {
+        checkAll(Arb.int(-50..50)) { steps -> SoundLevel.of(steps).map { it.steps } shouldBe (if (steps in 0..10) Some(steps) else None) }
+        Settings().soundLevel shouldBe SoundLevel.FULL
+        SoundLevel.FULL.steps shouldBe SoundLevel.MAX
     }
 
     @Test

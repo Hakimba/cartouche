@@ -63,6 +63,7 @@ var _preferred_regions: PackedStringArray
 
 
 func _ready() -> void:
+	_settings.sound_level_changed.connect(_change_sound_level)
 	_add_console.saving.connect(func(pending: bool) -> void:
 		_pending.visible = pending
 		_holding_presses = pending)
@@ -72,6 +73,7 @@ func _ready() -> void:
 func run(settings: AndroidServices.SettingsAnswer) -> void:
 	arrived = false
 	_games_float = settings.games_float
+	Sounds.level = settings.sound_level
 	_preferred_region = settings.preferred_region
 	_preferred_regions = settings.preferred_regions
 	if settings.first_launch and welcome_waits:
@@ -229,6 +231,7 @@ func _settings_menu() -> void:
 	# The form editing a platform counts its games as it opens: what that needs is prepared meanwhile.
 	android.prepare_titles()
 	_settings.games_float = _games_float
+	_settings.sound_level = Sounds.level
 	var focus := &"platforms"
 	while true:
 		if focus != &"games_float":
@@ -253,6 +256,15 @@ func _settings_menu() -> void:
 				await _platform_menu()
 				if library.set_up_platforms().is_empty():
 					return
+
+
+## The sounds at [param steps] at once, heard so, and kept.
+func _change_sound_level(steps: int) -> void:
+	Sounds.level = steps
+	Sounds.play(SoundEffects.Cue.VOLUME)
+	var saved := await android.save_sound_level(steps)
+	if not saved.ok:
+		Diagnostics.trace("settings", "sound level not saved (%s): %s" % [saved.code, saved.detail])
 
 
 func _choose_games_float() -> void:

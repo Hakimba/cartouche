@@ -604,12 +604,12 @@ func test_a_failed_float_save_restores_the_stored_switch_and_focus() -> void:
 	assert_str(_focused()).is_equal("GamesFloat")
 
 
-func test_settings_navigation_clamps_at_both_ends_and_preserves_the_region_row() -> void:
+func test_settings_navigation_clamps_at_both_ends_and_ends_on_the_sounds_row() -> void:
 	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3}))
 	await _float_row(carousel)
 	for step in 8:
 		await Fixtures.action(self, &"ui_down")
-	assert_str(_focused()).is_equal("Region")
+	assert_str(_focused()).is_equal("Sounds")
 	for step in 8:
 		await Fixtures.action(self, &"ui_up")
 	assert_str(_focused()).is_equal("Platforms")
@@ -852,7 +852,7 @@ func test_card_dim_and_hints_follow_the_specified_intervals_and_curves() -> void
 			assert_bool(is_equal_approx(node.modulate.a, expected)).is_true()
 			if track[1] == "Panel":
 				var hidden := 1.0 - expected
-				assert_bool(is_equal_approx(node.position.y, 172.8 + hidden * (25.6 if track[0] else 38.4))).is_true()
+				assert_bool(is_equal_approx(node.position.y, SettingsMenu._CARD_TOP + hidden * (25.6 if track[0] else 38.4))).is_true()
 				assert_bool(is_equal_approx(node.scale.x, lerpf(1.0, 0.98 if track[0] else 0.97, hidden))).is_true()
 
 

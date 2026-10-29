@@ -353,7 +353,7 @@ internal val EdgeSmoothing.wire: String
         }
 
 /**
- * `{"first_launch", "button_style"?, "edge_smoothing", "games_float", "preferred_region"?, "preferred_regions"}`:
+ * `{"first_launch", "button_style"?, "edge_smoothing", "games_float", "sound_level", "preferred_region"?, "preferred_regions"}`:
  * the style and the region are absent until one is chosen; the regions are those a preference can
  * name, as [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes.
  */
@@ -361,6 +361,7 @@ internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
     "first_launch" to firstLaunch,
     "edge_smoothing" to edgeSmoothing.wire,
     "games_float" to gamesFloat,
+    "sound_level" to soundLevel.steps,
     "preferred_regions" to PreferredRegion.entries.map { it.region }.toTypedArray(),
 ).putSome("button_style", buttonStyle.map { it.wire })
     .putSome("preferred_region", preferredRegion.map { it.region })

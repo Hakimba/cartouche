@@ -80,6 +80,7 @@ import app.cartouche.core.search.Finders
 import app.cartouche.core.search.Order
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
+import app.cartouche.core.settings.SoundLevel
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
 import arrow.core.None
@@ -603,6 +604,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun saveGamesFloat(requestId: Int, floating: Boolean): Unit = answering(requestId, libraryThread) {
         settingsStore.save(storedSettings().copy(gamesFloat = floating)).mapLeft { it.toWire() }.bind()
         trace("settings") { "games_float=$floating" }
+        success()
+    }
+
+    /** Stores how loud the sounds play, [steps] from 0 (silenced) to [SoundLevel.MAX]. */
+    @UsedByGodot
+    public fun saveSoundLevel(requestId: Int, steps: Int): Unit = answering(requestId, libraryThread) {
+        val level = SoundLevel.of(steps).getOrElse { raise(invalid("sound_level is out of 0 to ${SoundLevel.MAX}")) }
+        settingsStore.save(storedSettings().copy(soundLevel = level)).mapLeft { it.toWire() }.bind()
+        trace("settings") { "sound_level=$steps" }
         success()
     }
 

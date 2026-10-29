@@ -1,19 +1,43 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ConfirmRemoval
 extends Control
-## "Remove <platform>?": what goes, and that the game files stay. The focus starts on "Cancel";
-## B cancels too.
+## "Remove <platform>?": what goes, and that the game files stay, on a satin card as the settings' over the veiled
+## screen. The focus, the settings' ring round a pill, starts on "Cancel"; B cancels too.
 
 ## [param remove] is false when cancelled.
 signal answered(remove: bool)
 
 @onready var _title: Label = %Title
 @onready var _text: Label = %Text
-@onready var _cancel: Button = %Cancel
+## The card's corners, the focus ring's reach past a pill and its corners, as the settings' card and rows have them.
+const _CARD_RADIUS := 28.16
+const _RING := 6.4
+const _RING_RADIUS := 17.92
+
+var _card: SatinPanel.Backing
+var _ring: SatinPanel.Backing
+
+@onready var _panel: Control = %Panel
+@onready var _buttons: Control = %Buttons
+@onready var _cancel: FormPill = %Cancel
+@onready var _remove: FormPill = %Remove
 
 
 func _ready() -> void:
 	add_to_group(SoundEffects.MOVES)
+	_remove.keyed = false
+	_card = SatinPanel.Backing.new(_panel, StudioTokens.Look.SATIN)
+	_panel.resized.connect(func() -> void: _card.place(Rect2(Vector2.ZERO, _panel.size), _CARD_RADIUS))
+	_ring = SatinPanel.Backing.new(_buttons, StudioTokens.Look.FOCUS)
+	for pill: FormPill in [_cancel, _remove]:
+		pill.focus_entered.connect(_ring_round.bind(pill))
+		pill.resized.connect(func() -> void:
+			if pill.has_focus():
+				_ring_round(pill))
+
+
+func _ring_round(pill: FormPill) -> void:
+	_ring.place(Rect2(pill.position, pill.size).grow(_RING), _RING_RADIUS)
 
 
 func _unhandled_input(event: InputEvent) -> void:

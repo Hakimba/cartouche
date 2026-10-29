@@ -28,9 +28,9 @@ color = Color(0.235294, 0.172549, 0.117647, 0.16)
 [node name="Panel" type="Control" parent="."]
 layout_mode = 0
 offset_left = 294.4
-offset_top = 172.8
+offset_top = 128.0
 offset_right = 985.6
-offset_bottom = 788.48
+offset_bottom = 833.28
 mouse_filter = 2
 
 [node name="Items" type="Control" parent="Panel"]
@@ -38,7 +38,7 @@ layout_mode = 0
 offset_left = 33.28
 offset_top = 143.64
 offset_right = 657.92
-offset_bottom = 585.0
+offset_bottom = 674.6
 mouse_filter = 2
 
 [node name="Title" type="Label" parent="Panel/Items"]
@@ -69,6 +69,11 @@ label = "Games float"
 unique_name_in_owner = true
 layout_mode = 0
 label = "Preferred region of images"
+
+[node name="Sounds" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 0
+label = "Sounds"
 
 [node name="Hints" parent="." instance=ExtResource("hint_row")]
 

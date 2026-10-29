@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://screens/confirm_removal.gd" id="1"]
-[ext_resource type="Script" path="res://screens/glyph_button.gd" id="2"]
+[ext_resource type="Script" path="res://screens/form_pill.gd" id="2"]
 [ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
 
 [node name="ConfirmRemoval" type="Control"]
@@ -22,68 +22,74 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.094, 0.102, 0.125, 0.42)
+color = Color(0.235294, 0.172549, 0.117647, 0.16)
 
-[node name="Panel" type="PanelContainer" parent="."]
+[node name="Panel" type="MarginContainer" parent="."]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -350.0
-offset_right = 350.0
+offset_left = -345.6
+offset_right = 345.6
 grow_horizontal = 2
 grow_vertical = 2
-theme_type_variation = &"FormPanel"
+mouse_filter = 2
+theme_override_constants/margin_left = 43
+theme_override_constants/margin_top = 37
+theme_override_constants/margin_right = 43
+theme_override_constants/margin_bottom = 37
 
 [node name="Items" type="VBoxContainer" parent="Panel"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 18
 
 [node name="Title" type="Label" parent="Panel/Items"]
 unique_name_in_owner = true
 auto_translate_mode = 2
 layout_mode = 2
 theme_type_variation = &"PanelTitle"
-theme_override_font_sizes/font_size = 38
-horizontal_alignment = 1
+theme_override_font_sizes/font_size = 44
 autowrap_mode = 3
 script = ExtResource("studio_label")
 
 [node name="Text" type="Label" parent="Panel/Items"]
 unique_name_in_owner = true
 auto_translate_mode = 2
-custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
-horizontal_alignment = 1
-vertical_alignment = 1
+theme_type_variation = &"ScreenText"
 autowrap_mode = 3
 
 [node name="Gap" type="Control" parent="Panel/Items"]
-custom_minimum_size = Vector2(0, 12)
+custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 mouse_filter = 2
 
 [node name="Buttons" type="HBoxContainer" parent="Panel/Items"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 40
-alignment = 1
+theme_override_constants/separation = 24
+alignment = 2
 
 [node name="Cancel" type="Button" parent="Panel/Items/Buttons"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 focus_neighbor_left = NodePath(".")
+focus_neighbor_top = NodePath(".")
 focus_neighbor_right = NodePath("../Remove")
+focus_neighbor_bottom = NodePath(".")
 text = "Cancel"
 script = ExtResource("2")
 
 [node name="Remove" type="Button" parent="Panel/Items/Buttons"]
-custom_minimum_size = Vector2(0, 64)
+unique_name_in_owner = true
 layout_mode = 2
 focus_neighbor_left = NodePath("../Cancel")
+focus_neighbor_top = NodePath(".")
 focus_neighbor_right = NodePath(".")
+focus_neighbor_bottom = NodePath(".")
 text = "Remove"
 script = ExtResource("2")
 

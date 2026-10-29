@@ -77,12 +77,12 @@
    "note": "validé (29/10) avec les écrans jusqu'à la roue"
   },
   "ring_open": {
-   "status": "untreated",
-   "note": "nouveau (29/10) : ouvrir la roue, un son à elle"
+   "status": "validated",
+   "note": "validé (29/10) : « je valide tout ça, c niquel comme c'est »"
   },
   "ring_close": {
-   "status": "untreated",
-   "note": "nouveau (29/10) : fermer la roue, un son à elle"
+   "status": "validated",
+   "note": "validé (29/10) : « je valide tout ça, c niquel comme c'est »"
   }
  },
  "categories": [
@@ -535,7 +535,7 @@
      "untoggle"
     ],
     [
-     "le volume des sons : un cran (joué au nouveau volume)",
+     "« Sons » : ← → baisse ou monte d'un cran (de 0, coupés, à 10), joué au nouveau volume",
      "volume"
     ],
     [

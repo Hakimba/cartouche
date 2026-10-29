@@ -290,6 +290,18 @@ class CartouchePluginArtTest {
     }
 
     @Test
+    fun `a sound level is stored once saved, one out of range refused and the level kept`() {
+        val h = Planned(okage)
+        h.plugin.saveSoundLevel(1, 4)
+        h.scope.runCurrent()
+        ReflectionHelpers.callInstanceMethod<AppSettings>(h.plugin, "storedSettings").soundLevel.steps shouldBe 4
+        h.plugin.saveSoundLevel(2, 11)
+        h.scope.runCurrent()
+        ReflectionHelpers.callInstanceMethod<AppSettings>(h.plugin, "storedSettings").soundLevel.steps shouldBe 4
+        h.scope.cancel()
+    }
+
+    @Test
     fun `INV-E12-C1-02 games float is stored once saved, and read back with the settings`() {
         val h = Planned(okage)
         ReflectionHelpers.callInstanceMethod<AppSettings>(h.plugin, "storedSettings").gamesFloat shouldBe false

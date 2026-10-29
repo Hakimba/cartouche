@@ -47,7 +47,7 @@ const _DESKTOP_VARIANTS := "user://console-variants.json"
 
 var _snapshot := {}
 
-var _demo_settings := {"ok": true, "first_launch": false, "games_float": false}
+var _demo_settings := {"ok": true, "first_launch": false, "games_float": false, "sound_level": 10}
 
 ## The catalog, loaded when the app starts.
 var catalog := CatalogSummary.new({})
@@ -335,6 +335,11 @@ func save_edge_smoothing(smoothing: StringName) -> Result:
 ## Stores whether the selected game sways and bobs ([param floating]); the consoles never do.
 func save_games_float(floating: bool) -> Result:
 	return await _save_setting(&"saveGamesFloat", "games_float", floating)
+
+
+## Stores how loud the sounds play, [param steps] from 0 (silenced) to [constant SoundEffects.LEVELS].
+func save_sound_level(steps: int) -> Result:
+	return await _save_setting(&"saveSoundLevel", "sound_level", steps)
 
 
 
@@ -1181,6 +1186,8 @@ class SettingsAnswer extends Result:
 	var edge_smoothing: StringName
 	## Whether the selected game sways and bobs; the consoles never do.
 	var games_float: bool
+	## How loud the sounds play, from 0 (silenced) to [constant SoundEffects.LEVELS].
+	var sound_level: int
 	## The region labels' images prefer, one of [member preferred_regions]; empty for none.
 	var preferred_region: String
 	## The regions labels' images can prefer, as the plugin names them, the only ones it saves.
@@ -1193,6 +1200,7 @@ class SettingsAnswer extends Result:
 		button_style = payload.get("button_style", &"")
 		edge_smoothing = payload.get("edge_smoothing", &"4x")
 		games_float = payload.get("games_float", false)
+		sound_level = payload.get("sound_level", SoundEffects.LEVELS)
 		preferred_region = payload.get("preferred_region", "")
 		preferred_regions = payload.get("preferred_regions", PackedStringArray())
 
