@@ -135,7 +135,7 @@ public enum class Closure {
     /** No answer in time. */
     TIMED_OUT,
 
-    /** The server could not be reached while the network was up; a device really offline stalls on its next scan instead. */
+    /** The server could not be reached: tried again once the device's network is back ([ScreenScraperState.reconnected]). */
     UNREACHABLE,
 
     /** An answer that is neither an image nor a text the app knows, or a status it does not. */
@@ -224,6 +224,12 @@ public sealed interface ScreenScraperState {
 
     /** The state as a new run starts: a closure for the run is over, a day's or a key's is not. */
     public fun reopened(): ScreenScraperState = if (this is ClosedForRun) Open() else this
+
+    /**
+     * The state once the device's network is back: a run closed only because the server was out of reach is
+     * open again, a network lost on the way looking like a server gone; any other closure holds.
+     */
+    public fun reconnected(): ScreenScraperState = if (this == ClosedForRun(Closure.UNREACHABLE)) Open() else this
 
     /** The state on [today]: a closure until a day that has come is over. */
     public fun on(today: Day): ScreenScraperState = if (this is ClosedUntil && day <= today) Open() else this

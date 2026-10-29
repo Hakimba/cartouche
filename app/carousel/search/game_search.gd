@@ -4,7 +4,7 @@ extends Control
 ## The ribbon that searches the games screen's shelf. Down opens it under the carousel: keys A to
 ## Z, 0 to 9 and a space. Until a key is typed it is an index: left and right go from letter to
 ## letter, the carousel jumping to its first game behind; down again, from region to region, the
-## shelf by region. A types the key, and the carousel keeps only the games found (the core's
+## carousel keeping only the games of the region the cursor is on. A types the key, and the carousel keeps only the games found (the core's
 ## `Finder`: each word typed starts another word of the title, in any order); keys that would find
 ## nothing are dimmed and skipped. L1 and R1 go to the previous or next letter, or once keys are
 ## typed to the previous or next key that still finds a game, the carousel on the first game it
@@ -29,10 +29,13 @@ const _RISE_PX := 140.0
 ## A jump of the index, or of L1 and R1 once keys are typed, slides the carousel in from this many
 ## places.
 const _INDEX_SLIDE := 0.6
-## The big letter shows this long, then fades in this time; longer than two characters, it is smaller.
+## The big letter shows this long, then fades in this time.
 const _BIG_S := 0.7
 const _BIG_FADE_S := 0.12
-const _BIG_LONG_SCALE := 0.42
+## The size of the big letter for a leap among the keys typed, against its own.
+const _BIG_TYPED_SCALE := 0.25
+## Its right edge then, from the screen's, in pixels: across from the keys typed.
+const _BIG_TYPED_RIGHT := 40.0
 
 var android: AndroidServices = Android
 ## The carousel's row, which shows what is found.
@@ -126,6 +129,8 @@ func typed() -> String:
 
 ## The shelf position of the game the row shows, whatever it shows.
 func shown_position() -> int:
+	if _by_region:
+		return _view.games[_view.groups[_cursor].start + row.selected_index()]
 	return _view.games[row.selected_index()] if is_filtered() else row.selected_index()
 
 
@@ -149,8 +154,6 @@ func open() -> void:
 		_before = row.selected_index()
 		_view = _letters_view()
 		_cursor = _nearest_lit(_letter_key())
-	elif _by_region:
-		_cursor = _group_at(row.selected_index(), _view.groups)
 	_ribbon.show()
 	_animate_ribbon(true)
 	Diagnostics.trace("search", "opened on '%s'" % _typed)
@@ -224,7 +227,7 @@ func _move(direction: int) -> void:
 			_cursor = next
 			break
 	if _by_region:
-		row.jump(_view.groups[_cursor].start, direction, _INDEX_SLIDE)
+		_show_region(0)
 	elif _typed.is_empty() and _is_lit(KEYS[_cursor]):
 		row.jump(_view.keys[KEYS[_cursor]], direction, _INDEX_SLIDE)
 	_refresh()
@@ -273,9 +276,23 @@ func _switch_index() -> void:
 		return
 	var anchor := shown_position()
 	_by_region = not _by_region
-	_show(index, anchor)
-	_cursor = _group_at(row.selected_index(), _view.groups) if _by_region else _nearest_lit(_letter_key())
+	if _by_region:
+		_view = index
+		var at := maxi(index.games.find(anchor), 0)
+		_cursor = _group_at(at, index.groups)
+		_show_region(at - index.groups[_cursor].start)
+	else:
+		_show(index, anchor)
+		_cursor = _nearest_lit(_letter_key())
 	_refresh()
+
+
+## The games of the region the cursor is on alone, on the [param at]-th of them.
+func _show_region(at: int) -> void:
+	var games: Array[AndroidServices.Game] = []
+	for i: int in _region():
+		games.append(_shelf[_view.games[i]])
+	row.show_games(games, at)
 
 
 ## Shows [param view] on the row, on the game at shelf position [param anchor] if it shows it, else
@@ -340,6 +357,12 @@ func _leap_target(direction: int) -> Leap:
 	return Leap.new()
 
 
+## The indices in the index by region of the games of the region the cursor is on.
+func _region() -> Array:
+	var start := _view.groups[_cursor].start
+	return range(start, _view.groups[_cursor + 1].start if _cursor + 1 < _view.groups.size() else _view.games.size())
+
+
 ## The index in [param groups] of the group holding row index [param at].
 func _group_at(at: int, groups: Array[AndroidServices.Group]) -> int:
 	var found := 0
@@ -373,8 +396,16 @@ func _is_lit(key: String) -> bool:
 
 func _show_big(label: String) -> void:
 	_big_text.text = label
-	_big_text.add_theme_font_size_override(&"font_size",
-		roundi(_big_size * (_BIG_LONG_SCALE if label.length() > 2 else 1.0)))
+	# Once keys are typed, the leap tells the start of the words it reaches, small, at the right above the keys, clear
+	# of the title in the middle and of the keys typed at the left.
+	var keys_typed := not _typed.is_empty()
+	_big_text.add_theme_font_size_override(&"font_size", roundi(_big_size * (_BIG_TYPED_SCALE if keys_typed else 1.0)))
+	_big.anchor_left = 1.0 if keys_typed else 0.5
+	_big.anchor_right = _big.anchor_left
+	_big.grow_horizontal = Control.GROW_DIRECTION_BEGIN if keys_typed else Control.GROW_DIRECTION_BOTH
+	_big.offset_right = -_BIG_TYPED_RIGHT if keys_typed else 0.0
+	_big.offset_left = _big.offset_right
+	_big.reset_size()
 	if _big_fade:
 		_big_fade.kill()
 	_big.modulate.a = 1.0
@@ -395,8 +426,10 @@ func _animate_ribbon(up: bool) -> void:
 
 ## The ribbon's keys, the chip, the filter kept, the hints: as things are.
 func _refresh() -> void:
-	var found := _view.games.size()
-	_chip.visible = _open and not _typed.is_empty()
+	var found := _region().size() if _by_region else _view.games.size()
+	_chip.visible = _open and is_filtered()
+	# By region, the ribbon names the region: the count alone.
+	(_typed_text.get_parent() as Control).visible = not _by_region
 	_typed_text.text = _typed
 	_count.text = tr_n("{count} game", "{count} games", found).format({"count": found})
 	_filter.visible = not _open and is_filtered()
@@ -449,8 +482,6 @@ func _show_hints() -> void:
 		shown.append(PackedStringArray(["b", tr("Go back")]))
 	else:
 		shown.append(PackedStringArray(["a", tr("Type the key")]))
-		shown.append(PackedStringArray(["l1", _leap_target(-1).label]))
-		shown.append(PackedStringArray(["r1", _leap_target(1).label]))
 		if _is_lit(SPACE):
 			shown.append(PackedStringArray(["y", tr("Space")]))
 		shown.append(PackedStringArray(["b", tr("Erase")]))
@@ -477,7 +508,7 @@ func _tap(key: int) -> void:
 	Diagnostics.trace("touch", "ribbon key %d" % key)
 	if _by_region:
 		_cursor = key
-		row.jump(_view.groups[key].start, 1, _INDEX_SLIDE)
+		_show_region(0)
 		_refresh()
 	elif _is_lit(KEYS[key]):
 		_cursor = key

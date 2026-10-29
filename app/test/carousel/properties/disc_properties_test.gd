@@ -588,8 +588,13 @@ func test_INV_E7_02_whatever_is_pressed_and_when_the_properties_settle_on_one_wh
 				assert_bool(properties._properties.visible or properties._labels.visible or properties._framing_screen.visible).is_false()
 				assert_float(properties._naming.modulate.a).is_equal(1.0)
 				assert_bool(focused is Button and properties._naming._keyboard.is_ancestor_of(focused)).is_true()
-				assert_str(properties._naming._field.text).is_equal(properties._naming._typed + "|" if properties._naming._typed
-					else carousel._row.selected_game().own_title())
+				var naming := properties._naming
+				if naming._typed:
+					# The name with its caret, from the first character that keeps the caret in view.
+					assert_bool(naming._typed.insert(naming._caret, "|").ends_with(naming._field.text)).is_true()
+					assert_str(naming._field.text).contains("|")
+				else:
+					assert_str(naming._field.text).is_equal(carousel._row.selected_game().own_title())
 		if step != DiscProperties.Step.NAMING:
 			assert_bool(properties._naming.visible).is_false()
 		# Outside the framing, the label shows its texture covering it (the kept picture, once read,
@@ -840,23 +845,32 @@ func test_the_images_of_a_game_showing_the_user_s_own_picture_open_on_it() -> vo
 	assert_bool((Fixtures.focus(self) as LabelCard).own).is_true()
 
 
-## The keyboard of [param carousel]'s selected game's name, open.
-func _on_keyboard(carousel: Carousel) -> void:
+## The keyboard of [param carousel]'s selected game's name, open; the caret taken to the name's end with R1
+## when [param at_end].
+func _on_keyboard(carousel: Carousel, at_end := true) -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	await _settled(carousel)
 	await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _settled(carousel)
+	if at_end:
+		for letter in carousel._properties._naming.typed():
+			await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
 
 
 func test_A_on_the_name_opens_a_keyboard_under_the_disc_the_name_ready_to_edit() -> void:
 	var carousel: Carousel = (await _on_games())[0]
 	var properties := carousel._properties
 	var game := carousel._row.selected_game()
-	await _on_keyboard(carousel)
+	await _on_keyboard(carousel, false)
 	assert_int(properties._step).is_equal(DiscProperties.Step.NAMING)
 	assert_object(properties._staging).is_same(DiscProperties._on_naming)
-	assert_str(properties._naming._field.text).is_equal(game.title + "|")
+	# The caret before the name's first letter, R1 and L1 moving it through the name.
+	assert_str(properties._naming._field.text).is_equal("|" + game.title)
+	await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
+	await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
+	await Fixtures.joypad(self, JOY_BUTTON_LEFT_SHOULDER)
+	assert_str(properties._naming._field.text).is_equal(game.title.insert(1, "|"))
 	assert_object(Fixtures.focus(self)).is_same(properties._naming._keyboard.first_letter())
 
 

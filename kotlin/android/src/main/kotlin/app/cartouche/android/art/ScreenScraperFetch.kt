@@ -55,11 +55,13 @@ internal data class Credentials(val devId: String, val devPassword: String, val 
     }
 }
 
-/** What the scraper knows of ScreenScraper: whether it takes requests, and that a run starts. */
+/** What the scraper knows of ScreenScraper: whether it takes requests, that a run starts, that the network is back. */
 internal interface Textures {
     val open: Boolean
 
     suspend fun newRun()
+
+    suspend fun networkBack()
 
     companion object {
         /** No ScreenScraper: never open. */
@@ -68,6 +70,8 @@ internal interface Textures {
                 override val open: Boolean get() = false
 
                 override suspend fun newRun() = Unit
+
+                override suspend fun networkBack() = Unit
             }
     }
 }
@@ -138,6 +142,10 @@ internal class ScreenScraperFetch(
             requested = 0
             change(state.reopened())
         }
+    }
+
+    override suspend fun networkBack() {
+        lock.withLock { change(state.reconnected()) }
     }
 
     /**

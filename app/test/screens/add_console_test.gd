@@ -629,3 +629,20 @@ func test_a_form_given_up_does_not_keep_the_previewed_variant() -> void:
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	assert_dict(device.console_variants).is_empty()
 	assert_array(device.set_up).is_empty()
+
+
+func test_the_note_s_dot_shows_only_beside_games_found_whatever_colour_the_form_takes() -> void:
+	var device := _new_device()
+	var carousel := await Fixtures.on_form(self, device, false)
+	var form := _the_form(carousel)
+	form._set_note("No emulator.", false)
+	form._paint(Color.ORANGE)
+	await await_idle_frame()
+	assert_bool(form._dot._box.has_area()).is_false()
+	form._set_note("3 games found", true)
+	form._draw_note()
+	assert_bool(form._dot._box.has_area()).is_true()
+	form._set_note("No emulator.", false)
+	form._draw_note()
+	form._paint(Color.BLUE)
+	assert_bool(form._dot._box.has_area()).is_false()

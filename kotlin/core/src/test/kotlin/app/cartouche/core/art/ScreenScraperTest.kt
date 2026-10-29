@@ -177,6 +177,15 @@ class ScreenScraperTest {
     }
 
     @Test
+    fun `the network back reopens a run closed for an unreachable server only, and leaves every other state as it is`() {
+        ClosedForRun(Closure.UNREACHABLE).reconnected() shouldBe Open()
+        val others =
+            Closure.entries.filter { it != Closure.UNREACHABLE }.map(::ClosedForRun) +
+                listOf(Open(), Open(Some(Moment(5))), ScreenScraperState.ClosedUntil(tomorrow), ScreenScraperState.Off(Refusal.WRONG_KEY))
+        others.forEach { it.reconnected() shouldBe it }
+    }
+
+    @Test
     fun `an image, no image or a 429 to a request sent before a slow-down never changes it`() = runBlocking<Unit> {
         val answers = Arb.element(ScreenScraperAnswer.Image, ScreenScraperAnswer.NoMedia, ScreenScraperAnswer.Status(429))
         checkAll(Arb.long(0L..100_000L), Arb.long(0L..100_000L), answers) { at, before, answer ->

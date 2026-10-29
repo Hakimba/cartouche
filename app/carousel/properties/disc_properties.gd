@@ -125,7 +125,8 @@ var _pool_opacity := -1.0
 @onready var _naming: NameEditor = %Naming
 ## What X, Y and Start do on the keyboard.
 @onready var _naming_presses: Dictionary[StringName, Callable] = {
-	&"open_properties": _naming.erase, &"open_settings": _naming.space, &"form_submit": _keep_name}
+	&"open_properties": _naming.erase, &"open_settings": _naming.space, &"form_submit": _keep_name,
+	&"previous_letter": _naming.move_caret.bind(-1), &"next_letter": _naming.move_caret.bind(1)}
 
 
 func _init() -> void:

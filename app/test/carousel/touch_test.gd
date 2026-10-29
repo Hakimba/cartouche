@@ -266,7 +266,8 @@ func test_a_tap_on_the_name_opens_its_keyboard_and_one_on_a_key_types_it() -> vo
 	var typed := properties._naming.typed()
 	var key := properties._naming._keyboard.find_children("*", "Button", true, false)[0] as Button
 	await Fixtures.touch(self, [key.get_global_rect().get_center()])
-	assert_str(properties._naming.typed()).is_equal(typed + key.text)
+	# The caret starts before the name: the key goes first.
+	assert_str(properties._naming.typed()).is_equal(key.text + typed)
 
 
 ## The system's back, asked once, and the screens settled after it.

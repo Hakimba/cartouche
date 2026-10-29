@@ -64,8 +64,8 @@ The same words are used in the code, the tests and this document.
   platform shown last and each platform's selected game, and places the user back when the app
   starts.
 - **Ribbon**: the row of keys (A to Z, 0 to 9, a space) that down opens under the games. With
-  nothing typed it is the shelf's **index**, by letter or by region, the carousel jumping to each
-  **group**; a key typed starts a **search**: the carousel keeps the games **found**, those whose
+  nothing typed it is the shelf's **index**: by letter, the carousel jumping to each **group**; by
+  region, the carousel keeping the games of the region the cursor is on alone; a key typed starts a **search**: the carousel keeps the games **found**, those whose
   title has, for each word typed, another word starting with it, in any order. A key is **lit**
   when typing it still finds a game. What is found can be **kept** while browsing it (the
   **filter** shown at the top). In the ribbon only, L1 and R1 **leap** to the next letter, or once

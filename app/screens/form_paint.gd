@@ -56,9 +56,12 @@ class Layer:
 		for parameter in parameters:
 			_shader.set_shader_parameter(parameter, parameters[parameter])
 		_grow = shown.reach()
-		place(_box, _radius)
+		# Cleared, it stays so: a new colour paints only a layer that is placed.
+		if _box.has_area():
+			place(_box, _radius)
 
 	func clear() -> void:
+		_box = Rect2()
 		RenderingServer.canvas_item_clear(_item)
 
 	## Draws the material on [param box] (the owner's coordinates), its corners rounded by [param radius], or by

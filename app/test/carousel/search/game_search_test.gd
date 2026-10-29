@@ -78,18 +78,43 @@ func test_down_opens_the_ribbon_on_the_letter_shown_and_left_and_right_jump_the_
 	_press_direction(carousel, &"carousel_right")
 	assert_str(GameSearch.KEYS[carousel._search._cursor]).is_equal("e")
 	assert_str(_shown(carousel)).is_equal("Ico")
-	# Down again, by region: the shelf in region order, the cursor on the shown game's.
+	# Down again, by region: the carousel keeps the games of the shown game's region only, still on it,
+	# and each region's alone as the cursor moves.
 	Fixtures.press(carousel, &"ui_down")
 	assert_bool(carousel._search._by_region).is_true()
+	assert_str(_shown(carousel)).is_equal("Ico")
 	assert_str(carousel._row.selected_game().regions[0]).is_equal("USA")
+	assert_array(_regions_shown(carousel)).is_equal(["USA"])
 	_press_direction(carousel, &"carousel_right")
-	assert_str(carousel._row.selected_game().regions[0]).is_equal("Europe")
+	assert_array(_regions_shown(carousel)).is_equal(["Europe"])
+	assert_int(carousel._search.shown_position()).is_equal(carousel._search._shelf.find(carousel._row.selected_game()))
+	# Within a region, the carousel turns among its games only.
+	for step in carousel._row._games.size() + 1:
+		carousel._row.step(1)
+		assert_str(carousel._row.selected_game().regions[0]).is_equal("Europe")
 	# B closes it, back on the game shown before it opened, the shelf in title order.
 	Fixtures.press(carousel, &"screen_back")
 	assert_bool(carousel._search.is_open()).is_false()
 	assert_str(_shown(carousel)).is_equal("Ace Combat Distant Thunder")
 	assert_int(carousel._row._games.size()).is_equal(TITLES.size())
 	assert_bool(carousel._search.is_filtered()).is_false()
+
+
+## The first region of each game the carousel shows, each once.
+func _regions_shown(carousel: Carousel) -> Array[String]:
+	var regions: Array[String] = []
+	for game in carousel._row._games:
+		if game.regions[0] not in regions:
+			regions.append(game.regions[0])
+	return regions
+
+
+func test_once_keys_are_typed_no_hint_names_l1_or_r1() -> void:
+	var carousel := await _games_screen()
+	Fixtures.press(carousel, &"ui_down")
+	_type(carousel, "a")
+	for hint: ButtonHint in carousel._search._hints.get_children():
+		assert_array([hint.button]).not_contains([&"l1", &"r1"])
 
 
 func test_typing_keeps_only_the_games_found_any_word_in_any_order_the_chip_telling_how_many() -> void:

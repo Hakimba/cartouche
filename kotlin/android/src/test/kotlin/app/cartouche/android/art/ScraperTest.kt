@@ -237,9 +237,14 @@ class ScraperTest {
     /** ScreenScraper as the tests stage it: open or not. */
     private class FakeTextures(override var open: Boolean) : Textures {
         var runs = 0
+        var reconnections = 0
 
         override suspend fun newRun() {
             runs++
+        }
+
+        override suspend fun networkBack() {
+            reconnections++
         }
     }
 
@@ -442,6 +447,27 @@ class ScraperTest {
         harness.scraper.networkBack()
         harness.scope.runCurrent()
         store.stored(GameId("ps2/0")).shouldBeSome()
+    }
+
+    @Test
+    fun `a run resumed after an offline stall tells ScreenScraper the network is back, one resumed after a busy server never`() {
+        val textures = FakeTextures(open = true)
+        val fetch = FakeFetch(mapOf(url(0, 0) to image)).apply { online = false }
+        val harness = Harness(ArtStore(folder), fetch, textures)
+        harness.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
+        harness.scope.runCurrent()
+        harness.last.stall shouldBe Some(Stall.OFFLINE)
+        textures.reconnections shouldBe 0
+        fetch.online = true
+        harness.scraper.networkBack()
+        harness.scope.runCurrent()
+        textures.reconnections shouldBe 1
+        val busy = FakeTextures(open = true)
+        val refused = Harness(ArtStore(File(folder, "busy")), FakeFetch(emptyMap(), mapOf(url(0, 0) to FetchFailure.Refused(429))), busy)
+        refused.lookFor(requests(listOf(listOf(Held.IMAGE)), 1))
+        refused.scope.advanceTimeBy(31_000)
+        refused.scope.runCurrent()
+        busy.reconnections shouldBe 0
     }
 
     @Test

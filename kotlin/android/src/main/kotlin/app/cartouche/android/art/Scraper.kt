@@ -181,6 +181,8 @@ internal class Scraper(
     }
 
     private suspend fun resume() {
+        // A run that stalled offline lost ScreenScraper with the network, not to the server.
+        if (lock.withLock { run.stall == Some(Stall.OFFLINE) }) textures.networkBack()
         update(None) { run.resumed() }
         startWorkers()
     }
