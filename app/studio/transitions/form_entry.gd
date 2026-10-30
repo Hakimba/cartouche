@@ -6,23 +6,14 @@ extends Control
 ## flies there as the form comes in over the consoles, which stay under it. Closing, the card flies back into the closed
 ## ball and turns into it. The rail, the frame, the pool and the hints are the carousel's: it plays them beside this.
 
-## The button the ball opens into, and the ball it closes into (px of the design's frame): the card's two ends on the
+## The button the ball opens into, and the ball it closes into (px of the 1280 × 960 frame): the card's two ends on the
 ## consoles screen. The form's first field is its other end ([constant FIELD]).
 const BUTTON := Vector2(330.0, 46.0)
 const BALL := StudioTokens.PLUS
-## The form's first field, "01 Type": 41 / 16 cqw, 56 × 6.4 cqw.
+## The form's first field, "01 Type", in px.
 const FIELD := Rect2(524.8, 204.8, 716.8, 81.92)
-## Opening: the card flies in this time (seconds), fading in over the second and the form coming in at the third.
-static var OPEN_S: float:
-	get: return StudioTokens.TR_FORM_OPEN_S
+## Opening, the card fades in over this time (seconds); closing, the ball comes back after this one.
 const CARD_IN_S := 0.21
-static var FORM_AT_S: float:
-	get: return StudioTokens.TR_FORM_AT_S
-## Closing: the card flies in this time, fading out in the second, the ball coming back after the third.
-static var CLOSE_S: float:
-	get: return StudioTokens.TR_FORM_BACK_S
-static var CARD_OUT_S: float:
-	get: return StudioTokens.TR_FORM_OUT_S
 const BALL_AT_S := 0.18
 
 var _card := FormPaint.Card.new()
@@ -46,15 +37,15 @@ func _init() -> void:
 ## The button turns into the form's first field, from the ball [param ball] (open) as it stands; returns the flight.
 func open(ball: AddBall) -> Tween:
 	var centre := ball.get_global_rect().get_center()
-	return _fly(Rect2(centre - BUTTON / 2.0, BUTTON), BUTTON.y / 2.0, FIELD, StudioTokens.FOCUS_RADIUS, OPEN_S, 0.0,
+	return _fly(Rect2(centre - BUTTON / 2.0, BUTTON), BUTTON.y / 2.0, FIELD, StudioTokens.FOCUS_RADIUS, StudioTokens.TR_FORM_OPEN_S, 0.0,
 		CARD_IN_S, 0.0, 1.0, StudioTokens.TR_FORM_OPEN_S_CURVE)
 
 
 ## The card leaves the form's first field for the ball [param ball] (closed); returns the flight.
 func close(ball: AddBall) -> Tween:
 	var centre := ball.get_global_rect().get_center()
-	return _fly(FIELD, StudioTokens.FOCUS_RADIUS, Rect2(centre - BALL.size / 2.0, BALL.size), BALL.size.y / 2.0, CLOSE_S,
-		0.0, CARD_OUT_S, 1.0, 0.0, StudioTokens.TR_FORM_BACK_S_CURVE)
+	return _fly(FIELD, StudioTokens.FOCUS_RADIUS, Rect2(centre - BALL.size / 2.0, BALL.size), BALL.size.y / 2.0, StudioTokens.TR_FORM_BACK_S,
+		0.0, StudioTokens.TR_FORM_OUT_S, 1.0, 0.0, StudioTokens.TR_FORM_BACK_S_CURVE)
 
 
 ## The card flies from [param from] to [param to] in [param seconds], its look going from [param alpha_from] to

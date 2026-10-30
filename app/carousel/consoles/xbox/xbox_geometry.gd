@@ -13,7 +13,8 @@ extends RefCounted
 ## each of the jewel's letters tangent to its dome, those on the front as the details.
 
 const PARTS: Array[StringName] = [&"lower", &"strip", &"upper", &"cross", &"facets", &"fins", &"vents",
-	&"grille", &"grille_bars", &"feet", &"module", &"tray", &"tray_window", &"hub", &"clamp_ring", &"drive_opening", &"eject", &"power", &"jewel", &"jewel_ring",
+	&"grille", &"grille_bars", &"feet", &"module", &"tray", &"tray_window", &"hub", &"clamp_ring", &"drive_opening",
+	&"eject", &"power", &"jewel", &"jewel_ring",
 	&"power_ring", &"ports", &"port_openings", &"connectors", &"back_vent", &"vent_bars", &"bezel_logo",
 	&"jewel_x_left", &"jewel_b", &"jewel_o", &"jewel_x_right", &"port_1", &"port_2", &"port_3", &"port_4",
 	&"microsoft", &"disc_marks", &"eject_mark", &"power_mark"]
@@ -91,7 +92,6 @@ static func arrays(shape: XboxShape, part: StringName, detail: int) -> Array:
 			var outline := ShapeGeometry.rounded(body, shape.corner, shape.corner, steps)
 			var cross := PackedVector2Array()
 			var wedges := shape.wedges()
-			# Each corner's arc, then the wedge cut into the straight side after it.
 			for quarter in 4:
 				cross.append_array(outline.slice(quarter * (steps + 1), (quarter + 1) * (steps + 1)))
 				cross.append_array(wedges[quarter])
@@ -114,7 +114,6 @@ static func arrays(shape: XboxShape, part: StringName, detail: int) -> Array:
 					tops.append(high if absf(point.x) < absf(fin.get_center().x) else low)
 				ShapeGeometry.wedge(mesh, loop, shape.lip_top, tops, body)
 		&"vents":
-			# The dark floor between the fins, from the side's bevel in.
 			var wedges := shape.wedges()
 			for wedge: PackedVector2Array in [wedges[1], wedges[3]]:
 				var base := wedge.duplicate()
@@ -152,7 +151,6 @@ static func arrays(shape: XboxShape, part: StringName, detail: int) -> Array:
 		&"clamp_ring":
 			DiscTray.clamp_ring(mesh, shape.disc_centre(), shape.plate_levels().y, steps)
 		&"drive_opening":
-			# Through the strip's whole height, behind the bezel at rest.
 			var slot := shape.slot()
 			var mouth := Rect2(slot.position.x, shape.strip_bottom, slot.size.x, shape.strip_top - shape.strip_bottom)
 			var levels := shape.plate_levels()
@@ -174,7 +172,6 @@ static func arrays(shape: XboxShape, part: StringName, detail: int) -> Array:
 					panel + XboxShape.BUTTON_RAISE, 0.3, disc)
 			at = Transform3D.IDENTITY
 		&"bezel_logo":
-			# On the bezel's front, from near its left end, halfway up the strip.
 			var size := LOGOS[part]
 			var from := Vector2(shape.bezel().position.x + 4.7, (shape.strip_bottom + shape.strip_top - size.y) / 2.0)
 			ShapeGeometry.decal(mesh, Rect2(from, size), -shape.bezel().position.y)
@@ -192,7 +189,6 @@ static func arrays(shape: XboxShape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.prism(mesh, ShapeGeometry.circle(Vector2.ZERO, shape.ring_radius, _JEWEL_POINTS),
 				shape.cross_top - _JEWEL_RING_THICKNESS / 2.0, shape.cross_top + _JEWEL_RING_THICKNESS / 2.0)
 		&"jewel":
-			# From its foot up to its tip.
 			var step := PI / (2 * _DOME_STEPS + 1)
 			var rings: Array[PackedVector3Array] = [_ring(Vector3(0.0, 0.0, shape.cross_top),
 				Vector2.ONE * shape.jewel_radius * sin(_DOME_STEPS * step), _JEWEL_POINTS)]
@@ -201,7 +197,6 @@ static func arrays(shape: XboxShape, part: StringName, detail: int) -> Array:
 					Vector2.ONE * shape.jewel_radius * maxf(sin(k * step), ShapeGeometry.TIP), _JEWEL_POINTS))
 			ShapeGeometry.swept(mesh, rings, body)
 		&"power_ring":
-			# Its rings around its tube, each round the button.
 			var centre := Vector2(XboxShape.POWER.x, XboxShape.POWER.y)
 			var panel := shape.depth / 2.0 + XboxShape.MODULE_SIZE.y
 			var rings: Array[PackedInt32Array] = []

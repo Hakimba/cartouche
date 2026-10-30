@@ -9,14 +9,11 @@ extends ConsoleModel
 const _PRESS_MM := 1.5
 const _LIT := 2.5
 
-## How far the tray is out, in millimetres.
 var tray_mm := 0.0:
 	set(value):
-		# Given each frame by the launch animation: the tray is moved only when it slides.
 		if value != tray_mm and is_node_ready():
 			_tray.position.z = value * MeshBuilder.UNITS_PER_MM
 		tray_mm = value
-## How far the power and eject buttons are pressed in, in millimetres.
 var power_mm := 0.0:
 	set(value):
 		if value != power_mm and is_node_ready():

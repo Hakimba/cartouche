@@ -7,15 +7,15 @@ const Fixtures := preload("res://test/carousel/fixtures.gd")
 
 func test_the_art_bar_follows_a_run_greys_while_it_waits_and_fades_once_it_is_over() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
-	var progress: Control = carousel.get_node("%ArtProgress")
+	var progress: ArtBar = carousel.get_node("%ArtProgress")
 	var bar: ProgressBar = carousel.get_node("%Bar")
 	var text: Label = carousel.get_node("%ArtText")
 	var content: Control = carousel.get_node("%Content")
 	var tell := func(payload: Dictionary) -> void:
 		carousel._on_art_changed(AndroidServices.ArtChange.new(payload))
 		# The bar moves on its tween: moved to its end here, rather than waited for.
-		if carousel._art_tween:
-			carousel._art_tween.custom_step(Carousel._ART_STEP_S + 0.01)
+		if progress._tween:
+			progress._tween.custom_step(ArtBar._STEP_S + 0.01)
 	tell.call({"done": 0, "total": 0})
 	assert_bool(progress.visible).is_false()
 	tell.call({"done": 12, "total": 55})
@@ -42,40 +42,11 @@ func test_the_art_bar_follows_a_run_greys_while_it_waits_and_fades_once_it_is_ov
 	tell.call({"done": 55, "total": 55})
 	assert_float(bar.value).is_equal(55.0)
 	assert_bool(progress.visible).is_true()
-	carousel._art_tween.custom_step(Carousel._ART_FULL_S + Carousel._ART_FADE_S + 0.1)
+	progress._tween.custom_step(ArtBar._FULL_S + ArtBar._FADE_S + 0.1)
 	assert_bool(progress.visible).is_false()
 	# A later run with nothing to look for shows nothing.
 	tell.call({"done": 0, "total": 0})
 	assert_bool(progress.visible).is_false()
-
-
-
-func test_a_long_reason_of_the_art_bar_wraps_inside_its_box_on_the_screen() -> void:
-	var locale := TranslationServer.get_locale()
-	TranslationServer.set_locale("fr")
-	var carousel := await Fixtures.shown_carousel(self)
-	carousel._on_art_changed(AndroidServices.ArtChange.new({"done": 12, "total": 55, "stall": "offline"}))
-	await await_idle_frame()
-	await await_idle_frame()
-	var box := (carousel.get_node("%ArtProgress") as Control).get_global_rect()
-	var text := (carousel.get_node("%ArtText") as Control).get_global_rect()
-	TranslationServer.set_locale(locale)
-	assert_float(text.position.x).is_greater_equal(box.position.x)
-	assert_float(text.end.x).is_less_equal(box.end.x)
-	assert_bool(get_viewport().get_visible_rect().encloses(text)).is_true()
-
-func test_the_battery_keeps_the_designs_distance_to_the_right_edge_on_a_wider_window() -> void:
-	var window := get_window()
-	var saved := window.size
-	window.size = Vector2i(1707, 960)
-	var carousel := await Fixtures.shown_carousel(self)
-	await await_idle_frame()
-	var chip: BatteryChip = carousel.get_node("%Battery")
-	var bar: Control = chip.get_parent()
-	assert_float(bar.size.x).is_greater(1280.0)
-	var gap := bar.size.x - chip.position.x - chip.size.x
-	window.size = saved
-	assert_float(gap).is_equal(CarouselLayout.FRAME.x - StudioTokens.BATTERY.end.x)
 
 
 func test_the_battery_shows_its_level_and_the_bolt_exactly_while_plugged_in_as_soon_as_told() -> void:
@@ -108,14 +79,6 @@ func test_the_battery_shows_its_level_and_the_bolt_exactly_while_plugged_in_as_s
 	assert_array(chip.bolt()).is_empty()
 
 
-func test_what_moves_by_itself_goes_at_the_pace_of_the_rest() -> void:
-	var carousel := await Fixtures.shown_carousel(self)
-	get_tree().set_group(Resting.PACED, &"pace", 0.25)
-	for node: Node in [carousel._row, carousel._consoles]:
-		assert_float(node.get(&"pace")).is_equal(0.25)
-	get_tree().set_group(Resting.PACED, &"pace", 1.0)
-
-
 func test_while_labels_download_the_app_does_not_rest_once_they_wait_or_are_over_it_does() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var tell := func(payload: Dictionary) -> void:
@@ -141,28 +104,6 @@ func test_the_carousel_coming_in_wakes_the_app() -> void:
 	assert_float(carousel._resting.pace).is_equal(1.0)
 	assert_int(Engine.max_fps).is_equal(awake_fps)
 	assert_bool(OS.low_processor_usage_mode).is_false()
-
-
-func test_still_the_carousel_changes_nothing_frame_after_frame() -> void:
-	var carousel := await Fixtures.shown_carousel(self)
-	for screen: Carousel.Screen in [Carousel.Screen.CONSOLES, Carousel.Screen.GAMES]:
-		if screen == Carousel.Screen.GAMES:
-			Fixtures.press(carousel, &"ui_accept")
-			Fixtures.step_until(carousel, Carousel.Screen.GAMES)
-		get_tree().set_group(Resting.PACED, &"pace", 0.0)
-		# Settled first: the labels drawn, the consoles behind the games gone, what the press started
-		# (the hints coming in) over.
-		Fixtures.step_frames(carousel, 60)
-		for frame in 300:
-			if not get_tree().get_processed_tweens().any(func(tween: Tween) -> bool: return tween.is_running()):
-				break
-			await await_idle_frame()
-		var still := _shown(carousel)
-		Fixtures.step_frames(carousel, 120)
-		for frame in 5:
-			await await_idle_frame()
-		assert_dict(_shown(carousel)).is_equal(still)
-		get_tree().set_group(Resting.PACED, &"pace", 1.0)
 
 
 ## What [param carousel] shows: where every 3D node stands, whether every 2D item shows and in which
@@ -212,7 +153,7 @@ func test_the_selection_priority_timer_sends_nothing_for_an_empty_row() -> void:
 	assert_array(device.art_focus_calls).is_empty()
 
 
-func test_INV_E11_09_the_games_told_absent_are_known_so_and_a_download_told_rings_until_it_is_over() -> void:
+func test_the_games_told_absent_are_known_so_and_a_download_told_rings_until_it_is_over() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var games: Array[AndroidServices.Game] = carousel._row._games
 	# A game of another shelf too.

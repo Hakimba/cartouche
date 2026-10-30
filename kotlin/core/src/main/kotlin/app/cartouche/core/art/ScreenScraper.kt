@@ -3,6 +3,7 @@
 
 package app.cartouche.core.art
 
+import app.cartouche.core.intOrNone
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -19,7 +20,7 @@ public value class Day(public val iso: String) : Comparable<Day> {
     override fun compareTo(other: Day): Int = iso.compareTo(other.iso)
 }
 
-/** The app's developer key as a hash: what an off state kept across restarts is tied to, never the key itself (INV-E11-06). */
+/** The app's developer key as a hash: what an off state kept across restarts is tied to, never the key itself. */
 @Serializable @JvmInline
 public value class KeyHash(public val value: String)
 
@@ -30,8 +31,8 @@ public value class Moment(public val millis: Long) : Comparable<Moment> {
 }
 
 /**
- * What ScreenScraper allows a member at once and per minute, as `ssuserInfos.php` states them;
- * the app's key alone, with no member, one request at a time.
+ * What ScreenScraper allows a member at once and per minute, as `ssuserInfos.php` states them; the app's key alone,
+ * with no member, one request at a time.
  */
 public data class Limits(public val threads: Int, public val perMinute: Option<Int>) {
     public companion object {
@@ -41,7 +42,6 @@ public data class Limits(public val threads: Int, public val perMinute: Option<I
 
 /** What `ssuserInfos.php` says of the member whose account the requests go as. */
 public sealed interface Account {
-    /** The member's limits. */
     public data class Member(public val limits: Limits) : Account
 
     /** The member is refused (a 403, the user-login error text, or a level of 0): the key alone from then on. */
@@ -60,8 +60,8 @@ public sealed interface Account {
             }
 
         /**
-         * What an answer of [status] with [body] says of the member; none when it says nothing of
-         * them (another status, a text the app cannot read): it is then an answer like any request's.
+         * What an answer of [status] with [body] says of the member; none when it says nothing of them (another
+         * status, a text the app cannot read): it is then an answer like any request's.
          */
         public fun of(status: Int, body: Option<String>): Option<Account> = when {
             status == FORBIDDEN -> Some(Refused)
@@ -80,14 +80,15 @@ public sealed interface Account {
                 }
         }
 
-        private fun limitsOf(user: User): Option<Limits> =
-            Option.fromNullable(user.maxthreads.toIntOrNull()).filter { it > 0 }.flatMap { threads ->
-                Option.fromNullable(user.maxrequestspermin.toIntOrNull()).filter { it > 0 }.map { Limits(threads, Some(it)) }
-            }
+        private fun limitsOf(user: User): Option<Limits> = user.maxthreads.intOrNone().filter { it > 0 }.flatMap { threads ->
+            user.maxrequestspermin.intOrNone().filter { it > 0 }.map { Limits(threads, Some(it)) }
+        }
     }
 }
 
-/** An `ssuserInfos.php` answer: `response.ssuser.maxthreads`, `maxrequestspermin` and the member's `niveau`, as text. */
+/**
+ * An `ssuserInfos.php` answer: `response.ssuser.maxthreads`, `maxrequestspermin` and the member's `niveau`, as text.
+ */
 @Serializable
 private data class UserAnswer(val response: Response) {
     @Serializable
@@ -135,7 +136,10 @@ public enum class Closure {
     /** No answer in time. */
     TIMED_OUT,
 
-    /** The server could not be reached: tried again once the device's network is back ([ScreenScraperState.reconnected]). */
+    /**
+     * The server could not be reached: tried again once the device's network is back
+     * ([ScreenScraperState.reconnected]).
+     */
     UNREACHABLE,
 
     /** An answer that is neither an image nor a text the app knows, or a status it does not. */
@@ -152,21 +156,24 @@ public enum class Refusal {
 }
 
 /**
- * Whether ScreenScraper takes requests, as the last answer left it: while not [Open], a texture is
- * skipped at once for the game's next image, and nothing waits on it (INV-E11-05).
+ * Whether ScreenScraper takes requests, as the last answer left it: while not [Open], a texture is skipped at once
+ * for the game's next image, and nothing waits on it.
  */
 public sealed interface ScreenScraperState {
     /**
-     * Requests go; after a 429, which came at [slowedAt], the next waits a back-off from then. The
-     * requests already under way then say nothing new, whatever they answer; only one sent after
-     * the slow-down tells whether the server has room again (see [after]).
+     * Requests go; after a 429, which came at [slowedAt], the next waits a back-off from then. The requests already
+     * under way then say nothing new, whatever they answer; only one sent after the slow-down tells whether the
+     * server has room again (see [after]).
      */
     public data class Open(public val slowedAt: Option<Moment> = None) : ScreenScraperState
 
     /** Closed until the scraper's next run ([reopened]): the server refused or failed. */
     public data class ClosedForRun(public val reason: Closure) : ScreenScraperState
 
-    /** Closed until [day]: the day's quota, or its allowance of unknown games, is spent (430, 431); kept across restarts. */
+    /**
+     * Closed until [day]: the day's quota, or its allowance of unknown games, is spent (430, 431); kept across
+     * restarts.
+     */
     public data class ClosedUntil(public val day: Day) : ScreenScraperState
 
     /** Off for good: the app's key is refused, or the app blacklisted. */
@@ -204,7 +211,10 @@ public sealed interface ScreenScraperState {
             }
     }
 
-    /** The closures that hold whatever the state: the key refused or the app blacklisted (off), the day's quota spent (until [tomorrow]). */
+    /**
+     * The closures that hold whatever the state: the key refused or the app blacklisted (off), the day's quota spent
+     * (until [tomorrow]).
+     */
     private fun closure(answer: ScreenScraperAnswer, tomorrow: Day): Option<ScreenScraperState> = when (answer) {
         ScreenScraperAnswer.LoginRefused -> Some(Off(Refusal.WRONG_KEY))
         is ScreenScraperAnswer.Status ->
@@ -226,8 +236,8 @@ public sealed interface ScreenScraperState {
     public fun reopened(): ScreenScraperState = if (this is ClosedForRun) Open() else this
 
     /**
-     * The state once the device's network is back: a run closed only because the server was out of reach is
-     * open again, a network lost on the way looking like a server gone; any other closure holds.
+     * The state once the device's network is back: a run closed only because the server was out of reach is open
+     * again, a network lost on the way looking like a server gone; any other closure holds.
      */
     public fun reconnected(): ScreenScraperState = if (this == ClosedForRun(Closure.UNREACHABLE)) Open() else this
 

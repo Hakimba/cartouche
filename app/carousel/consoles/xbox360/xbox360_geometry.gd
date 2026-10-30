@@ -55,7 +55,6 @@ static func arrays(shape: Xbox360Shape, part: StringName, detail: int) -> Array:
 			for band in shape.vents():
 				_vents(mesh, shape, band)
 			_honeycomb(mesh, shape)
-			# The eject button's hole, its walls and floor a hair inside the shell's.
 			var hole := shape.eject_hole().grow(-Xbox360Shape.RAISE)
 			ShapeGeometry.sunk(mesh, ShapeGeometry.circle(shape.eject_centre(), hole.size.x / 2.0, 16 * steps),
 				front - Xbox360Shape.EJECT_DEPTH + Xbox360Shape.RAISE, front, hole)
@@ -118,13 +117,11 @@ static func arrays(shape: Xbox360Shape, part: StringName, detail: int) -> Array:
 			mesh.basis = ShapeGeometry.PLAN
 			DiscTray.clamp_ring(mesh, shape.disc_plan(), shape.plate_levels().y, steps)
 		&"drive_opening":
-			# Its walls a hair inside the pocket's, behind the bezel at rest.
 			var slot := shape.slot().grow(-DiscTray.RAISE)
 			var mouth := ShapeGeometry.rounded(slot, slot.size.y / 2.0, slot.size.y / 2.0, 2 * steps)
 			DiscTray.opening(mesh, mouth, shape.plate(), front - Xbox360Shape.BEZEL_THICKNESS - Xbox360Shape.TRAY_GAP,
 				front - shape.pocket_depth() + DiscTray.RAISE)
 		&"eject":
-			# Round, from deep in its hole: a dark gap all round it.
 			var low := front - Xbox360Shape.EJECT_DEPTH + 0.3
 			ShapeGeometry.block(mesh, shape.eject(), Vector2.ONE * shape.eject_radius, 4 * steps, low,
 				front + Xbox360Shape.EJECT_RAISE, 0.5 * Xbox360Shape.EJECT_RAISE, shape.eject())
@@ -141,7 +138,6 @@ static func arrays(shape: Xbox360Shape, part: StringName, detail: int) -> Array:
 				ShapeGeometry.flat(mesh, lit, low + 0.2 + Xbox360Shape.RING_RAISE, Vector3.BACK, shape.boss())
 				ShapeGeometry.wall(mesh, lit, low, low + 0.2 + Xbox360Shape.RING_RAISE, shape.boss())
 		&"bezel_logo":
-			# At the chrome bar's right, its lettering 5.9 mm short of its end.
 			var bezel := shape.bezel()
 			_logo(mesh, part, Vector2(bezel.end.x - 5.0 - LOGOS[part].x / 2.0, bezel.get_center().y), front)
 		&"top_logo":

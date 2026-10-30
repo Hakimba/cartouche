@@ -1,11 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name SmoothingCard
-extends Control
-## One edge smoothing to choose: a white card with a close-up of an edge drawn with it, its name and
-## what it changes. Focusable; the focus is a ring.
-
-## Confirmed while focused: this smoothing is chosen.
-signal chosen(smoothing: StringName)
+extends ChoiceCard
+## One edge smoothing to choose ([member ChoiceCard.value]): a close-up of an edge drawn with it, its name and
+## what it changes.
 
 ## Each smoothing's sample offsets from the pixel's centre: Vulkan's standard sample locations.
 const SAMPLES: Dictionary[StringName, Array] = {
@@ -24,33 +21,19 @@ const _MARGIN := 15.0
 const _TITLE_SIZE := 28
 const _NOTE_SIZE := 18
 
-@export var smoothing := &"4x"
 @export var title := ""
 @export_multiline var note := ""
 
 var _close_up: ImageTexture
-var _focus_scale := FocusScale.new()
 
 
 func _ready() -> void:
-	focus_mode = FOCUS_ALL
-	focus_entered.connect(queue_redraw)
-	focus_exited.connect(queue_redraw)
-	_focus_scale.watch(self)
-	_close_up = ImageTexture.create_from_image(close_up(smoothing, Vector2i(Vector2(custom_minimum_size.x - 2.0 * _MARGIN, custom_minimum_size.y / 2.0))))
+	super()
+	_close_up = ImageTexture.create_from_image(close_up(value, Vector2i(Vector2(custom_minimum_size.x - 2.0 * _MARGIN,
+		custom_minimum_size.y / 2.0))))
 
 
-func _gui_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"ui_accept"):
-		accept_event()
-		chosen.emit(smoothing)
-
-
-func _draw() -> void:
-	var card := Rect2(Vector2.ZERO, size)
-	draw_style_box(get_theme_stylebox(&"normal", &"Field"), card)
-	if has_focus():
-		draw_style_box(get_theme_stylebox(&"focus", &"Field"), card)
+func _draw_sample() -> void:
 	draw_texture(_close_up, Vector2(_MARGIN, _MARGIN))
 	var font := get_theme_font(&"font", &"FieldValue")
 	var width := size.x - 2.0 * _MARGIN

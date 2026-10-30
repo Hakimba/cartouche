@@ -10,11 +10,7 @@ import arrow.core.raise.either
 import java.io.IOException
 import java.nio.ByteBuffer
 
-/**
- * A document opened read-only, read where the decoders ask through [readAt], a positional read on
- * its descriptor's channel (`FileChannel.read(buffer, position)`). [size] is the descriptor's, -1
- * when it is not a file (a pipe), which no decoder reads.
- */
+/** [size] is the descriptor's, -1 when it is not a file (a pipe), which no decoder reads. */
 internal class DocumentBytes(private val readAt: (ByteBuffer, Long) -> Int, override val size: Long) : ByteSource {
     /** The bytes read so far, for the traces. */
     var bytesRead: Long = 0

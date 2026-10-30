@@ -6,21 +6,18 @@ extends ConsoleModel
 ## inner ends. It is presented standing, its screen to the camera, leant back enough to show the
 ## cartridge going down into the top.
 
-## The shoulder buttons fully pressed, in degrees; how bright the power light is once on.
+## How far the shoulder buttons press, in degrees; how bright the power light is once on, as its emission energy.
 const _PRESS_DEGREES := 3.5
 const _LIT := 2.5
 ## A handheld is presented standing, its face to the camera, its top leant back towards it this far,
 ## in degrees, so that the slot shows as the cartridge comes down into it.
 const _LEAN_DEGREES := 18.0
 
-## How far the power switch has slid on, in millimetres.
 var power_mm := 0.0:
 	set(value):
-		# Given each frame by the launch animation: the parts are moved only when they move.
 		if value != power_mm and is_node_ready():
 			_slide(value)
 		power_mm = value
-## How far the shoulder buttons are pressed, in degrees.
 var shoulders_degrees := 0.0:
 	set(value):
 		if value != shoulders_degrees and is_node_ready():
@@ -67,7 +64,6 @@ func _slide(mm: float) -> void:
 	_power.position = _switch_rest.origin + _switch_rest.basis.x * mm * MeshBuilder.UNITS_PER_MM
 
 
-## Each button's outer end goes down: the left one turns forward about Z, the right one back.
 func _press(degrees: float) -> void:
 	_left.rotation.z = deg_to_rad(degrees)
 	_right.rotation.z = -deg_to_rad(degrees)

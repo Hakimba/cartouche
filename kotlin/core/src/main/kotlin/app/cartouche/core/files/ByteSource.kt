@@ -9,16 +9,16 @@ import arrow.core.raise.Raise
 
 /**
  * A game file open for reading, as a documents provider or a filesystem hands it: its [size] and the bytes at any
- * place in it. Every decoder of this package reads through it, the Android plugin opens the file, tests hold bytes
- * in memory. It has no way to write.
+ * place in it. Every decoder of this package reads through it, the Android plugin opens the file, tests hold bytes in
+ * memory. It has no way to write.
  */
 public interface ByteSource {
     public val size: Long
 
     /**
-     * The [length] bytes at [offset], fewer when the file ends before, in a new array the caller may change; a failure
-     * when the file cannot be read there. Decoders only ask within [size] and take fewer bytes than asked as a damaged
-     * file.
+     * The [length] bytes at [offset], fewer when the file ends before, in a new array the caller may change; a
+     * failure when the file cannot be read there. Decoders only ask within [size] and take fewer bytes than asked as
+     * a damaged file.
      */
     public fun read(offset: Long, length: Int): Either<ReadFailure, ByteArray>
 }

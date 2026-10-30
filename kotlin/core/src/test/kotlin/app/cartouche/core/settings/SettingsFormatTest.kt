@@ -16,12 +16,12 @@ import org.junit.Test
 
 class SettingsFormatTest {
     @Test
-    fun `stored settings read back the same`() = runBlocking<Unit> {
+    fun `INV-15 stored settings read back the same`() = runBlocking<Unit> {
         checkAll(settings) { settings -> SettingsFormat.decode(SettingsFormat.encode(settings)).shouldBeRight(settings) }
     }
 
     @Test
-    fun `a settings file that is damaged, of another format or names an unknown style is not read`() {
+    fun `INV-15 a settings file that is damaged, of another format or names an unknown style is not read`() {
         listOf(
             "",
             "not json",
@@ -35,39 +35,21 @@ class SettingsFormatTest {
     }
 
     @Test
-    fun `INV-E8-02 settings stored before the edge smoothing existed read with 4x, the style kept`() {
-        SettingsFormat
-            .decode("""{"version":2,"settings":{"buttonStyle":"nintendo"}}""")
-            .shouldBeRight(Settings(Some(ButtonStyle.NINTENDO), EdgeSmoothing.FOUR_TIMES))
-        SettingsFormat.decode("""{"version":2,"settings":{}}""").shouldBeRight(Settings(None, EdgeSmoothing.FOUR_TIMES))
-    }
-
-    @Test
-    fun `INV-E8-02 each edge smoothing is stored under its own name`() {
+    fun `INV-15 old files read with the choices they predate off, and the new choices are stored`() {
+        fun read(settings: String) = SettingsFormat.decode("""{"version":2,"settings":{$settings}}""")
+        read(""""buttonStyle":"nintendo"""").shouldBeRight(Settings(Some(ButtonStyle.NINTENDO), EdgeSmoothing.FOUR_TIMES))
+        read("").shouldBeRight(Settings(None, EdgeSmoothing.FOUR_TIMES))
+        read(""""buttonStyle":"xbox","edgeSmoothing":"2x"""")
+            .shouldBeRight(Settings(Some(ButtonStyle.XBOX), EdgeSmoothing.TWICE, None, gamesFloat = false))
         mapOf(EdgeSmoothing.FOUR_TIMES to "4x", EdgeSmoothing.TWICE to "2x", EdgeSmoothing.OFF to "off").forEach { (smoothing, name) ->
             SettingsFormat.encode(Settings(edgeSmoothing = smoothing)) shouldContain """"edgeSmoothing":"$name""""
         }
-    }
-
-    @Test
-    fun `INV-E11-08 settings stored before the preferred region existed read with none, and each region is stored under its name`() {
-        SettingsFormat
-            .decode("""{"version":2,"settings":{"buttonStyle":"xbox","edgeSmoothing":"2x"}}""")
-            .shouldBeRight(Settings(Some(ButtonStyle.XBOX), EdgeSmoothing.TWICE, None))
         SettingsFormat.encode(Settings(preferredRegion = Some(PreferredRegion.UNITED_KINGDOM))) shouldContain
             """"preferredRegion":"United Kingdom""""
     }
 
     @Test
-    fun `INV-E12-C1-02 an old file reads with games float off, and the choice is stored`() {
-        SettingsFormat
-            .decode("""{"version":2,"settings":{"buttonStyle":"xbox","edgeSmoothing":"2x"}}""")
-            .shouldBeRight(Settings(Some(ButtonStyle.XBOX), EdgeSmoothing.TWICE, None, gamesFloat = false))
-        SettingsFormat.decode(SettingsFormat.encode(Settings(gamesFloat = true))).shouldBeRight(Settings(gamesFloat = true))
-    }
-
-    @Test
-    fun `reading a settings file is total, whatever is left of it`() = runBlocking<Unit> {
+    fun `INV-15 reading a settings file is total, whatever is left of it`() = runBlocking<Unit> {
         checkAll(settings, Arb.int(0..200), Arb.string(0..20)) { settings, cut, noise ->
             val text = SettingsFormat.encode(settings)
             val read = SettingsFormat.decode(text.take(cut) + noise)

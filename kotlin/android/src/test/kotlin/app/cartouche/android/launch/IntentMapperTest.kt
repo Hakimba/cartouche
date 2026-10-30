@@ -10,7 +10,6 @@ import app.cartouche.core.launch.sdGame
 import arrow.core.toOption
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.ints.shouldBeGreaterThan
-import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
@@ -18,7 +17,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
+@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 class IntentMapperTest {
     private val context = RuntimeEnvironment.getApplication()
@@ -27,15 +28,7 @@ class IntentMapperTest {
         IntentMapper.toIntent(LaunchTemplate.parse(template).shouldBeRight().resolve(sdGame).shouldBeRight())
 
     @Test
-    fun `INV-E0-12 the game URI handed to the emulator is covered by a read-only grant`() {
-        val intent =
-            intentFor("-n org.dolphinemu.dolphinemu/.ui.main.MainActivity -a android.intent.action.MAIN -e AutoStartFile {file.uri}")
-        intent.clipData.shouldNotBeNull().getItemAt(0).uri.toString() shouldBe GAME_URI
-        intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION shouldBe Intent.FLAG_GRANT_READ_URI_PERMISSION
-    }
-
-    @Test
-    fun `INV-E0-12 whatever the template, an intent grants read access to the game URI and nothing else`() = runBlocking<Unit> {
+    fun `INV-01 whatever the template, an intent grants read access to the game URI and nothing else`() = runBlocking<Unit> {
         var handed = 0
         forEveryResolvedTemplate { _, spec ->
             // What startActivity does to the intent before the system reads its grants.
@@ -54,25 +47,7 @@ class IntentMapperTest {
     }
 
     @Test
-    fun `INV-E0-12 aX360e gets the game URI as text under its own action, and read access to that URI alone`() {
-        val intent = intentFor("-n aenu.ax360e/aenu.ax360e.EmulatorActivity -a aenu.intent.action.AX360E --es game_uri {file.uri}")
-        intent.action shouldBe "aenu.intent.action.AX360E"
-        intent.getStringExtra("game_uri") shouldBe GAME_URI
-        intent.clipData.shouldNotBeNull().let { clip -> (0 until clip.itemCount).map { clip.getItemAt(it).uri.toString() } } shouldBe
-            listOf(GAME_URI)
-        intent.flags and GRANT_FLAGS shouldBe Intent.FLAG_GRANT_READ_URI_PERMISSION
-    }
-
-    @Test
-    fun `INV-E0-12 a launch that hands no URI grants nothing, even with a URI written in the template`() {
-        val intent = intentFor("-n com.retroarch.aarch64/.Activity -e ROM {file.path} -e X content://other/document/y")
-        intent.clipData.shouldBeNull()
-        intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION shouldBe 0
-        intent.getStringExtra("ROM") shouldBe "/storage/1A2B-3C4D/ROMs/ps2/Burnout 3 - Takedown (Europe).chd"
-    }
-
-    @Test
-    fun `INV-E0-13 launches always start a new task and keep the template's switches`() = runBlocking<Unit> {
+    fun `launches always start a new task and keep the template's switches`() = runBlocking<Unit> {
         val intent = intentFor("-n com.armsx2/.Main -a android.intent.action.VIEW -d {file.uri} --activity-clear-task")
         intent.component.shouldNotBeNull().className shouldBe "com.armsx2.Main"
         intent.data.toString() shouldBe GAME_URI

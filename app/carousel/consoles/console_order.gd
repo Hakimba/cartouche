@@ -26,28 +26,10 @@ signal form_wanted
 ## The placing is over: placed (true), or given up for the form (false).
 signal placing_over(placed: bool)
 
-## The ring opens in this time, the console pointed at gliding from the hero's place; the others come from the
-## rail a little after, in their own time; the arrow, the middle and the hints follow, each from its
-## moment, in its time (seconds).
-static var _OPEN_S: float:
-	get: return StudioTokens.TR_RING_OPEN_S
-static var _RISE_AFTER_S: float:
-	get: return StudioTokens.TR_RING_RISE_AT_S
-static var _RISE_S: float:
-	get: return StudioTokens.TR_RING_RISE_S
-static var _MARKS_AFTER_S: float:
-	get: return StudioTokens.TR_RING_MARKS_AT_S
-static var _MARKS_S: float:
-	get: return StudioTokens.TR_RING_MARKS_S
-static var _MIDDLE_AFTER_S: float:
-	get: return StudioTokens.TR_RING_MIDDLE_AT_S
-static var _MIDDLE_S: float:
-	get: return StudioTokens.TR_RING_MIDDLE_S
+## Opening the ring, the hints come in from this moment, in this time (seconds).
 const _HINTS_AFTER_S := 0.25
 const _HINTS_S := 0.15
-## It closes in this time, the others sinking towards the rail in theirs, the rest fading in theirs.
-static var _CLOSE_S: float:
-	get: return StudioTokens.TR_RING_CLOSE_S
+## Closing the ring, the others sink towards the rail in this time, the marks and hints fade in theirs.
 const _SINK_S := 0.372
 const _MARKS_OUT_S := 0.186
 const _HINTS_OUT_S := 0.15
@@ -61,21 +43,14 @@ const _COMING_EACH_S := 0.018
 const _COMING_S := 0.3
 const _PLACE_IN_S := 0.32
 const _PLACE_MIDDLE_AFTER_S := 0.252
-## Flying into the gap, the middle goes in this time; flying back the others go in the first, the marks in the second,
-## the ring as a whole after this long in the third, and the form comes back as the ring leaves.
+## Flying into the gap, the middle goes in this time; flying back, the ring fades in this time.
 const _MIDDLE_OUT_S := 0.16
-static var _OTHERS_OUT_S: float:
-	get: return StudioTokens.TR_PLACE_OTHERS_S
-static var _BACK_MARKS_S: float:
-	get: return StudioTokens.TR_PLACE_MARKS_S
-static var _BACK_FADE_AFTER_S: float:
-	get: return StudioTokens.TR_PLACE_AT_S
 const _BACK_FADE_S := 0.32
 ## A console peels off, and is put back down, in these times, springing a little.
 const _PEEL_S := 0.24
 const _PUT_DOWN_S := 0.26
 ## By touch: the cursor moves one console for each stretch this long dragged; a tap takes the
-## console whose box is nearest it, this far from the box at most (in pixels of the design's frame).
+## console whose box is nearest it, this far from the box at most (in pixels of the reference frame).
 const _DRAG_STEP := 160.0
 const _TAP_REACH := 110.0
 ## The arrow stands this far (px) beyond the pointed console's box, further while it is held; a unit of its
@@ -83,10 +58,10 @@ const _TAP_REACH := 110.0
 const _ARROW_OUT_PX := 14.08
 const _ARROW_HELD_PX := 20.48
 const _ARROW_UNIT := 1.28
-## How far the white edge reaches past the ink (the design's stroke of 3 units, half of it showing).
+## How far the white edge reaches past the ink: half of a stroke of 3 units shows outside it.
 const _ARROW_EDGE_PX := 1.5 * _ARROW_UNIT
 const _ARROW_SHADOW := Vector2(0.0, 3.2)
-## The gel glow round the arrow (the design's drop-shadow of 0.9 cqw at 55 %): its layers' alphas, from the nearest
+## The coloured glow round the arrow: its layers' alphas, from the nearest
 ## to the farthest, each reaching 2 px further out than the one before; a Gaussian's edge laid in steps.
 const _GLOW_ALPHAS: Array[float] = [0.0856, 0.0668, 0.0472, 0.0302, 0.0173, 0.0089, 0.0041, 0.0025]
 const _GLOW_STEP_PX := 2.0
@@ -115,9 +90,7 @@ var _opening_s := 0.0:
 		_place_opening()
 var _peeling: Tween
 var _finger := Finger.new()
-## How many steps the finger's drag has made.
 var _drag_steps := 0
-## Where the arrow stands round the ring and how far beyond the console, and where it is going.
 var _arrow_angle := 0.0
 var _arrow_out := 0.0
 var _arrow_to := 0.0
@@ -135,9 +108,6 @@ var _marks := 0.0:
 		_tint_marks()
 ## Where the middle's top stands (px): the ordering ring's, or under the console placed.
 var _middle_y := _MIDDLE_Y
-## Placing a console: the flow, the id of the console placed, the angle each console of the ring stands at and
-## goes to, how long the ring has been coming in, how much the others are still there, how far the console's move has
-## gone (0 to 1) and its bounce, where it started the move, and the move that waits for a press.
 var _placing: Placing
 var _placed_id := ""
 var _angle: Dictionary[String, float] = {}
@@ -170,10 +140,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	var follow := 1.0 - exp(-RingFit.FOLLOW * minf(delta, Motion.MAX_STEP_S))
-	var gap := wrapf(_arrow_to - _arrow_angle, -PI, PI)
-	_arrow_angle = _arrow_to if absf(gap) < 1e-4 else _arrow_angle + gap * follow
-	_arrow_out = _arrow_out_to if absf(_arrow_out_to - _arrow_out) < 1e-4 else lerpf(_arrow_out, _arrow_out_to, follow)
+	var follow := RingFit.share(delta)
+	_arrow_angle = RingFit.turn_toward(_arrow_angle, _arrow_to, follow)
+	_arrow_out = RingFit.toward(_arrow_out, _arrow_out_to, follow)
 	if _placing:
 		_follow_placing(follow)
 	_place_marks()
@@ -287,9 +256,8 @@ func _close() -> void:
 	_open = false
 	_busy = true
 	Diagnostics.trace("order", "ring closed on %s" % _wheel.selected())
-	# The row comes back round the console the cursor was on.
 	consoles.select(_row.find(_wheel.selected()))
-	var duration := maxf(_opening_s, 0.001) if rewind else _CLOSE_S
+	var duration := maxf(_opening_s, 0.001) if rewind else StudioTokens.TR_RING_CLOSE_S
 	closing.emit(duration)
 	var leaving := create_tween() if rewind else _tween_out()
 	if rewind:
@@ -314,15 +282,21 @@ func _tween_in() -> Tween:
 
 
 func _opening_length() -> float:
-	return [ _OPEN_S, _RISE_AFTER_S + _RISE_S, _MARKS_AFTER_S + _MARKS_S,
-		_MIDDLE_AFTER_S + _MIDDLE_S, _HINTS_AFTER_S + _HINTS_S ].max()
+	return [
+		StudioTokens.TR_RING_OPEN_S,
+		StudioTokens.TR_RING_RISE_AT_S + StudioTokens.TR_RING_RISE_S,
+		StudioTokens.TR_RING_MARKS_AT_S + StudioTokens.TR_RING_MARKS_S,
+		StudioTokens.TR_RING_MIDDLE_AT_S + StudioTokens.TR_RING_MIDDLE_S,
+		_HINTS_AFTER_S + _HINTS_S,
+	].max()
 
 
 func _place_opening() -> void:
-	consoles.wheel = Motion.phase(_opening_s, 0.0, _OPEN_S, StudioTokens.TR_RING_OPEN_S_CURVE)
-	consoles.others_wheel = Motion.phase(_opening_s, _RISE_AFTER_S, _RISE_S, StudioTokens.TR_RING_RISE_S_CURVE)
-	_marks = Motion.phase(_opening_s, _MARKS_AFTER_S, _MARKS_S)
-	_middle_in = Motion.phase(_opening_s, _MIDDLE_AFTER_S, _MIDDLE_S, StudioTokens.TR_RING_MIDDLE_S_CURVE)
+	consoles.wheel = Motion.phase(_opening_s, 0.0, StudioTokens.TR_RING_OPEN_S, StudioTokens.TR_RING_OPEN_S_CURVE)
+	consoles.others_wheel = Motion.phase(_opening_s, StudioTokens.TR_RING_RISE_AT_S, StudioTokens.TR_RING_RISE_S,
+		StudioTokens.TR_RING_RISE_S_CURVE)
+	_marks = Motion.phase(_opening_s, StudioTokens.TR_RING_MARKS_AT_S, StudioTokens.TR_RING_MARKS_S)
+	_middle_in = Motion.phase(_opening_s, StudioTokens.TR_RING_MIDDLE_AT_S, StudioTokens.TR_RING_MIDDLE_S, StudioTokens.TR_RING_MIDDLE_S_CURVE)
 	_hints().modulate.a = Motion.phase(_opening_s, _HINTS_AFTER_S, _HINTS_S)
 
 
@@ -330,7 +304,8 @@ func _place_opening() -> void:
 ## rail, the arrow, the middle and the hints leave.
 func _tween_out() -> Tween:
 	var moves := create_tween().set_parallel()
-	moves.tween_property(consoles, ^"wheel", 0.0, _CLOSE_S).set_custom_interpolator(Motion.curve(StudioTokens.TR_RING_CLOSE_S_CURVE))
+	moves.tween_property(consoles, ^"wheel", 0.0,
+		StudioTokens.TR_RING_CLOSE_S).set_custom_interpolator(Motion.curve(StudioTokens.TR_RING_CLOSE_S_CURVE))
 	moves.tween_property(consoles, ^"others_wheel", 0.0, _SINK_S).set_custom_interpolator(Motion.curve(Motion.Easing.SINK))
 	moves.tween_property(self, ^"_marks", 0.0, _MARKS_OUT_S)
 	moves.tween_property(self, ^"_middle_in", 0.0, _HINTS_OUT_S)
@@ -362,7 +337,7 @@ func place(platform_ids: Array[String], platform_id: String) -> bool:
 	_busy = false
 	_finger = Finger.new()
 	_sticker.consoles = consoles
-	_rim = StudioTokens.GEL.get(StringName(_folder_of(platform_id)), StudioTokens.NEUTRAL)
+	_rim = ConsoleManifest.gel_of(_folder_of(platform_id))
 	consoles.wheel_slots = _ring_slots()
 	consoles.pointed = -1
 	consoles.held = -1
@@ -437,14 +412,13 @@ func _play_arrival() -> void:
 	var in_out := Motion.curve(Motion.Easing.EASE_OUT)
 	motion.tween_property(self, ^"_marks", 1.0, _PLACE_IN_S).from(0.0).set_custom_interpolator(in_out)
 	motion.tween_property(_moving, ^"modulate:a", 1.0, _PLACE_IN_S).from(0.0).set_custom_interpolator(in_out)
-	motion.tween_property(self, ^"_middle_in", 1.0, _MIDDLE_S).from(0.0).set_delay(_PLACE_MIDDLE_AFTER_S) \
+	motion.tween_property(self, ^"_middle_in", 1.0, StudioTokens.TR_RING_MIDDLE_S).from(0.0).set_delay(_PLACE_MIDDLE_AFTER_S) \
 		.set_custom_interpolator(in_out)
 	_arriving = _tween()
 	_arriving.tween_property(self, ^"_move", 1.0, StudioTokens.ARRIVE_S).from(0.0)
 	_arriving.tween_callback(_placing.done)
 
 
-## A press while a console is placed: what its state makes of it.
 func _press_placing(direction: int, accept: bool) -> void:
 	var pressed := Placing.Press.A if accept else Placing.Press.B
 	if direction:
@@ -488,10 +462,9 @@ func _aim_placing() -> void:
 ## How tall the console placed stands in the middle, in px.
 func _middle_height() -> float:
 	var width := RingFit.width(RingFit.weight_of(_folder_of(_placed_id)), consoles.ring_target, 0.0) * Placing.MIDDLE_GROWTH
-	return width * 0.75 * consoles.silhouette(_row.find(_placed_id)).size.y * RingFit.CQW
+	return width * 0.75 * consoles.silhouette(_row.find(_placed_id)).size.y * FormPaint.CQW
 
 
-## The scale the [param ids] stand on at [param angles].
 func _fit_placing(ids: Array[String], angles: PackedFloat64Array) -> void:
 	var boxes: Array[Rect2] = []
 	var weights := PackedFloat64Array()
@@ -515,7 +488,7 @@ func _folder_of(platform_id: String) -> String:
 func _plinth_stand() -> ConsoleRow.Stand:
 	var stand := ConsoleRow.Stand.new()
 	stand.centre = Placing.PLINTH
-	stand.size = Placing.PLINTH_WIDTH / (CarouselLayout.FRAME.x / RingFit.CQW)
+	stand.size = Placing.PLINTH_WIDTH / (CarouselLayout.FRAME.x / FormPaint.CQW)
 	return stand
 
 
@@ -525,7 +498,7 @@ func _stand_of_placed(centre: Vector2, angle: float, growth: float) -> ConsoleRo
 	var stand := ConsoleRow.Stand.new()
 	stand.centre = centre
 	stand.size = RingFit.width(RingFit.weight_of(_folder_of(_placed_id)), consoles.ring_scale, angle) * growth \
-		/ (CarouselLayout.FRAME.x / RingFit.CQW)
+		/ (CarouselLayout.FRAME.x / FormPaint.CQW)
 	return stand
 
 
@@ -543,11 +516,9 @@ func _write_ring() -> void:
 		consoles.flier_stand = _flier_stand()
 
 
-## Every console of the ring follows its angle, as the arrow does.
 func _follow_placing(follow: float) -> void:
 	for id in _angle:
-		var gap := wrapf(_angle_to[id] - _angle[id], -PI, PI)
-		_angle[id] = _angle_to[id] if absf(gap) < 1e-4 else _angle[id] + gap * follow
+		_angle[id] = RingFit.turn_toward(_angle[id], _angle_to[id], follow)
 	_write_ring()
 
 
@@ -557,7 +528,7 @@ func _flier_stand() -> ConsoleRow.Stand:
 	var landed := _stand_of_placed(RingFit.place(angle), angle, 1.0)
 	var to := _stand_of_placed(Placing.MIDDLE, 0.0, Placing.MIDDLE_GROWTH)
 	var easing := Motion.Easing.IN_OUT
-	var lift := Placing.ARRIVE_LIFT
+	var lift := StudioTokens.TR_PLACE_ARC_PX
 	match _placing.state:
 		Placing.State.ARRIVING, Placing.State.CHOOSING:
 			easing = Motion.Easing.OUT_BACK
@@ -622,8 +593,6 @@ func _landed(gap: int) -> void:
 	order.assign(Array(answer.order))
 	ordered.emit(order)
 	_row = order
-	# The consoles are in their new order: the console placed and the places on the ring follow it.
-	consoles.flier = _row.find(_placed_id)
 	consoles.wheel_slots = _ring_slots()
 	if pause.time_left > 0.0:
 		await pause.timeout
@@ -638,7 +607,7 @@ func _morph() -> void:
 	consoles.flier = -1
 	consoles.pointed = _row.find(_placed_id)
 	_write_ring()
-	closing.emit(_CLOSE_S)
+	closing.emit(StudioTokens.TR_RING_CLOSE_S)
 	await _tween_out().finished
 	_placing.done()
 	_end_placing(true)
@@ -651,12 +620,12 @@ func _fly_back(stood: ConsoleRow.Stand) -> void:
 	_move = 0.0
 	var motion := _tween().set_parallel()
 	var ease_in := Motion.curve(Motion.Easing.EASE_IN)
-	motion.tween_property(self, ^"_move", 1.0, Placing.BACK_S)
-	motion.tween_property(self, ^"_others_in", 0.0, _OTHERS_OUT_S).set_custom_interpolator(ease_in)
-	motion.tween_property(self, ^"_marks", 0.0, _BACK_MARKS_S)
-	motion.tween_property(self, ^"_middle_in", 0.0, _BACK_MARKS_S)
-	motion.tween_property(_moving, ^"modulate:a", 0.0, _BACK_FADE_S).set_delay(_BACK_FADE_AFTER_S).set_custom_interpolator(ease_in)
-	get_tree().create_timer(_BACK_FADE_AFTER_S).timeout.connect(form_wanted.emit)
+	motion.tween_property(self, ^"_move", 1.0, StudioTokens.TR_PLACE_BACK_S)
+	motion.tween_property(self, ^"_others_in", 0.0, StudioTokens.TR_PLACE_OTHERS_S).set_custom_interpolator(ease_in)
+	motion.tween_property(self, ^"_marks", 0.0, StudioTokens.TR_PLACE_MARKS_S)
+	motion.tween_property(self, ^"_middle_in", 0.0, StudioTokens.TR_PLACE_MARKS_S)
+	motion.tween_property(_moving, ^"modulate:a", 0.0, _BACK_FADE_S).set_delay(StudioTokens.TR_PLACE_AT_S).set_custom_interpolator(ease_in)
+	get_tree().create_timer(StudioTokens.TR_PLACE_AT_S).timeout.connect(form_wanted.emit)
 	await motion.finished
 	_placing.done()
 	_end_placing(false)
@@ -680,7 +649,6 @@ func _end_placing(placed: bool) -> void:
 	placing_over.emit(placed)
 
 
-## The hint row the buttons show now.
 func _hints() -> Control:
 	return _moving if _placing or _wheel.is_holding() else _choosing
 
@@ -774,9 +742,7 @@ func _distance_to_box(index: int, at: Vector2) -> float:
 
 ## The console held peels off to [param amount] (0, down) in [param seconds], springing a little.
 func _peel(amount: float, seconds: float) -> void:
-	if _peeling:
-		_peeling.kill()
-	_peeling = create_tween()
+	_peeling = Motion.restart(self, _peeling)
 	_peeling.tween_property(consoles, ^"peel", amount, seconds).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
@@ -796,7 +762,7 @@ func _show() -> void:
 	_fit_view()
 
 
-## The ring's parts stand in the design's frame as the viewport shows it.
+## The ring's parts stand in the reference frame as the viewport shows it.
 func _fit_view() -> void:
 	_frame.position = consoles.view_origin()
 	_frame.scale = Vector2.ONE * consoles.view_scale()
@@ -816,7 +782,7 @@ func _refit() -> void:
 		angles.append(float(slot) / count * TAU)
 	consoles.ring_target = RingFit.scale(boxes, weights, angles, RingFit.WIDEST / RingFit.PS2_BOX.size.x)
 	Diagnostics.trace("order", "fit scale=%.2f room=%.2f in %.2f ms" % [consoles.ring_target,
-		minf(RingFit.least_room(boxes, weights, angles, consoles.ring_target), RingFit.ROOM * RingFit.CQW),
+		minf(RingFit.least_room(boxes, weights, angles, consoles.ring_target), RingFit.ROOM * FormPaint.CQW),
 		(Time.get_ticks_usec() - started) / 1000.0])
 
 
@@ -830,7 +796,7 @@ func _aim() -> void:
 	_arrow_to = angle
 	_arrow_angle = angle
 	_arrow_out_to = reach + (_ARROW_HELD_PX if _wheel.is_holding() else _ARROW_OUT_PX)
-	_rim = StudioTokens.GEL.get(StringName(item.folder), StudioTokens.NEUTRAL)
+	_rim = ConsoleManifest.gel_of(item.folder)
 	_tint_marks()
 	_arrow.queue_redraw()
 	_logo.show_logo(LogoView.Slot.RING_MIDDLE, item.folder)
@@ -888,8 +854,6 @@ func _notification(what: int) -> void:
 			_describe()
 
 
-
-## The middle as opaque and as high as it has come in.
 func _place_middle() -> void:
 	_middle.modulate.a = _middle_in
 	_middle.position.y = _middle_y + (1.0 - _middle_in) * _MIDDLE_RISE_PX
@@ -899,14 +863,13 @@ func _tint_marks() -> void:
 	_arrow.modulate.a = _marks
 
 
-## The arrow where the ring's marks stand this frame.
 func _place_marks() -> void:
 	var radial := Vector2(RingFit.RADII.x * sin(_arrow_angle), RingFit.RADII.y * cos(_arrow_angle)).normalized()
 	_arrow.position = RingFit.place(_arrow_angle) + radial * _arrow_out - Vector2(_arrow.pivot_offset.x, 0.0)
 	_arrow.rotation = atan2(-radial.x, radial.y)
 
 
-## The arrow, as the design draws it: an ink head with a white edge and a shine, a shadow and a glow of the pointed
+## The arrow: an ink head with a white edge and a shine, a shadow and a glow of the pointed
 ## console's gel.
 func _draw_arrow() -> void:
 	var head := _arrow_shape([Vector2(0, 0), Vector2(12, 28), Vector2(0, 21), Vector2(-12, 28)])
@@ -919,8 +882,8 @@ func _draw_arrow() -> void:
 	_arrow.draw_colored_polygon(shine, _ARROW_SHINE)
 
 
-## The head's outline [param reach] px out, as the design strokes it: edge by edge with a disc on each corner (the
-## polyline's own corners are mitred, the design's are round), the inside filled when [param filled].
+## The head's outline [param reach] px out, with round corners: edge by edge with a disc on each corner (a
+## polyline's own corners are mitred), the inside filled when [param filled].
 func _stroke_arrow(head: PackedVector2Array, reach: float, colour: Color, filled: bool) -> void:
 	if filled:
 		_arrow.draw_colored_polygon(head, colour)
@@ -929,7 +892,7 @@ func _stroke_arrow(head: PackedVector2Array, reach: float, colour: Color, filled
 		_arrow.draw_circle(head[k], reach, colour)
 
 
-## The points [param units] (the design's, tip at the origin) in the arrow control's pixels.
+## The points [param units] (in arrow units, tip at the origin) in the arrow control's pixels.
 func _arrow_shape(units: Array[Vector2]) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for unit in units:
@@ -944,7 +907,7 @@ func _shifted(points: PackedVector2Array, by: Vector2) -> PackedVector2Array:
 	return moved
 
 
-## A word of the line under the logo, in the design's mono face and its muted ink.
+## A word of the line under the logo, in the mono face and the muted ink.
 class Word:
 	extends Control
 

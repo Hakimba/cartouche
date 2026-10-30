@@ -14,14 +14,14 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * How a game's label is cut from a scan: by its platform's [kind] of scan, for a game that comes in [medium]
- * and whose ROM says it was sold in a [shell].
+ * How a game's label is cut from a scan: by its platform's [kind] of scan, for a game that comes in [medium] and
+ * whose ROM says it was sold in a [shell].
  */
 public data class LabelCut(public val kind: ArtKind, public val medium: MediumId, public val shell: Shell = Shell.UNKNOWN) {
     /**
-     * The label on [candidate]'s image whose medium (its opaque part) is [width] by [height] pixels:
-     * a texture whole, it is the label as printed (a disc's drawn on a square, a cartridge's at its
-     * own proportions, by [kind]); a scan as [on] reads it.
+     * The label on [candidate]'s image whose medium (its opaque part) is [width] by [height] pixels: a texture whole,
+     * it is the label as printed (a disc's drawn on a square, a cartridge's at its own proportions, by [kind]); a
+     * scan as [on] reads it.
      */
     public fun on(candidate: Candidate, width: Int, height: Int): Option<PixelRect> = when (candidate) {
         is Candidate.Texture -> Some(whole(width, height))
@@ -48,7 +48,10 @@ public data class LabelCut(public val kind: ArtKind, public val medium: MediumId
         }
     }
 
-    /** Whether the same scan is cut as [other] cuts it: the shell only counts for a front the profile gives exclusives of. */
+    /**
+     * Whether the same scan is cut as [other] cuts it: the shell only counts for a front the profile gives exclusives
+     * of.
+     */
     public fun cutsAs(other: LabelCut): Boolean = kind == other.kind && medium == other.medium && exclusive == other.exclusive
 
     private val exclusive: Boolean get() = shell == Shell.EXCLUSIVE && kind is ArtKind.CartridgeFront && medium in kind.exclusives
@@ -60,9 +63,8 @@ public data class LabelCut(public val kind: ArtKind, public val medium: MediumId
 
     public companion object {
         /**
-         * How far, as a fraction of a front's proportion, a straight scan of it may be: scans cut
-         * close or with a shadow stay within 5 %, while the fronts of one platform's cartridges
-         * differ by 10 % at least.
+         * How far, as a fraction of a front's proportion, a straight scan of it may be: scans cut close or with a
+         * shadow stay within 5 %, while the fronts of one platform's cartridges differ by 10 % at least.
          */
         public const val TOLERANCE: Double = 0.06
     }

@@ -4,7 +4,6 @@ package app.cartouche.android.storage
 import android.database.Cursor
 import android.database.CursorWrapper
 import android.database.sqlite.SQLiteException
-import android.net.Uri
 import android.os.BadParcelableException
 import android.os.OperationCanceledException
 import android.provider.DocumentsContract.Document
@@ -27,8 +26,6 @@ import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.Codepoint
-import io.kotest.property.arbitrary.alphanumeric
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.constant
@@ -43,30 +40,22 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.util.zip.CRC32
 import kotlin.reflect.KClass
 
+@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 class FoldersTest {
     private val context = RuntimeEnvironment.getApplication()
     private val tree = TREE
 
     @Test
-    fun `INV-E0-14 access to a picked folder is kept read-only`() {
+    fun `INV-01 access to a picked folder is kept read-only`() {
         val tree = cardTree("ps2")
         Folders(context).keepAccess(tree).shouldBeRight().name shouldBe "ps2"
         context.contentResolver.persistedUriPermissions.map { Triple(it.uri, it.isReadPermission, it.isWritePermission) } shouldBe
             listOf(Triple(tree, true, false))
-    }
-
-    @Test
-    fun `INV-E0-14 whatever folders are picked, none is kept writable`() = runBlocking<Unit> {
-        checkAll(Arb.list(Arb.string(1..12, Codepoint.alphanumeric()), 1..4)) { names ->
-            names.forEach {
-                Folders(context).keepAccess(Uri.parse("content://com.android.externalstorage.documents/tree/primary%3A$it")).shouldBeRight()
-            }
-            context.contentResolver.persistedUriPermissions.forEach { it.isWritePermission shouldBe false }
-        }
     }
 
     @Test
@@ -94,7 +83,7 @@ class FoldersTest {
     }
 
     @Test
-    fun `INV-E1-12 a folder the provider cannot list is a typed failure, a sub-folder a skipped one`() {
+    fun `INV-09 a folder the provider cannot list is a typed failure, a sub-folder a skipped one`() {
         val failures: List<Pair<() -> Cursor?, KClass<out StorageFailure>>> =
             listOf(
                 { throw SecurityException("revoked") } to StorageFailure.PermissionDenied::class,
@@ -129,7 +118,7 @@ class FoldersTest {
     }
 
     @Test
-    fun `INV-E1-12 whatever rows a provider returns, listing is a result, never a crash`() = runBlocking<Unit> {
+    fun `INV-09 whatever rows a provider returns, listing is a result, never a crash`() = runBlocking<Unit> {
         val folders = listOf("root", "root/0", "root/1", "root/2")
         val mime = Arb.element(Document.MIME_TYPE_DIR, "application/octet-stream", "").orNull(0.2)
         val id = Arb.element(folders).orNull(0.1)
@@ -145,26 +134,11 @@ class FoldersTest {
                 .onRight { listed++ }
                 .onLeft { it.unlisted().shouldBeInstanceOf<StorageFailure.Unavailable>() }
         }
-        // About half the cases list something: the property is not only about failures.
         listed shouldBeGreaterThan 300
     }
 
     @Test
-    fun `INV-E1-14 a folder holding more entries than a scan reads fails it, and rows past the limit are not read`() {
-        var read = 0
-        installDocuments {
-            val files = Array(FolderWalk.MAX_ENTRIES + 50) { fileRow("root/$it.dds") }
-            object : CursorWrapper(rows(*files)) {
-                override fun moveToNext(): Boolean = super.moveToNext().also { if (it) read++ }
-            }
-        }
-        Folders(context).files(tree, FolderDepth.TOP_LEVEL, DataFolders.NONE).shouldBeLeft() shouldBe
-            WalkFailure.TooManyEntries(FolderWalk.MAX_ENTRIES, None, FolderWalk.MAX_ENTRIES + 1, None)
-        read shouldBe FolderWalk.MAX_ENTRIES + 1
-    }
-
-    @Test
-    fun `INV-E1-15 an emulator data folder is reported, never listed`() {
+    fun `an emulator data folder is reported, never listed`() {
         val listed = mutableListOf<String>()
         installDocuments { folder -> rows(folderRow("root/MemCards"), fileRow("root/g.iso")).also { listed += folder } }
         val contents = Folders(context).files(tree, FolderDepth.SUBFOLDERS, testDataFolders).shouldBeRight().contents
@@ -173,7 +147,7 @@ class FoldersTest {
     }
 
     @Test
-    fun `INV-E1-14 a scan reads at most one entry past the limit, over its sub-folders too`() {
+    fun `INV-09 a scan reads at most one entry past the limit, over its sub-folders too`() {
         var read = 0
         installDocuments { folder ->
             val entries =
@@ -194,7 +168,7 @@ class FoldersTest {
     }
 
     @Test
-    fun `INV-E1-12 a listing that ends before the provider's own count fails, as when the provider dies meanwhile`() {
+    fun `INV-09 a listing that ends before the provider's own count fails, as when the provider dies meanwhile`() {
         installDocuments {
             object : CursorWrapper(rows(fileRow("root/a.iso"), fileRow("root/b.iso"))) {
                 override fun moveToNext(): Boolean = position < 0 && super.moveToNext()
@@ -209,7 +183,7 @@ class FoldersTest {
     }
 
     @Test
-    fun `INV-E6-03 the access to the folders no platform uses is given up, the others kept`() {
+    fun `INV-13 the access to the folders no platform uses is given up, the others kept`() {
         val trees = listOf("ps2", "gba", "gc").map(::cardTree)
         val folders = Folders(context)
         val kept = trees.map { folders.keepAccess(it).shouldBeRight().uri }

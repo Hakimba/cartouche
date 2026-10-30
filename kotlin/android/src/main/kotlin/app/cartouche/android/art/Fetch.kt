@@ -28,7 +28,10 @@ internal sealed interface FetchFailure {
     /** The server has no such image, or will not give it: the next source is tried. */
     data object NotFound : FetchFailure
 
-    /** The server could not be reached: no network, or a network that goes nowhere; [reason] is the failure's class, never its message. */
+    /**
+     * The server could not be reached: no network, or a network that goes nowhere; [reason] is the failure's class,
+     * never its message.
+     */
     data class Offline(val reason: String) : FetchFailure
 
     /** The server answered with [status], busy (a quota) or failing: tried again later. */
@@ -56,18 +59,24 @@ internal fun interface Fetch {
 
 /** Why a server gave no answer at all. */
 internal sealed interface Unanswered {
-    /** [reason] names the failure's class only: its message may hold the URL, and so the credentials (INV-E11-06). */
+    /** [reason] is the failure's class only: its message may hold the URL, and so the credentials. */
     data class Offline(val reason: String) : Unanswered
 
     data object TimedOut : Unanswered
 }
 
-/** A server's answer: its [status], and its [body] when the status is 200 and it is no larger than [Http.LARGEST_BYTES]. */
+/**
+ * A server's answer: its [status], and its [body] when the status is 200 and it is no larger than
+ * [Http.LARGEST_BYTES].
+ */
 internal class Answer(val status: Int, val body: Option<ByteArray>)
 
 /** The HTTP transport every source is reached through; the port the tests replace. */
 internal fun interface Http {
-    /** Returns once [url] answers, or the server cannot be reached or does not answer in time, telling [progress] how far its body has come. */
+    /**
+     * Returns once [url] answers, or the server cannot be reached or does not answer in time, telling [progress] how
+     * far its body has come.
+     */
     suspend fun get(url: String, progress: Progress): Either<Unanswered, Answer>
 
     companion object {
@@ -76,9 +85,8 @@ internal fun interface Http {
 }
 
 /**
- * [Http] over the platform's connections, naming Cartouche to the server as [userAgent]; a redirect
- * to another protocol is not followed. Each chunk of a body read waits [chunkDelay] more (debug
- * builds' `--art-slow`, to see a download's progress).
+ * A redirect to another protocol is not followed. Each chunk of a body waits [chunkDelay] more (debug builds'
+ * `--art-slow`, to see a download's progress).
  */
 internal class JavaHttp(private val userAgent: String, private val chunkDelay: Duration = Duration.ZERO) : Http {
     override suspend fun get(url: String, progress: Progress): Either<Unanswered, Answer> = try {
@@ -111,7 +119,10 @@ internal class JavaHttp(private val userAgent: String, private val chunkDelay: D
         const val BUFFER_BYTES = 64 * 1024
     }
 
-    /** The whole body, of [size] bytes when the server tells it, when it is no larger than [Http.LARGEST_BYTES]; [progress] told as it is read. */
+    /**
+     * The whole body, of [size] bytes when the server tells it, when it is no larger than [Http.LARGEST_BYTES];
+     * [progress] told as it is read.
+     */
     private suspend fun readAtMost(body: InputStream, size: Option<Long>, progress: Progress): Option<ByteArray> {
         val read = ByteArrayOutputStream()
         val buffer = ByteArray(BUFFER_BYTES)

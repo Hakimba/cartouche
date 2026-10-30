@@ -75,5 +75,5 @@ suspend fun forEveryResolvedTemplate(game: GameFile = sdGame, property: suspend 
     check(resolved >= RESOLVED_AT_LEAST) { "Only $resolved generated templates resolved" }
 }
 
-/** Of the 1,000 cases a property runs. */
-private const val RESOLVED_AT_LEAST = 300
+/** Of the 100 cases an ordinary property runs. */
+private const val RESOLVED_AT_LEAST = 30

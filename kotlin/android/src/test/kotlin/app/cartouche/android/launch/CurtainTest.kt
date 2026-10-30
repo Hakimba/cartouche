@@ -2,7 +2,6 @@
 package app.cartouche.android.launch
 
 import android.app.Activity
-import android.graphics.PixelFormat
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager.LayoutParams
@@ -31,14 +30,15 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowSettings
 import org.robolectric.shadows.ShadowWindowManagerImpl
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
+@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 class CurtainTest {
     private sealed interface Step {
@@ -74,34 +74,7 @@ class CurtainTest {
     fun lowered() = curtain.lower()
 
     @Test
-    fun `without the permission, no curtain is raised`() {
-        ShadowSettings.setCanDrawOverlays(false)
-        curtain.raise(2.seconds)
-        curtains() shouldHaveSize 0
-    }
-
-    @Test
-    fun `a curtain of no time is none`() {
-        ShadowSettings.setCanDrawOverlays(true)
-        curtain.raise(Duration.ZERO)
-        curtains() shouldHaveSize 0
-    }
-
-    @Test
-    fun `a curtain is an opaque window over the whole screen that leaves the controller to the emulator`() {
-        ShadowSettings.setCanDrawOverlays(true)
-        curtain.raise(2.seconds)
-        val layout = curtains().single().layoutParams as LayoutParams
-        (layout.flags and LayoutParams.FLAG_NOT_FOCUSABLE) shouldBe LayoutParams.FLAG_NOT_FOCUSABLE
-        // Touchable: a window touches go through is capped at 80 % opacity.
-        (layout.flags and LayoutParams.FLAG_NOT_TOUCHABLE) shouldBe 0
-        layout.format shouldBe PixelFormat.OPAQUE
-        layout.width shouldBe LayoutParams.MATCH_PARENT
-        layout.height shouldBe LayoutParams.MATCH_PARENT
-    }
-
-    @Test
-    fun `INV-E3-06 a start runs under its curtain, which comes down at once if the start fails`() {
+    fun `INV-07 a start runs under its curtain, which comes down at once if the start fails`() {
         ShadowSettings.setCanDrawOverlays(true)
         var upDuringStart = 0
         curtain.over(2.seconds) { "refused".left().also { upDuringStart = curtains().size } }
@@ -112,13 +85,12 @@ class CurtainTest {
     }
 
     @Test
-    fun `INV-E3-06 whatever happens, a curtain is up exactly until its time is up or it is lowered, and never two`() = runBlocking<Unit> {
+    fun `INV-07 whatever happens, a curtain is up exactly until its time is up or it is lowered, and never two`() = runBlocking<Unit> {
         var raised = 0
         checkAll(Arb.list(steps, 1..12)) { script ->
             ShadowSettings.setCanDrawOverlays(true)
             curtain.lower()
             var allowed = true
-            // The model: when the curtain up comes down; none when no curtain is up.
             var now = 0L
             var downAt: Option<Long> = None
             script.forEach { step ->

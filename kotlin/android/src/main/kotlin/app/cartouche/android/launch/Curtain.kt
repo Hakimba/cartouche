@@ -30,14 +30,10 @@ import kotlin.time.Duration
 internal data class CurtainRefused(val reason: String)
 
 /**
- * A black window over every app, raised as a game's emulator starts and lowered after the time the
- * emulator takes to show its game ([app.cartouche.core.platforms.CurtainTimes]), or as soon as
- * Cartouche is back. It does not take the focus, so the controller reaches the emulator beneath,
- * but it takes touches while it is up: Android 12 and later cap a window that lets touches through
- * to 80 % opacity, which would let the emulator's screens show.
- *
- * Needs the "display over other apps" permission; without it, nothing is raised. Main thread only;
- * its timer runs in [scope].
+ * A black window over every app while an emulator starts, lowered after
+ * [app.cartouche.core.platforms.CurtainTimes] or when Cartouche is back.
+ * It does not take focus, so the controller reaches the emulator, but it takes touches: Android 12+ caps a window letting touches through
+ * at 80 % opacity. Needs the "display over other apps" permission. Main thread only.
  */
 internal class Curtain(private val context: Context, private val scope: CoroutineScope) {
     private data class Raised(val manager: WindowManager, val view: View, val timer: Job)
@@ -68,7 +64,10 @@ internal class Curtain(private val context: Context, private val scope: Coroutin
         }
     }
 
-    /** Lowers the curtain, if it is up: at once, since what it uncovers is black too, the game starting or Cartouche's screen. */
+    /**
+     * Lowers the curtain, if it is up: at once, since what it uncovers is black too, the game starting or Cartouche's
+     * screen.
+     */
     fun lower() {
         raised.onSome { (manager, view, timer) ->
             timer.cancel()

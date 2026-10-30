@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="SnesPalCartShape" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://carousel/models/snes_pal_cart_shape.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/media/snes_pal_cart/snes_pal_cart_shape.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

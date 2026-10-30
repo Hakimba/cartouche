@@ -8,9 +8,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * The games whose label came from a later image only because ScreenScraper was skipped, each with
- * the identity of the image shown: at a later run with ScreenScraper open, the game is asked again
- * for the images before that one, and its label replaced only by one of them.
+ * The games whose label came from a later image only because ScreenScraper was skipped, each with the identity of the
+ * image shown: at a later run with ScreenScraper open, the game is asked again for the images before that one, and
+ * its label replaced only by one of them.
  */
 @Serializable
 public data class ProvisionalArt(private val games: Map<GameId, Identity> = emptyMap()) {

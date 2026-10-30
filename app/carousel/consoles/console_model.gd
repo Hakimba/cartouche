@@ -3,7 +3,7 @@
 class_name ConsoleModel
 extends Node3D
 ## A console as the consoles screen shows it and a game goes into it: all the carousel and the
-## launch know of one. Each console is a folder of its own (see ONBOARDING, "Adding a console"),
+## launch know of one. Each console is a folder of its own (see docs/adding-a-console.md),
 ## its scene's root a model of this kind, built from its [member shape].
 ##
 ## The parts that move are float properties of the model, its [method moving_parts]: the launch

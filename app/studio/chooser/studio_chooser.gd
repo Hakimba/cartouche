@@ -88,7 +88,7 @@ class Row:
 		draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), StudioTokens.LINE)
 
 
-const _CQW := 12.8
+const _CQW := FormPaint.CQW
 const _ROW := Vector2(56.0 * _CQW, 6.4 * _CQW)
 const _PITCH := 7.0 * _CQW
 const _PAD_LEFT := 2.2 * _CQW
@@ -99,53 +99,37 @@ const _GAP := 1.6 * _CQW
 const _KICK_PX := 1.35 * _CQW
 const _NAME_PX := 2.35 * _CQW
 const _NUMBER_PX := 1.4 * _CQW
-## The browser's "normal" line heights and ascents of the two families (Plex Mono 1.3 and 1.025 em, Plus
-## Jakarta Sans 1.26 and 1.038 em): the text block of a row is centred as two such lines.
-const _KICK_LINE := 1.3 * _KICK_PX
-const _KICK_ASCENT := 1.025 * _KICK_PX
-## The browser sets the kicker this much higher in its row than its line box alone puts it.
+## The text block of a row is centred as two lines of the families' normal height.
+const _KICK_LINE := FormPaint.PLEX_LINE * _KICK_PX
+const _KICK_ASCENT := FormPaint.PLEX_ASCENT * _KICK_PX
+## How much higher in its row the kicker is set than its line box alone puts it, in px.
 const _KICK_RAISE := 3.0
-## Where the browser's line boxes put the plate's lines against ours (px, from the pictures): all of them
-## lower when the kicker is empty, and a little lower again for the kicker and the files when it is not.
+## How far the plate's lines are set down, in px: all of them when the kicker is empty, and a little more for
+## the kicker and the files when it is not.
 const _PLATE_DROP := 3.0
 const _FILES_DROP := 1.0
 const _KICKED_DROP := 1.0
 const _KICKED_FILES_DROP := 1.5
-const _NAME_LINE := 1.26 * _NAME_PX
-const _NAME_ASCENT := 1.038 * _NAME_PX
-const _NUMBER_LINE := 1.3 * _NUMBER_PX
-const _NUMBER_ASCENT := 1.025 * _NUMBER_PX
+const _NAME_LINE := FormPaint.JAKARTA_LINE * _NAME_PX
+const _NAME_ASCENT := FormPaint.JAKARTA_ASCENT * _NAME_PX
+const _NUMBER_LINE := FormPaint.PLEX_LINE * _NUMBER_PX
+const _NUMBER_ASCENT := FormPaint.PLEX_ASCENT * _NUMBER_PX
 const _LIST := Rect2(41.0 * _CQW, 7.6 * _CQW, 56.0 * _CQW, 58.4 * _CQW)
 const _LIST_PAD := 2.2 * _CQW
 const _FADE := 2.0 * _CQW
-const _TITLE := Vector2(5.0 * _CQW, 8.0 * _CQW)
-const _COUNT := Vector2(5.2 * _CQW, 14.6 * _CQW)
-const _TITLE_PX := 4.6 * _CQW
-## The browser's count sits this far up and left of its box.
-const _COUNT_SHIFT := Vector2(-1.0, -1.0)
-const _COUNT_PX := 1.7 * _CQW
 const _PLATE_NAME_PX := 2.6 * _CQW
 const _PLATE_KICK_PX := 1.4 * _CQW
 const _PLATE_FILES_WIDTH := 26.0 * _CQW
 const _FILES_LINE := 1.35 * _PLATE_KICK_PX
 const _FILES_SHARE := 0.6
-## The chooser's own motion (the form to chooser transition, its chooser half), in seconds.
-static var _OPEN_LAYER_AT: float:
-	get: return StudioTokens.TR_CHOOSER_AT_S
-static var _OPEN_LAYER_S: float:
-	get: return StudioTokens.TR_CHOOSER_LAYER_S
-static var _OPEN_LINES_AT: float:
-	get: return StudioTokens.TR_CHOOSER_LINES_AT_S
-static var _OPEN_LINES_S: float:
-	get: return StudioTokens.TR_CHOOSER_IN_S
-static var _LINES_SHIFT: Vector2:
-	get: return Vector2(StudioTokens.TR_CHOOSER_SHIFT_PX, StudioTokens.TR_CHOOSER_TITLE_PX)
 const _DRAG_START_PX := 12.0
 const _CURSOR_S := 0.24
 const _SCROLL_S := 0.3
 const _PLATE_S := 0.22
 const _TYPE_PLATE_RISE := 0.6 * _CQW
 const _PLAYER_PLATE_RISE := 0.8 * _CQW
+
+static var _variant := RegEx.create_from_string("^(.*?) \\((.*)\\)$")
 
 ## The form's current model choices, by platform; empty entries use the base model.
 var console_folders: Dictionary[String, String] = {}
@@ -179,8 +163,6 @@ var _press_at := Vector2.ZERO
 var _pressing := false
 var _dragging := false
 var _motions: Dictionary[StringName, Tween] = {}
-
-static var _variant := RegEx.create_from_string("^(.*?) \\((.*)\\)$")
 
 @onready var _backdrop: Cyclorama = $Backdrop
 @onready var _title_node: Control = $Title
@@ -299,11 +281,6 @@ func focused() -> int:
 	return _index
 
 
-## The inner list's offset from the window's top, in px: [constant _LIST_PAD] less the scroll.
-func list_offset() -> float:
-	return _inner.position.y
-
-
 ## Where the list rests for the cursor on row [param i] of [param n]: the row in the middle of the window,
 ## the first and the last held to the window's ends (px of scroll).
 static func scroll_of(i: int, n: int) -> float:
@@ -319,14 +296,6 @@ static func _last_scroll(n: int) -> float:
 func counter() -> String:
 	var total := _entries.size()
 	return "%02d / %s" % [_index + 1, str(total) if _is_type else "%02d" % total]
-
-
-## What the emulator plate shows: the player's name, its kicker, then its accepted files as lines.
-func plate_lines() -> PackedStringArray:
-	var lines := PackedStringArray([_plate_name.text, _plate_kick.text])
-	for line in _files:
-		lines.append(line.text)
-	return lines
 
 
 func rows() -> Array[Row]:
@@ -354,7 +323,7 @@ func _choose(is_type: bool, title: String, entries: Array[Entry], current: int, 
 	_choosing = true
 	_is_type = is_type
 	_entries = entries
-	_title = StudioText.new(title, StudioTokens.Face.JAKARTA_800, _TITLE_PX, -0.04)
+	_title = StudioText.new(title, StudioTokens.Face.JAKARTA_800, FormPaint.TITLE_PX, -0.04)
 	for row in _rows:
 		_inner.remove_child(row)
 		row.queue_free()
@@ -409,7 +378,7 @@ func _settle() -> void:
 
 func _gel_of(i: int) -> Color:
 	var folder := _entries[i].folder if _is_type else _plinth.console()
-	return StudioTokens.GEL.get(StringName(folder), StudioTokens.NEUTRAL)
+	return ConsoleManifest.gel_of(folder)
 
 
 func _place() -> void:
@@ -430,7 +399,7 @@ func _focus(i: int) -> void:
 	_show_focus(true)
 
 
-## The cursor is on row [member _index]: what follows it, moving by the design's curves when [param moving].
+## The cursor is on row [member _index]: what follows it, eased into place when [param moving].
 func _show_focus(moving: bool) -> void:
 	var entry := _entries[_index]
 	Diagnostics.trace("console form", "%s focus=%s" % ["type" if _is_type else "emulator", entry.id])
@@ -448,13 +417,13 @@ func _show_focus(moving: bool) -> void:
 		return
 	var from_y := _cursor_y
 	var to_y := _index * _PITCH
-	_animate(&"cursor", _CURSOR_S, Motion.Easing.SNAP, func(p: float) -> void:
+	Motion.animate(self, _motions, &"cursor", _CURSOR_S, Motion.Easing.SNAP, func(p: float) -> void:
 		_cursor_y = lerpf(from_y, to_y, p)
 		_cursor.position.y = _cursor_y)
 	if not _dragging:
 		_settle_scroll()
 	var from_rim := _rim
-	_animate(&"rim", StudioTokens.GEL_FADE_S, Motion.Easing.EASE, func(p: float) -> void:
+	Motion.animate(self, _motions, &"rim", StudioTokens.GEL_FADE_S, Motion.Easing.EASE, func(p: float) -> void:
 		_rim = from_rim.lerp(gel, p)
 		_cursor.gel = _rim
 		_count_node.queue_redraw()
@@ -464,18 +433,9 @@ func _show_focus(moving: bool) -> void:
 	var plate: Control = _plate_ink if not _is_type else _plinth.get_node("Plate")
 	var rise := _TYPE_PLATE_RISE if _is_type else _PLAYER_PLATE_RISE
 	var rest := 0.0 if not _is_type else _plate_rest
-	_animate(&"plate", _PLATE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
+	Motion.animate(self, _motions, &"plate", _PLATE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
 		plate.modulate.a = clampf(p, 0.0, 1.0)
 		plate.position.y = rest + rise * (1.0 - p))
-
-
-## A move of [param key] over [param seconds] by [param easing]: restarts from where the last one was left.
-func _animate(key: StringName, seconds: float, easing: Motion.Easing, apply: Callable) -> void:
-	if key in _motions:
-		_motions[key].kill()
-	var tween := create_tween()
-	_motions[key] = tween
-	tween.tween_method(func(t: float) -> void: apply.call(Motion.eased(easing, t)), 0.0, 1.0, seconds)
 
 
 ## The chooser's half of the form to chooser transition: the screen fades in, its lines, title and count come
@@ -489,15 +449,16 @@ func _open() -> void:
 		_opening.kill()
 	_open_clock = 0.0
 	_opening = create_tween()
-	var seconds := maxf(_OPEN_LAYER_AT + _OPEN_LAYER_S, _OPEN_LINES_AT + _OPEN_LINES_S)
+	var seconds := maxf(StudioTokens.TR_CHOOSER_AT_S + StudioTokens.TR_CHOOSER_LAYER_S,
+		StudioTokens.TR_CHOOSER_LINES_AT_S + StudioTokens.TR_CHOOSER_IN_S)
 	_opening.tween_property(self, ^"_open_clock", seconds, seconds)
 
 
 func _place_opening() -> void:
-	modulate.a = Motion.phase(_open_clock, _OPEN_LAYER_AT, _OPEN_LAYER_S, Motion.Easing.EASE_OUT)
-	var progress := Motion.phase(_open_clock, _OPEN_LINES_AT, _OPEN_LINES_S, Motion.Easing.ARRIVE)
+	modulate.a = Motion.phase(_open_clock, StudioTokens.TR_CHOOSER_AT_S, StudioTokens.TR_CHOOSER_LAYER_S, Motion.Easing.EASE_OUT)
+	var progress := Motion.phase(_open_clock, StudioTokens.TR_CHOOSER_LINES_AT_S, StudioTokens.TR_CHOOSER_IN_S, Motion.Easing.ARRIVE)
 	for line in _lines():
-		line.position = _rests[line] + _LINES_SHIFT * (1.0 - progress)
+		line.position = _rests[line] + Vector2(StudioTokens.TR_CHOOSER_SHIFT_PX, StudioTokens.TR_CHOOSER_TITLE_PX) * (1.0 - progress)
 		line.modulate.a = progress
 
 
@@ -524,7 +485,7 @@ func _drag_by(pixels: float) -> void:
 func _settle_scroll() -> void:
 	var from := _scroll
 	var to := scroll_of(_index, _entries.size())
-	_animate(&"scroll", _SCROLL_S, Motion.Easing.GLIDE, func(p: float) -> void:
+	Motion.animate(self, _motions, &"scroll", _SCROLL_S, Motion.Easing.GLIDE, func(p: float) -> void:
 		_scroll = lerpf(from, to, p)
 		_inner.position.y = _LIST_PAD - _scroll)
 
@@ -600,10 +561,7 @@ func _draw_title() -> void:
 
 func _draw_count() -> void:
 	var parts := counter().split(" / ")
-	var number := StudioText.new(parts[0], StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
-	var rest := StudioText.new(" / " + parts[1], StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
-	number.draw(_count_node, _COUNT_SHIFT, _rim)
-	rest.draw(_count_node, _COUNT_SHIFT + Vector2(number.width, 0.0), StudioTokens.MUTE)
+	FormPaint.draw_count(_count_node, parts[0], " / " + parts[1], _rim)
 
 
 func _draw_plate() -> void:
@@ -617,9 +575,9 @@ func _draw_plate() -> void:
 	var name_shift := (_plate_name.height - name_box) / 2.0
 	_plate_name.draw(_plate_ink, Vector2(centre - _plate_name.width / 2.0, y - name_shift), StudioTokens.INK)
 	y += name_box + 0.3 * _CQW
-	var kick_box := _PLATE_KICK_PX * 1.3 if kicked else 1.6 * _CQW
+	var kick_box := _PLATE_KICK_PX * FormPaint.PLEX_LINE if kicked else 1.6 * _CQW
 	_plate_kick.draw(_plate_ink, Vector2(centre - _plate_kick.width / 2.0,
-			y + 1.025 * _PLATE_KICK_PX - _plate_kick.baseline + _KICKED_DROP),
+			y + FormPaint.PLEX_ASCENT * _PLATE_KICK_PX - _plate_kick.baseline + _KICKED_DROP),
 		StudioTokens.MUTE)
 	y += kick_box + 0.3 * _CQW
 	y += _KICKED_FILES_DROP if kicked else _FILES_DROP

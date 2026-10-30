@@ -15,6 +15,12 @@ extends Control
 ## edit, its buttons read "Remove" and "Save". Saving another type (one not set up yet) adds that
 ## console and removes the one edited.
 
+signal closed(outcome: Outcome)
+## The form starts to go, given up: the screens behind it may start to come in.
+signal leaving
+## Slow storage and scanning run behind the departing form.
+signal saving(pending: bool)
+
 ## How the form closed.
 enum Outcome {
 	## The console was added or saved, and scanned.
@@ -24,17 +30,7 @@ enum Outcome {
 	REMOVE,
 }
 
-signal closed(outcome: Outcome)
-## The form starts to go, given up: the screens behind it may start to come in.
-signal leaving
-## Slow storage and scanning run behind the departing form.
-signal saving(pending: bool)
-
 const _CQW := FormPaint.CQW
-const _TITLE_PX := 4.6 * _CQW
-const _COUNT_PX := 1.7 * _CQW
-## The browser's count sits this far up and left of its box.
-const _COUNT_SHIFT := Vector2(-1.0, -1.0)
 const _NOTE_PX := 1.45 * _CQW
 const _NOTE_FOUND_PX := 1.9 * _CQW
 const _DOT := 1.0 * _CQW
@@ -44,41 +40,21 @@ const _KICK_PX := 1.4 * _CQW
 const _PLATE_PAD := 1.4 * _CQW
 const _LOGO_MIN := 4.6 * _CQW
 const _PLATE_GAP := 0.3 * _CQW
-## Where the overview's plate puts "No console" against the middle of the logo's box (px, from the picture).
+## How far below the middle of the logo's box the plate puts "No console", in px.
 const _NO_TYPE_DROP := 6.0
 const _PLATE_S := 0.22
 const _PLATE_RISE := 0.6 * _CQW
 ## How far past a pill button its ring stands.
 const _PILL_RING := 0.7 * _CQW
-## The corners of that ring, as the design's table gives them whatever the pill's height.
+## The corners of that ring, whatever the pill's height.
 const _PILL_RING_RADIUS := 3.5 * _CQW
 const _CARD_S := 0.24
 const _CARD_MOTIONS: Array[StringName] = [&"card_position", &"card_size"]
 const _LINE_MOTIONS: Array[StringName] = [&"enter", &"lines", &"leave"]
-static var _CARD_FLIGHT_S: float:
-	get: return StudioTokens.TR_CHOOSER_CARD_S
 ## The form's own motion, in seconds and px: the "+" ball to form transition (its form half), and the form to
 ## chooser transition (its form half).
-static var _ENTER_AT_S: float:
-	get: return StudioTokens.TR_FORM_AT_S
-static var _ENTER_FADE_S: float:
-	get: return StudioTokens.TR_FORM_FADE_S
 const _ENTER_S := 0.32
-static var _ENTER_LIFT: float:
-	get: return StudioTokens.TR_FORM_LIFT_PX
-static var _ENTER_SLIDE: float:
-	get: return StudioTokens.TR_FORM_SLIDE_PX
-static var _ENTER_RISE: float:
-	get: return StudioTokens.TR_FORM_CHOOSER_TITLE_PX
 const _LEAVE_FADE_S := 0.3
-static var _LEAVE_S: float:
-	get: return StudioTokens.TR_FORM_LEAVE_S
-static var _ASIDE_S: float:
-	get: return StudioTokens.TR_CHOOSER_OUT_S
-static var _ASIDE_SHIFT: float:
-	get: return StudioTokens.TR_CHOOSER_SHIFT_PX
-static var _ASIDE_MODEL_S: float:
-	get: return StudioTokens.TR_CHOOSER_MODEL_S
 const _COME_BACK_S := 0.23
 ## The model rising again after a chooser: from this far down (px), in this time, as the plinth's own rise.
 const _MODEL_RISE := 1.6 * _CQW
@@ -97,12 +73,10 @@ var platform_id := ""
 ## The library as the form last saved it (a console added or saved, or choices kept although
 ## their scan found nothing); null while nothing was saved.
 var library: AndroidServices.Library
-
 ## The platform edited, as it was set up; empty while adding.
 var _edited_id := ""
 ## The platforms the form cannot set up: those set up already, but for the one edited.
 var _taken := PackedStringArray()
-
 var _players: Array[AndroidServices.Player] = []
 ## Index of the chosen player in [member _players]; -1 until one is chosen.
 var _player := -1
@@ -114,7 +88,6 @@ var _games := -1
 var _counts := 0
 ## Set while the console is being set up and scanned: nothing else may act meanwhile.
 var _adding := false
-
 ## The gel's colour now, and whether the note is the one that games were found.
 var _rim := StudioTokens.NEUTRAL
 var _found := false
@@ -194,7 +167,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or _choice.visible or _leaving:
 		return
-	if not _adding and not event.is_echo() and _variants.size() > 1 			and (event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"ui_right")) 			and get_viewport().gui_get_focus_owner() in [_type, _emulator, _folder_field]:
+	if not _adding and not event.is_echo() and _variants.size() > 1 \
+			and (event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"ui_right")) \
+			and get_viewport().gui_get_focus_owner() in [_type, _emulator, _folder_field]:
 		get_viewport().set_input_as_handled()
 		_variant = posmod(_variant + (1 if event.is_action_pressed(&"ui_right") else -1), _variants.size())
 		_folders[platform_id] = ConsoleManifest.folder_of(_variants[_variant])
@@ -297,7 +272,7 @@ func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: An
 	library = null
 	platform_id = edited_id
 	_title.text = tr("Edit the platform") if edited_id else tr("Add a console")
-	_title_line = FormPaint.line(_title.text, StudioTokens.Face.JAKARTA_800, _TITLE_PX, -0.04)
+	_title_line = FormPaint.line(_title.text, StudioTokens.Face.JAKARTA_800, FormPaint.TITLE_PX, -0.04)
 	_cancel.text = tr("Remove") if edited_id else tr("Cancel")
 	_cancel.keyed = edited_id.is_empty()
 	_add.text = tr("Save") if edited_id else tr("Add")
@@ -618,12 +593,12 @@ func _nudge(side: int) -> void:
 	var arrow := _arrows[side]
 	var rest := StudioTokens.PLINTH.size.x + _ARROW_GAP if side == 1 else -_ARROW_GAP - arrow.size.x
 	var out := _ARROW_NUDGE * (1.0 if side == 1 else -1.0)
-	_animate(&"arrow", _ARROW_NUDGE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
+	Motion.animate(self, _motions, &"arrow", _ARROW_NUDGE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
 		arrow.position.x = rest + out * sin(PI * p))
 
 
 func _gel() -> Color:
-	return StudioTokens.GEL.get(StringName(_folders[platform_id] if _folders.has(platform_id) else ""), StudioTokens.NEUTRAL)
+	return ConsoleManifest.gel_of(_folders[platform_id] if _folders.has(platform_id) else "")
 
 
 ## The gel of the console chosen on everything the form paints with it.
@@ -633,7 +608,7 @@ func _show_gel(animated: bool) -> void:
 		_paint(gel)
 		return
 	var from := _rim
-	_animate(&"rim", StudioTokens.GEL_FADE_S, Motion.Easing.EASE, func(p: float) -> void: _paint(from.lerp(gel, p)))
+	Motion.animate(self, _motions, &"rim", StudioTokens.GEL_FADE_S, Motion.Easing.EASE, func(p: float) -> void: _paint(from.lerp(gel, p)))
 
 
 func _paint(gel: Color) -> void:
@@ -662,7 +637,7 @@ func _show_plate(popping: bool) -> void:
 		_logo.position = (Vector2(plate.x + StudioTokens.PLINTH_PLATE.size.x / 2.0 - _logo.size.x / 2.0, plate.y + _PLATE_PAD)).round()
 	_plate.queue_redraw()
 	if popping:
-		_animate(&"plate", _PLATE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
+		Motion.animate(self, _motions, &"plate", _PLATE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
 			_plate.modulate.a = clampf(p, 0.0, 1.0)
 			_plate.position.y = _rests[_plate].y + _PLATE_RISE * (1.0 - p))
 
@@ -690,19 +665,11 @@ func _aim(control: Control, animated: bool) -> void:
 func _glide_card(rect: Rect2, radius: float, seconds: float, moving: Motion.Easing, growing: Motion.Easing) -> void:
 	var from := Rect2(_card.position, _card.size)
 	var from_radius := _card.radius
-	_animate(&"card_position", seconds, moving, func(p: float) -> void: _card.position = from.position.lerp(rect.position, p))
-	_animate(&"card_size", seconds, growing, func(p: float) -> void:
+	Motion.animate(self, _motions, &"card_position", seconds, moving,
+		func(p: float) -> void: _card.position = from.position.lerp(rect.position, p))
+	Motion.animate(self, _motions, &"card_size", seconds, growing, func(p: float) -> void:
 		_card.size = from.size.lerp(rect.size, p)
 		_card.radius = lerpf(from_radius, radius, p))
-
-
-## A move of [param key] over [param seconds] by [param easing]: restarts from where the last one was left.
-func _animate(key: StringName, seconds: float, easing: Motion.Easing, apply: Callable) -> void:
-	if key in _motions:
-		_motions[key].kill()
-	var tween := create_tween()
-	_motions[key] = tween
-	tween.tween_method(func(t: float) -> void: apply.call(Motion.eased(easing, t)), 0.0, 1.0, seconds)
 
 
 ## Every part of the form where it rests, whole.
@@ -730,18 +697,20 @@ func _enter() -> void:
 	modulate.a = 0.0
 	var motion := create_tween().set_parallel()
 	_motions[&"enter"] = motion
-	motion.tween_property(self, ^"modulate:a", 1.0, _ENTER_FADE_S).set_delay(_ENTER_AT_S) \
+	motion.tween_property(self, ^"modulate:a", 1.0, StudioTokens.TR_FORM_FADE_S).set_delay(StudioTokens.TR_FORM_AT_S) \
 		.set_custom_interpolator(Motion.curve(Motion.Easing.EASE_OUT))
 	var arrive := Motion.curve(Motion.Easing.ARRIVE)
-	_plinth.position.y += _ENTER_LIFT
-	motion.tween_property(_plinth, ^"position:y", StudioTokens.PLINTH.position.y, _ENTER_S).set_delay(_ENTER_AT_S).set_custom_interpolator(arrive)
-	_plate.position.y += _ENTER_LIFT
-	motion.tween_property(_plate, ^"position:y", _rests[_plate].y, _ENTER_S).set_delay(_ENTER_AT_S).set_custom_interpolator(arrive)
-	_list.position.x += _ENTER_SLIDE
-	motion.tween_property(_list, ^"position:x", _rests[_list].x, _ENTER_S).set_delay(_ENTER_AT_S).set_custom_interpolator(arrive)
+	_plinth.position.y += StudioTokens.TR_FORM_LIFT_PX
+	motion.tween_property(_plinth, ^"position:y", StudioTokens.PLINTH.position.y,
+		_ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
+	_plate.position.y += StudioTokens.TR_FORM_LIFT_PX
+	motion.tween_property(_plate, ^"position:y", _rests[_plate].y,
+		_ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
+	_list.position.x += StudioTokens.TR_FORM_SLIDE_PX
+	motion.tween_property(_list, ^"position:x", _rests[_list].x, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
 	for line: Control in [_title, _count_node]:
-		line.position.y += _ENTER_RISE
-		motion.tween_property(line, ^"position:y", _rests[line].y, _ENTER_S).set_delay(_ENTER_AT_S).set_custom_interpolator(arrive)
+		line.position.y += StudioTokens.TR_FORM_CHOOSER_TITLE_PX
+		motion.tween_property(line, ^"position:y", _rests[line].y, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
 
 
 ## The form goes, taking no press and no focus, the console just added flying to its place on the ring; hidden once
@@ -788,8 +757,10 @@ func _leave() -> Tween:
 	_motions[&"leave"] = motion
 	var ease_in := Motion.curve(Motion.Easing.EASE_IN)
 	motion.tween_property(self, ^"modulate:a", 0.0, _LEAVE_FADE_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_list, ^"position:x", _rests[_list].x + _ENTER_SLIDE, _LEAVE_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_plinth, ^"position:y", StudioTokens.PLINTH.position.y + _ENTER_LIFT, _LEAVE_S).set_custom_interpolator(ease_in)
+	motion.tween_property(_list, ^"position:x", _rests[_list].x + StudioTokens.TR_FORM_SLIDE_PX,
+		StudioTokens.TR_FORM_LEAVE_S).set_custom_interpolator(ease_in)
+	motion.tween_property(_plinth, ^"position:y", StudioTokens.PLINTH.position.y + StudioTokens.TR_FORM_LIFT_PX,
+		StudioTokens.TR_FORM_LEAVE_S).set_custom_interpolator(ease_in)
 	return motion
 
 
@@ -800,15 +771,18 @@ func _step_aside() -> void:
 	var motion := create_tween().set_parallel()
 	_motions[&"lines"] = motion
 	var ease_in := Motion.curve(Motion.Easing.EASE_IN)
-	motion.tween_property(_list, ^"position:x", _rests[_list].x - _ASIDE_SHIFT, _ASIDE_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_list, ^"modulate:a", 0.0, _ASIDE_S).set_custom_interpolator(ease_in)
+	motion.tween_property(_list, ^"position:x", _rests[_list].x - StudioTokens.TR_CHOOSER_SHIFT_PX,
+		StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
+	motion.tween_property(_list, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
 	for line: Control in [_title, _count_node]:
-		motion.tween_property(line, ^"position:y", _rests[line].y - _ENTER_RISE, _ASIDE_S).set_custom_interpolator(ease_in)
-		motion.tween_property(line, ^"modulate:a", 0.0, _ASIDE_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_plinth.get_node("Turntable"), ^"modulate:a", 0.0, _ASIDE_MODEL_S)
+		motion.tween_property(line, ^"position:y", _rests[line].y - StudioTokens.TR_FORM_CHOOSER_TITLE_PX,
+			StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
+		motion.tween_property(line, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
+	motion.tween_property(_plinth.get_node("Turntable"), ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_MODEL_S)
 	var from := Rect2(_card.position, _card.size)
 	var from_radius := _card.radius
-	_animate(&"card_position", _CARD_FLIGHT_S, StudioTokens.TR_CHOOSER_CARD_S_CURVE, func(p: float) -> void:
+	Motion.animate(self, _motions, &"card_position", StudioTokens.TR_CHOOSER_CARD_S, StudioTokens.TR_CHOOSER_CARD_S_CURVE,
+		func(p: float) -> void:
 		var to := _choice.cursor_rect()
 		_card.position = from.position.lerp(to.position - _list.global_position, p)
 		_card.size = from.size.lerp(to.size, p)
@@ -840,7 +814,8 @@ func _come_back(cursor: Rect2, rise: bool) -> void:
 	_card.radius = StudioTokens.FOCUS_RADIUS
 	var field := get_viewport().gui_get_focus_owner()
 	if field in _fields:
-		_glide_card(Rect2(field.position, field.size), StudioTokens.FOCUS_RADIUS, _CARD_FLIGHT_S, StudioTokens.TR_CHOOSER_CARD_S_CURVE, StudioTokens.TR_CHOOSER_CARD_S_CURVE)
+		_glide_card(Rect2(field.position, field.size), StudioTokens.FOCUS_RADIUS, StudioTokens.TR_CHOOSER_CARD_S,
+			StudioTokens.TR_CHOOSER_CARD_S_CURVE, StudioTokens.TR_CHOOSER_CARD_S_CURVE)
 
 
 func _draw_title() -> void:
@@ -851,13 +826,10 @@ func _draw_title() -> void:
 
 ## The count of fields chosen, in the gel's colour, over the total.
 func _draw_count() -> void:
-	var number := FormPaint.line("%02d" % steps(), StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
-	var rest := FormPaint.line(" / 03", StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
-	number.draw(_count_node, _COUNT_SHIFT, _rim)
-	rest.draw(_count_node, _COUNT_SHIFT + Vector2(number.width, 0.0), StudioTokens.MUTE)
+	FormPaint.draw_count(_count_node, "%02d" % steps(), " / 03", _rim)
 
 
-## The note, centred in its box as a flex row is, a dot in the gel before it when games were found.
+## The note, centred in its box, a dot in the gel before it when games were found.
 func _draw_note() -> void:
 	if _note_line == null:
 		return

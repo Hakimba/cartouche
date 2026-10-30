@@ -78,7 +78,7 @@ func test_a_dragging_finger_is_no_long_press_and_a_second_finger_counts_for_noth
 	assert_bool(finger.is_down).is_true()
 
 
-func test_INV_E7_10_whatever_a_finger_does_a_moved_press_is_never_a_tap_and_a_long_press_comes_once() -> void:
+func test_inv_22_whatever_a_finger_does_a_moved_press_is_never_a_tap_and_a_long_press_comes_once() -> void:
 	var random := Fixtures.cases(71)
 	var counted: Dictionary[String, int] = {"tap": 0, "drag": 0, "long": 0, "drift": 0}
 	for case in 800:

@@ -15,7 +15,7 @@ class PendingPickTest {
     private enum class Event { PICK_OPENS, PICK_FAILS_TO_OPEN, RESULT }
 
     @Test
-    fun `INV-E0-15 every folder pick is answered exactly once`() = runBlocking<Unit> {
+    fun `INV-06 every folder pick is answered exactly once`() = runBlocking<Unit> {
         checkAll(Arb.list(Arb.element(Event.entries))) { events ->
             val answered = mutableListOf<Pair<Int, String>>()
             val pick = PendingPick<String> { id, answer -> answered += id to answer }
@@ -27,7 +27,6 @@ class PendingPickTest {
                 }
             }
             pick.end().onSome { answered += it to "result" }
-            // A pick that opened is ended by whatever comes next: a result, a newer pick, or the final end().
             val expected =
                 events.indices.filter { events[it] != Event.RESULT }.associateWith { i ->
                     when {

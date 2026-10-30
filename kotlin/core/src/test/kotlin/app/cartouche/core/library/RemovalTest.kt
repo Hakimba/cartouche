@@ -34,26 +34,25 @@ class RemovalTest {
         }
 
     @Test
-    fun `INV-E6-03 a removed platform leaves nothing in the library or the selection, and the others are as they were`() =
-        runBlocking<Unit> {
-            // "never" is a platform never set up: removing it changes nothing.
-            checkAll(libraries, Arb.element(platforms + PlatformId("never"))) { (library, selection), platform ->
-                val removed = library.without(platform)
-                val forgotten = selection.without(platform)
-                // Nothing of it: no key, no game, no id, as stored.
-                LibraryFormat.encode(removed).let { stored ->
-                    stored shouldNotContain "\"${platform.value}\""
-                    stored shouldNotContain "\"${platform.value}/"
-                }
-                Shelves.of(removed, platforms, forgotten).onSome { found -> found.shelves.map { it.platform } shouldNotContain platform }
-
-                // The others untouched.
-                fun others(of: Library) = listOf(of.setups, of.notGames, of.ignoredCounts, of.skippedFolders).map { it - platform }
-                others(removed) shouldBe others(library)
-                removed.games shouldBe library.games.filter { it.platform != platform }
-                removed.consoleOrder shouldBe library.consoleOrder - platform
-                forgotten.games shouldBe selection.games - platform
-                forgotten.platform shouldBe selection.platform.filter { it != platform }
+    fun `INV-13 a removed platform leaves nothing in the library or the selection, and the others are as they were`() = runBlocking<Unit> {
+        // "never" is a platform never set up: removing it changes nothing.
+        checkAll(libraries, Arb.element(platforms + PlatformId("never"))) { (library, selection), platform ->
+            val removed = library.without(platform)
+            val forgotten = selection.without(platform)
+            // Nothing of it: no key, no game, no id, as stored.
+            LibraryFormat.encode(removed).let { stored ->
+                stored shouldNotContain "\"${platform.value}\""
+                stored shouldNotContain "\"${platform.value}/"
             }
+            Shelves.of(removed, platforms, forgotten).onSome { found -> found.shelves.map { it.platform } shouldNotContain platform }
+
+            // The others untouched.
+            fun others(of: Library) = listOf(of.setups, of.notGames, of.ignoredCounts, of.skippedFolders).map { it - platform }
+            others(removed) shouldBe others(library)
+            removed.games shouldBe library.games.filter { it.platform != platform }
+            removed.consoleOrder shouldBe library.consoleOrder - platform
+            forgotten.games shouldBe selection.games - platform
+            forgotten.platform shouldBe selection.platform.filter { it != platform }
         }
+    }
 }

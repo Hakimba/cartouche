@@ -2,87 +2,87 @@
  "sounds": {
   "step": {
    "status": "validated",
-   "note": "validé sur la console : « absolument parfait »"
+   "note": "validated by ear"
   },
   "step_low": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "step_high": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "jump": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "open": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "open_small": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "succeeded": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "failed": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "carry": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "peel": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "stick": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "press_a": {
    "status": "validated",
-   "note": "choisi (29/10) : « ok pour b, applique le partout »"
+   "note": "validated by ear"
   },
   "open_x": {
    "status": "validated",
-   "note": "validé à l'écoute (25/10) : « je valide A, Y et X »"
+   "note": "validated by ear"
   },
   "open_y": {
    "status": "validated",
-   "note": "validé à l'écoute (25/10) : « je valide A, Y et X »"
+   "note": "validated by ear"
   },
   "switch_on": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "switch_off": {
    "status": "validated",
-   "note": "validé à l'écoute (23/10)"
+   "note": "validated by ear"
   },
   "close_small": {
    "status": "validated",
-   "note": "validé (29/10) avec les écrans d'avant l'étagère des jeux"
+   "note": "validated by ear"
   },
   "swap": {
    "status": "untreated",
-   "note": "nouveau (29/10) : passer à un autre modèle de la console"
+   "note": "new"
   },
   "key": {
    "status": "validated",
-   "note": "validé (29/10) avec les écrans jusqu'à la roue"
+   "note": "validated by ear"
   },
   "ring_open": {
    "status": "validated",
-   "note": "validé (29/10) : « je valide tout ça, c niquel comme c'est »"
+   "note": "validated by ear"
   },
   "ring_close": {
    "status": "validated",
-   "note": "validé (29/10) : « je valide tout ça, c niquel comme c'est »"
+   "note": "validated by ear"
   }
  },
  "categories": [

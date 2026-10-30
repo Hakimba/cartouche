@@ -51,8 +51,8 @@ public class FileNamePattern private constructor(public val source: String, priv
     override fun toString(): String = source
 
     /**
-     * The file extensions the pattern accepts, when it reads like the definitions' usual
-     * `….(?:iso|chd|bin)$` and accepts any name with them; none for any other pattern.
+     * The file extensions the pattern accepts, when it reads like the definitions' usual `….(?:iso|chd|bin)$` and
+     * accepts any name with them; none for any other pattern.
      */
     public val extensions: Option<List<String>>
         get() =
@@ -158,7 +158,6 @@ public sealed interface LaunchError {
 
     public data class InvalidTemplate(public val error: TemplateError) : LaunchError
 
-    /** English description, for logs. */
     public val message: String
         get() =
             when (this) {
@@ -189,7 +188,6 @@ public sealed interface CatalogError {
     /** The value under [key] is not one the file allows. */
     public data class InvalidValue(override val source: String, public val key: String, public val detail: String) : CatalogError
 
-    /** English description, for logs. */
     public val message: String
         get() =
             when (this) {
@@ -218,7 +216,10 @@ public sealed interface CatalogError {
 public data class Catalog(
     public val platforms: List<Platform> = emptyList(),
     public val rejected: List<CatalogError> = emptyList(),
-    /** The platforms with a console model and coded support, which the app's console manifests name: the only ones a person may add. */
+    /**
+     * The platforms with a console model and coded support, which the app's console manifests name: the only ones a
+     * person may add.
+     */
     public val supported: Set<PlatformId> = emptySet(),
 ) {
     private val all: List<Candidate> get() = platforms.flatMap { platform -> platform.players.map { Candidate(platform, it) } }
@@ -244,8 +245,8 @@ public data class Catalog(
 
     public companion object {
         /**
-         * Reads the Daijishō [definitions] and the [profiles] file (`{platform id: profile}`); [supported]
-         * names the platforms that have a console model.
+         * Reads the Daijishō [definitions] and the [profiles] file (`{platform id: profile}`); [supported] names the
+         * platforms that have a console model.
          */
         public fun parse(
             definitions: List<DefinitionSource>,
@@ -266,7 +267,6 @@ public data class Catalog(
         }
     }
 
-    /** Adds [platform], rejecting it if its id is taken, and its players whose id is taken. */
     private fun withPlatform(source: String, platform: Platform, rejectedPlayers: List<CatalogError>): Catalog =
         if (platforms.any { it.id == platform.id }) {
             copy(rejected = rejected + CatalogError.DuplicatePlatform(source, platform.id))
@@ -281,7 +281,6 @@ public data class Catalog(
         }
 }
 
-/** Reads one definition file; every missing or mistyped field raises a [CatalogError] naming it. */
 private class DefinitionReader(val source: String, val profiles: Map<PlatformId, PlatformProfile>, raise: Raise<CatalogError>) :
     Raise<CatalogError> by raise {
     /** The platform and the players rejected from it. */

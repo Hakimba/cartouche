@@ -7,7 +7,7 @@ var _setup := {}
 
 
 func _ready() -> void:
-	catalog = CatalogSummary.new(AndroidServices._desktop_demo("catalog"))
+	catalog = CatalogSummary.new(DesktopPlugin.demo("catalog"))
 
 
 func is_available() -> bool:
@@ -57,7 +57,7 @@ func persisted_folders() -> FolderList:
 
 
 func _library() -> String:
-	var data := AndroidServices._desktop_demo("library").duplicate(true)
+	var data := DesktopPlugin.demo("library").duplicate(true)
 	var source: Array = data.get("games", [])
 	var games: Array = source.filter(func(game: Dictionary) -> bool: return game["platform_id"] in ["gc", "gba", "ps2"] \
 		and (_added or game["platform_id"] != "ps2"))

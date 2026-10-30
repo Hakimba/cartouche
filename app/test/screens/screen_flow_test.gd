@@ -24,7 +24,7 @@ func _shows(carousel: Carousel) -> Array[String]:
 	return seen
 
 
-func test_INV_E6_05_a_fresh_install_goes_from_the_welcome_to_its_console_with_the_controller_alone() -> void:
+func test_a_fresh_install_goes_from_the_welcome_to_its_console_with_the_controller_alone() -> void:
 	var device := _new_device()
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
@@ -65,7 +65,7 @@ func test_the_battery_shows_as_the_carousel_starts() -> void:
 	assert_array(chip.bolt()).is_empty()
 
 
-func test_INV_E6_05_an_app_already_set_up_opens_straight_on_its_consoles_the_welcome_never_shown() -> void:
+func test_an_app_already_set_up_opens_straight_on_its_consoles_the_welcome_never_shown() -> void:
 	var device := _new_device()
 	device.first_launch = false
 	device.has_games = true
@@ -84,7 +84,7 @@ func test_INV_E6_05_an_app_already_set_up_opens_straight_on_its_consoles_the_wel
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 
-func test_INV_E6_05_past_the_first_launch_with_no_games_it_goes_to_no_console_without_asking_again() -> void:
+func test_past_the_first_launch_with_no_games_it_goes_to_no_console_without_asking_again() -> void:
 	var device := _new_device()
 	device.first_launch = false
 	var carousel := Fixtures.carousel_for(self, device)
@@ -156,7 +156,7 @@ func test_the_welcome_stays_until_a_button_and_that_press_chooses_no_style() -> 
 	assert_array(device.saved_styles).is_empty()
 
 
-func test_INV_E6_01_on_every_screen_where_something_is_chosen_exactly_one_control_of_it_has_the_focus() -> void:
+func test_inv_20_on_every_screen_where_something_is_chosen_exactly_one_control_of_it_has_the_focus() -> void:
 	var random := CarouselFixtures.cases(61)
 	var device := _new_device()
 	var carousel := Fixtures.fresh_carousel(self, device)
@@ -183,7 +183,8 @@ func test_the_floating_setting_survives_closing_and_a_new_carousel() -> void:
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
-	assert_bool(await Fixtures.until(self, func() -> bool: return menu.is_visible_in_tree() and menu.state == SettingsMenu.State.OPEN)).is_true()
+	assert_bool(await Fixtures.until(self,
+		func() -> bool: return menu.is_visible_in_tree() and menu.state == SettingsMenu.State.OPEN)).is_true()
 	for step in 3:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -198,7 +199,8 @@ func test_the_floating_setting_survives_closing_and_a_new_carousel() -> void:
 	assert_bool(await Fixtures.until(self, func() -> bool: return restarted._shown)).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	var reopened: SettingsMenu = restarted.get_node("%Screens/Settings")
-	assert_bool(await Fixtures.until(self, func() -> bool: return reopened.is_visible_in_tree() and reopened.state == SettingsMenu.State.OPEN)).is_true()
+	assert_bool(await Fixtures.until(self,
+		func() -> bool: return reopened.is_visible_in_tree() and reopened.state == SettingsMenu.State.OPEN)).is_true()
 	assert_bool(reopened.games_float).is_true()
 	assert_array(device.saved_floats).is_equal([true])
 

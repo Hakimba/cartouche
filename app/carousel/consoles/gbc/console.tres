@@ -12,3 +12,4 @@ model_name = "CGB-001 Teal"
 scene = "res://carousel/consoles/gbc/gbc.tscn"
 launch = "res://carousel/consoles/gbc/launch.json"
 triangle_budget = 9500
+ring_size = Vector2(1.336, -0.138)

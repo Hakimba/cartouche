@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name StudioMaterial
 extends RefCounted
-## One of the design's materials, as [StudioTokens] gives it: its fill, its corner radius and its CSS
-## box-shadows. [SatinPanel] draws it with a shader, [SatinStyle] as a StyleBox for Godot's own controls.
+## One of the Studio materials, as [StudioTokens] gives it: its fill, its corner radius and its box
+## shadows. [SatinPanel] draws it with a shader, [SatinStyle] as a StyleBox for Godot's own controls.
 
 ## The fill's stops (parts of the way), and their colours.
 var stops: Array[float] = []
@@ -10,16 +10,16 @@ var colors: Array[Color] = []
 ## A radial fill's centre in parts of the box (to the farthest corner), or (-1, -1) for a fill from top to bottom.
 var centre: Vector2
 var radius: float
-## Insets first, then the outer shadows, each group in CSS order (the first one drawn on top).
+## Insets first, then the outer shadows, each group in the tokens' order (the first one drawn on top).
 var shadows: Array[Shadow] = []
 
 
-## A CSS box-shadow: its offset, blur, spread, colour, whether inside the box, and whether it takes the gel.
+## A box shadow: its offset, blur, spread, colour, whether inside the box, and whether it takes the gel.
 class Shadow:
 	extends RefCounted
 
 	var offset: Vector2
-	## A Gaussian of standard deviation blur / 2, as CSS has it.
+	## A Gaussian of standard deviation blur / 2.
 	var blur: float
 	var spread: float
 	var color: Color
@@ -74,15 +74,15 @@ func fill_at(t: float) -> Color:
 	return color
 
 
-## [param colour] mixed with white in OKLab, [param share] of it, as CSS `color-mix(in oklab, colour, #fff)`
-## draws it: out of the screen's colours, clipped to them.
+## [param colour] mixed with white in OKLab, [param share] of it; a mix out of the screen's colours is clipped
+## to them.
 static func whitened(colour: Color, share: float) -> Color:
 	if share >= 1.0:
 		return colour
 	return srgb(oklab(colour).lerp(oklab(Color.WHITE), 1.0 - share)).clamp()
 
 
-## [param colour] mixed with black in OKLab, [param share] of it, as CSS `color-mix(in oklab, colour, #000)`.
+## [param colour] mixed with black in OKLab, [param share] of it.
 static func shaded(colour: Color, share: float) -> Color:
 	return srgb(oklab(colour) * share).clamp()
 

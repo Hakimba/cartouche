@@ -13,8 +13,8 @@ extends ModelShape
 ## hides the cartridge's lower part, to the connector at its foot, the sticker sunk in it; the
 ## battery cover lower down, ribbed, its latch's tongue under the notch a finger pushes it down by;
 ## four screws sunk in the back beside the bay and the plate. The power switch slides in a slot on
-## the top, between the seam and the bay; the contrast and volume wheels stand out of the sides. Positions on the front are of centres, in its plane; on the sides
-## and the top, from the front backwards.
+## the top, between the seam and the bay; the contrast and volume wheels stand out of the sides.
+## Positions on the front are of centres, in its plane; on the sides and the top, from the front backwards.
 
 const SEAM_BEVEL := 0.6
 ## The bezel's three small corners and its large one, bottom right; how far the screen's top is
@@ -375,7 +375,6 @@ func dpad(steps: int) -> PackedVector2Array:
 	var end := dpad_size.x / 2.0
 	var at := PackedVector2Array()
 	var radii := PackedFloat32Array()
-	# Each arm's two outer corners, then the inner corner before the next arm.
 	for quarter in 4:
 		var turn := Transform2D(PI / 2.0 * quarter, dpad_centre)
 		for arm_corner: Vector2 in [Vector2(-arm, -end), Vector2(arm, -end), Vector2(arm, -arm)]:

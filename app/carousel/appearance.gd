@@ -16,14 +16,9 @@ var insertions: Dictionary[String, Insertion] = {}
 var pose := ShelfRow.Pose.new()
 
 var _media_animation: Animation
-## Each medium's folder, by medium; the one shown for a medium of each kind without a folder of its
-## own; and each medium's model, once first asked for.
 var _media: Dictionary[String, MediumManifest] = {}
 var _kind_media: Dictionary[String, String] = {}
 var _models: Dictionary[String, PackedScene] = {}
-## Each platform's console, the version shown unless the user chooses another; its scene, and its
-## launch animations (by platform for a console with steps of its own, else by platform and medium),
-## once first asked for.
 var _consoles: Dictionary[String, ConsoleManifest] = {}
 var _scenes: Dictionary[String, PackedScene] = {}
 var _animations: Dictionary[String, Animation] = {}
@@ -61,7 +56,6 @@ static func read(path: String) -> Appearance:
 	appearance.pose.sway = pose_data["sway_degrees"]
 	appearance.pose.bob = pose_data["bob_height"]
 	var period: float = pose_data["sway_period_s"]
-	# A sway never takes no time.
 	appearance.pose.sway_period_s = maxf(period, 0.5)
 	return appearance
 
@@ -99,6 +93,50 @@ static func shown_media(manifests: Dictionary[String, MediumManifest]) -> Dictio
 ## the platform is shown by its medium.
 func console_of(platform_id: String) -> ConsoleManifest:
 	return _consoles.get(platform_id)
+
+
+## The colour [param platform_id]'s console lights the screens with; neutral when it is shown by its medium.
+func gel(platform_id: String) -> Color:
+	var manifest := console_of(platform_id)
+	return manifest.gel() if manifest else StudioTokens.NEUTRAL
+
+
+## How [param platform]'s labels look: its colour and band, its name; drawn as demo art when [param demo].
+func look(platform: AndroidServices.Platform, demo: bool) -> ShelfRow.LabelLook:
+	var label := ShelfRow.LabelLook.new()
+	label.color = colors.get(platform.id, default_color)
+	label.platform_name = platform.name
+	label.demo_art = demo
+	if platform.id in bands:
+		var band: Dictionary = bands[platform.id]
+		var color: String = band["color"]
+		label.band = Color(color)
+		label.band_text = band["text"]
+	return label
+
+
+## [param platform] as the consoles screen shows it, resting as the launch animation of a game of [param medium]
+## starts: its console, or else its medium labelled with its name, the labels looking as [method look] has them.
+func console_item(platform: AndroidServices.Platform, medium: String, demo: bool) -> ConsoleRow.Item:
+	var animation := animation_of(platform, medium)
+	var manifest := console_of(platform.id)
+	var shown: Node3D
+	if manifest:
+		shown = console(platform.id)
+	else:
+		var labelled := ShelfRow.LabelledModel.new(model_of("", platform.media))
+		labelled.draw_label(platform.name, look(platform, demo))
+		shown = labelled
+	return ConsoleRow.Item.new(shown, ConsoleRow.Rest.of(animation), ConsoleManifest.folder_of(manifest), manifest != null)
+
+
+## The models of [param games]' media on [param platform], by medium (see [method model_of]).
+func models_of(platform: AndroidServices.Platform, games: Array[AndroidServices.Game]) -> Dictionary[String, PackedScene]:
+	var models: Dictionary[String, PackedScene] = {}
+	for game in games:
+		if game.medium not in models:
+			models[game.medium] = model_of(game.medium, platform.media)
+	return models
 
 
 ## Applies the library's model choices; omitted choices restore the base models.

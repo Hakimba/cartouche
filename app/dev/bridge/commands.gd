@@ -6,9 +6,11 @@ const LaunchView := preload("res://dev/bridge/launch_view.gd")
 const Views := preload("res://dev/bridge/views.gd")
 const BridgeSounds := preload("res://dev/bridge/sounds.gd")
 const RouteFixture := preload("res://dev/bridge/route_fixture.gd")
+const _PLINTH := preload("res://studio/views/plinth.gd")
 const CACHE_FILES := {
-	"res://data/studio_lights.json": [preload("res://studio/views/studio_lights.gd"), preload("res://carousel/consoles/console_row.gd"), preload("res://studio/views/plinth.gd")],
-	"res://data/turntable.json": [preload("res://studio/views/plinth.gd")],
+	"res://data/studio_lights.json":
+		[preload("res://studio/views/studio_lights.gd"), preload("res://carousel/consoles/console_row.gd"), _PLINTH],
+	"res://data/turntable.json": [_PLINTH],
 	"res://data/media_poses.json": [preload("res://studio/games/games_layout.gd")],
 }
 ## Files read once as the app starts: a change reaches the app only by a restart.
@@ -451,8 +453,8 @@ func _find_sequence(node: Node) -> ConsoleSequence:
 
 
 func _snapshot() -> Dictionary:
-	var library := await android._request(&"library", [], android.desktop_library())
-	var settings := await android._request(&"settings", [], android._demo_settings.duplicate(true))
+	var library := await android._request(&"library")
+	var settings := await android._request(&"settings")
 	if not library.get("ok", false) or not settings.get("ok", false):
 		return _error("snapshot request failed")
 	var parsed: Variant = JSON.parse_string(str(library.get("library", "{}")))

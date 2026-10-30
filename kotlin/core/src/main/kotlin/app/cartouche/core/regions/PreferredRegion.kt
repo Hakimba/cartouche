@@ -5,9 +5,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * The region whose images the user would rather see on a label when nothing found in the game
- * settles its own (see `ArtSources.order`), named as [Regions] names it, stored and sent under
- * that name.
+ * The region whose images the user would rather see on a label when nothing found in the game settles its own (see
+ * `ArtSources.order`), named as [Regions] names it, stored and sent under that name.
  */
 @Serializable
 public enum class PreferredRegion(public val region: String) {

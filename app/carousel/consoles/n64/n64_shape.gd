@@ -13,9 +13,8 @@ extends ModelShape
 ## flaps inside a dark bezel, hinged along its long edges, that fold down into it. Plan positions
 ## are of centres, X to the right and Y towards the back, from the centre of the outline.
 
-## How high the feet lift the body off the table; estimated from the drawing (front and side): how
-## far in from each lobe's outline its foot keeps, and the pads at the back corners, from the side
-## and the back to their outer corner, and their size.
+## How high the feet lift the body off the table; how far in from each lobe's outline its foot keeps,
+## and the pads at the back corners, from the side and the back to their outer corner, and their size.
 const FEET := 4.5
 const POD_FOOT_INSET := 6.0
 const BACK_FEET := Rect2(45.0, 35.0, 30.0, 20.0)
@@ -305,7 +304,6 @@ func vent(index: int) -> PackedVector2Array:
 	var ends := PackedVector2Array()
 	for share: float in [VENT_REACH.x, VENT_REACH.y]:
 		var reach := lerpf(floor_reach(), bowl.y, share)
-		# The U of that reach grows along the ray: where they meet, halved in on.
 		var span := Vector2(0.0, VENT_FOCUS + bowl.length())
 		for halving in 32:
 			var middle := focus + towards * (span.x + span.y) / 2.0
@@ -366,7 +364,6 @@ func _rules() -> Dictionary[StringName, bool]:
 		# The top is drawn along rays from the slot's centre: deeper than wide, they leave the corners
 		# of the slot's surround between them, and the flaps fold through the floor around it.
 		&"no_deeper_than_wide": depth <= width,
-		# Clear of the slits along the sides.
 		&"pods_at_the_front_corners": pod_corner() > POD_ROUND + 0.1 and pod_size.x < width / 2.0 - 2.0
 			and pod_size.y > front_inset + corner and pod_height > FEET + 2.0 * POD_ROUND + 0.1
 			and pod_size.y - depth / 2.0 < outline.end.y - corner - SIDE_VENTS * SIDE_VENT_PITCH
@@ -398,7 +395,6 @@ func _rules() -> Dictionary[StringName, bool]:
 func _switch_fits(power: bool) -> bool:
 	var room := recess(power)
 	var out := absf(room.get_center().x)
-	# The power switch's ON and OFF lie on the flank too, outside its recess.
 	var beside := N64Geometry.LOGOS[&"switch_label"].x + N64Geometry.SWITCH_LABEL_GAP if power else 0.0
 	return out - room.size.x / 2.0 >= hill.x / 2.0 + FALL_ROUND * hill.y \
 		and out + room.size.x / 2.0 + beside <= hill.x / 2.0 + (1.0 - FALL_ROUND) * hill.y \

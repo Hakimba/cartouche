@@ -218,7 +218,6 @@ func _arrays(part: StringName, detail: int) -> Array:
 
 
 func _rules() -> Dictionary[StringName, bool]:
-	# On the flat of its wing's top, clear of the well's arc.
 	var on_wing := func(button: Vector3, side: int) -> bool:
 		var reach := button.z + groove
 		var top := wing_box(side)

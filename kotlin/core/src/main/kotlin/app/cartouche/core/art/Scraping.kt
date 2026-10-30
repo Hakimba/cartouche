@@ -13,8 +13,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * A game whose art is looked for, and where to look, best first, in the sources of [version]; its
- * [title] names it in the traces; [cut] says what of a scan its label shows.
+ * A game whose art is looked for, and where to look, best first, in the sources of [version]; its [title] names it in
+ * the traces; [cut] says what of a scan its label shows.
  */
 public data class ArtRequest(
     public val game: GameId,
@@ -47,8 +47,8 @@ public data class Scraping private constructor(
     /** Stalls since the last request that finished, for [retryDelay]. */
     private val stalls: Int,
     /**
-     * The requests the last [with] made of the games under way then, none for those it no longer
-     * asks for: they wait again so, never as they were taken.
+     * The requests the last [with] made of the games under way then, none for those it no longer asks for: they wait
+     * again so, never as they were taken.
      */
     private val replanned: Map<GameId, Option<ArtRequest>>,
 ) {
@@ -81,8 +81,8 @@ public data class Scraping private constructor(
     }
 
     /**
-     * [game]'s request was set aside before its end, as when the app stops, or its label was asked
-     * again while it was under way: it waits again, first.
+     * [game]'s request was set aside before its end, as when the app stops, or its label was asked again while it was
+     * under way: it waits again, first.
      */
     public fun returned(game: GameId): Scraping = ifUnderWay(
         game,
@@ -90,15 +90,18 @@ public data class Scraping private constructor(
 
     public fun resumed(): Scraping = copy(stall = None)
 
-    /** The run with [games]' waiting requests first, in that order, the others after in theirs: the games on screen are looked for first. */
+    /**
+     * The run with [games]' waiting requests first, in that order, the others after in theirs: the games on screen
+     * are looked for first.
+     */
     public fun ahead(games: List<GameId>): Scraping {
         val first = games.distinct().flatMap { game -> waiting.filter { it.game == game } }
         return copy(waiting = first + (waiting - first.toSet()))
     }
 
     /**
-     * The run for [requests], the games that have no art now: those under way stay so, the others
-     * wait in the given order. A run that was over starts again from nothing done.
+     * The run for [requests], the games that have no art now: those under way stay so, the others wait in the given
+     * order. A run that was over starts again from nothing done.
      */
     public fun with(requests: List<ArtRequest>): Scraping {
         val run = if (isOver) copy(done = 0, stall = None, stalls = 0) else this
@@ -113,7 +116,6 @@ public data class Scraping private constructor(
     private fun again(game: GameId, request: List<ArtRequest>): List<ArtRequest> =
         replanned.getOrNone(game).fold({ request }) { it.toList() }
 
-    /** [change] of [game]'s request under way and the others; unchanged when it is not under way. */
     private fun ifUnderWay(game: GameId, change: (List<ArtRequest>, List<ArtRequest>) -> Scraping): Scraping =
         underWay.partition { it.game == game }.let { (request, others) -> if (request.isEmpty()) this else change(request, others) }
 

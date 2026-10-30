@@ -11,7 +11,6 @@ signal loaded(game_id: String)
 
 const _KEPT := 24
 
-## The stored art by game id.
 var _art: Dictionary[String, AndroidServices.Art] = {}
 ## Textures made, by game id, the latest last.
 var _textures: Dictionary[String, Texture2D] = {}

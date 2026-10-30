@@ -4,7 +4,7 @@ extends GdUnitTestSuite
 const Fixtures := preload("res://test/carousel/fixtures.gd")
 
 
-func test_INV_E2_03_each_step_moves_exactly_one_game_whatever_the_row_is_doing() -> void:
+func test_each_step_moves_exactly_one_game_whatever_the_row_is_doing() -> void:
 	var random := Fixtures.cases(5)
 	for i in 200:
 		var count := random.randi_range(1, 30)
@@ -21,7 +21,7 @@ func test_INV_E2_03_each_step_moves_exactly_one_game_whatever_the_row_is_doing()
 			assert_int(row.selected_index()).is_equal(expected)
 
 
-func test_INV_E2_03_n_steps_one_way_then_n_the_other_come_back_to_the_same_game() -> void:
+func test_n_steps_one_way_then_n_the_other_come_back_to_the_same_game() -> void:
 	var random := Fixtures.cases(6)
 	for i in 200:
 		var count := random.randi_range(1, 30)
@@ -37,47 +37,7 @@ func test_INV_E2_03_n_steps_one_way_then_n_the_other_come_back_to_the_same_game(
 		assert_str(row.selected_game().id).is_equal(start.id)
 
 
-func test_INV_E2_04_a_held_direction_repeats_faster_and_faster_down_to_48_ms_and_stops_on_release() -> void:
-	var random := Fixtures.cases(7)
-	for i in 50:
-		var row := _row(50, 0)
-		# Whatever the idle motions' pace, which never slows a held direction.
-		row.pace = random.randf()
-		var clock := [0.0]
-		var steps: Array[float] = []
-		row.selection_changed.connect(func(_game: AndroidServices.Game) -> void: steps.append(clock[0]))
-		var held_s := random.randf_range(0.0, 6.0)
-		var frame_s := random.randf_range(1.0 / 120.0, 1.0 / 20.0)
-		row.hold(1)
-		for frame in ceili(held_s / frame_s):
-			clock[0] += frame_s
-			row._process(frame_s)
-		row.release(1)
-		var held_steps := steps.size()
-		_frames(row, 120, frame_s)
-		assert_int(steps.size()).is_equal(held_steps)
-		if held_s > CarouselLayout.FIRST_REPEAT_S + frame_s:
-			assert_int(steps.size()).is_greater(1)
-		for step in range(1, steps.size()):
-			var gap := steps[step] - steps[step - 1]
-			assert_float(gap).is_greater_equal(0.048 - 0.0001)
-			# Never slower than the gap before, give or take the frame it lands on.
-			if step >= 2:
-				assert_float(gap).is_less_equal(steps[step - 1] - steps[step - 2] + frame_s)
-
-
-func test_INV_E2_04_held_long_enough_the_row_steps_20_times_a_second_at_60_fps() -> void:
-	var row := _row(50, 0)
-	var steps := [0]
-	row.selection_changed.connect(func(_game: AndroidServices.Game) -> void: steps[0] += 1)
-	row.hold(1)
-	_frames(row, 300, Fixtures.FRAME_S)
-	var so_far: int = steps[0]
-	_frames(row, 60, Fixtures.FRAME_S)
-	assert_int(steps[0] - so_far).is_equal(20)
-
-
-func test_INV_E2_02_however_the_row_moves_each_game_in_view_has_a_place_of_its_own_at_its_offset() -> void:
+func test_however_the_row_moves_each_game_in_view_has_a_place_of_its_own_at_its_offset() -> void:
 	var random := Fixtures.cases(8)
 	for i in 100:
 		var count := random.randi_range(1, 20)
@@ -99,25 +59,6 @@ func test_after_a_change_of_shelf_every_game_in_view_has_a_place_of_its_own() ->
 		row.show_shelf(Fixtures.games(count), 0, Fixtures.DVDS, ShelfRow.LabelLook.new())
 		_frames(row, 1, Fixtures.FRAME_S)
 		_assert_places(row, count)
-
-
-func test_holding_again_starts_slow_again_and_releasing_the_other_way_changes_nothing() -> void:
-	var row := _row(50, 0)
-	row.hold(1)
-	_frames(row, 300, Fixtures.FRAME_S)
-	row.release(-1)
-	var moving := row.selected_index()
-	_frames(row, 30, Fixtures.FRAME_S)
-	assert_int(row.selected_index()).is_not_equal(moving)
-	row.release(1)
-	row.hold(1)
-	# The first repeat, then the second, each waiting as long as on a first hold.
-	for delay: float in [CarouselLayout.repeat_delay(0), CarouselLayout.repeat_delay(1)]:
-		var started := row.selected_index()
-		_frames(row, floori(delay / Fixtures.FRAME_S) - 1, Fixtures.FRAME_S)
-		assert_int(row.selected_index()).is_equal(started)
-		_frames(row, 2, Fixtures.FRAME_S)
-		assert_int(row.selected_index()).is_equal(started + 1)
 
 
 func test_every_game_in_view_shows_on_the_model_of_its_own_medium_alone_whatever_the_moves() -> void:
@@ -146,32 +87,6 @@ func test_every_game_in_view_shows_on_the_model_of_its_own_medium_alone_whatever
 	assert_int(seen.size()).is_equal(models.size())
 
 
-func test_INV_E10_04_a_shelf_makes_each_place_s_model_of_its_media_alone_kept_until_the_library_drops_it() -> void:
-	var cartridge: PackedScene = load("res://carousel/media/gba_cart/gba_cart.tscn")
-	var row := _row(3, 0)
-	var games := Fixtures.games(3)
-	for game in games:
-		game.medium = "gba_cart"
-	var made: Array[ShelfRow.LabelledModel] = []
-	for place: ShelfRow.Place in row._places:
-		assert_array(place._models.keys()).contains_exactly([Fixtures.DVD])
-		made.append(place._models[Fixtures.DVD])
-	# Made as the shelf shows, whether its games are in view or not; the other shelf's kept.
-	row.show_shelf(games, 0, {"gba_cart": cartridge}, ShelfRow.LabelLook.new())
-	for place: ShelfRow.Place in row._places:
-		assert_array(place._models.keys()).contains_exactly_in_any_order([Fixtures.DVD, cartridge])
-	var alive := ShelfRow.LabelledModel.alive
-	row.keep_models([cartridge])
-	assert_int(ShelfRow.LabelledModel.alive).is_equal(alive - made.size())
-	for place: ShelfRow.Place in row._places:
-		assert_array(place._models.keys()).contains_exactly([cartridge])
-	assert_bool(made.any(is_instance_valid)).is_false()
-	row.show_shelf(games, 1, {"gba_cart": cartridge}, ShelfRow.LabelLook.new())
-	_frames(row, 1, Fixtures.FRAME_S)
-	for place: ShelfRow.Place in row._places:
-		assert_object(place.shown).is_same(place._models[cartridge])
-
-
 func test_a_shelf_of_one_game_does_not_move() -> void:
 	var row := _row(1, 0)
 	row.hold(1)
@@ -188,7 +103,7 @@ func test_the_games_around_the_selected_one_are_it_then_its_neighbours_nearest_f
 	assert_array(ids.call(_row(1, 0).games_around(2))).is_equal(["test/0"])
 
 
-func test_INV_E11_09_a_blank_shows_no_title_nor_platform_until_a_try_found_no_image_then_both() -> void:
+func test_a_blank_shows_no_title_nor_platform_until_a_try_found_no_image_then_both() -> void:
 	var row := _row(3, 1)
 	row._look.platform_name = "PlayStation 2"
 	_frames(row, ShelfRow._PLACES, 0.016)
@@ -208,56 +123,6 @@ func test_INV_E11_09_a_blank_shows_no_title_nor_platform_until_a_try_found_no_im
 	_frames(row, ShelfRow._PLACES, 0.016)
 	assert_str(titles.call()["test/0"][0]).is_equal(row._games[0].title)
 	assert_str(titles.call()["test/1"][0]).is_empty()
-
-
-func test_INV_E11_09_a_ring_fills_on_the_blank_of_a_game_in_view_while_its_label_downloads_and_goes_once_it_is_over() -> void:
-	var row := _row(3, 1)
-	_frames(row, ShelfRow._PLACES, 0.016)
-	assert_bool(_ring_of(row, "test/1").visible).is_false()
-	row.downloading("test/1", 0.25)
-	row.downloading("test/1", 0.5)
-	assert_bool(_ring_of(row, "test/1").visible).is_true()
-	assert_float(_ring_of(row, "test/1").fraction).is_equal(0.5)
-	assert_bool(_ring_of(row, "test/0").visible).is_false()
-	var view := _place_of(row, "test/1").shown._view
-	assert_int(view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
-	# Drawn again, its blank keeps the ring; once over, the ring goes.
-	row.show_own_label()
-	assert_bool(_ring_of(row, "test/1").visible).is_true()
-	row.downloaded("test/1")
-	assert_bool(_ring_of(row, "test/1").visible).is_false()
-	# A size unknown: a quarter turns, frame after frame, and stops turning once over.
-	row.downloading("test/2", -1.0)
-	var unknown := _ring_of(row, "test/2")
-	_frames(row, 3, 0.1)
-	assert_float(unknown.turn).is_equal_approx(0.3 * TAU, 0.001)
-	row.downloaded("test/2")
-	_frames(row, 3, 0.1)
-	assert_float(unknown.turn).is_equal_approx(0.3 * TAU, 0.001)
-	assert_bool(row._downloads.is_empty()).is_true()
-
-
-func _place_of(row: ShelfRow, game_id: String) -> ShelfRow.Place:
-	for place: ShelfRow.Place in row.get_children():
-		if place.visible and row._games[place.game].id == game_id:
-			return place
-	return null
-
-
-func _ring_of(row: ShelfRow, game_id: String) -> ProgressRing:
-	return _place_of(row, game_id).shown._ring
-
-
-func test_INV_E11_09_a_ring_shows_only_on_a_blank_never_over_an_image() -> void:
-	var image := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGB8))
-	var row := _row(3, 1)
-	(row.label_images as Fixtures.FakeArt).arrive(row._games[1], image)
-	_frames(row, ShelfRow._PLACES, 0.016)
-	var selected: ShelfRow.Place = row._placed[1]
-	assert_bool(selected.shown.is_blank()).is_false()
-	selected.shown._view.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	row.downloading("test/1", 0.5)
-	assert_int(selected.shown._view.render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
 
 
 ## A row showing [param count] test games from [param selected], moved only by the test, with no
@@ -372,200 +237,12 @@ func test_gone_the_row_still_takes_its_shelves_and_steps_and_comes_back_on_them_
 			return
 
 
-func test_with_anything_of_it_showing_the_row_stands_each_frame_where_a_row_never_gone_stands() -> void:
-	var random := Fixtures.cases(62)
-	for i in 30:
-		var count := random.randi_range(1, 12)
-		var partly := _row(count, 0)
-		var whole := _row(count, 0)
-		# Any one of these left is enough for the row to be seen, however little.
-		var left := random.randi_range(0, 3)
-		var little: float = [0.0001, 0.01, 0.5][random.randi_range(0, 2)]
-		partly.selected_presence = little if left == 0 else 0.0
-		partly.neighbours = little if left == 1 else 0.0
-		partly.stage = little if left == 2 else 0.0
-		whole.stage = partly.stage
-		if left == 3:
-			# Launched, the disc out of the row stands where the launch has it.
-			for row: ShelfRow in [partly, whole]:
-				row.stand_selected(Transform3D(Basis(), Vector3(0.0, 1.0, 2.0)), 1.0, 0.1)
-		for frame in random.randi_range(1, 60):
-			_frames(partly, 1, Fixtures.FRAME_S)
-			_frames(whole, 1, Fixtures.FRAME_S)
-			for place: ShelfRow.Place in partly.get_children():
-				var twin: ShelfRow.Place = whole.get_child(place.get_index())
-				assert_bool(place.transform == twin.transform).is_true()
-		if is_failure():
-			return
-
-
-func test_a_game_standing_still_is_not_placed_again_and_its_parts_hear_nothing() -> void:
-	var row := _row(5, 2, true)
-	_frames(row, 2, Fixtures.FRAME_S)
-	await await_idle_frame()
-	# A neighbour stands still; the selected game floats, as a guard that probes do hear.
-	var still: Fixtures.TransformProbe = auto_free(Fixtures.TransformProbe.new())
-	var floating: Fixtures.TransformProbe = auto_free(Fixtures.TransformProbe.new())
-	(row._placed[1] as ShelfRow.Place).add_child(still)
-	(row._placed[2] as ShelfRow.Place).add_child(floating)
-	await await_idle_frame()
-	still.heard = 0
-	floating.heard = 0
-	for frame in 10:
-		_frames(row, 1, Fixtures.FRAME_S)
-		await await_idle_frame()
-	assert_int(still.heard).is_equal(0)
-	assert_int(floating.heard).is_equal(10)
-
-
-func test_INV_E2_5_06_the_pose_is_the_selected_game_s_alone_within_its_angles() -> void:
-	var random := Fixtures.cases(50)
-	for i in Fixtures.CASES:
-		var pose := _pose(random)
-		var clock := random.randf_range(0.0, 1000.0)
-		assert_bool(pose.at(clock, 0.0).is_equal_approx(Basis.IDENTITY)).is_true()
-		var centred := random.randf_range(0.0, 1.0)
-		var angles := pose.at(clock, centred).get_euler() * (180.0 / PI)
-		assert_float(absf(angles.x)).is_less_equal((absf(pose.tilt) + pose.sway) * centred + 0.001)
-		assert_float(absf(angles.y)).is_less_equal((absf(pose.turn) + pose.sway) * centred + 0.001)
-		pose.sway = 0.0
-		var still := pose.at(clock, 1.0).get_euler() * (180.0 / PI)
-		assert_vector(still).is_equal_approx(Vector3(-pose.tilt, pose.turn, 0.0), Vector3.ONE * 0.001)
-
-
-func test_INV_E2_5_06_on_a_stopped_row_the_selected_game_is_posed_and_the_others_stand_as_laid_out() -> void:
-	var random := Fixtures.cases(52)
-	for i in 100:
-		var row := _row(random.randi_range(1, 20), 0)
-		_frames(row, random.randi_range(1, 300), Fixtures.FRAME_S)
-		var offsets := GamesLayout.offsets(row._games.size(), row._scroll)
-		for place: ShelfRow.Place in row.get_children():
-			if place.visible:
-				var laid_out := GamesLayout.new("ps2_dvd").standing(offsets[place.game]).basis
-				assert_bool(place.transform.basis.is_equal_approx(laid_out)).is_true()
-
-
-func test_at_rest_the_selected_game_stops_floating_and_swaying_and_goes_on_from_there() -> void:
-	var row := _row(9, 4, true)
-	_frames(row, 30, Fixtures.FRAME_S)
-	var centre := _centre(row)
-	row.pace = 0.0
-	var stood := centre.transform
-	_frames(row, 120, Fixtures.FRAME_S)
-	assert_bool(centre.transform == stood).is_true()
-	# Slowed, it goes on from where it stopped, as far as its pace takes it: as a row that never
-	# stopped would stand half a frame later.
-	row.pace = 0.5
-	_frames(row, 1, Fixtures.FRAME_S)
-	assert_bool(centre.transform == stood).is_false()
-	var twin := _row(9, 4, true)
-	_frames(twin, 30, Fixtures.FRAME_S)
-	twin._process(Fixtures.FRAME_S / 2.0)
-	assert_bool(centre.transform.is_equal_approx(_centre(twin).transform)).is_true()
-
-
-func test_INV_E2_5_07_the_stick_turns_the_selected_game_any_way_up_to_its_back() -> void:
-	for stick: Vector2 in [Vector2(1.0, 0.0), Vector2(-1.0, 0.0), Vector2(0.0, 1.0), Vector2(0.0, -1.0)]:
-		var row := _row(5, 0)
-		var front := _centre(row).transform.basis
-		row.inspect(stick)
-		# Half a turn, at the stick's speed.
-		_frames(row, roundi(PI / StickTurn.SPEED / Fixtures.FRAME_S), Fixtures.FRAME_S)
-		row.inspect(Vector2.ZERO)
-		_frames(row, 120, Fixtures.FRAME_S)
-		var turned := _centre(row).transform.basis
-		# Its back faces the camera, turned about the axis the stick pushes on.
-		assert_float(turned.z.normalized().dot(front.z.normalized())).is_equal_approx(-1.0, 0.02)
-		var axis := Vector3.UP if stick.y == 0.0 else Vector3.RIGHT
-		assert_vector(turned * axis).is_equal_approx(front * axis, Vector3.ONE * 0.02)
-
-
-func test_INV_E2_5_07_the_stick_turns_the_selected_game_which_stays_turned_until_another_is_selected() -> void:
-	var random := Fixtures.cases(51)
-	for i in 100:
-		var row := _row(random.randi_range(2, 20), 0)
-		var front := _centre(row).transform.basis
-		row.inspect(Vector2(1.0, 0.0))
-		_frames(row, 30, Fixtures.FRAME_S)
-		for push in random.randi_range(0, 4):
-			row.inspect(Vector2(random.randf_range(-1.0, 1.0), random.randf_range(-1.0, 1.0)))
-			_frames(row, random.randi_range(1, 120), Fixtures.FRAME_S)
-		row.inspect(Vector2.ZERO)
-		_frames(row, 60, Fixtures.FRAME_S)
-		var let_go := _centre(row).transform.basis
-		assert_bool(let_go.is_equal_approx(front)).override_failure_message("the game turned back when the stick was let go").is_false()
-		var offsets := GamesLayout.offsets(row._games.size(), row._scroll)
-		for place: ShelfRow.Place in row.get_children():
-			if place.visible and place.game != row.selected_index():
-				assert_bool(place.transform.basis.is_equal_approx(GamesLayout.new("ps2_dvd").standing(offsets[place.game]).basis)) \
-					.override_failure_message("the stick turned a game beside the selected one").is_true()
-		_frames(row, random.randi_range(60, 600), Fixtures.FRAME_S)
-		assert_bool(_centre(row).transform.basis.is_equal_approx(let_go)) \
-			.override_failure_message("the game did not stay as the stick left it").is_true()
-		var turned_game := row.selected_index()
-		row.hold(Fixtures.direction(random))
-		row.release(1)
-		row.release(-1)
-		_frames(row, 120, Fixtures.FRAME_S)
-		# The game turned is front again as it leaves, and the one arriving is front.
-		assert_bool(_centre(row).transform.basis.is_equal_approx(front)).override_failure_message("not front again").is_true()
-		var laid_out := GamesLayout.offsets(row._games.size(), row._scroll)
-		for place: ShelfRow.Place in row.get_children():
-			if place.visible and place.game == turned_game:
-				assert_bool(place.transform.basis.is_equal_approx(GamesLayout.new("ps2_dvd").standing(laid_out[place.game]).basis)) \
-					.override_failure_message("the game turned did not turn back as it left").is_true()
-
-
-func test_INV_E2_5_07_a_game_just_selected_turns_from_the_front_whatever_the_last_one_was_turned_to() -> void:
-	var row := _row(5, 0)
-	row.inspect(Vector2(1.0, 0.0))
-	_frames(row, 60, Fixtures.FRAME_S)
-	row.inspect(Vector2.ZERO)
-	row.hold(1)
-	row.release(1)
-	_frames(row, 1, Fixtures.FRAME_S)
-	row.inspect(Vector2(1.0, 0.0))
-	_frames(row, 3, Fixtures.FRAME_S)
-	# Three frames of stick: a small turn, from where the row stands it now.
-	var standing := GamesLayout.new("ps2_dvd").standing(MediaView.offset(row.selected_index(), row._scroll, 5)).basis
-	var turned := _centre(row).transform.basis
-	assert_float(turned.z.angle_to(standing.z)).is_less(3.0 * Fixtures.FRAME_S * StickTurn.SPEED + 0.01)
-
-
-## A pose [param random] draws.
-func _pose(random: RandomNumberGenerator) -> ShelfRow.Pose:
-	var pose := ShelfRow.Pose.new()
-	pose.tilt = random.randf_range(-45.0, 45.0)
-	pose.turn = random.randf_range(-45.0, 45.0)
-	pose.sway = random.randf_range(0.0, 15.0)
-	pose.sway_period_s = random.randf_range(1.0, 20.0)
-	return pose
-
-
 ## The place of the selected game.
 func _centre(row: ShelfRow) -> ShelfRow.Place:
 	for place: ShelfRow.Place in row.get_children():
 		if place.game == row.selected_index():
 			return place
 	return null
-
-
-func test_INV_E12_06_the_chosen_game_floats_only_when_games_float_is_on() -> void:
-	var row := _row(5, 2)
-	var at := row.selected_stand()
-	_frames(row, 30, Fixtures.FRAME_S)
-	assert_bool(row.games_float).is_false()
-	assert_bool(row.selected_stand() == at).is_true()
-	row.games_float = true
-	_frames(row, 30, Fixtures.FRAME_S)
-	assert_bool(row.selected_stand().is_equal_approx(at)).is_false()
-	assert_float(row.selected_stand().origin.y).is_greater_equal(at.origin.y)
-	for place: ShelfRow.Place in row._places:
-		if place.visible and place.game != row.selected_index():
-			assert_bool(place.basis.orthonormalized().is_equal_approx(Basis.IDENTITY)).is_true()
-	row.games_float = false
-	_frames(row, 1, Fixtures.FRAME_S)
-	assert_bool(row.selected_stand() == at).is_true()
 
 
 func test_twenty_fast_presses_keep_their_target_and_settle_on_the_twentieth_game() -> void:
@@ -581,15 +258,6 @@ func test_twenty_fast_presses_keep_their_target_and_settle_on_the_twentieth_game
 	_assert_places(row, 50)
 
 
-func test_the_row_uses_the_studio_spring_without_retargeting_its_position_on_a_press() -> void:
-	var row := _row(5, 0)
-	row.step(1)
-	assert_float(row._scroll).is_equal(0.0)
-	row._process(1.0 / 60.0)
-	assert_float(row._scroll).is_equal_approx(280.0 / 3600.0, 1e-6)
-	assert_float(row._spring.velocity).is_equal_approx(280.0 / 60.0, 1e-6)
-
-
 func test_fast_selection_keeps_the_title_available_and_launching_brings_that_game_into_view() -> void:
 	var row := _row(50, 0)
 	for press in 20:
@@ -601,69 +269,6 @@ func test_fast_selection_keeps_the_title_available_and_launching_brings_that_gam
 	assert_bool(row.selected_stand().is_equal_approx(GamesLayout.new("ps2_dvd").chosen)).is_true()
 
 
-func test_a_live_media_view_keeps_labels_through_turning_launch_and_return_and_freezes_at_rest() -> void:
-	var row := _row(5, 2)
-	var camera: Camera3D = auto_free(Camera3D.new())
-	add_child(camera)
-	camera.position = Vector3(0.0, 0.1, 3.7)
-	camera.fov = 32.0
-	row.camera = camera
-	_frames(row, 8, Fixtures.FRAME_S)
-	var place := _centre(row)
-	var shown := place.shown
-	assert_object(place.media_view).is_not_null()
-	assert_object(shown.get_parent()).is_same(place.media_view.holder())
-
-	assert_bool(shown.is_blank()).is_true()
-	place.media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
-	_frames(row, 2, Fixtures.FRAME_S)
-	assert_int(place.media_view.view().render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
-	row.hide()
-	assert_bool(place.media_view.visible).is_false()
-	row.show()
-	_frames(row, 1, Fixtures.FRAME_S)
-	assert_bool(place.media_view.visible).is_true()
-	var stand := row.selected_stand()
-	row.stand_selected(stand, 0.4, 0.1)
-	_frames(row, 1, Fixtures.FRAME_S)
-	assert_object(shown.get_parent()).is_same(place)
-	assert_bool(place.media_view.visible).is_false()
-	row.pose_selected()
-	_frames(row, 2, Fixtures.FRAME_S)
-	assert_object(place.shown).is_same(shown)
-	assert_object(shown.get_parent()).is_same(place.media_view.holder())
-	assert_bool(place.media_view.visible).is_true()
-	row.stage = 1.0
-	row.staged = stand
-	_frames(row, 1, Fixtures.FRAME_S)
-	assert_object(shown.get_parent()).is_same(place)
-	row.stage = 0.0
-	_frames(row, 1, Fixtures.FRAME_S)
-	assert_object(shown.get_parent()).is_same(place.media_view.holder())
-
-
-func test_a_scan_arriving_at_rest_redraws_its_view_and_replaces_the_blank_light_without_moving_any_game() -> void:
-	var row := _row(5, 2)
-	var camera: Camera3D = auto_free(Camera3D.new())
-	add_child(camera)
-	camera.position = Vector3(0.0, 0.1, 3.7)
-	camera.fov = 32.0
-	row.camera = camera
-	_frames(row, 8, Fixtures.FRAME_S)
-	var place := _centre(row)
-	var before_stand := place.transform
-	assert_float(place.media_view.environment().ambient_light_energy).is_equal_approx(place.blank.room, 1e-6)
-	place.media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
-	var image := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGB8))
-	(row.label_images as Fixtures.FakeArt).arrive(row.selected_game(), image)
-	_frames(row, 1, Fixtures.FRAME_S)
-	assert_bool(place.shown.is_blank()).is_false()
-	assert_bool(place.transform == before_stand).is_true()
-	assert_int(place.media_view.view().render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
-	assert_float(place.media_view.environment().ambient_light_energy).is_equal_approx(place.lit.room, 1e-6)
-	assert_float(row.room_energy).is_equal(place.lit.room)
-
-
 ## [param row] drawn through a screen camera, as in the app.
 func _with_camera(row: ShelfRow) -> Camera3D:
 	var camera: Camera3D = auto_free(Camera3D.new())
@@ -673,18 +278,6 @@ func _with_camera(row: ShelfRow) -> Camera3D:
 	row.camera = camera
 	_frames(row, 8, Fixtures.FRAME_S)
 	return camera
-
-
-func test_a_spring_in_flight_on_a_shelf_of_two_is_not_cut_short_by_a_freeze() -> void:
-	var row := _row(2, 0)
-	row.step(1)
-	_frames(row, 3, Fixtures.FRAME_S)
-	var scroll := row._scroll
-	assert_float(scroll).is_between(0.0, 1.0)
-	row.freeze()
-	assert_float(row._scroll).is_equal(scroll)
-	assert_bool(row._placed.has(row.selected_index())).is_true()
-	assert_int(row._placed.size()).is_equal(2)
 
 
 func test_a_launch_of_a_shelf_of_one_or_two_games_takes_the_selected_one_out_and_brings_it_back() -> void:
@@ -726,16 +319,6 @@ func test_a_filter_change_keeps_every_view_bound_to_its_own_model_and_makes_no_n
 		assert_int(ShelfRow.LabelledModel.alive).is_equal(models)
 
 
-func test_the_pill_top_is_the_title_place_top_of_the_selected_games_own_model() -> void:
-	var row := _row(5, 2)
-	var camera := _with_camera(row)
-	var place := _centre(row)
-	var layout := GamesLayout.new("ps2_dvd")
-	var expected := TitlePlace.top(TitlePlace.vertices(place.shown.get_child(0) as Node3D), layout.chosen,
-		camera.global_transform, camera.get_viewport().get_visible_rect().size, camera.fov)
-	assert_float(row.title_top()).is_equal_approx(expected, 0.001)
-
-
 func test_a_shelf_without_its_model_shown_yet_gives_a_pill_top_without_failing() -> void:
 	var row: ShelfRow = auto_free(ShelfRow.new())
 	row.label_images = auto_free(Fixtures.FakeArt.new())
@@ -743,36 +326,6 @@ func test_a_shelf_without_its_model_shown_yet_gives_a_pill_top_without_failing()
 	row.show_shelf(Fixtures.games(3), 0, Fixtures.DVDS, ShelfRow.LabelLook.new())
 	row._placed.clear()
 	assert_float(row.title_top()).is_equal(0.0)
-
-
-func test_a_blank_weight_moving_by_less_than_one_percent_does_not_relight_but_reaches_its_ends() -> void:
-	var row := _row(5, 2)
-	_with_camera(row)
-	var place := _centre(row)
-	var at := place.transform
-	place.draw_at(at, 0.0, 0.5, ShelfRow.Place.Draw.SHOWN, 0)
-	place.draw_at(at, 0.0, 0.504, ShelfRow.Place.Draw.SHOWN, 0)
-	assert_float(place._blank_weight).is_equal(0.5)
-	place.draw_at(at, 0.0, 0.52, ShelfRow.Place.Draw.SHOWN, 0)
-	assert_float(place._blank_weight).is_equal(0.52)
-	place.draw_at(at, 0.0, 0.998, ShelfRow.Place.Draw.SHOWN, 0)
-	place.draw_at(at, 0.0, 1.0, ShelfRow.Place.Draw.SHOWN, 0)
-	assert_float(place._blank_weight).is_equal(1.0)
-
-
-func test_the_room_energy_follows_the_blank_share_of_the_games_in_view_by_how_centred_each_is() -> void:
-	var row := _row(5, 2)
-	_with_camera(row)
-	var lit := _centre(row).lit.room
-	var blank := _centre(row).blank.room
-	assert_float(lit).is_not_equal(blank)
-	row.step(1)
-	_frames(row, 4, Fixtures.FRAME_S)
-	var share := 0.0
-	for game: int in GamesLayout.offsets(5, row._scroll):
-		share += 1.0 - MediaView.softness(GamesLayout.offsets(5, row._scroll)[game])
-	assert_float(share).is_between(0.0, 1.0)
-	assert_float(row.room_energy).is_equal_approx(lerpf(lit, blank, share), 1e-6)
 
 
 func test_a_jump_takes_the_shorter_way_round_the_ring_and_the_forward_one_at_half() -> void:

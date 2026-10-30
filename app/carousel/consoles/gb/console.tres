@@ -12,3 +12,4 @@ model_name = "DMG-01"
 scene = "res://carousel/consoles/gb/gb.tscn"
 launch = "res://carousel/consoles/gb/launch.json"
 triangle_budget = 10000
+ring_size = Vector2(1.485, 0.004)

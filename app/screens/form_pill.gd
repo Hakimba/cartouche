@@ -17,7 +17,7 @@ const _NAME_PX := 2.1 * FormPaint.CQW
 const _OFF := Color(1.0, 0.988235, 0.968627, 0.5)
 ## The name goes from muted to white over this long when the pill starts to act.
 const _LIT_S := 0.3
-## The browser's line box sits this much higher than the centred text (px, from the pictures).
+## How much higher than centred the name is drawn, in px.
 const _INK_RAISE := 1.0
 
 ## Whether it is the primary pill, the one that adds.
@@ -109,10 +109,8 @@ func _recolor() -> void:
 
 
 func _light(to: float) -> void:
-	if _lighting:
-		_lighting.kill()
 	var from := _lit
-	_lighting = create_tween()
+	_lighting = Motion.restart(self, _lighting)
 	_lighting.tween_method(func(t: float) -> void:
 		_lit = lerpf(from, to, Motion.eased(Motion.Easing.EASE, t))
 		queue_redraw(), 0.0, 1.0, _LIT_S)

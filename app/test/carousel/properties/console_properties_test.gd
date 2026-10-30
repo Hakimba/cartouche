@@ -50,7 +50,7 @@ func test_a_console_alone_has_no_order_action_and_no_press_opens_a_name_editor()
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 
-func test_INV_E7_02_a_random_console_properties_walk_settles_on_a_whole_screen_without_renaming() -> void:
+func test_inv_20_a_random_console_properties_walk_settles_on_a_whole_screen_without_renaming() -> void:
 	var carousel := await _on_consoles()
 	var random := CarouselFixtures.cases(37)
 	var buttons: Array[JoyButton] = [JOY_BUTTON_A, JOY_BUTTON_X, JOY_BUTTON_Y, JOY_BUTTON_START, JOY_BUTTON_DPAD_DOWN, JOY_BUTTON_DPAD_RIGHT]

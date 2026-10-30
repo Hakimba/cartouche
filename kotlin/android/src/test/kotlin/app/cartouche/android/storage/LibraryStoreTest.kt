@@ -16,8 +16,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.io.File
 
+@Config(sdk = [30, 34])
 @RunWith(RobolectricTestRunner::class)
 class LibraryStoreTest {
     private val file = File(RuntimeEnvironment.getApplication().filesDir, "library.json")
@@ -31,7 +33,7 @@ class LibraryStoreTest {
     }
 
     @Test
-    fun `INV-E1-08 an unreadable library file is set aside, never overwritten`() {
+    fun `INV-11 an unreadable library file is set aside, never overwritten`() {
         file.writeText("not a library")
         LibraryStore(file).load().shouldBeLeft().shouldBeInstanceOf<LibraryError.Unreadable>()
         LibraryStore(file).setAside() shouldBe true

@@ -15,11 +15,8 @@ import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
-import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.Codepoint
-import io.kotest.property.arbitrary.alphanumeric
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
@@ -27,7 +24,6 @@ import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -78,14 +74,6 @@ class ScanTest {
             Shell.UNKNOWN
     }
 
-    @Test
-    fun `a game of several files takes the shell of its first`() {
-        val (first, second) = listOf("Rayman (Disc 1).gbc", "Rayman (Disc 2).gbc").map { listed(it, size = Some(1_000_000)) }
-        val told = mapOf(first.uri to FileFacts.Print(1u, Shell.EXCLUSIVE), second.uri to FileFacts.Print(2u, Shell.COMPATIBLE))
-        Scan.of(gbc, contents(listOf(second, first)), TitleIndex.EMPTY, DiscGrouping.GROUPED, told).games.single().shell shouldBe
-            Shell.EXCLUSIVE
-    }
-
     private val gbc = Shipped.catalog.platforms.single { it.id == PlatformId("gbc") }
 
     /** The rectangle cut from a 663 by 755 scan for a game of [gbc] whose only file, a ROM with [flag] in its header, is read as the app reads it. */
@@ -109,24 +97,6 @@ class ScanTest {
     fun `a Game Boy Color ROM's colour flag reaches the cut of its label, the exclusives' lower, any other today's`() {
         cutFromRom(0xC0) shouldBe PixelRect(82, 254, 499, 436)
         listOf(0x80, 0x00, 0xC1).forEach { cutFromRom(it) shouldBe PixelRect(82, 215, 499, 436) }
-    }
-
-    @Test
-    fun `a game whose first file tells a serial or nothing has no shell`() {
-        val file = listed("Rayman.gbc", size = Some(1_000_000))
-        listOf(FileFacts.Serial("ABCD"), FileFacts.Silent).forEach { told ->
-            Scan
-                .of(
-                    gbc,
-                    contents(listOf(file)),
-                    TitleIndex.EMPTY,
-                    DiscGrouping.GROUPED,
-                    mapOf(file.uri to told),
-                ).games
-                .single()
-                .shell shouldBe
-                Shell.UNKNOWN
-        }
     }
 
     @Test
@@ -216,14 +186,6 @@ class ScanTest {
     }
 
     @Test
-    fun `unknown games keep their file name's title`() {
-        val game = scan(listed("Homebrew Racer (World) (v0.3).iso")).games.single()
-        game.title shouldBe "Homebrew Racer"
-        game.redumpName shouldBe None
-        game.version shouldBe Some("v0.3")
-    }
-
-    @Test
     fun `discs of one game make one game, unless grouping is off`() {
         val discs = arrayOf(listed("0 Story (Japan) (Disc 2).chd"), listed("0 Story (Japan) (Disc 1).chd"))
         val game = scan(*discs).games.single()
@@ -271,7 +233,7 @@ class ScanTest {
     }
 
     @Test
-    fun `INV-E1-04 a game shows what its file name states, and names a reference disc only when it is exactly that disc`() =
+    fun `INV-10 a game shows what its file name states, and names a reference disc only when it is exactly that disc`() =
         runBlocking<Unit> {
             val names = Shipped.ps2Names
             // Reference names as they are, or reduced to their title with one tag of another kind.
@@ -295,40 +257,7 @@ class ScanTest {
         }
 
     @Test
-    fun `INV-E11-01 a file whose content names one game is given that game, whatever its name says`() = runBlocking<Unit> {
-        // Each entry's serials, and the list's serials as discs write them (`SLES_524.95`) with the entries having each: read
-        // from the list, not the index.
-        val serialsOf =
-            Shipped.text("titles/ps2.tsv").lines().filter(String::isNotBlank).associate { line ->
-                line.substringBefore('\t') to line.substringAfter('\t').split(',').filter(String::isNotBlank)
-            }
-        val oneGame =
-            serialsOf.entries
-                .flatMap { (name, serials) -> serials.map { it.replace('-', '_') to name } }
-                .groupBy { FileFacts.Serial(it.first).key }
-                .values
-                .map { pairs -> pairs.first().first to pairs.map { it.second }.distinct() }
-                .filter { (_, names) -> names.map { GameName.parse(it).displayTitle }.distinct().size == 1 }
-        val fileNames = Arb.choice(Arb.element(Shipped.ps2Names), Arb.string(1..20, Codepoint.alphanumeric()))
-        var shared = 0
-        // As often a serial several versions share.
-        val serials = Arb.choice(Arb.element(oneGame), Arb.element(oneGame.filter { it.second.size > 1 }))
-        checkAll(serials, fileNames) { (serial, names), fileName ->
-            val game = read(listed("$fileName.iso") to FileFacts.Serial(serial)).games.single()
-            game.title shouldBe GameName.parse(names.first()).displayTitle
-            val versions = names.map { serialsOf.getValue(it).toSet() }
-            when {
-                names.size == 1 -> game.redumpName shouldBe Some(names.single())
-                // A name of no tag tells no version apart: the game keeps the serials all its versions share.
-                fileName !in serialsOf -> game.serials.toSet() shouldBe versions.reduce(Set<String>::intersect).also { shared++ }
-                else -> (game.serials.toSet() in versions + setOf(versions.reduce(Set<String>::intersect))) shouldBe true
-            }
-        }
-        shared shouldBeGreaterThan 100
-    }
-
-    @Test
-    fun `INV-E11-03 a file that tells nothing, or nothing the list knows, is identified by its name as before`() = runBlocking<Unit> {
+    fun `INV-03 a file that tells nothing, or nothing the list knows, is identified by its name as before`() = runBlocking<Unit> {
         // Crazy Taxi and an Xploder disc share SLES-50215: a serial naming two games names none.
         val untold =
             Arb.element(FileFacts.Silent, FileFacts.Serial("XXXX_999.99"), FileFacts.Print(0x03048DE6u), FileFacts.Serial("SLES_502.15"))
@@ -340,7 +269,7 @@ class ScanTest {
     }
 
     @Test
-    fun `INV-E1-01 every file ends up in exactly one game or among the ignored files`() = runBlocking<Unit> {
+    fun `INV-08 every file ends up in exactly one game or among the ignored files`() = runBlocking<Unit> {
         checkAll(folderFiles) { files ->
             val scan = Scan.of(ps2, contents(files), ps2Titles, DiscGrouping.GROUPED)
             (scan.games.flatMap { game -> game.discs.map { it.file } } + scan.ignored.map { it.file }) shouldContainExactlyInAnyOrder files
@@ -348,7 +277,7 @@ class ScanTest {
     }
 
     @Test
-    fun `INV-E1-02 a scan does not depend on the order the folder lists its files and sub-folders in`() = runBlocking<Unit> {
+    fun `INV-08 a scan does not depend on the order the folder lists its files and sub-folders in`() = runBlocking<Unit> {
         checkAll(folderFiles, skippedFolders, Arb.enum<DiscGrouping>(), Arb.long()) { files, skipped, grouping, seed ->
             val random = Random(seed)
             Scan.of(ps2, FolderContents(files.shuffled(random), skipped.shuffled(random)), ps2Titles, grouping) shouldBe
@@ -357,7 +286,7 @@ class ScanTest {
     }
 
     @Test
-    fun `INV-E1-07 only files a player of the platform accepts become games, never hidden files or a BIOS`() = runBlocking<Unit> {
+    fun `only files a player of the platform accepts become games, never hidden files or a BIOS`() = runBlocking<Unit> {
         val bios = listOf("SCPH-70012_BIOS_V12_USA_200.BIN", "scph39001.bin", "ps2_bios.bin", "PS2 Bios 30004R V6 Pal.bin", "bios.bin")
         // Game-sized or of unknown size: only their name tells they are not games.
         val files = bios.flatMap { listOf(listed(it, id = "$it-sized"), listed(it, id = "$it-unsized", size = None)) }

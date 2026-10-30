@@ -17,7 +17,5 @@ func watch(control: Control) -> void:
 
 
 func _scale(control: Control, to: float) -> void:
-	if _tween:
-		_tween.kill()
-	_tween = control.create_tween()
+	_tween = Motion.restart(control, _tween)
 	_tween.tween_property(control, ^"scale", Vector2.ONE * to, DURATION_S)

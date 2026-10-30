@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name HintRow
 extends SatinPanel
-## The one hint row of every screen: its [ButtonHint] children on a frost pill at the design's place,
+## The one hint row of every screen: its [ButtonHint] children on a frost pill at a fixed place,
 ## bottom left, a thin line between each two, growing to the right only (the bottom right stays free).
 ## Hints are laid at their exact x (a BoxContainer would round each to a whole pixel).
 
@@ -22,7 +22,7 @@ func _notification(what: int) -> void:
 		_pin()
 
 
-## The design's place on the screen, wherever the screen's own parts start and wherever they move.
+## Its fixed place on the screen, wherever the screen's own parts start and wherever they move.
 func _pin() -> void:
 	if global_position != StudioTokens.HINTS.position:
 		global_position = StudioTokens.HINTS.position

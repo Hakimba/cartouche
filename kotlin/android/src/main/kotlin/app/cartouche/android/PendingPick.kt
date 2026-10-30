@@ -6,9 +6,8 @@ import arrow.core.Option
 import arrow.core.Some
 
 /**
- * A system pick (a folder, a picture) awaiting its activity result. A pick is answered exactly
- * once: with its result, when the picker cannot open, or when a newer pick replaces it. Not
- * thread-safe: main thread only.
+ * A system pick awaiting its activity result, answered exactly once: with its result, when the picker cannot open,
+ * or when a newer pick replaces it. Main thread only.
  */
 internal class PendingPick<A>(private val answer: (requestId: Int, A) -> Unit) {
     private var current: Option<Int> = None
@@ -20,6 +19,6 @@ internal class PendingPick<A>(private val answer: (requestId: Int, A) -> Unit) {
         open().onSome { failed -> end().onSome { answer(it, failed) } }
     }
 
-    /** Ends the pending pick, to be answered with its result; none when the result belongs to no pick of this process. */
+    /** None when the result belongs to no pick of this process. */
     fun end(): Option<Int> = current.also { current = None }
 }

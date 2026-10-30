@@ -12,82 +12,6 @@ extends ModelShape
 ## A grille on each end, the hard drive on the left one in front of which the grille is cut short;
 ## dotted vents along both ends of the top; a honeycomb vent and the ports at the back.
 
-@export var width := 309.0:
-	set(value):
-		width = value
-		emit_changed()
-@export var depth := 258.0:
-	set(value):
-		depth = value
-		emit_changed()
-## At the ends; the top and the bottom are each [member dip] closer to the middle at the middle.
-@export var height := 83.0:
-	set(value):
-		height = value
-		emit_changed()
-@export var dip := 2.5:
-	set(value):
-		dip = value
-		emit_changed()
-## The body's underside at the ends, on its feet.
-@export var foot_height := 2.0:
-	set(value):
-		foot_height = value
-		emit_changed()
-## The front outline's corners, and the rounding of the body's edges at the front and the back.
-@export var corner := 9.0:
-	set(value):
-		corner = value
-		emit_changed()
-@export var bevel := 5.0:
-	set(value):
-		bevel = value
-		emit_changed()
-## How far behind the front the faceplate's seam runs.
-@export var faceplate_depth := 12.0:
-	set(value):
-		faceplate_depth = value
-		emit_changed()
-## The tray's slot, from its left end to its right one (X), from its bottom to its top: its ends
-## are round.
-@export var slot_span := Vector2(-124.5, 13.5):
-	set(value):
-		slot_span = value
-		emit_changed()
-@export var slot_levels := Vector2(45.5, 62.5):
-	set(value):
-		slot_levels = value
-		emit_changed()
-## The eject button, round, at the slot's left end.
-@export var eject_radius := 8.0:
-	set(value):
-		eject_radius = value
-		emit_changed()
-## The discs the tray takes.
-@export var disc_radius := 60.0:
-	set(value):
-		disc_radius = value
-		emit_changed()
-## The power button's boss: its centre on the front and its radius; the ring of lights round the
-## button, from its inner radius to its outer one.
-@export var power_centre := Vector2(68.5, 41.5):
-	set(value):
-		power_centre = value
-		emit_changed()
-@export var boss_radius := 23.5:
-	set(value):
-		boss_radius = value
-		emit_changed()
-@export var ring_radii := Vector2(13.0, 15.0):
-	set(value):
-		ring_radii = value
-		emit_changed()
-## How far the hard drive stands out of the left end.
-@export var drive_protrusion := 16.0:
-	set(value):
-		drive_protrusion = value
-		emit_changed()
-
 ## The gap around the tray in its slot; its bezel's thickness; its plate, above the slot's bottom,
 ## and its thickness; the room left between a disc and the bezel; the gap between the eject button
 ## and the slot; the eject button's own gap round it, in its round hole in the front, and how deep
@@ -139,6 +63,81 @@ const HONEYCOMB := Rect2(42.0, 10.0, 150.0, 60.0)
 const HONEYCOMB_HOLES := Vector3(7.0, 6.0, 5.5)
 const MAINS := Rect2(14.0, 11.0, 20.0, 14.0)
 const PORTS: Array[Rect2] = [Rect2(68.0, 18.0, 32.0, 9.0), Rect2(42.0, 18.0, 14.0, 12.0), Rect2(42.0, 40.0, 12.0, 5.0)]
+
+@export var width := 309.0:
+	set(value):
+		width = value
+		emit_changed()
+@export var depth := 258.0:
+	set(value):
+		depth = value
+		emit_changed()
+## At the ends; the top and the bottom are each [member dip] closer to the middle at the middle.
+@export var height := 83.0:
+	set(value):
+		height = value
+		emit_changed()
+@export var dip := 2.5:
+	set(value):
+		dip = value
+		emit_changed()
+## The body's underside at the ends, on its feet.
+@export var foot_height := 2.0:
+	set(value):
+		foot_height = value
+		emit_changed()
+## The front outline's corners, and the rounding of the body's edges at the front and the back.
+@export var corner := 9.0:
+	set(value):
+		corner = value
+		emit_changed()
+@export var bevel := 5.0:
+	set(value):
+		bevel = value
+		emit_changed()
+## How far behind the front the faceplate's seam runs.
+@export var faceplate_depth := 12.0:
+	set(value):
+		faceplate_depth = value
+		emit_changed()
+## The tray's slot, from its left end to its right one (X), from its bottom to its top: its ends
+## are round.
+@export var slot_span := Vector2(-124.5, 13.5):
+	set(value):
+		slot_span = value
+		emit_changed()
+@export var slot_levels := Vector2(45.5, 62.5):
+	set(value):
+		slot_levels = value
+		emit_changed()
+## The eject button, round, at the slot's left end.
+@export var eject_radius := 8.0:
+	set(value):
+		eject_radius = value
+		emit_changed()
+@export var disc_radius := 60.0:
+	set(value):
+		disc_radius = value
+		emit_changed()
+## The power button's boss: its centre on the front and its radius; the ring of lights round the
+## button, from its inner radius to its outer one.
+@export var power_centre := Vector2(68.5, 41.5):
+	set(value):
+		power_centre = value
+		emit_changed()
+@export var boss_radius := 23.5:
+	set(value):
+		boss_radius = value
+		emit_changed()
+@export var ring_radii := Vector2(13.0, 15.0):
+	set(value):
+		ring_radii = value
+		emit_changed()
+## How far the hard drive stands out of the left end.
+@export var drive_protrusion := 16.0:
+	set(value):
+		drive_protrusion = value
+		emit_changed()
 
 
 func parts() -> Array[StringName]:

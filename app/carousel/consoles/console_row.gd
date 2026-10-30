@@ -22,7 +22,7 @@ signal selection_changed(index: int)
 
 ## How much of its pose a staged console keeps: enough to show its top and its front.
 const _STAGED_POSE := 0.35
-## Where the middle of the staged console's silhouette stands, in px of the design's frame, whatever its pose.
+## Where the middle of the staged console's silhouette stands, in px of the 1280 × 960 reference frame, whatever its pose.
 const STAGE_CENTRE := Vector2(640.0, 440.0)
 ## How much the console pointed at grows, and how fast (a pop); the one peeled off, how much it grows,
 ## leans (radians, counter-clockwise on the screen) and rises (px).
@@ -31,14 +31,12 @@ const _POP_S := 0.26
 const _PEEL_GROWTH := 0.08
 const _PEEL_LEAN := deg_to_rad(4.0)
 const _PEEL_LIFT_PX := 23.04
-## The 1280 × 960 frame the design is drawn in, and where the others come from when the ring opens and go to
-## when it closes: the rail, as far towards its place as the design has them, at this size.
+## Where the others come from when the ring opens and go to when it closes: this share of the way (per axis) from
+## their ring place towards the rail of logos, in px of the reference frame, at this size.
 const _RAIL_POINT := Vector2(640.0, 762.88)
 const _RAIL_PULL := Vector2(0.45, 0.55)
 const _RAIL_SIZE := 0.6
-## How much nearer the camera the console flying free of the ring is than the ones on it.
 const _FLIER_NEARER := 0.9
-## How small a console is as it comes onto the ring from nothing.
 const _COMING_SIZE := 0.7
 ## A swap: the console leaving slides this far away (px of the screen), shrinks to this size and fades in
 ## [constant _OUT_S]; the one coming slides in from this far, grows from this size in [constant _IN_S].
@@ -50,15 +48,14 @@ const _IN_PX := 76.8
 const _IN_SCALE := 0.96
 ## How far the hero's whole frame stands above its fitted pose, in pixels of the screen.
 const RAISE_PX := 83.2
-## The render layer of the selected console when a light was designed for it on this screen: only that rig's
+## The render layer of the selected console when it has its own light rig on this screen: only that rig's
 ## lights are culled to it, the Sun leaves it alone.
 const HERO := 1 << 3
-## One pixel of the 1280 × 960 design frame, in world units a unit of depth away (the camera's field of view
+## One pixel of the 1280 × 960 reference frame, in world units a unit of depth away (the camera's field of view
 ## being 32°).
 const _WORLD_PER_PX := 0.000597386
 
 
-## Which folders have a light on the consoles screen, including an empty loaded set.
 static var _with_rig: Dictionary[String, bool] = {}
 static var _rigs_read := false
 
@@ -86,7 +83,7 @@ var staged_size := 1.0
 ## others have come from the rail's, 0 to 1.
 var wheel := 0.0
 var others_wheel := 0.0
-## The scale every console stands on, in cqw ([method RingFit.scale]), and the one it is following.
+## The scale every console stands on ([method RingFit.scale]), and the one it is following.
 var ring_scale := 0.0
 var ring_target := 0.0
 ## Each console's place round the ring, by its index in the row, -1 for none; the consoles pointed at and
@@ -120,7 +117,6 @@ var _scroll := 0.0
 var _pose_s := 0.0
 var _stick := Vector2.ZERO
 var _turn := StickTurn.new(true)
-## Where each console stands round the ring this frame, sliding towards its slot; how many places the ring has.
 var _slid: Array[float] = []
 var _ring_places := 0
 ## How far each console's pop has gone, from 0 (as placed) to 1 (grown).
@@ -133,7 +129,7 @@ var _stuck := -1
 ## arranged again as the clock moves on.
 var _arranged := false
 ## The consoles leaving, each from where it stood when it was left; the way the row went (-1 or 1) and the seconds
-## since the console now selected started coming in: the swap is over once it arrived.
+## since the selected console started coming in: the swap is over once it arrived.
 var _leavers: Array[Leaver] = []
 var _way := 0
 var _in_from := Swap.new(0.0, 1.0, 1.0)
@@ -141,7 +137,7 @@ var _swap_s := _IN_S
 var _screen_presence := 1.0
 
 
-## Stops a row between steps at its selected position before another screen opens.
+## Whether the row is still between two positions or in a swap; [method settle] ends it at once.
 func is_settling() -> bool:
 	return not is_equal_approx(_scroll, float(_position)) or _swap_s < _IN_S
 
@@ -151,7 +147,7 @@ func settle() -> void:
 	arrange()
 
 
-## Fades the row without interrupting its pose or arranging internals from outside.
+## Fades the whole row to [param presence], from 0 (gone) to 1.
 func fade_to(presence: float) -> void:
 	_screen_presence = presence
 	arrange()
@@ -195,7 +191,6 @@ func show_consoles(items: Array[Item], from: int) -> void:
 	_peeled = -1
 	_stuck = -1
 	_stop_swap()
-	# New models are drawn in front.
 	behind = false
 	wheel_slots.assign(range(_items.size()))
 	_slid.assign(wheel_slots)
@@ -228,7 +223,6 @@ func selected() -> Item:
 	return _items[selected_index()]
 
 
-## The console at [param index] of the row.
 func console_at(index: int) -> Item:
 	return _items[index]
 
@@ -245,23 +239,33 @@ func select(index: int) -> void:
 
 
 ## The consoles in a new order: the one at [param order]'s first index first, and so on. Each one
-## stays as it is (selected, turned, pointed at, held, on the ring) wherever it goes. ConsoleOrder._landed
-## rewrites flier and the ring angles immediately afterwards.
+## stays as it is (selected, turned, pointed at, held, flying, at its angle on the ring) wherever it goes.
 func reorder(order: Array[int]) -> void:
 	var items: Array[Item] = []
 	var slid: Array[float] = []
 	var popped: Array[float] = []
+	var angles := PackedFloat64Array()
+	var arrivals := PackedFloat64Array()
+	# The ring writes an angle and an arrival for every console, or none.
+	var ringed := ring_angles.size() == _items.size()
 	for index in order:
 		items.append(_items[index])
 		slid.append(_slid[index])
 		popped.append(_pop[index])
+		if ringed:
+			angles.append(ring_angles[index])
+			arrivals.append(ring_arrival[index])
 	_items = items
 	_slid = slid
 	_pop = popped
+	if ringed:
+		ring_angles = angles
+		ring_arrival = arrivals
 	wheel_slots.assign(range(_items.size()))
 	_position = order.find(selected_index())
 	_scroll = _position
 	_turn.index = order.find(_turn.index)
+	flier = order.find(flier)
 	pointed = order.find(pointed)
 	held = order.find(held)
 	_peeled = order.find(_peeled)
@@ -345,7 +349,6 @@ func let_go() -> void:
 	_turn.let_go()
 
 
-## Draws every console in the render layers of [param mask].
 func show_in_layers(mask: int) -> void:
 	behind = mask == ConsoleLayer.BEHIND
 	for i in _items.size():
@@ -421,7 +424,7 @@ static func forget() -> void:
 	_with_rig.clear()
 
 
-## Whether the console in [param folder] has a light designed for it on this screen (`consoles`).
+## Whether the console in [param folder] has its own light rig on this screen (`consoles`).
 static func has_rig(folder: String) -> bool:
 	if not _rigs_read:
 		_with_rig = _rigs_from(FileAccess.get_file_as_string(StudioLights.FILE))
@@ -442,7 +445,6 @@ static func _rigs_from(text: String) -> Dictionary[String, bool]:
 	return found
 
 
-
 func _adopt(item: Item) -> void:
 	add_child(item.model)
 	item.geometry.assign(item.model.find_children("*", "VisualInstance3D", true, false))
@@ -451,7 +453,7 @@ func _adopt(item: Item) -> void:
 
 
 ## The lights of the selected console's own rig stand about it, the console alone drawn in their layer; a
-## console without a rig keeps the Sun and the room as they are (today's light).
+## console without a rig keeps the Sun and the room as they are.
 func _light_selected() -> void:
 	var wanted := selected_index() if not _items.is_empty() and has_rig(selected().folder) else -1
 	if wanted == _lit and (wanted < 0 or _lights):
@@ -472,7 +474,6 @@ func _light_selected() -> void:
 				geometry.layers = _front_layer(i) if not behind else ConsoleLayer.BEHIND
 
 
-## The lights taken down.
 func _unlight() -> void:
 	if _lights:
 		for light in _lights.lights():
@@ -481,12 +482,10 @@ func _unlight() -> void:
 	_lit = -1
 
 
-## The layer console [param index] is drawn in in front of the games.
 func _front_layer(index: int) -> int:
 	return HERO if index == _lit else ConsoleLayer.FRONT
 
 
-## How the console coming in stands this far into a swap.
 func _swap_in() -> Swap:
 	var arrived := Motion.eased(Motion.Easing.ARRIVE, clampf(_swap_s / _IN_S, 0.0, 1.0))
 	return Swap.new(lerpf(_in_from.shift_px, 0.0, arrived), lerpf(_in_from.size, 1.0, arrived),
@@ -501,7 +500,6 @@ func _leaver_of(index: int) -> Leaver:
 	return null
 
 
-## No swap under way: the console selected stands, the ones that were leaving are gone.
 func _stop_swap() -> void:
 	_leavers.clear()
 	_swap_s = _IN_S
@@ -518,7 +516,7 @@ func _stand(index: int) -> Stand:
 	var angle := ring_angles[index] if index < ring_angles.size() else _slid[index] / _ring_places * TAU
 	var peeled := peel if index == _peeled else 0.0
 	var growth := Motion.eased(Motion.Easing.POP, _pop[index]) * lerpf(_POINTED_GROWTH, _PEEL_GROWTH, peeled)
-	var size := RingFit.width(RingFit.weight_of(item.folder), ring_scale, angle) * (1.0 + growth) / (CarouselLayout.FRAME.x / RingFit.CQW)
+	var size := RingFit.width(RingFit.weight_of(item.folder), ring_scale, angle) * (1.0 + growth) / (CarouselLayout.FRAME.x / FormPaint.CQW)
 	var place := RingFit.place(angle) - Vector2(0.0, _PEEL_LIFT_PX * peeled)
 	var stand := Stand.new()
 	if index == pointed:
@@ -548,12 +546,11 @@ func _on_ring(index: int, stand: Stand) -> Transform3D:
 	return Transform3D(leaning * _three_euler(rest.console_rotation).scaled(Vector3.ONE * rest.console_scale * stand.size * nearer), at)
 
 
-## How console [param index] stands on the ring this frame.
 func ring_stand(index: int) -> Stand:
 	return _stand(index)
 
 
-## The selected console's silhouette on the stage, in px of the design's frame.
+## The selected console's silhouette on the stage, in px of the reference frame.
 func staged_box() -> Rect2:
 	var size := _hero_of(selected()).box.size * CarouselLayout.FRAME * staged_size
 	return Rect2(STAGE_CENTRE - size / 2.0, size)
@@ -580,23 +577,23 @@ func ring_point(slot: float) -> Vector2:
 	return to_view(RingFit.place(slot / _ring_places * TAU))
 
 
-## How many px of the viewport a px of the design's frame is: the camera keeps the view's height, so a screen taller
-## than the frame's 4:3 shows it larger.
+## How many px of the viewport one px of the reference frame covers: the camera keeps the view's height, so a screen
+## taller than the frame's 4:3 shows it larger.
 func view_scale() -> float:
 	return get_viewport().get_visible_rect().size.y / CarouselLayout.FRAME.y
 
 
-## The design's frame in the middle of the viewport: where its corner stands, in px of the viewport.
+## Where the corner of the reference frame, centred in the viewport, stands, in px of the viewport.
 func view_origin() -> Vector2:
 	return to_view(Vector2.ZERO)
 
 
-## The point [param design] of the design's frame, in px of the viewport.
+## The point [param design] of the reference frame, in px of the viewport.
 func to_view(design: Vector2) -> Vector2:
 	return get_viewport().get_visible_rect().size / 2.0 + (design - CarouselLayout.FRAME / 2.0) * view_scale()
 
 
-## The point [param view] of the viewport, in px of the design's frame.
+## The point [param view] of the viewport, in px of the reference frame.
 func to_design(view: Vector2) -> Vector2:
 	return (view - get_viewport().get_visible_rect().size / 2.0) / view_scale() + CarouselLayout.FRAME / 2.0
 
@@ -634,8 +631,8 @@ func _count_places() -> void:
 ## Each console slides towards its slot round the ring, the shorter way.
 func _slide(delta: float) -> void:
 	_count_places()
-	var follow := 1.0 - exp(-RingFit.FOLLOW * minf(delta, Motion.MAX_STEP_S))
-	ring_scale = ring_target if absf(ring_target - ring_scale) < 1e-4 else lerpf(ring_scale, ring_target, follow)
+	var follow := RingFit.share(delta)
+	ring_scale = RingFit.toward(ring_scale, ring_target, follow)
 	for i in mini(_items.size(), wheel_slots.size()):
 		if wheel_slots[i] < 0:
 			continue
@@ -733,7 +730,7 @@ class Rest:
 		return rest
 
 
-## Where a console's silhouette stands on the ring: its centre in px of the design's frame, its size against
+## Where a console's silhouette stands on the ring: its centre in px of the reference frame, its size against
 ## the picture in the consoles screen (1 there), its opacity.
 class Stand:
 	var centre := Vector2.ZERO
@@ -742,7 +739,7 @@ class Stand:
 
 
 ## How a console looks in the hero's place, drawn through the camera: where its origin and the centre of its
-## silhouette stand in px of the design's frame, how far from the camera its origin is, and its silhouette's box
+## silhouette stand in px of the reference frame, how far from the camera its origin is, and its silhouette's box
 ## as fractions of the picture (the frame is raised by [constant RAISE_PX] over the screen).
 class Hero:
 	var origin := Vector2.ZERO

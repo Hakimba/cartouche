@@ -4,13 +4,13 @@ extends Control
 ## The ribbon that searches the games screen's shelf. Down opens it under the carousel: keys A to
 ## Z, 0 to 9 and a space. Until a key is typed it is an index: left and right go from letter to
 ## letter, the carousel jumping to its first game behind; down again, from region to region, the
-## carousel keeping only the games of the region the cursor is on. A types the key, and the carousel keeps only the games found (the core's
-## `Finder`: each word typed starts another word of the title, in any order); keys that would find
-## nothing are dimmed and skipped. L1 and R1 go to the previous or next letter, or once keys are
-## typed to the previous or next key that still finds a game, the carousel on the first game it
-## finds; a big letter tells where. B erases a key, then closes the ribbon, back on the game shown
-## before; up or Start close it keeping what is found, told at the top, which B on the games screen
-## clears. A key tapped is typed.
+## carousel keeping only the games of the region the cursor is on. A types the key, and the carousel
+## keeps only the games found (the core's `Finder`: each word typed starts another word of the title,
+## in any order); keys that would find nothing are dimmed and skipped. L1 and R1 go to the previous
+## or next letter, or once keys are typed to the previous or next key that still finds a game, the
+## carousel on the first game it finds; a big letter tells where. B erases a key, then closes the
+## ribbon, back on the game shown before; up or Start close it keeping what is found, told at the
+## top, which B on the games screen clears. A key tapped is typed.
 ##
 ## The carousel hands its presses over while the ribbon is open ([method take]), and B while what
 ## is found is kept ([method clear]).
@@ -425,16 +425,13 @@ func _show_big(label: String) -> void:
 
 
 func _animate_ribbon(up: bool) -> void:
-	if _rise:
-		_rise.kill()
-	_rise = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_rise = Motion.restart(self, _rise).set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_rise.tween_property(_ribbon, ^"position:y", _ribbon_y if up else _ribbon_y + _RISE_PX, RISE_S)
 	_rise.tween_property(_ribbon, ^"modulate:a", 1.0 if up else 0.0, RISE_S)
 	if not up:
 		_rise.chain().tween_callback(_ribbon.hide)
 
 
-## The ribbon's keys, the chip, the filter kept, the hints: as things are.
 func _refresh() -> void:
 	var found := _region().size() if _by_region else _view.games.size()
 	_chip.visible = _open and is_filtered()

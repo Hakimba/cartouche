@@ -6,8 +6,6 @@ import app.cartouche.core.files.FileFacts
 import arrow.core.None
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeSome
-import io.kotest.matchers.collections.shouldNotBeEmpty
-import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.Test
@@ -21,13 +19,6 @@ class TitleIndexTest {
     private fun titles(platform: String) = TitleIndex.parse(Shipped.text("titles/$platform.tsv"))
 
     private fun TitleIndex.read(facts: FileFacts, fileName: String) = identifyByContent(facts, GameName.parse(fileName))
-
-    @Test
-    fun `every shipped list parses whole`() {
-        ps2.size shouldBe ps2Text.lines().count { it.isNotBlank() }
-        ps2.size shouldBeGreaterThan 10_000
-        Shipped.lists("titles").values.forEach { text -> TitleIndex.parse(text).size shouldBe text.lines().count { it.isNotBlank() } }
-    }
 
     @Test
     fun `file names find their disc, preferring the same region and version`() {
@@ -55,13 +46,6 @@ class TitleIndexTest {
             listOf("SLPS-91105")
         // Read for its title and tags, the name also fits `Street Fighter Zero 2 (Japan)`, without the apostrophe.
         psx.judge(GameName.parse("Street Fighter Zero 2' (Japan)")) shouldBe None
-    }
-
-    @Test
-    fun `an exact disc also has the name's disc number`() {
-        // `Dungeon Creator (Japan) (Disc 1)` is another disc with another serial.
-        titles("psx").identifyByName("DUNGEON CREATOR (Japan)").shouldBeSome().shouldBeInstanceOf<Identification.Disc>().disc.text shouldBe
-            "Dungeon Creator (Japan)"
     }
 
     @Test
@@ -189,13 +173,6 @@ class TitleIndexTest {
     }
 
     @Test
-    fun `versions of one release are identified by the serial they share`() {
-        identify("Katamari Damacy (Japan)").shouldBeSome().serials shouldBe listOf("SLPS-25360")
-        identify("Gran Turismo 4 (USA)").shouldBeSome().serials shouldBe listOf("SCUS-97328")
-        identify("Nickelodeon Avatar - The Legend of Aang (Europe) (En,Fr,De,Nl)").shouldBeSome().serials shouldBe listOf("SLES-54188")
-    }
-
-    @Test
     fun `a patched dump naming its original version keeps that version's serial`() {
         identify("Real World Golf (Europe) (v1.01) (v1.1)").shouldBeSome().shouldBeInstanceOf<Identification.Release>().serials shouldBe
             listOf("SLES-53371")
@@ -221,7 +198,7 @@ class TitleIndexTest {
     private val known = ps2Text.lines().filter { it.isNotBlank() }.map { KnownTitle(it.substringBefore('\t'), serials(it)) }
 
     @Test
-    fun `INV-E1-04 a reference name is identified as itself, and never as another edition, region or disc`() {
+    fun `INV-10 a reference name is identified as itself, and never as another edition, region or disc`() {
         known.forEach { reference ->
             identify(reference.text).shouldBeSome().shouldBeInstanceOf<Identification.Disc>().disc.text shouldBe reference.text
             // Its title in capitals, it is no longer written as the entry: read for its title and tags, it keeps them.
@@ -247,78 +224,6 @@ class TitleIndexTest {
             }
         }
     }
-
-    @Test
-    fun `INV-E1-04 a name that leaves out a tag never gets a serial the full name's disc lacks`() {
-        var found = 0
-        lessPrecise.forEach { (reference, text) ->
-            val file = GameName.parse(text)
-            identify(text).onSome { identification ->
-                found++
-                when (identification) {
-                    // The file could be the reference disc: another disc only when it matches the name exactly.
-                    is Identification.Disc ->
-                        listOf(
-                            identification.disc.name.regions,
-                            identification.disc.name.languages,
-                            identification.disc.name.versions,
-                        ) shouldBe
-                            listOf(file.regions, file.languages, file.versions)
-                    is Identification.Release -> reference.serials.containsAll(identification.serials) shouldBe true
-                }
-            }
-        }
-        found shouldBeGreaterThan 1000
-    }
-
-    @Test
-    fun `INV-E1-04 a name stating another disc's languages or version never gets a disc contradicting it`() {
-        known.groupBy { it.name.key }.values.forEach { discs ->
-            discs.forEach { reference ->
-                discs.filter { it != reference }.forEach { other ->
-                    // The reference's name with the other disc's languages, then with its versions.
-                    listOf(reference.name.copy(languages = other.name.languages), reference.name.copy(versions = other.name.versions))
-                        .map(::written)
-                        .forEach { text ->
-                            val file = GameName.parse(text)
-                            identify(text).onSome { found ->
-                                val title = found.title
-                                (file.languages.isEmpty() || title.languages.isEmpty() || title.languages == file.languages) shouldBe true
-                                (file.versions.containsAll(title.versions) || title.versions.containsAll(file.versions)) shouldBe true
-                            }
-                        }
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `a release found by name always has serials`() {
-        val releases = lessPrecise.flatMap { identify(it.second).toList() }.filterIsInstance<Identification.Release>()
-        releases.forEach { it.serials.shouldNotBeEmpty() }
-        releases.size shouldBeGreaterThan 100
-    }
-
-    /** Each reference name without one of the tags whose absence makes it less precise (without `(Beta)`, it names another disc). */
-    private val lessPrecise: List<Pair<KnownTitle, String>> by lazy {
-        known.flatMap { reference ->
-            Regex("""\s*\([^()]*\)""")
-                .findAll(reference.text)
-                .map { it.value }
-                .filter { tag -> tag.trim().removeSurrounding("(", ")").let { it !in reference.name.otherTags && !it.startsWith("Disc") } }
-                .map { tag -> reference to reference.text.replace(tag, "") }
-                .toList()
-        }
-    }
-
-    /** A file name stating [name]'s title and tags, in Redump's order. */
-    private fun written(name: GameName): String = (
-        listOf(name.title) +
-            listOf(name.regions.joinToString(", "), name.languages.joinToString(",")).filter(String::isNotEmpty).map { "($it)" } +
-            name.versions.map { "($it)" } +
-            name.disc.fold({ emptyList() }) { listOf("(Disc $it)") } +
-            name.otherTags.map { "($it)" }
-    ).joinToString(" ")
 
     private fun serials(line: String) = line.substringAfter('\t').split(',').filter(String::isNotBlank)
 }

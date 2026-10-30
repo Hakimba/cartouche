@@ -12,8 +12,8 @@ import kotlinx.serialization.Serializable
 @JvmInline public value class ArtUrl(public val value: String)
 
 /**
- * The version of a platform's art sources: the dates of its extract and of its texture table, such
- * as `2026-09-28 2026-10-18`. Art no source has is looked for again once it changes.
+ * The version of a platform's art sources: the dates of its extract and of its texture table, such as `2026-09-28
+ * 2026-10-18`. Art no source has is looked for again once it changes.
  */
 @Serializable @JvmInline
 public value class ArtVersion(public val date: String) {
@@ -31,8 +31,8 @@ public value class ArtVersion(public val date: String) {
 @JvmInline public value class TextureMedia(public val name: String)
 
 /**
- * What names a candidate in the store, the traces and what is remembered of it: a scan's URL, a
- * texture's `ss:<system>:<game>:<media>`; never a URL carrying credentials.
+ * What names a candidate in the store, the traces and what is remembered of it: a scan's URL, a texture's
+ * `ss:<system>:<game>:<media>`; never a URL carrying credentials.
  */
 @Serializable @JvmInline
 public value class Identity(public val value: String) {
@@ -40,11 +40,14 @@ public value class Identity(public val value: String) {
 }
 
 /**
- * An image a source may have of a game's medium, and how to ask for it: its [identity] names it,
- * its [source] is what the chooser names it by beside its region, and a chosen label remembers.
+ * An image a source may have of a game's medium, and how to ask for it: its [identity] names it, its [source] is what
+ * the chooser names it by beside its region, and a chosen label remembers.
  */
 public sealed interface Candidate {
-    /** The region the image is of, as its source names it (`Regions` reads every source's names); empty when none is stated. */
+    /**
+     * The region the image is of, as its source names it (`Regions` reads every source's names); empty when none is
+     * stated.
+     */
     public val region: String
 
     public val identity: Identity
@@ -56,7 +59,9 @@ public sealed interface Candidate {
         override val identity: Identity get() = Identity(url.value)
     }
 
-    /** ScreenScraper's texture [media] of [game] on [system]: the printed label itself, downloaded with the app's key. */
+    /**
+     * ScreenScraper's texture [media] of [game] on [system]: the printed label itself, downloaded with the app's key.
+     */
     public data class Texture(
         public val system: ScreenScraperSystem,
         public val game: ScreenScraperGame,

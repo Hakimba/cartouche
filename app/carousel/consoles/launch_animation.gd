@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name LaunchAnimation
 extends RefCounted
-## Makes a console's [Animation] from its steps (its folder's `launch.json`, see ONBOARDING): each
+## Makes a console's [Animation] from its steps (its folder's `launch.json`, see docs/adding-a-console.md, "Launch steps"): each
 ## step a whole state of the scene, reached from the previous one in `dur` seconds (a hundredth at
 ## least) along its `ease` (`linear`, `in`, `out`, `inOut`, the default, or the rebound `outBack`),
 ## then held `hold` seconds (none at least). A value left out takes its default (see
@@ -216,7 +216,6 @@ static func _moved(role: MovingPart.Role, i: int) -> bool:
 	return false
 
 
-## The steps [param data] lists, those that are steps.
 static func _steps(data: Dictionary) -> Array[Dictionary]:
 	var steps: Array[Dictionary] = []
 	var listed: Variant = data.get("steps")
@@ -226,7 +225,6 @@ static func _steps(data: Dictionary) -> Array[Dictionary]:
 	return steps
 
 
-## The parts [param console] moves; none without one.
 static func _moving_parts(console: ConsoleModel) -> Array[MovingPart]:
 	return console.moving_parts() if console else ([] as Array[MovingPart])
 

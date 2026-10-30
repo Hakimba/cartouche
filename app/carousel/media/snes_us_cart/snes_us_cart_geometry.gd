@@ -42,7 +42,6 @@ static func _shell(mesh: MeshBuilder, shape: SnesUsCartShape, steps: int) -> voi
 	var face := ShapeGeometry.rolled(mesh, shape.front_outline(), shape.corner, seam, shape.wings(),
 		Vector3.ONE * shape.front_round, steps, whole)
 	ShapeGeometry.flat(mesh, face, shape.wings(), Vector3.BACK, whole)
-	# The raised body: its upper part round the label's recess, the rails, the grip's sloping sides.
 	var corner := SnesUsCartShape.BODY_CORNER
 	var rolls := Vector3.ONE * shape.body_round
 	var cut := shape.label_centre.x
@@ -61,8 +60,6 @@ static func _shell(mesh: MeshBuilder, shape: SnesUsCartShape, steps: int) -> voi
 			PackedFloat32Array([end, end, under, under]), whole)
 
 
-## Adds each groove round the wings and the back: across the back (either side of the sticker's
-## recess when it crosses it), and round each wing's side and face, into the raised body.
 static func _grooves(mesh: MeshBuilder, shape: SnesUsCartShape) -> void:
 	var off := SnesUsCartShape.DARK_OFF
 	var half := shape.width / 2.0 + off
@@ -80,7 +77,6 @@ static func _grooves(mesh: MeshBuilder, shape: SnesUsCartShape) -> void:
 			ShapeGeometry.prism(mesh, _band(span, band), -0.5, shape.wings() + off)
 
 
-## The outline from [param across].x to .y, and from [param up].x to .y.
 static func _band(across: Vector2, up: Vector2) -> PackedVector2Array:
 	return ShapeGeometry.square(Rect2(across.x, up.x, across.y - across.x, up.y - up.x))
 

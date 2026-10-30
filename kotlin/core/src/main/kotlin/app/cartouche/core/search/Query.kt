@@ -5,9 +5,9 @@ import arrow.core.Option
 import arrow.core.Some
 
 /**
- * What is typed on the ribbon, read as titles are ([Words]): the words already typed, [done], and
- * the one being typed, [typing], empty right after a space. Each word typed is the start of another
- * word of a title, in any order: "ace dist" and "dist ace" both find "Ace Combat - Distant Thunder".
+ * What is typed on the ribbon, read as titles are ([Words]): the words already typed, [done], and the one being
+ * typed, [typing], empty right after a space. Each word typed is the start of another word of a title, in any order:
+ * "ace dist" and "dist ace" both find "Ace Combat - Distant Thunder".
  */
 public class Query private constructor(internal val done: List<String>, internal val typing: String) {
     /** Every word typed, the one being typed included unless it is still empty. */

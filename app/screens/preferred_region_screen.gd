@@ -63,7 +63,6 @@ func open(current: String, regions: PackedStringArray) -> void:
 	(_cards.get_child(maxi(_choices.find(current), 0)) as Control).grab_focus()
 
 
-
 func _choose(region: String) -> void:
 	Sounds.play(SoundEffects.Cue.SELECT)
 	chosen.emit(region)

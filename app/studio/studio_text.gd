@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name StudioText
 extends RefCounted
-## One line of text in a Studio face at its fractional size and em tracking, laid out to the browser's width.
+## One line of text in a Studio face at its fractional size and em tracking, laid out to its exact width.
 ## Godot's font sizes and glyph spacing are whole pixels, which drifts a string by up to 20 px; so the glyphs
 ## are shaped once on an MSDF twin of the face (exact advances at any size, no raster at the shaping size),
 ## placed at their exact x, and drawn from the raster face at the nearest whole size with no scale (a scale
-## near 1 blurs them). [member width] is the CSS box's width.
+## near 1 blurs them).
 
 ## The shaping size: the twin's advances are exact at it.
 const _SHAPE_SIZE := 4096
-## The CSS line box: every Studio text is 1.5 times its size tall.
+## The line box: every Studio text is 1.5 times its size tall.
 const _LINE_HEIGHT := 1.5
 const _ELLIPSIS := "…"
 const _FILES: Array[String] = [
@@ -24,13 +24,13 @@ const _FILES: Array[String] = [
 static var _faces: Dictionary[StudioTokens.Face, Array] = {}
 
 var text: String
-## The width of the CSS box, the tracking after the last letter included; less once [method fit] cut it.
+## The line's width, the tracking after the last letter included; less once [method fit] cut it.
 var width := 0.0
-## The CSS line box's height.
+## The line box's height.
 var height: float
-## The baseline from the line box's top, half the leading above the font's ascent, as the browser sets it.
+## The baseline from the line box's top, half the leading above the font's ascent.
 var baseline: float
-## The font's ascent at this size, as the browser sets a line's baseline from its box's top: rounded.
+## The font's ascent at this size, rounded, which sets the baseline from the box's top.
 var ascent: float
 
 var _face_id: StudioTokens.Face
@@ -81,11 +81,11 @@ func _init(shown: String, face: StudioTokens.Face, px: float, tracking_em := 0.0
 	_display = fonts[0]
 	_measure = fonts[1]
 	var features := {"tnum": 1} if tabular else {}
-	# Chromium leaves optional ligatures out between letters spaced apart.
+	# Letters spaced apart take no optional ligatures.
 	if tracking_em != 0.0:
 		features["liga"] = 0
 	height = px * _LINE_HEIGHT
-	# The raster face's metrics are the font's own, as the browser reads them; the twin's are padded.
+	# The raster face's metrics are the font's own; the twin's are padded.
 	var raw_ascent := _display.get_ascent(_SHAPE_SIZE) * px / _SHAPE_SIZE
 	ascent = roundf(raw_ascent)
 	baseline = (height - (raw_ascent + _display.get_descent(_SHAPE_SIZE) * px / _SHAPE_SIZE)) / 2.0 + raw_ascent

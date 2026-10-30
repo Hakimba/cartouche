@@ -63,15 +63,16 @@ theme_override_constants/separation = 60
 custom_minimum_size = Vector2(300, 340)
 layout_mode = 2
 script = ExtResource("2")
+value = &"xbox"
 
 [node name="Nintendo" type="Control" parent="Cards"]
 custom_minimum_size = Vector2(300, 340)
 layout_mode = 2
 script = ExtResource("2")
-style = &"nintendo"
+value = &"nintendo"
 
 [node name="PlayStation" type="Control" parent="Cards"]
 custom_minimum_size = Vector2(300, 340)
 layout_mode = 2
 script = ExtResource("2")
-style = &"playstation"
+value = &"playstation"

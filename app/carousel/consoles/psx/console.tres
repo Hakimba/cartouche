@@ -12,3 +12,4 @@ model_name = "Original"
 scene = "res://carousel/consoles/psx/psx.tscn"
 launch = "res://carousel/consoles/psx/launch.json"
 triangle_budget = 12000
+ring_size = Vector2(1.816, 0.044)

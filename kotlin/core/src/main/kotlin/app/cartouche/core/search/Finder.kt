@@ -21,16 +21,16 @@ public data class Group(public val label: String, public val start: Int)
 public data class Mark(public val start: Int, public val length: Int)
 
 /**
- * What the carousel shows: [games], as positions in the shelf's order; the index's [groups] of them
- * (none while searching); and each key of the ribbon that leads to a game (a letter, a digit, a
- * space) with the position among [games] it brings the carousel to.
+ * What the carousel shows: [games], as positions in the shelf's order; the index's [groups] of them (none while
+ * searching); and each key of the ribbon that leads to a game (a letter, a digit, a space) with the position among
+ * [games] it brings the carousel to.
  */
 public data class View(public val games: List<Int>, public val groups: List<Group>, public val keys: Map<Char, Int>)
 
 /**
- * The index and the search of one shelf's games, given in the shelf's order: each title is read
- * once, when the finder is made. Total; what it found for the words typed lately is kept to answer
- * the next keys sooner, which changes no answer.
+ * The index and the search of one shelf's games, given in the shelf's order: each title is read once, when the finder
+ * is made. Total; what it found for the words typed lately is kept to answer the next keys sooner, which changes no
+ * answer.
  */
 public class Finder private constructor(private val titles: List<Title>) {
     /** How many games the shelf has. */
@@ -65,8 +65,8 @@ public class Finder private constructor(private val titles: List<Title>) {
     }
 
     /**
-     * The games whose title has, for each word of [query], another word starting with it, in shelf
-     * order; and each key that, typed next, still finds a game, with the first game it finds.
+     * The games whose title has, for each word of [query], another word starting with it, in shelf order; and each
+     * key that, typed next, still finds a game, with the first game it finds.
      */
     public fun search(query: Query): View {
         val text = query.text
@@ -130,7 +130,6 @@ public class Finder private constructor(private val titles: List<Title>) {
             },
         )
 
-        /** The start of the group of [key]'s letter, or of the next letter's (for a digit, of the first other group), else 0. */
         private fun letterStart(groups: List<Group>, key: Char): Int {
             val letter = key.uppercaseChar().toString()
             val starts =
@@ -150,8 +149,8 @@ public class Finder private constructor(private val titles: List<Title>) {
 }
 
 /**
- * The finders of [library]'s shelves, made all at once when one is first asked for, or by [prepare].
- * Safe to ask from any thread; asked for while [prepare] makes them, they wait for it.
+ * The finders of [library]'s shelves, made all at once when one is first asked for, or by [prepare]. Safe to ask from
+ * any thread; asked for while [prepare] makes them, they wait for it.
  */
 public class Finders(private val library: Library) {
     private val byPlatform: Map<PlatformId, Finder> by lazy {
@@ -165,8 +164,8 @@ public class Finders(private val library: Library) {
     public fun size(platform: PlatformId): Int = of(platform).fold({ 0 }, Finder::size)
 
     /**
-     * What the carousel shows of [platform]'s shelf: the games found for [typed], or with nothing
-     * typed (or only signs) the index in [order]; nothing for a platform without games.
+     * What the carousel shows of [platform]'s shelf: the games found for [typed], or with nothing typed (or only
+     * signs) the index in [order]; nothing for a platform without games.
      */
     public fun view(platform: PlatformId, order: Order, typed: String): View = of(platform).fold({
         View(emptyList(), emptyList(), emptyMap())
@@ -182,8 +181,8 @@ public class Finders(private val library: Library) {
     }
 
     /**
-     * These finders if [kept] searches the same (a game launched, a label chosen: the same titles,
-     * names, regions and consoles), else new ones for it.
+     * These finders if [kept] searches the same (a game launched, a label chosen: the same titles, names, regions and
+     * consoles), else new ones for it.
      */
     public fun after(kept: Library): Finders {
         val same = kept.games.size == library.games.size && kept.games.zip(library.games).all { (a, b) -> searchSame(a, b) }

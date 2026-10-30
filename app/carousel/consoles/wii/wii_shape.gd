@@ -25,8 +25,8 @@ const DOOR_WELL := 3.0
 const DOOR_GAP := 0.4
 const DOOR_THICKNESS := 1.2
 const DOOR_SWING := 100.0
-## The sync button behind the door, at the top of its opening, estimated from the photo of the door
-## open: how far it keeps from the door's sides and top, and its height.
+## The sync button behind the door, at the top of its opening: how far it keeps from the door's sides
+## and top, and its height.
 const SYNC_INSET := Vector2(1.0, 2.0)
 const SYNC_HEIGHT := 4.0
 ## The gap between the stand and the slab, and the stand's rounded edges.
@@ -278,16 +278,13 @@ func _rules() -> Dictionary[StringName, bool]:
 		&"slot_on_the_front": slot_gap > 0.5 and slot_gap < slot_rim - 2.0 * RIM_BEVEL - 0.2,
 		&"disc_through_the_slot": gap().size.y > 2.0 * (disc_radius + 1.0)
 			and disc_depth > front_depth + disc_radius and disc_depth + disc_radius < depth - back_depth,
-		# The door, wider than its sync button, swings open clear of the buttons and the slot.
 		&"front_parts_apart": door().size.x > 4.0 and door().size.y > 8.0 and ShapeGeometry.apart(front, flat)
 			and ShapeGeometry.apart([button(0), button(1), button(2), slot(), door_sweep().merge(door_opening())],
 			flat.merge(door_sweep()), 1.0),
-		# Each longer and wider than its two corners.
 		&"flaps_on_the_top": memory_flap.x > back_depth + 0.5
 			and memory_flap.y - memory_flap.x > 2.0 * FLAP_CORNER + 0.2 and controller_flap.x > memory_flap.y + 1.0
 			and controller_flap.y - controller_flap.x > 2.0 * FLAP_CORNER + 0.2
 			and controller_flap.y < depth - front_depth - 0.5 and flap(memory_flap).size.x > 2.0 * FLAP_CORNER + 0.2,
-		# Below the front's parts.
 		&"stand_wraps_the_foot": stand_wall > STAND_BEVEL + STAND_GAP + 0.1
 			and stand_height > 2.0 * STAND_BEVEL + 0.1 and stand_sink > 0.5 and stand_sink < stand_height - 1.0
 			and front.all(func(part: Rect2) -> bool: return part.position.y > bottom() + stand_sink + 0.5)

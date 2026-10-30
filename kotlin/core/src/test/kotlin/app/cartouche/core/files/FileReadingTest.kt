@@ -96,7 +96,7 @@ class FileReadingTest {
     }
 
     @Test
-    fun `INV-E11-03 reading never fails, never asks for bytes outside the file, and has no way to write`() = runBlocking<Unit> {
+    fun `INV-03 reading never fails, never asks for bytes outside the file, and has no way to write`() = runBlocking<Unit> {
         val fixtures =
             (READABLE_CHDS + "dvd-runs.chd" + "cd-cdfl.chd" + "disc.iso" + "disc-crowded.iso" + "disc.bin").associateWith(
                 ::image,

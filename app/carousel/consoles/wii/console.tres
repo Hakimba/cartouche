@@ -12,3 +12,4 @@ model_name = "RVL-001"
 scene = "res://carousel/consoles/wii/wii.tscn"
 launch = "res://carousel/consoles/wii/launch.json"
 triangle_budget = 10000
+ring_size = Vector2(2.194, 0.068)

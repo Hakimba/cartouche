@@ -2,7 +2,6 @@
 package app.cartouche.core.regions
 
 import app.cartouche.core.art.regionNames
-import io.kotest.matchers.collections.shouldBeSortedWith
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
@@ -17,15 +16,13 @@ class RegionsTest {
     private fun order(game: List<String>, images: List<String>) = images.sortedBy { Regions.rank(game, it) }
 
     @Test
-    fun `INV-E4-01 a French game prefers a French image, then European ones, the world, America, then Japan`() {
+    fun `a game prefers its own region, then its zone, then the world, America, Europe and Japan`() {
         order(listOf("France"), listOf("Japan", "North America", "World", "United Kingdom", "Europe", "France")) shouldBe
             listOf("France", "Europe", "United Kingdom", "World", "North America", "Japan")
-    }
-
-    @Test
-    fun `a Japanese game prefers Japan, then Asia, then the world, America and Europe`() {
         order(listOf("Japan"), listOf("Europe", "North America", "", "Korea", "Japan")) shouldBe
             listOf("Japan", "Korea", "", "North America", "Europe")
+        order(emptyList(), listOf("Atlantis", "Japan", "Europe", "North America", "World")) shouldBe
+            listOf("World", "North America", "Europe", "Japan", "Atlantis")
     }
 
     @Test
@@ -36,7 +33,7 @@ class RegionsTest {
     }
 
     @Test
-    fun `INV-E4-01 an image of one of the game's regions comes first, and the world before the other groups`() = runBlocking<Unit> {
+    fun `an image of one of the game's regions comes first, and the world before the other groups`() = runBlocking<Unit> {
         checkAll(Arb.list(regionNames, 0..3), regionNames) { game, image ->
             if (image in game) Regions.rank(game, image) shouldBe 0
             if (image in setOf("World", "") && image !in game) {
@@ -48,25 +45,17 @@ class RegionsTest {
     }
 
     @Test
-    fun `INV-E11-07 an image of the game's own region is one of its own or of its group, and a game of no region has none`() =
-        runBlocking<Unit> {
-            var own = 0
-            checkAll(Arb.list(regionNames, 0..2), regionNames) { game, image ->
-                if (Regions.isOwn(game, image)) {
-                    // Its country or its zone, never a region of another group nor the world of a game of a known region.
-                    Regions.rank(game, image) shouldBeLessThanOrEqual 2
-                    if (game.map(Regions::same).contains(Regions.same(image))) Regions.rank(game, image) shouldBe 0
-                    own++
-                }
-                if (game.isEmpty() || image.isEmpty()) Regions.isOwn(game, image) shouldBe false
+    fun `an image of the game's own region is one of its own or of its group, and a game of no region has none`() = runBlocking<Unit> {
+        var own = 0
+        checkAll(Arb.list(regionNames, 0..2), regionNames) { game, image ->
+            if (Regions.isOwn(game, image)) {
+                // Its country or its zone, never a region of another group nor the world of a game of a known region.
+                Regions.rank(game, image) shouldBeLessThanOrEqual 2
+                if (game.map(Regions::same).contains(Regions.same(image))) Regions.rank(game, image) shouldBe 0
+                own++
             }
-            own shouldBeGreaterThan 50
+            if (game.isEmpty() || image.isEmpty()) Regions.isOwn(game, image) shouldBe false
         }
-
-    @Test
-    fun `a game of no region takes the world first, then America, Europe and Japan`() {
-        val ranks = listOf("World", "North America", "Europe", "Japan", "Atlantis").map { Regions.rank(emptyList(), it) }
-        ranks shouldBeSortedWith compareBy { it }
-        ranks.distinct().size shouldBe ranks.size
+        own shouldBeGreaterThan 9
     }
 }

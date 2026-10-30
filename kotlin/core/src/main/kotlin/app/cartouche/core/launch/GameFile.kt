@@ -10,8 +10,8 @@ import arrow.core.Option
 public enum class RunningInstance { KEEP, STOP }
 
 /**
- * A game file as the launcher sees it. [uri] is readable once granted; [path] is its filesystem path,
- * when it has one (templates using `{file.path}` need it).
+ * A game file as the launcher sees it. [uri] is readable once granted; [path] is its filesystem path, when it has one
+ * (templates using `{file.path}` need it).
  */
 public data class GameFile(public val name: FileName, public val uri: ContentUri, public val path: Option<FilePath>) {
     /** Values of the template placeholders; `file.path` is absent without a path. */

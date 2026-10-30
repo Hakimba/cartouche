@@ -26,7 +26,7 @@ const SHOULDER_SHARE := 0.75
 const HUMP_CORNER := 6.0
 const HUMP_BEVEL := 2.5
 const HUMP_GAP := 0.5
-## How the bottom bows: flatter in the middle than a parabola, as measured.
+## How the bottom bows: flatter in the middle than a parabola.
 const BELLY_POWER := 2.3
 ## The screen's lens and its corners, bottom and top; the plate with the maker's name above it.
 const BEZEL_CORNERS := Vector2(11.0, 5.0)
@@ -433,7 +433,6 @@ func mark(part: StringName) -> Transform2D:
 	return Transform2D(0.0, controls[0 if part == &"a_label" else 1].get_center())
 
 
-## The speaker's slits, as outlines.
 func slits() -> Array[PackedVector2Array]:
 	var found: Array[PackedVector2Array] = []
 	var centre := on_face(SPEAKER, true)

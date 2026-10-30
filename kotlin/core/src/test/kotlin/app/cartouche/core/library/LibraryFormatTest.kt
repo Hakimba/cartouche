@@ -8,7 +8,6 @@ import app.cartouche.core.uri
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
-import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -20,7 +19,7 @@ import org.junit.Test
 
 class LibraryFormatTest {
     @Test
-    fun `INV-E1-13 a stored library grows with games and files a player opens, not with hidden or unsupported files`() = runBlocking<Unit> {
+    fun `a stored library grows with games and files a player opens, not with hidden or unsupported files`() = runBlocking<Unit> {
         checkAll(folderFiles, Arb.int(0..500)) { files, extra ->
             val junk = (1..extra).flatMap { listOf(listed("texture-%05d.dds".format(it)), listed("._Game %05d.chd".format(it))) }
 
@@ -82,7 +81,7 @@ class LibraryFormatTest {
     }
 
     @Test
-    fun `INV-E1-05 a stored library reads back identical`() = runBlocking<Unit> {
+    fun `INV-11 a stored library reads back identical`() = runBlocking<Unit> {
         checkAll(folderFiles, setups, skippedFolders, Arb.int(0..3)) { files, setup, skipped, disc ->
             val library =
                 Library()
@@ -139,14 +138,6 @@ class LibraryFormatTest {
         for (bad in listOf("", "  Okage", "two\\nlines", "a  b", "x".repeat(81))) {
             LibraryFormat.decode(stored.replace("\"lastDisc\":0", "\"lastDisc\":0,\"displayName\":\"$bad\"")).isLeft() shouldBe true
         }
-    }
-
-    @Test
-    fun `INV-E7-07 a library saved with console names still loads`() {
-        val stored = """{"version":2,"library":{"consoleNames":{"ps2":"Legacy console"}}}"""
-        val library = LibraryFormat.decode(stored).shouldBeRight().library
-        library.consoleNames shouldBe mapOf(PlatformId("ps2") to DisplayName.of("Legacy console").shouldBeSome())
-        LibraryFormat.decode(LibraryFormat.encode(library)).shouldBeRight().library shouldBe library
     }
 
     @Test

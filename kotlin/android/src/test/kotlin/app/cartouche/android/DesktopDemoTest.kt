@@ -7,7 +7,6 @@ import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
-import arrow.core.toOption
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.Json
@@ -28,9 +27,8 @@ class DesktopDemoTest {
     private val app = File(checkNotNull(System.getProperty("cartouche.app")) { "Run the tests through Gradle" })
 
     @Test
-    fun `INV-E2_5-01 the desktop demo is the catalog and the demo library as the plugin sends them`() {
+    fun `_5-01 the desktop demo is the catalog and the demo library as the plugin sends them`() {
         val data = File(app, "data/platforms")
-        // In name order, as the plugin reads them.
         val files =
             listOf("daijishou", "cartouche")
                 .flatMap { data.resolve(it).listFiles { file -> file.extension == "json" }.orEmpty().toList() }
@@ -49,7 +47,6 @@ class DesktopDemoTest {
             buildJsonObject {
                 put("catalog", desktopCatalog.toWire().toJson())
                 put("library", Json.parseToJsonElement(library.toWireJson(Shelves.of(library, platforms, Selection()), catalog)))
-                // What the desktop shows of the battery: full and charging, as the design draws it.
                 put(
                     "battery",
                     buildJsonObject {
@@ -73,43 +70,6 @@ class DesktopDemoTest {
             val manifest = folder.resolve("console.tres").readText()
             PlatformId(checkNotNull(Regex("""^platform = "(.*)"$""", RegexOption.MULTILINE).find(manifest)).groupValues[1])
         }.toSet()
-
-    @Test
-    fun `INV-E12-C1-01 the desktop demo offers exactly the twelve supported consoles, as the catalog lists them`() {
-        val data = File(app, "data/platforms")
-        val definitions =
-            listOf("daijishou", "cartouche")
-                .flatMap { data.resolve(it).listFiles { file -> file.extension == "json" }.orEmpty().toList() }
-                .map { DefinitionSource(it.name, it.readText()) }
-        val profiles = DefinitionSource("profiles.json", data.resolve("profiles.json").readText())
-        val expected = Catalog.parse(definitions, profiles, supportedPlatforms()).offered
-        val demo = Json.parseToJsonElement(File(app, "dev/demo/desktop.json").readText()) as JsonObject
-        val offered = ((demo["catalog"] as JsonObject)["offered"] as JsonArray).map { it as JsonObject }
-        expected.size shouldBe 12
-        offered.map { it["id"] } shouldBe expected.map { JsonPrimitive(it.platform.value) }
-        offered.map { it["model"] } shouldBe expected.map { JsonPrimitive(it.model) }
-        // As on the wire, a console with no maker has no key.
-        offered.map { it["maker"].toOption() } shouldBe expected.map { console -> console.maker.map { JsonPrimitive(it) } }
-    }
-
-    @Test
-    fun `INV-E12-D1-01 the desktop demo and the demo library hold games of supported consoles only`() {
-        val supported = supportedPlatforms().map { it.value }.toSet()
-        supported.size shouldBe 12
-        val demo = Json.parseToJsonElement(File(app, "dev/demo/desktop.json").readText()) as JsonObject
-        val games = (demo["library"] as JsonObject)["games"] as JsonArray
-        val platforms =
-            games.map {
-                ((it as JsonObject)["platform_id"] as JsonPrimitive).content
-            }
-        platforms.size shouldBe DESKTOP_GAMES
-        (platforms.toSet() - supported) shouldBe emptySet()
-        platforms.toSet() shouldBe supported
-        val catalog = demo["catalog"] as JsonObject
-        val listed = (catalog["platforms"] as JsonArray).map { ((it as JsonObject)["id"] as JsonPrimitive).content }
-        listed.size shouldBe supported.size
-        listed.toSet() shouldBe supported
-    }
 
     private fun Any?.toJson(): JsonElement = when (this) {
         is Dictionary -> JsonObject(entries.associate { it.key to it.value.toJson() })

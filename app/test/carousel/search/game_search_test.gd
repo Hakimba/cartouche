@@ -264,7 +264,7 @@ func test_a_view_of_another_library_is_set_aside() -> void:
 	assert_str(_shown(carousel)).is_equal("Bouncer")
 
 
-func test_INV_E9_03_whatever_is_pressed_a_launches_the_game_shown_and_b_out_of_the_ribbon_goes_back_where_it_opened() -> void:
+func test_inv_04_whatever_is_pressed_a_launches_the_game_shown_and_b_out_of_the_ribbon_goes_back_where_it_opened() -> void:
 	for titles: Array in [TITLES, ["Ace Combat Zero", "Bouncer", "Combat Ace"]]:
 		await _walk(titles)
 
@@ -316,7 +316,6 @@ func _walk(titles: Array) -> void:
 	assert_int(backs).is_greater(10)
 	assert_int(launches_checked).is_greater(10)
 	assert_int(filtered_launches).is_greater(4)
-
 
 
 ## Searches a shelf as the core does, plainly: each word typed starts another word of the title,

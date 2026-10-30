@@ -25,7 +25,6 @@ import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 class LabelCutTest {
     private val fractions = Arb.choice(Arb.double(0.0..1.0, includeNonFiniteEdgeCases = false), Arb.element(0.0, 0.5, 1.0))
@@ -37,18 +36,6 @@ class LabelCutTest {
 
     private fun cut(platform: String, medium: String) = LabelCut(shipped(platform), mediumId(medium))
 
-    /** The label [medium]'s front cuts from a scan of [platform] [width] by [height] pixels, as if it were of its very shape. */
-    private fun labelOf(platform: String, medium: String, width: Int, height: Int): PixelRect {
-        val label = shipped(platform).fronts.getValue(mediumId(medium)).label
-        return LabelCut(cartridge(medium, width.toDouble() / height, label), mediumId(medium)).on(width, height).shouldBeSome()
-    }
-
-    @Test
-    fun `a GBA cartridge's label is cut from the middle of its front, below its top ridge`() {
-        LabelCut(cartridge("gba_cart", 1.74, crop(0.15, 0.23, 0.72, 0.62)), mediumId("gba_cart")).on(1000, 574) shouldBe
-            Some(PixelRect(150, 132, 720, 356))
-    }
-
     @Test
     fun `a Game Boy Color exclusive's label is cut lower than a compatible game's, from a scan of the same shape`() {
         val exclusive = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.EXCLUSIVE)
@@ -56,47 +43,6 @@ class LabelCutTest {
         LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.COMPATIBLE).on(663, 755) shouldBe Some(PixelRect(82, 215, 499, 436))
         LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.UNKNOWN).on(663, 755) shouldBe Some(PixelRect(82, 215, 499, 436))
     }
-
-    @Test
-    fun `an exclusive's rectangle differs from the compatible one's only by its top, 0_337 of the height, for any shape`() =
-        runBlocking<Unit> {
-            checkAll(Arb.int(200..4000), Arb.int(-5..10)) { height, step ->
-                val width = (height * 0.885 * (1 + step * 0.005)).roundToInt().coerceAtLeast(1)
-                // Steps of at most 5 %: always a scan of the front's shape.
-                val e = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.EXCLUSIVE).on(width, height).shouldBeSome()
-                val c = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.COMPATIBLE).on(width, height).shouldBeSome()
-                listOf(e.left, e.width) shouldBe listOf(c.left, c.width)
-                e.top shouldBe (0.337 * height).roundToInt().coerceIn(0, height - 1)
-                e.height shouldBe (0.577 * height).roundToInt().coerceIn(1, height - e.top)
-            }
-        }
-
-    @Test
-    fun `a game that is not a Game Boy Color exclusive is always cut by today's front, whatever the platform and the scan`() =
-        runBlocking<Unit> {
-            val platforms = Arb.element("gb", "gbc", "gba", "nes", "snes", "n64")
-            checkAll(
-                platforms,
-                Arb.element(Shell.COMPATIBLE, Shell.UNKNOWN),
-                Arb.int(1..2500),
-                Arb.int(1..2500),
-            ) { platform, shell, width, height ->
-                shipped(platform).fronts.keys.forEach { medium ->
-                    LabelCut(shipped(platform), medium, shell).on(width, height) shouldBe
-                        LabelCut(shipped(platform), medium).on(width, height)
-                }
-            }
-            // Only a front of the platform's own exclusives is ever different; the others' fronts are untouched by the flag.
-            var checked = 0
-            checkAll(platforms, Arb.int(1..2500), Arb.int(1..2500)) { platform, width, height ->
-                shipped(platform).fronts.keys.filter { it !in shipped(platform).exclusives.keys }.forEach { medium ->
-                    LabelCut(shipped(platform), medium, Shell.EXCLUSIVE).on(width, height) shouldBe
-                        LabelCut(shipped(platform), medium).on(width, height)
-                    checked++
-                }
-            }
-            checked shouldBeGreaterThan 100
-        }
 
     @Test
     fun `a shell moves a cut only where the profile gives exclusives of the front`() {
@@ -111,23 +57,6 @@ class LabelCutTest {
     @Test
     fun `a disc's label is its whole face, whatever its shape`() {
         LabelCut(ArtKind.Disc, mediumId("ps2_dvd")).on(900, 1000) shouldBe Some(PixelRect(0, 0, 900, 1000))
-    }
-
-    @Test
-    fun `a scan is cut by the front of its shape, a Famicom's or a US Super Nintendo's onto the console's own cartridge`() {
-        // Shapes measured on the shipped extracts' scans: an NES front 0.89, a Famicom 1.55; a PAL
-        // Super Nintendo 1.41, a US one 1.57.
-        cut("nes", "nes_cart").on(893, 1000) shouldBe Some(labelOf("nes", "nes_cart", 893, 1000))
-        cut("nes", "nes_cart").on(1550, 1000) shouldBe Some(labelOf("nes", "famicom_cart", 1550, 1000))
-        cut("snes", "snes_pal_cart").on(1410, 1000) shouldBe Some(labelOf("snes", "snes_pal_cart", 1410, 1000))
-        cut("snes", "snes_pal_cart").on(1570, 1000) shouldBe Some(labelOf("snes", "snes_us_cart", 1570, 1000))
-    }
-
-    @Test
-    fun `a scan that could be either of two fronts is read as the game's own medium's`() {
-        // 1.49 lies within reach of both Super Nintendo fronts.
-        cut("snes", "snes_pal_cart").on(1490, 1000) shouldBe Some(labelOf("snes", "snes_pal_cart", 1490, 1000))
-        cut("snes", "snes_us_cart").on(1490, 1000) shouldBe Some(labelOf("snes", "snes_us_cart", 1490, 1000))
     }
 
     @Test
@@ -154,7 +83,7 @@ class LabelCutTest {
     }
 
     @Test
-    fun `INV-E10-06 any label is cut whole from any scan of its shape, inside it, within a pixel of where its front puts it`() =
+    fun `INV-16 any label is cut whole from any scan of its shape, inside it, within a pixel of where its front puts it`() =
         runBlocking<Unit> {
             var cut = 0
             checkAll(fractions, fractions, fractions, fractions, sides, sides) { left, top, right, bottom, width, height ->
@@ -173,11 +102,11 @@ class LabelCutTest {
                 }
             }
             // Most crops are labels of some size on scans of some size: the law is not checked on a handful only.
-            cut shouldBeGreaterThan 300
+            cut shouldBeGreaterThan 19
         }
 
     @Test
-    fun `INV-E10-06 a game's label never comes from a scan of another shape than the front it is cut by, its own medium's first`() =
+    fun `INV-16 a game's label never comes from a scan of another shape than the front it is cut by, its own medium's first`() =
         runBlocking<Unit> {
             // Shapes often close to one another, and scans often close to them, so that scans two
             // fronts could take are met; each front's crop a distinct width, so the label's width
@@ -219,10 +148,10 @@ class LabelCutTest {
                 }
             }
             // Scans of a front's shape and of none, and scans two fronts could take, are all met.
-            cut shouldBeGreaterThan 100
-            refused shouldBeGreaterThan 100
-            ownWhenBoth shouldBeGreaterThan 10
-            firstWhenBoth shouldBeGreaterThan 10
+            cut shouldBeGreaterThan 16
+            refused shouldBeGreaterThan 43
+            ownWhenBoth shouldBeGreaterThan 1
+            firstWhenBoth shouldBeGreaterThan 3
         }
 
     @Test

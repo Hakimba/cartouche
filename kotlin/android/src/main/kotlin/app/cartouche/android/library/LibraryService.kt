@@ -102,10 +102,8 @@ internal data class ScanReport(
 )
 
 /**
- * The library and the selection, held in memory and in their files. Not thread-safe but for
- * [finders]: the plugin runs every call on one single-threaded dispatcher, in the order the calls
- * arrive. A launch reads its choice, starts the emulator on the main thread, then records its disc:
- * other calls can run in between.
+ * Not thread-safe but for [finders]: the plugin runs every call on one single-threaded dispatcher. A launch reads its choice, starts the
+ * emulator on the main thread, then records its disc: other calls can run in between.
  */
 internal class LibraryService(
     private val store: LibraryStore,
@@ -182,9 +180,8 @@ internal class LibraryService(
     }
 
     /**
-     * Removes [platform]: its choices, games and what its scans set aside, what the selection
-     * remembers of it, and the access to its folder unless another platform uses it. The files in
-     * the folder are not touched.
+     * Removes [platform]: its choices, games and what its scans set aside, what the selection remembers of it, and
+     * the access to its folder unless another platform uses it. The files in the folder are not touched.
      */
     fun remove(platform: PlatformId): Either<LibraryFailure, Library> = either {
         // The selection first: one left remembering a platform that stayed only starts it from its first game.
@@ -193,8 +190,8 @@ internal class LibraryService(
     }
 
     /**
-     * The games whose art is kept: those of the library; none when it could not be read, as its
-     * games are not known then.
+     * The games whose art is kept: those of the library; none when it could not be read, as its games are not known
+     * then.
      */
     fun gamesWithArt(): Option<Set<GameId>> {
         // Read first: whether it could be is known once it is.
@@ -202,7 +199,6 @@ internal class LibraryService(
         return if (loadProblem.isSome()) None else Some(games.mapTo(HashSet()) { it.id })
     }
 
-    /** Saves [selection] if it changed. */
     private fun remember(selection: Selection): Either<LibraryFailure, Selection> = either {
         if (selection != selection()) {
             val started = TimeSource.Monotonic.markNow()
@@ -213,11 +209,7 @@ internal class LibraryService(
         selection
     }
 
-    /**
-     * Keeps the access to the folders of [library]'s platforms only; a failure only leaves some
-     * access kept. Not while the library could not be read: the folders of the one set aside are
-     * not known.
-     */
+    /** Not while the library could not be read: the folders of the one set aside are not known. */
     private fun keepFoldersOf(library: Library) {
         if (loadProblem.isSome()) return
         folders
@@ -227,8 +219,8 @@ internal class LibraryService(
     }
 
     /**
-     * Lists [platform]'s folder, reads its game files new or changed since the last scan (see
-     * [factsOf]) and replaces its games with what the scan finds.
+     * Lists [platform]'s folder, reads its game files new or changed since the last scan (see [factsOf]) and replaces
+     * its games with what the scan finds.
      */
     fun scan(platform: Platform, titles: TitleIndex, dataFolders: DataFolders): Either<LibraryFailure, Pair<Library, ScanReport>> = either {
         val (scan, report) = found(platform, library().setup(platform.id), titles, dataFolders) { factsOf(platform.id, it) }.bind()
@@ -236,8 +228,8 @@ internal class LibraryService(
     }
 
     /**
-     * How many games a scan of [platform] with [setup] would find, its files identified by what they
-     * told at the last scan: no file is read, nothing is saved.
+     * How many games a scan of [platform] with [setup] would find, its files identified by what they told at the last
+     * scan: no file is read, nothing is saved.
      */
     fun preview(
         platform: Platform,
@@ -247,7 +239,6 @@ internal class LibraryService(
     ): Either<LibraryFailure, ScanReport> =
         found(platform, setup, titles, dataFolders) { facts.load(platform.id).mapValues { it.value.facts } }.map { it.second }
 
-    /** The scan of [setup]'s folder, its files' facts as [told] gives them for its listing. */
     private fun found(
         platform: Platform,
         setup: PlatformSetup,
@@ -291,11 +282,7 @@ internal class LibraryService(
         scan to report
     }
 
-    /**
-     * What [listing]'s files tell of themselves, those [FileReading] reads for [platform]: as kept
-     * for a file of the same stamp, read now for the others, then kept for the next scan. A file that
-     * cannot be opened or read tells nothing, and is read again at the next scan.
-     */
+    /** A file that cannot be opened or read tells nothing, and is read again at the next scan. */
     private fun factsOf(platform: PlatformId, listing: FolderListing): Map<ContentUri, FileFacts> {
         val kept = facts.load(platform)
         val known =
@@ -317,7 +304,10 @@ internal class LibraryService(
     /** Forgets what the game files told: every one is read again at its platform's next scan. */
     fun forgetFacts(): Either<StorageFailure, Unit> = facts.forget()
 
-    /** What launching game [id] takes: [disc] (an index) if given, else the disc launched last, and its platform's choices. */
+    /**
+     * What launching game [id] takes: [disc] (an index) if given, else the disc launched last, and its platform's
+     * choices.
+     */
     fun launchChoice(id: GameId, disc: Option<Int>): Either<LibraryFailure, LaunchChoice> = either {
         val game = library().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id)) }
         val index = disc.getOrElse { game.lastDisc }
@@ -347,7 +337,10 @@ internal class LibraryService(
         save(library().withConsoleOrder(order)).bind()
     }
 
-    /** Puts [platform]'s console at [gap] among the others shown ([Library.withConsoleAt]), [platforms] being the catalog's, and keeps the order. */
+    /**
+     * Puts [platform]'s console at [gap] among the others shown ([Library.withConsoleAt]), [platforms] being the
+     * catalog's, and keeps the order.
+     */
     fun placeConsole(platform: PlatformId, gap: Int, platforms: List<PlatformId>): Either<LibraryFailure, Library> = either {
         save(library().withConsoleAt(platform, gap, platforms).mapLeft(LibraryFailure::Placement).bind()).bind()
     }

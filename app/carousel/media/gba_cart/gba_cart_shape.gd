@@ -275,26 +275,20 @@ func _rules() -> Dictionary[StringName, bool]:
 			and label_size.y > 2.0 * LABEL_CORNER and arrow.x > 0.0 and arrow.y > 0.0 and stripe_width > 0.0
 			and panel_size.x > 0.0 and panel_size.y > 0.0 and chamfer.x > 0.0 and chamfer.y > 0.0 and shoulder > 0.0
 			and sleeve_inset > 0.0 and hump.x >= 0.0,
-		# Each layer thicker than its bevels and than the deepest recess in it; the hump above the
-		# head's ends by more than its top's roll.
 		&"layers_fit": plate_depth > maxf(SCREW_SINK, DIMPLE_DEPTH) + BEVEL + 0.1
 			and plate_depth > SLEEVE_STEP + BEVEL + 0.1 and plate_depth > PANEL_DEPTH + 0.3
 			and body_depth - plate_depth > chamfer.y + BEVEL + 0.1 and chamfer.y > BEVEL and chamfer.x > BEVEL
 			and body_depth - plate_depth > maxf(RECESS, SHALLOW) + CONNECTOR.y / 2.0 + 0.5
 			and peak() - head_front() > ROLL + 0.2 and head_front() - ROLL > joint() + 0.1,
-		# The head's and the body's corners, the sleeve and the chamfer's taper, each on its side.
 		&"outline_fits": corner > BEVEL and head_drop > corner + HEAD_CORNER + ROLL + 0.1 and half > maxf(chamfer.x, BOTTOM_CORNER) + 2.0
 			and height - head_drop > sleeve_height + 0.5 and sleeve_height > BOTTOM_CORNER + FILLET + 0.1
 			and BOTTOM_CORNER + 0.1 < TAPER and TAPER < height - head_drop - 0.5
 			and half - sleeve_inset > BOTTOM_CORNER + 1.0,
-		# The hump's flat middle within it, its ends on the head's straight lower edge, beyond the
-		# label's recess; its arch higher than its top's roll, under the body's top.
 		&"hump_fits": hump.x + 1.0 < hump.y and hump.y < width / 2.0 - maxf(corner, HEAD_CORNER) - 0.1
 			and arch_drop > ROLL + 0.3 and arch_drop < head_drop - 0.5,
 		&"front_on_its_face": GbCartShape.holds(body_face, front_holes)
 			and ShapeGeometry.apart(front_holes, whole, RIM)
 			and recess_top > arch(recess_box().size.x / 2.0) + RIM,
-		# The name on the band, below the arch and above the recess, on the body's face.
 		&"logo_on_the_band": recess_top - arch(LOGO.x / 2.0) > LOGO.y + 0.2 and LOGO.x / 2.0 < half - chamfer.x - 0.5,
 		&"back_on_its_face": GbCartShape.holds(back_face, behind) and ShapeGeometry.apart(behind, whole, RIM)
 			and middle_apart

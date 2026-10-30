@@ -1,0 +1,51 @@
+# gdlint (gdtoolkit 4) settings for dev/build.sh: the Godot style guide's member order and names, lines up to
+# 140 characters as in Kotlin. Allowed besides: the desktop stand-in's camelCase methods (the Kotlin plugin's
+# names), upper-case static variables (timings the debug bridge retunes), PascalCase constants (aliases of
+# classes) and private signals.
+class-definitions-order:
+- tools
+- classnames
+- extends
+- docstrings
+- signals
+- enums
+- consts
+- staticvars
+- exports
+- pubvars
+- prvvars
+- onreadypubvars
+- onreadyprvvars
+- others
+class-load-variable-name: (([A-Z][a-z0-9]*)+|_?[a-z][a-z0-9]*(_[a-z0-9]+)*)
+class-name: ([A-Z][a-z0-9]*)+
+class-variable-name: (_?[a-z][a-z0-9]*(_[a-z0-9]+)*|_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)
+comparison-with-itself: null
+constant-name: (_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*|([A-Z][a-z0-9]*)+)
+disable:
+- function-arguments-number
+- function-preload-variable-name
+- max-file-lines
+- max-public-methods
+- max-returns
+- no-elif-return
+- no-else-return
+- unused-argument
+duplicated-load: null
+enum-element-name: '[A-Z][A-Z0-9]*(_[A-Z0-9]+)*'
+enum-name: ([A-Z][a-z0-9]*)+
+excluded_directories: !!set
+  .git: null
+expression-not-assigned: null
+function-argument-name: _?[a-z][a-z0-9]*(_[a-z0-9]+)*
+function-name: (test_\w+|_on_([A-Z][a-z0-9]*)+(_[a-z0-9]+)*|_?[a-z][a-z0-9]*(_[a-z0-9]+)*|[a-z]+([A-Z][a-z0-9]*)+)
+function-variable-name: '[a-z][a-z0-9]*(_[a-z0-9]+)*'
+load-constant-name: (([A-Z][a-z0-9]*)+|_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)
+loop-variable-name: _?[a-z][a-z0-9]*(_[a-z0-9]+)*
+max-line-length: 140
+mixed-tabs-and-spaces: null
+signal-name: _?[a-z][a-z0-9]*(_[a-z0-9]+)*
+sub-class-name: _?([A-Z][a-z0-9]*)+
+tab-characters: 1
+trailing-whitespace: null
+unnecessary-pass: null

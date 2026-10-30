@@ -75,13 +75,13 @@ static func arrays(shape: PsxShape, part: StringName, detail: int) -> Array:
 		&"left", &"right":
 			var side := -1 if part == &"left" else 1
 			var wing := ShapeGeometry.rounded_box(shape.wing_box(side), shape.corner, steps)
-			ShapeGeometry.slab(mesh, _ccw(Geometry2D.clip_polygons(wing, notch)[0]), 0.0, shape.height,
+			# Points closer than half a millimetre made one: a shorter side would fold as the bevel moves its ends in.
+			ShapeGeometry.slab(mesh, ShapeGeometry.ccw(Geometry2D.clip_polygons(wing, notch)[0], 0.5), 0.0, shape.height,
 				Vector2.ONE * shape.bevel, body)
 		&"centre":
-			# Square where it meets the wings.
 			var deck := ShapeGeometry.square(shape.centre_box())
 			var well := ShapeGeometry.circle(shape.lid_centre, shape.opening(), count)
-			_sunk(mesh, _ccw(Geometry2D.merge_polygons(deck, notch)[0]), 0.0, shape.deck(), shape.bevel, body, well,
+			_sunk(mesh, ShapeGeometry.ccw(Geometry2D.merge_polygons(deck, notch)[0], 0.5), 0.0, shape.deck(), shape.bevel, body, well,
 				shape.deck() - shape.well_depth)
 		&"lid":
 			var lid := ShapeGeometry.circle(shape.lid_centre, shape.lid_radius, count)
@@ -108,7 +108,6 @@ static func arrays(shape: PsxShape, part: StringName, detail: int) -> Array:
 				var centre := Vector2(button.x, button.y)
 				ShapeGeometry.band(mesh, ShapeGeometry.circle(centre, button.z + shape.groove, 4 * steps),
 					ShapeGeometry.circle(centre, button.z, 4 * steps), on_top, Vector3.BACK, body)
-			# The lid's latch, from its opening to the open button's groove.
 			var towards := (shape.open_centre - shape.lid_centre).normalized()
 			var across := towards.orthogonal() * shape.groove / 2.0
 			var from := shape.lid_centre + towards * shape.notch()
@@ -125,7 +124,6 @@ static func arrays(shape: PsxShape, part: StringName, detail: int) -> Array:
 					ShapeGeometry.prism(mesh, ShapeGeometry.square(placed.abs()), shape.vent_band.x, shape.vent_band.y,
 						body)
 		&"louvres":
-			# Dark behind the ribs, a hair off the sides.
 			var reach := ((shape.vent_count - 1) * shape.vent_pitch + shape.vent_width) / 2.0 + 1.0
 			for side: float in [1.0, -1.0]:
 				var x := side * (shape.width / 2.0 + 0.1)
@@ -145,7 +143,6 @@ static func arrays(shape: PsxShape, part: StringName, detail: int) -> Array:
 				Vector2(_DRIVE_SIZE.x, _DRIVE_SIZE.y))
 			ShapeGeometry.prism(mesh, ShapeGeometry.square(box), floor_height, floor_height + _DRIVE_SIZE.z)
 		&"lens":
-			# Its rings from the bottom pole up.
 			var centre := shape.deck() - shape.well_depth + _LENS_SIZE.z
 			var rings: Array[PackedVector3Array] = []
 			for k in _LENS_RINGS + 1:
@@ -201,17 +198,3 @@ static func _sunk(mesh: MeshBuilder, outline: PackedVector2Array, back: float, f
 		false)
 	ShapeGeometry.holed(mesh, face, [well], front, Vector3.BACK, uv, PackedFloat32Array([cut]))
 	ShapeGeometry.sunk(mesh, well, well_floor, front, uv)
-
-
-## [param loop] counter-clockwise, its points closer than half a millimetre made one: a shorter side
-## would fold as the bevel moves its ends in.
-static func _ccw(loop: PackedVector2Array) -> PackedVector2Array:
-	var found := PackedVector2Array()
-	for point in loop:
-		if found.is_empty() or point.distance_to(found[-1]) > 0.5:
-			found.append(point)
-	if found[0].distance_to(found[-1]) <= 0.5:
-		found.remove_at(found.size() - 1)
-	if Geometry2D.is_polygon_clockwise(found):
-		found.reverse()
-	return found

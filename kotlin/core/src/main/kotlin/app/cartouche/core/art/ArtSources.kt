@@ -71,7 +71,7 @@ public class ArtSources(
      * The images the extract and the table have for [game] among those [offered] (the others left
      * out, as textures while ScreenScraper is not open, or a texture it answered it has none of):
      * every image of both sources, the first of [order] for each region (whichever name a source
-     * gives it: `USA` and `North America` are one) and source, in that order (INV-E7-03).
+     * gives it: `USA` and `North America` are one) and source, in that order.
      */
     public fun variantsOf(game: Game, offered: (Candidate) -> Boolean): List<ArtVariant> = ordered(game, emptyList())
         .filter(offered)
@@ -98,9 +98,9 @@ public class ArtSources(
         public val NONE: ArtSources = ArtSources(ArtKind.Disc, MediaRule(MediumId.NONE), ArtIndex.EMPTY, None, TextureTable.EMPTY)
 
         /**
-         * [platform]'s sources: its profile's in [catalog], its extract and its texture table the
-         * ones [extracts] and [tables] (texts by platform) hold for it, the table read only when the
-         * profile names the platform's ScreenScraper system.
+         * [platform]'s sources: its profile's in [catalog], its extract and its texture table the ones [extracts] and
+         * [tables] (texts by platform) hold for it, the table read only when the profile names the platform's
+         * ScreenScraper system.
          */
         public fun of(
             catalog: Catalog,
@@ -122,7 +122,10 @@ public class ArtSources(
                 }
             }.getOrElse { NONE }
 
-        /** The version [of] gives [platform]'s sources, read from their first lines alone: no extract or table is indexed. */
+        /**
+         * The version [of] gives [platform]'s sources, read from their first lines alone: no extract or table is
+         * indexed.
+         */
         public fun versionOf(
             catalog: Catalog,
             extracts: Map<PlatformId, String>,
@@ -145,7 +148,7 @@ public class ArtSources(
             profile.screenScraperSystem.flatMap { system -> tables.getOrNone(platform).map { it to system } }
 
         /**
-         * INV-E11-07: the order a game of [regions] tries its images in. An image is of the game's
+         * The order a game of [regions] tries its images in. An image is of the game's
          * region when its region is one of the game's or the zone holding one of them
          * ([Regions.isOwn]: a French game's are France's and Europe's, not Germany's; a world
          * release's the world's). A cartridge ([ArtKind.CartridgeFront]) takes ScreenScraper's
@@ -154,7 +157,7 @@ public class ArtSources(
          * other image closest first ([Regions.closestTo]), a texture before a scan when equally close; a disc
          * takes the scans of its region first, then the textures of its region, then its serial
          * scans, then the rest, a scan before a texture. A game of no region has no image of its
-         * region: its serial scans, then the ranked list. INV-E11-08: with a [preferred] region, when
+         * region: its serial scans, then the ranked list. With a [preferred] region, when
          * the images hold no or several regions surely the game's ([Regions.rank] 0 or 1), the rest
          * comes by [Regions.preferredFirst] before it is ranked.
          */
@@ -243,9 +246,9 @@ public class ArtSources(
         }
 
         /**
-         * Which automatic labels of [games] are looked up again from scratch: those a source of their
-         * platform's [sources] may have art for, and those none can, whose image goes; a label the user
-         * chose, their own picture or a region's image, is neither, and stays.
+         * Which automatic labels of [games] are looked up again from scratch: those a source of their platform's
+         * [sources] may have art for, and those none can, whose image goes; a label the user chose, their own picture
+         * or a region's image, is neither, and stays.
          */
         public fun lookAgain(games: List<Game>, sources: (PlatformId) -> ArtSources): LookAgain {
             val automatic = games.filter { it.label == LabelChoice.Automatic }
@@ -256,15 +259,18 @@ public class ArtSources(
 }
 
 /**
- * A look's [requests], and the games of an automatic label wanting art that no source can have any
- * for ([unfound]), with their sources' version: known absent at once, they show their title.
+ * A look's [requests], and the games of an automatic label wanting art that no source can have any for ([unfound]),
+ * with their sources' version: known absent at once, they show their title.
  */
 public data class ArtPlan(public val requests: List<ArtRequest>, public val unfound: Map<GameId, Option<ArtVersion>>)
 
 /** The games whose label is looked up again ([asked]), and those no source can have art for ([unfound]). */
 public data class LookAgain(public val asked: Set<GameId>, public val unfound: Set<GameId>)
 
-/** The scans of [serials] (`SLPM-65688`) at this source, in order, of no stated region; serials of another form, as some lists hold, are left out. */
+/**
+ * The scans of [serials] (`SLPM-65688`) at this source, in order, of no stated region; serials of another form, as
+ * some lists hold, are left out.
+ */
 internal fun SerialScans.scansOf(serials: List<String>): List<Candidate.Web> = serials.filter(serial::matches).distinct().map {
     Candidate.Web(ArtUrl(template.replace(SerialScans.PLACE, it)), "", ArtSource.PSXDATACENTER)
 }

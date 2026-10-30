@@ -12,3 +12,4 @@ model_name = "NUS-001"
 scene = "res://carousel/consoles/n64/n64.tscn"
 launch = "res://carousel/consoles/n64/launch.json"
 triangle_budget = 10000
+ring_size = Vector2(1.733, 0.044)

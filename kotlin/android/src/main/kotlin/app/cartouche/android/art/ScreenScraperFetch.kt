@@ -37,7 +37,7 @@ import java.time.LocalDate
 
 /** A ScreenScraper member, whose quota and threads the requests count on. */
 internal data class Member(val id: String, val password: String) {
-    /** Never the password: a member may be traced (INV-E11-06). */
+    /** Never the password: a member may be traced. */
     override fun toString(): String = "Member($id)"
 }
 
@@ -46,7 +46,10 @@ internal data class Credentials(val devId: String, val devPassword: String, val 
     override fun toString(): String = "Credentials($devId, $softName, $member)"
 
     companion object {
-        /** The credentials built into the app (`local.properties` or the environment at build time); none without a key: the app then has no ScreenScraper. */
+        /**
+         * The credentials built into the app (`local.properties` or the environment at build time); none without a
+         * key: the app then has no ScreenScraper.
+         */
         fun fromBuild(): Option<Credentials> = Some(BuildConfig.SCREENSCRAPER_DEVID).filter(String::isNotEmpty).map { devId ->
             val ssid = Some(BuildConfig.SCREENSCRAPER_SSID).filter(String::isNotEmpty)
             val member = ssid.map { Member(it, BuildConfig.SCREENSCRAPER_SSPASSWORD) }
@@ -77,16 +80,9 @@ internal interface Textures {
 }
 
 /**
- * Downloads ScreenScraper's textures with the app's key and, if any, the member's account, at the
- * pace they allow (INV-E11-05): one request at a time with the key alone, the member's threads and
- * per-minute allowance otherwise, read by `ssuserInfos.php` at the first request of each day (a
- * refused member leaves the key alone); after a 429 the next request waits [BACK_OFF]. Every
- * request goes through this one gate, and asks only for images (`mediaJeu.php`), never which game
- * a file is (INV-E11-04). The credentials go into a URL at request time only: nothing stored or
- * traced holds them (INV-E11-06). The state follows the answers ([ScreenScraperState]), a server
- * out of reach closing it for the run like any failure (a device really offline stalls on its next
- * scan); what outlives a restart (a closure until a day, an off state for this key) is kept in
- * [stateFile] ([KeptClosures]). [changed] hears each new state.
+ * One request at a time with the key alone; with a member, its threads and per-minute allowance, read from `ssuserInfos.php` at the first
+ * request of each day. After a 429 the next request waits [BACK_OFF]. The credentials go into a URL at request time only: nothing stored
+ * or traced holds them. [stateFile] keeps what outlives a restart ([KeptClosures]).
  */
 internal class ScreenScraperFetch(
     private val http: Http,
@@ -117,7 +113,6 @@ internal class ScreenScraperFetch(
 
     private var checkedOn: Option<Day> = None
 
-    /** When the requests of the last minute started. */
     private val sent = ArrayDeque<Long>()
 
     /** The requests sent since the run began, traced as the next begins. */
@@ -149,8 +144,8 @@ internal class ScreenScraperFetch(
     }
 
     /**
-     * [texture]'s image, [progress] told as it downloads; skipped at once while ScreenScraper is not
-     * open, not found when the game has no such image.
+     * [texture]'s image, [progress] told as it downloads; skipped at once while ScreenScraper is not open, not found
+     * when the game has no such image.
      */
     suspend fun get(texture: Candidate.Texture, progress: Progress): Either<FetchFailure, ByteArray> {
         checkAccount()
@@ -182,7 +177,6 @@ internal class ScreenScraperFetch(
         }
     }
 
-    /** The answer to the request [sent], taken into the state, and what it means for the image. */
     private suspend fun answered(answer: ScreenScraperAnswer, body: Option<ByteArray>, sent: Moment): Either<FetchFailure, ByteArray> {
         val next = lock.withLock { change(state.after(answer, tomorrow(), sent, Moment(now()))) }
         return when (answer) {
@@ -198,8 +192,8 @@ internal class ScreenScraperFetch(
     }
 
     /**
-     * Waits for a request's turn: ScreenScraper open, a thread free, the minute's allowance and the
-     * back-off over; answers the moment it is sent, or skipped when not open.
+     * Waits for a request's turn: ScreenScraper open, a thread free, the minute's allowance and the back-off over;
+     * answers the moment it is sent, or skipped when not open.
      */
     private suspend fun admitted(): Either<FetchFailure.Skipped, Moment> {
         while (true) {
@@ -242,9 +236,8 @@ internal class ScreenScraperFetch(
     }
 
     /**
-     * Reads the member's limits once a day, a request like the others. The member is left out from
-     * then on only when refused ([Account.Refused]); an answer that says nothing of them counts for
-     * the state as any request's, and the day stays unchecked.
+     * The member is left out from then on only when refused ([Account.Refused]); an answer that says nothing of them counts for the state
+     * as any request's, and the day stays unchecked.
      */
     private suspend fun checkAccount() = checking.withLock {
         if (!due()) return@withLock
@@ -272,7 +265,9 @@ internal class ScreenScraperFetch(
         }
     }
 
-    /** What the server answered, for the state: no answer in time or no server reached count as answers of their own. */
+    /**
+     * What the server answered, for the state: no answer in time or no server reached count as answers of their own.
+     */
     private fun answerOf(result: Either<Unanswered, Answer>): ScreenScraperAnswer = result.fold({ unanswered ->
         when (unanswered) {
             is Unanswered.Offline -> ScreenScraperAnswer.Unreachable
@@ -301,7 +296,6 @@ internal class ScreenScraperFetch(
 
     private fun tomorrow(): Day = Day(LocalDate.parse(today().iso).plusDays(1).toString())
 
-    /** The URL of [script] with the key, the member if any, and [params], each encoded. */
     private fun url(script: String, vararg params: Pair<String, String>): String {
         val key = listOf("devid" to credentials.devId, "devpassword" to credentials.devPassword, "softname" to credentials.softName)
         val account = member.fold({ emptyList() }) { listOf("ssid" to it.id, "sspassword" to it.password) }

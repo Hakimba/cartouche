@@ -16,16 +16,14 @@ import arrow.core.singleOrNone
 import arrow.core.toOption
 
 /**
- * One platform's extract of the LaunchBox Games Database (`app/data/art`, written by
- * `dev/launchbox_art.py`): each game's names and scans, by region, all of the type of image its
- * platform's profile names (`ArtKind`: a disc's face, a cartridge's front).
+ * One platform's extract of the LaunchBox Games Database (`app/data/art`, written by `dev/launchbox_art.py`): each
+ * game's names and scans, by region, all of the type of image its platform's profile names (`ArtKind`: a disc's face,
+ * a cartridge's front).
  */
 public class ArtIndex private constructor(
     /** None when the file does not name the database's date on its first line. */
     public val version: Option<ArtVersion>,
-    /** The games by their name's [joined] key. */
     private val byName: Map<String, List<Match>>,
-    /** The games by their alternate names' [joined] keys. */
     private val byAlternateName: Map<String, List<Match>>,
     /** The games an alternate name written `<title> (<Country>)` names, by the title's [dashed] key and the country. */
     private val regional: Map<Pair<String, String>, List<Match>>,
@@ -39,7 +37,6 @@ public class ArtIndex private constructor(
     /** Compared by identity: two lines of the extract are two games, whatever they hold. */
     private class Game(val name: String, val alternates: List<String>, val images: List<Image>)
 
-    /** A [game] found by one of its names. */
     private class Match(val game: Game, val name: String)
 
     /**
@@ -80,8 +77,8 @@ public class ArtIndex private constructor(
         private val SPACES = Regex("""\s+""")
 
         /**
-         * The title reduced for matching ([TitleKey]), its words kept apart; its bracketed tags stay
-         * (`Final Fantasy XII [Demo]` is another game).
+         * The title reduced for matching ([TitleKey]), its words kept apart; its bracketed tags stay (`Final Fantasy
+         * XII [Demo]` is another game).
          */
         private fun dashed(title: String): String = TitleKey.of(title).value
 

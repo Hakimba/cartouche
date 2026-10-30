@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ButtonHint
 extends Control
-## A controller button and what it does, small: "Y Settings", the design's key then its label, in a [HintRow].
+## A controller button and what it does, small: "Y Settings", the key then its label, in a [HintRow].
 
 ## The button, as [method Controls.mark] names it.
 @export var button := &"a"

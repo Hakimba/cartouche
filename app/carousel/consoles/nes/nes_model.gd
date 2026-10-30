@@ -7,23 +7,19 @@ extends ConsoleModel
 ## pressed down level once it is in; its power button stays pushed in while it is on, its diode lit; its
 ## reset button goes in when pressed. Each part turns or slides from the rest the glb gives its node.
 
-## How bright the diode once lit.
+## How bright the power diode is once lit, as its emission energy.
 const _LIT := 2.0
 
-## How far the door is open, in degrees.
 var door_degrees := 0.0:
 	set(value):
-		# Each is given each frame by the launch animation: moved only when it changes.
 		if value != door_degrees and is_node_ready():
 			_door.rotation.x = -deg_to_rad(value)
 		door_degrees = value
-## How far the tray is tilted up, in degrees.
 var tray_degrees := 0.0:
 	set(value):
 		if value != tray_degrees and is_node_ready():
 			_tray.rotation.x = -deg_to_rad(value)
 		tray_degrees = value
-## How far the power and reset buttons are pushed in, in millimetres.
 var power_mm := 0.0:
 	set(value):
 		if value != power_mm and is_node_ready():

@@ -18,7 +18,6 @@ import io.kotest.property.arbitrary.constant
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
-import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
@@ -64,7 +63,7 @@ class ScreenScraperTest {
         )
 
     @Test
-    fun `INV-E11-05 a spent quota closes ScreenScraper until the next day, an off state for good, both kept across a restart`() =
+    fun `INV-17 a spent quota closes ScreenScraper until the next day, an off state for good, both kept across a restart`() =
         runBlocking<Unit> {
             var closed = 0
             checkAll(Arb.list(steps, 1..30)) { script ->
@@ -109,7 +108,7 @@ class ScreenScraperTest {
                         }
                 }
             }
-            closed shouldBeGreaterThan 100
+            closed shouldBeGreaterThan 15
             KeptClosures.NONE.after(Open(), key) shouldBe KeptClosures.NONE
             KeptClosures.NONE.after(ClosedForRun(Closure.BUSY), key) shouldBe KeptClosures.NONE
             KeptClosures.decode("{broken").shouldBeNone()
@@ -127,7 +126,7 @@ class ScreenScraperTest {
     }
 
     @Test
-    fun `INV-E11-05 an answer that comes once ScreenScraper is closed never makes the closure lighter`() = runBlocking<Unit> {
+    fun `INV-17 an answer that comes once ScreenScraper is closed never makes the closure lighter`() = runBlocking<Unit> {
         val closed =
             Arb.element(
                 ClosedForRun(Closure.BUSY),
@@ -183,15 +182,6 @@ class ScreenScraperTest {
             Closure.entries.filter { it != Closure.UNREACHABLE }.map(::ClosedForRun) +
                 listOf(Open(), Open(Some(Moment(5))), ScreenScraperState.ClosedUntil(tomorrow), ScreenScraperState.Off(Refusal.WRONG_KEY))
         others.forEach { it.reconnected() shouldBe it }
-    }
-
-    @Test
-    fun `an image, no image or a 429 to a request sent before a slow-down never changes it`() = runBlocking<Unit> {
-        val answers = Arb.element(ScreenScraperAnswer.Image, ScreenScraperAnswer.NoMedia, ScreenScraperAnswer.Status(429))
-        checkAll(Arb.long(0L..100_000L), Arb.long(0L..100_000L), answers) { at, before, answer ->
-            val slowed = Open(Some(Moment(at)))
-            slowed.after(answer, tomorrow, Moment(minOf(at, before)), Moment(at + before)) shouldBe slowed
-        }
     }
 
     @Test

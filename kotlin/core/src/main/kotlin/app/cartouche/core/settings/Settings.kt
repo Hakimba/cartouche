@@ -14,9 +14,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
 /**
- * How the face buttons are drawn on screen: Xbox's letters (A at the bottom), Nintendo's (A on the
- * right) or PlayStation's shapes. It changes no action: confirming and going back follow the buttons
- * as the device sends them.
+ * How the face buttons are drawn on screen: Xbox's letters (A at the bottom), Nintendo's (A on the right) or
+ * PlayStation's shapes. It changes no action: confirming and going back follow the buttons as the device sends them.
  */
 @Serializable
 public enum class ButtonStyle {
@@ -57,9 +56,9 @@ public value class SoundLevel private constructor(public val steps: Int) {
 }
 
 /**
- * The app's own settings, apart from the library; [preferredRegion], none until the user chooses one,
- * orders labels' images; [gamesFloat] makes the selected game sway and bob (the consoles never do);
- * [soundLevel] is how loud the sounds play, full until the user turns them down.
+ * The app's own settings, apart from the library; [preferredRegion], none until the user chooses one, orders labels'
+ * images; [gamesFloat] makes the selected game sway and bob (the consoles never do); [soundLevel] is how loud the
+ * sounds play, full until the user turns them down.
  */
 @Serializable
 public data class Settings(
@@ -70,8 +69,8 @@ public data class Settings(
     public val soundLevel: SoundLevel = SoundLevel.FULL,
 ) {
     /**
-     * Whether the first launch is still to do: no button style chosen and no platform set up. An
-     * app updated from a build without settings, already set up, does not see it again.
+     * Whether the first launch is still to do: no button style chosen and no platform set up. An app updated from a
+     * build without settings, already set up, does not see it again.
      */
     public fun isFirstLaunch(library: Library): Boolean = buttonStyle.isNone() && library.setups.isEmpty()
 }

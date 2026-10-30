@@ -11,8 +11,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.io.File
 
+@Config(sdk = [30, 34])
 @RunWith(RobolectricTestRunner::class)
 class SettingsStoreTest {
     private val file = File(RuntimeEnvironment.getApplication().filesDir, "settings.json")

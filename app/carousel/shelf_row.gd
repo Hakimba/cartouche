@@ -13,15 +13,16 @@ const WHOLE := Rect2(0.0, 0.0, 1.0, 1.0)
 ## Every game [method GamesLayout.offsets] can show at once.
 const _PLACES := 5
 
+@export var frame_origin := Vector3.ZERO
+
 ## Debug builds: turns per second of the selected game around its vertical axis, to see every side.
 var turntable := 0.0
 ## Where label images come from; a game shows a plain blank until its image is ready, and its title
-## on the blank once no source had one (INV-E11-09).
+## on the blank once no source had one.
 var label_images: GameArt:
 	set(art):
 		label_images = art
 		art.loaded.connect(refresh_label)
-@export var frame_origin := Vector3.ZERO
 var camera: Camera3D
 var games_float := false
 var room_energy := 0.55
@@ -38,9 +39,7 @@ var selected_presence := 1.0
 var stage := 0.0
 ## Where the selected game stands once staged, in the row's space.
 var staged := Transform3D.IDENTITY
-
 var _games: Array[AndroidServices.Game] = []
-## The model of each of the shelf's games' media, by medium.
 var _models: Dictionary[String, PackedScene] = {}
 var _look := LabelLook.new()
 ## The selected game's position on the endless row (see [CarouselLayout]); the scroll follows it.
@@ -75,11 +74,11 @@ var _previewing := false
 var _downloads: Dictionary[String, float] = {}
 
 
-## Stops a row between steps at its selected position before another screen opens.
 func is_settling() -> bool:
 	return not is_equal_approx(_scroll, float(_position))
 
 
+## Stops a row between steps at its selected position before another screen opens.
 func settle() -> void:
 	_scroll = float(_position)
 	_spring = Motion.Spring.new(_scroll)
@@ -363,14 +362,12 @@ func _draw_blank(place: Place, game: AndroidServices.Game) -> void:
 	place.shown.draw_label(game.title if _look.demo_art or label_images.is_absent(game) else "", _look)
 
 
-## Shows the ring of [param game_id]'s download, or none, on its place once its label is drawn.
 func _show_ring(game_id: String) -> void:
 	for place: Place in _placed.values():
 		if _games[place.game].id == game_id and place not in _unlabelled:
 			place.shown.ring(_download(game_id))
 
 
-## Turns the rings of downloads of unknown size, on the places in view.
 func _turn_rings(delta: float) -> void:
 	for place: Place in _placed.values():
 		if _download(_games[place.game].id) < 0.0 and place not in _unlabelled:
@@ -509,16 +506,20 @@ class LabelLook:
 ## once made, until the library has no game of it, so that another game or shelf only shows another
 ## one.
 class Place extends Node3D:
+	## Where its medium is drawn: in its own view, in the main world (the launch has it outside the
+	## row), or nowhere.
+	enum Draw { SHOWN, OUTSIDE, HIDDEN }
+
 	## Index of the game shown here, -1 when the place is free.
 	var game := -1
 	var shown: LabelledModel
-	var _models: Dictionary[PackedScene, LabelledModel] = {}
 	var layout: GamesLayout
 	var lit: StudioLights.Rig
 	var blank: StudioLights.Rig
 	## One view per place, kept while the place lives: a place is reused by the games of the row, not
 	## made again at each move.
 	var media_view: MediaView
+	var _models: Dictionary[PackedScene, LabelledModel] = {}
 	var _blank_weight := -1.0
 
 	## Frees its models of the media not among [param models].
@@ -559,10 +560,6 @@ class Place extends Node3D:
 			media_view.hide()
 			media_view.set_process(false)
 			media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
-
-	## Where its medium is drawn: in its own view, in the main world (the launch has it outside the
-	## row), or nowhere.
-	enum Draw { SHOWN, OUTSIDE, HIDDEN }
 
 	func draw_at(at: Transform3D, softness: float, weight: float, mode: Draw, order: int) -> void:
 		var camera := (get_parent() as ShelfRow).camera
@@ -621,9 +618,9 @@ class LabelledModel extends Node3D:
 	## Brings the model from its size in the row to its real size, in its own frame: its root's
 	## transform undone.
 	var to_real_size := Transform3D.IDENTITY
+	var dirty := true
 
 	var _fade: ModelFade
-	## The model's label, drawn with a material of its own.
 	var _label_mesh: MeshInstance3D
 	var _view: SubViewport = _LABEL_VIEW.instantiate()
 	var _background: ColorRect = _view.get_node("Background")
@@ -634,7 +631,6 @@ class LabelledModel extends Node3D:
 	var _demo_art := ShaderMaterial.new()
 	## Whether its label shows the blank drawn in its viewport, not an image.
 	var _blank := false
-	var dirty := true
 	var _blur := 0.0
 
 	func _init(model: PackedScene) -> void:

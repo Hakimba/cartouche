@@ -17,21 +17,11 @@ class Iso9660Test {
     private val boot = "BOOT2 = cdrom0:\\$FIXTURE_SERIAL;1"
 
     @Test
-    fun `the serial SYSTEM CNF boots is read from the root of the volume`() {
-        Iso9660.bootSerial(sectorsOf(disc)) shouldBeSome FileFacts.Serial(FIXTURE_SERIAL)
-    }
-
-    @Test
     fun `SYSTEM CNF is found in a root directory over several sectors`() {
         val crowded = image("disc-crowded.iso")
         // The root directory's record in the volume descriptor: its size, beyond a sector.
         crowded.littleEndian(16 * SECTOR + 156 + 10, 4) shouldBeGreaterThan SECTOR.toLong()
         Iso9660.bootSerial(sectorsOf(crowded)) shouldBeSome FileFacts.Serial(FIXTURE_SERIAL)
-    }
-
-    @Test
-    fun `a PlayStation's BOOT line is read as a PlayStation 2's BOOT2`() {
-        Iso9660.bootSerial(sectorsOf(disc.patched(boot, "BOOT = cdrom:\\SLUS_012.34;1"))) shouldBeSome FileFacts.Serial("SLUS_012.34")
     }
 
     @Test

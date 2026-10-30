@@ -103,7 +103,5 @@ func _paint(box: Rect2, radius: float) -> void:
 
 
 func _focus_changed() -> void:
-	if _focus:
-		_focus.kill()
-	_focus = create_tween()
+	_focus = Motion.restart(self, _focus)
 	_focus.tween_property(_outline, ^"modulate:a", 1.0 if has_focus() else 0.0, 0.2)

@@ -47,7 +47,6 @@ static func arrays(shape: GbaShape, part: StringName, detail: int) -> Array:
 			Vector3(placed.origin.x, placed.origin.y, 0.0) * MeshBuilder.UNITS_PER_MM)
 	match part:
 		&"body":
-			# Its back, seen from behind, the screws' holes sunk in it.
 			var outline := func(inset: float) -> PackedVector2Array:
 				return shape.body_outline(inset, steps)
 			var rings := _rings(_body_levels(shape), outline, 0.0, 0.0)
@@ -64,7 +63,6 @@ static func arrays(shape: GbaShape, part: StringName, detail: int) -> Array:
 			for hole in holes:
 				ShapeGeometry.sunk(mesh, hole, -shape.back() - GbaShape.SCREW_SINK, -shape.back(), whole)
 		&"screws":
-			# Their heads at the foot of their holes.
 			mesh.basis = ShapeGeometry.BEHIND
 			var foot := -shape.back() - GbaShape.SCREW_SINK
 			for screw in shape.screws():
@@ -94,7 +92,6 @@ static func arrays(shape: GbaShape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.flat(mesh, ShapeGeometry.cross(bars[0].grow(0.8), bars[1].grow(0.8)), face + _OFF,
 				Vector3.BACK, whole)
 		&"buttons":
-			# A and B, then Start and Select, lower.
 			for button: Rect2 in shape.round_controls().slice(0, 4):
 				var size := button.size.x
 				var top := face + (GbaShape.KEY_HEIGHT if size > GbaShape.SMALL_BUTTON else 1.5)
@@ -120,7 +117,6 @@ static func arrays(shape: GbaShape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.contacts(mesh, shape.connector(), shape.slot_floor() + ShapeGeometry.CONNECTOR_HEIGHT)
 			at.basis = ShapeGeometry.PLAN
 		&"bottom_ports":
-			# Each laid out in its frame and standing off it.
 			for port: Array in shape.bottom_ports(steps):
 				var frame: Transform3D = port[0]
 				var loop: PackedVector2Array = port[1]
@@ -143,7 +139,6 @@ static func arrays(shape: GbaShape, part: StringName, detail: int) -> Array:
 			var ridge := Rect2(-0.4, knob.position.y, 0.8, knob.size.y)
 			ShapeGeometry.block(mesh, ridge, Vector2.ONE * 0.3, steps, 0.9, 1.7, 0.2, ridge)
 		&"battery_cover":
-			# On the hump's back, laid out as seen from behind; the panel and the latch's notch sunk in it.
 			var recesses: Array[PackedVector2Array] = [
 				ShapeGeometry.rounded_box(GbaShape.PANEL, GbaShape.PANEL_CORNER, steps, 0.0),
 				ShapeGeometry.rounded_box(GbaShape.LATCH_NOTCH, 0.5, steps, 0.0)]
@@ -155,7 +150,6 @@ static func arrays(shape: GbaShape, part: StringName, detail: int) -> Array:
 				ShapeGeometry.sunk(mesh, hole, GbaShape.COVER_RAISE - GbaShape.PANEL_SINK, GbaShape.COVER_RAISE, whole)
 			at = shape.back_frame()
 		&"cover_gap":
-			# The parting gap's dark at the cover's foot.
 			ShapeGeometry.slab(mesh, shape.cover(GbaShape.COVER_GAP, steps), -0.5, _OFF, Vector2.ZERO, whole)
 			at = shape.back_frame()
 		&"cover_mark":
@@ -229,7 +223,6 @@ static func _hump_levels(shape: GbaShape) -> Array[Vector2]:
 ## edge to the seam, standing off it, its inner side inside the shells.
 static func _grey(mesh: MeshBuilder, shape: GbaShape, button: bool, right: bool, steps: int, uv: Rect2) -> void:
 	var inner := shape.grey_end(button, GbaShape.GREY_DEPTH, steps)
-	# Off the shells: out of the back's round edge, then off their side up to the seam's groove.
 	var centre := Vector2(GbaShape.BACK_BEVEL, shape.back() + GbaShape.BACK_BEVEL)
 	var levels: Array[Vector2] = []
 	for level: Vector2 in _body_levels(shape).slice(0, _BEVEL_STEPS + 1):

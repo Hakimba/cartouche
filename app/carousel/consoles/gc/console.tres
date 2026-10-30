@@ -12,3 +12,4 @@ model_name = "DOL-001"
 scene = "res://carousel/consoles/gc/gc.tscn"
 launch = "res://carousel/consoles/gc/launch.json"
 triangle_budget = 7000
+ring_size = Vector2(1.134, -2.579)

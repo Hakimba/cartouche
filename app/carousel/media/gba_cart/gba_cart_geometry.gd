@@ -10,7 +10,6 @@ extends RefCounted
 ## edge the hump's arch.
 
 const PARTS: Array[StringName] = [&"label", &"shell", &"gloss", &"metal", &"screw", &"logo", &"marks"]
-## Steps of the roll along the head's top edge.
 const ROLL_STEPS := 3
 
 
@@ -44,7 +43,6 @@ static func arrays(shape: GbaCartShape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.prism(mesh, ShapeGeometry.square(Rect2(-GbaCartShape.CONNECTOR.x / 2.0, -shape.height / 2.0 - 0.05,
 				GbaCartShape.CONNECTOR.x, 2.5)), middle - GbaCartShape.CONNECTOR.y / 2.0, middle + GbaCartShape.CONNECTOR.y / 2.0)
 		&"screw":
-			# Its head, its foot buried in its hole's floor.
 			mesh.basis = ShapeGeometry.BEHIND
 			var sunk := back - GbaCartShape.SCREW_SINK
 			ShapeGeometry.prism(mesh, GbCartGeometry.circle_at(backs[4].get_center(), GbaCartShape.SCREW_HEAD / 2.0,
@@ -108,8 +106,6 @@ static func _body(mesh: MeshBuilder, shape: GbaCartShape, steps: int, label: Pac
 	ShapeGeometry.sunk(mesh, arrow, face - GbaCartShape.SHALLOW, face, whole)
 
 
-## Adds the head: at each station across, its section from its lower edge (the arch, or the head's
-## lower edge beyond it) up to its top edge, rolled towards the front, at the roof's height there.
 static func _head(mesh: MeshBuilder, shape: GbaCartShape, steps: int, whole: Rect2) -> void:
 	var stations := _stations(shape, steps)
 	var joint := shape.joint()
@@ -163,7 +159,6 @@ static func _head(mesh: MeshBuilder, shape: GbaCartShape, steps: int, whole: Rec
 	ShapeGeometry.flat(mesh, plan, joint, Vector3.FORWARD, whole)
 
 
-## The stations across the head, ascending: along its corners, through the hump.
 static func _stations(shape: GbaCartShape, steps: int) -> PackedFloat32Array:
 	var half := shape.width / 2.0
 	var found: Array[float] = [0.0]
@@ -184,7 +179,6 @@ static func _stations(shape: GbaCartShape, steps: int) -> PackedFloat32Array:
 	return across
 
 
-## The head's lower edge at [param x]: the arch, or beyond it the head's lower edge and corner.
 static func _under(shape: GbaCartShape, x: float) -> float:
 	var off := absf(x) - shape.width / 2.0 + GbaCartShape.HEAD_CORNER
 	var rounding := GbaCartShape.HEAD_CORNER - sqrt(maxf(0.0, GbaCartShape.HEAD_CORNER * GbaCartShape.HEAD_CORNER - off * off)) \
@@ -192,7 +186,6 @@ static func _under(shape: GbaCartShape, x: float) -> float:
 	return shape.at(minf(shape.arch(x), shape.head_drop)) + rounding
 
 
-## The head's top edge at [param x], round its top corners.
 static func _over(shape: GbaCartShape, x: float) -> float:
 	var off := absf(x) - shape.width / 2.0 + shape.corner
 	var rounding := shape.corner - sqrt(maxf(0.0, shape.corner * shape.corner - off * off)) if off > 0.0 else 0.0

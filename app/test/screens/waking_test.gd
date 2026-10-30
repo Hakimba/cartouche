@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
-## The app at rest wakes with the first press, push or tap, which acts as it always does (INV-E8-01).
+## The app at rest wakes with the first press, push or tap, which acts as it always does.
 
 const Fixtures := preload("res://test/screens/fixtures.gd")
 ## A finger this far beside the console in the middle moves one console that way.
@@ -28,13 +28,13 @@ func _assert_woken_on_the_next(carousel: Carousel) -> void:
 	assert_int(carousel._consoles.selected_index()).is_equal(1)
 
 
-func test_INV_E8_01_the_first_press_wakes_the_app_and_acts() -> void:
+func test_inv_20_the_first_press_wakes_the_app_and_acts() -> void:
 	var carousel := await _still()
 	await Fixtures.action(self, &"carousel_right")
 	_assert_woken_on_the_next(carousel)
 
 
-func test_INV_E8_01_the_first_push_of_the_stick_wakes_the_app_and_acts() -> void:
+func test_inv_20_the_first_push_of_the_stick_wakes_the_app_and_acts() -> void:
 	var carousel := await _still()
 	for value: float in [1.0, 0.0]:
 		var push := InputEventJoypadMotion.new()
@@ -45,7 +45,7 @@ func test_INV_E8_01_the_first_push_of_the_stick_wakes_the_app_and_acts() -> void
 	_assert_woken_on_the_next(carousel)
 
 
-func test_INV_E8_01_the_first_tap_wakes_the_app_and_acts() -> void:
+func test_inv_20_the_first_tap_wakes_the_app_and_acts() -> void:
 	var carousel := await _still()
 	await Fixtures.touch(self, [carousel._selected_point() + BESIDE])
 	_assert_woken_on_the_next(carousel)

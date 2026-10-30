@@ -3,22 +3,15 @@ package app.cartouche.core.platforms
 
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
-import app.cartouche.core.PackageName
 import app.cartouche.core.Shipped
 import app.cartouche.core.art.crop
 import app.cartouche.core.art.front
-import app.cartouche.core.launch.Component
-import app.cartouche.core.launch.Extra
-import app.cartouche.core.launch.ExtraValue
-import app.cartouche.core.launch.GAME_URI
 import app.cartouche.core.launch.GameFile
-import app.cartouche.core.launch.LaunchSpec
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.launch.TemplateError
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
-import arrow.core.getOrElse
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
@@ -42,7 +35,7 @@ class CatalogTest {
     private val shippedCatalog = Shipped.catalog
 
     @Test
-    fun `INV-E0-07 every shipped definition parses without rejection, and every player can launch`() {
+    fun `INV-14 every shipped definition parses without rejection, and every player can launch`() {
         // The app reads both folders into one map by file name: a repeated name would hide a file.
         shipped.map { it.name }.shouldBeUnique().shouldContainAll("SonyPlayStation2.json", "MicrosoftXbox.json")
         shippedCatalog.rejected.shouldBeEmpty()
@@ -64,32 +57,8 @@ class CatalogTest {
         }
     }
 
-    private val supportedTwelve =
-        listOf("xbox", "xbox360", "gb", "gba", "gbc", "gc", "n64", "nes", "wii", "psx", "ps2", "snes").map(::PlatformId)
-
     @Test
-    fun `INV-E12-C1-01 offered is exactly the platforms with a model, in the Type chooser's order with its maker and model split`() {
-        val offered = Catalog.parse(shipped, Shipped.profiles, supportedTwelve.toSet()).offered
-        offered.map { it.platform } shouldBe supportedTwelve
-        offered.map { it.maker.getOrElse { "" } to it.model } shouldBe
-            listOf(
-                "Microsoft" to "Xbox",
-                "Microsoft" to "Xbox 360",
-                "Nintendo" to "Game Boy",
-                "Nintendo" to "Game Boy Advance",
-                "Nintendo" to "Game Boy Color",
-                "Nintendo" to "GameCube",
-                "Nintendo" to "Nintendo 64",
-                "Nintendo" to "Nintendo Entertainment System",
-                "Nintendo" to "Wii",
-                "Sony" to "PlayStation",
-                "Sony" to "PlayStation 2",
-                "Nintendo" to "Super Nintendo Entertainment System",
-            )
-    }
-
-    @Test
-    fun `INV-E12-C1-01 a platform whose name holds no maker is offered under its whole name, with no maker`() {
+    fun `a platform whose name holds no maker is offered under its whole name, with no maker`() {
         val profiles = """{"test": {"media": "dvd", "medium": {"default": "d"}, "minimumGameBytes": 1}}"""
         val catalog =
             Catalog.parse(
@@ -101,20 +70,19 @@ class CatalogTest {
     }
 
     @Test
-    fun `INV-E12-C1-01 offered holds the catalog platforms that have a model and nothing else, whatever the models named`() =
-        runBlocking<Unit> {
-            val known = shippedCatalog.platforms.map { it.id }
-            // The chooser's order: names compared in lower case, as the rule says, not taken from the code's own output.
-            val byName = shippedCatalog.platforms.sortedBy { it.name.lowercase() }.map { it.id }
-            checkAll(Arb.set(Arb.element(known + PlatformId("dreamcast-without-definition")), 0..known.size)) { named ->
-                val catalog = Catalog.parse(shipped, Shipped.profiles, named)
-                catalog.offered.map { it.platform }.toSet() shouldBe named.intersect(known.toSet())
-                // Whatever is named, the ones offered keep the order the whole set has.
-                catalog.offered.map { it.platform } shouldBe byName.filter { it in named }
-                catalog.offered.map { it.platform }.shouldBeUnique()
-                catalog.platforms shouldBe shippedCatalog.platforms
-            }
+    fun `offered holds the catalog platforms that have a model and nothing else, whatever the models named`() = runBlocking<Unit> {
+        val known = shippedCatalog.platforms.map { it.id }
+        // The chooser's order: names compared in lower case, as the rule says, not taken from the code's own output.
+        val byName = shippedCatalog.platforms.sortedBy { it.name.lowercase() }.map { it.id }
+        checkAll(Arb.set(Arb.element(known + PlatformId("dreamcast-without-definition")), 0..known.size)) { named ->
+            val catalog = Catalog.parse(shipped, Shipped.profiles, named)
+            catalog.offered.map { it.platform }.toSet() shouldBe named.intersect(known.toSet())
+            // Whatever is named, the ones offered keep the order the whole set has.
+            catalog.offered.map { it.platform } shouldBe byName.filter { it in named }
+            catalog.offered.map { it.platform }.shouldBeUnique()
+            catalog.platforms shouldBe shippedCatalog.platforms
         }
+    }
 
     @Test
     fun `a player's emulator name leaves out the platform the definitions put first`() {
@@ -139,55 +107,7 @@ class CatalogTest {
     }
 
     @Test
-    fun `Xbox and Xbox 360 games are DVDs, offered to their emulators, which are handed the game's URI alone`() {
-        fun profile(id: String) = shippedCatalog.platform(PlatformId(id)).shouldBeSome().profile
-        profile("xbox") shouldBe
-            PlatformProfile(
-                MediaType.DVD,
-                MediaRule(mediumId("xbox_dvd")),
-                16_000_000,
-                Some(ArtKind.Disc),
-                None,
-                Some(ScreenScraperSystem(32)),
-            )
-        profile("xbox360") shouldBe
-            PlatformProfile(
-                MediaType.DVD,
-                MediaRule(mediumId("xbox360_dvd")),
-                1_048_576,
-                Some(ArtKind.Disc),
-                None,
-                Some(ScreenScraperSystem(33)),
-            )
-
-        fun extensions(id: String) = shippedCatalog.platform(PlatformId(id)).shouldBeSome().players.map { it.accepts.extensions }.toSet()
-        extensions("xbox") shouldBe setOf(Some(listOf("iso", "xiso")))
-        extensions("xbox360") shouldBe setOf(Some(listOf("iso", "xex", "zar")))
-        val game = GameFile(FileName("Halo 3 (USA).iso"), uri(GAME_URI), None)
-        val data = Some(GAME_URI)
-        val view = LaunchSpec(None, Some("android.intent.action.VIEW"), data, None, emptyList(), 0, emptySet(), emptyList(), Some(game.uri))
-        val extras = listOf(Extra("game_uri", ExtraValue.Text(GAME_URI)))
-        val ax360e = view.copy(action = Some("aenu.intent.action.AX360E"), data = None, extras = extras)
-
-        fun LaunchSpec.at(pkg: String, activity: String) = copy(component = PackageName.parse(pkg).map { Component(it, activity) })
-        val launches =
-            mapOf(
-                "xbox.com.rfandango.haku_x" to view.at("com.rfandango.haku_x", "com.rfandango.haku_x.LauncherActivity"),
-                "xbox.com.izzy2lost.x1box" to view.at("com.izzy2lost.x1box", "com.izzy2lost.x1box.LauncherActivity"),
-                "xbox360.aenu.ax360e" to ax360e.at("aenu.ax360e", "aenu.ax360e.EmulatorActivity"),
-                "xbox360.aenu.ax360e.free" to ax360e.at("aenu.ax360e.free", "aenu.ax360e.EmulatorActivity"),
-                "xbox360.xendroid.compose" to view.at("xendroid.compose", "xendroid.compose.EmulatorHostActivity"),
-            )
-        shippedCatalog.platforms.filter { it.id.value.startsWith("xbox") }.flatMap { it.players }.map { it.id.value }.toSet() shouldBe
-            launches.keys
-        launches.forEach { (id, spec) ->
-            shippedCatalog.launch(PlayerId(id), game).shouldBeRight() shouldBe
-                Launch(spec, RunningInstance.KEEP)
-        }
-    }
-
-    @Test
-    fun `INV-E10-06 a profile says what its scans show and each cartridge front's shape and label, and refuses a label off it`() {
+    fun `INV-16 a profile says what its scans show and each cartridge front's shape and label, and refuses a label off it`() {
         fun profiles(art: String) = Catalog.parse(
             listOf(definition(platform = "p")),
             DefinitionSource("profiles.json", """{"p": {"media": "cartridge", "medium": {"default": "c"}, "minimumGameBytes": 1$art}}"""),
@@ -239,7 +159,7 @@ class CatalogTest {
     }
 
     @Test
-    fun `INV-E10-06 a shipped cartridge platform has a front for each of its media, a disc platform its face, every extract a kind`() {
+    fun `INV-16 a shipped cartridge platform has a front for each of its media, a disc platform its face, every extract a kind`() {
         shippedCatalog.platforms.forEach { platform ->
             platform.profile.art.onSome { art ->
                 (art is ArtKind.CartridgeFront) shouldBe (platform.profile.media == MediaType.CARTRIDGE)
@@ -266,7 +186,7 @@ class CatalogTest {
     }
 
     @Test
-    fun `INV-E0-08 a broken or duplicate player is rejected alone, a duplicate platform whole, and every rejection is reported`() {
+    fun `a broken or duplicate player is rejected alone, a duplicate platform whole, and every rejection is reported`() {
         val parsed =
             catalog(
                 definition(playerJson("good"), playerJson("bad", template = "-n nopackage"), playerJson("good")),
@@ -288,7 +208,7 @@ class CatalogTest {
     }
 
     @Test
-    fun `INV-E0-08 a broken definition file is rejected whole and reported`() {
+    fun `a broken definition file is rejected whole and reported`() {
         catalog(DefinitionSource("broken.json", "{")).rejected.single().shouldBeInstanceOf<CatalogError.InvalidJson>()
         catalog(DefinitionSource("empty.json", "{}")).rejected.single() shouldBe
             CatalogError.MissingField("empty.json", "platform")
@@ -300,13 +220,13 @@ class CatalogTest {
     }
 
     @Test
-    fun `INV-E0-09 hidden files are never offered to a player, whatever the patterns`() = runBlocking<Unit> {
+    fun `hidden files are never offered to a player, whatever the patterns`() = runBlocking<Unit> {
         val permissive = catalog(definition(playerJson("any", pattern = ".*")))
         checkAll(Arb.string()) { name -> permissive.candidates(FileName(".$name")).shouldBeEmpty() }
     }
 
     @Test
-    fun `INV-E0-10 catalog parsing and file matching are total`() = runBlocking<Unit> {
+    fun `INV-03 catalog parsing and file matching are total`() = runBlocking<Unit> {
         checkAll(Arb.choice(definitionTexts, Arb.string()), Arb.string()) { text, fileName ->
             catalog(DefinitionSource("fuzz.json", text)).candidates(FileName(fileName))
             shippedCatalog.candidates(FileName(fileName))

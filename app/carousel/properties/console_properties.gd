@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ConsoleProperties
 extends PropertiesScreen
-## The console staged under its light, with the existing ordering action. A console with
+## The console staged under its light, with its ordering action. A console with
 ## other models has its model focusable, a callout naming it: A shows every model in a mosaic, the
 ## console turning into the one the cursor is on; A keeps it, B brings back the one it had.
 
@@ -53,7 +53,7 @@ func _process(_delta: float) -> void:
 	_model.position = shown.position
 	_model.size = shown.size
 	if _model.has_focus() or _step == Step.VARIANTS:
-		# On the silhouette's upper right corner, as close to every console.
+		# On the silhouette's upper right corner, equally close for every console.
 		var anchor := shown.position + Vector2(shown.size.x, 0.0)
 		_callout.point(tr("Variant"), anchor + Vector2(40.0, -40.0), anchor)
 	else:

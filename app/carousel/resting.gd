@@ -4,7 +4,7 @@ extends Node
 ## Lets the app rest while nothing happens. With nothing pressed, touched or moving for
 ## [constant SLOW_AFTER_S], Godot's low processor mode takes over: it draws only when something
 ## changes, its loop running at the rate of `application/run/low_processor_mode_sleep_usec`, rather
-## than capping the engine's frame rate, which kept frames slow for a while after waking. After
+## than capping the engine's frame rate, which would keep frames slow for a while after waking. After
 ## [constant STILL_AFTER_S], the motions that go on by themselves (the nodes of the group
 ## [constant PACED]: the games' and consoles' float and sway, the welcome's worm)
 ## slow to a stop in [constant STOPPING_S], and from then on the screen is drawn only when something

@@ -9,15 +9,11 @@ extends ConsoleModel
 const _PUSHED_MM := 1.0
 const _LIT := 1.6
 
-# Each moving part is given each frame by the launch animation: what it moves is changed only when
-# its value does.
-## How far the lid is open, in degrees.
 var lid_degrees := 0.0:
 	set(value):
 		if value != lid_degrees and is_node_ready():
 			_lid.rotation.x = -deg_to_rad(value)
 		lid_degrees = value
-## How far the power and open buttons are pushed in, in millimetres.
 var power_mm := 0.0:
 	set(value):
 		if value != power_mm and is_node_ready():

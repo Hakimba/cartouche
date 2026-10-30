@@ -36,7 +36,7 @@ func _ready() -> void:
 	modulate.a = 0.0
 
 
-## Game properties use the validated frost callout; console properties keep their existing callout.
+## Draws on a frost pill, the lead starting at a dot; otherwise a plain caption, the lead ending in an arrow.
 func use_studio() -> void:
 	_studio = true
 	_backing = SatinPanel.Backing.new(self, StudioTokens.Look.FROST)
@@ -117,8 +117,6 @@ func _fade_to(alpha: float) -> void:
 	if timeline or (_fade_alpha == alpha and (_fade or is_equal_approx(modulate.a, alpha))):
 		return
 	_fade_alpha = alpha
-	if _fade:
-		_fade.kill()
-	_fade = create_tween()
+	_fade = Motion.restart(self, _fade)
 	_fade.tween_property(self, ^"modulate:a", alpha, _FADE_S)
 	_fade.finished.connect(func() -> void: _fade = null)

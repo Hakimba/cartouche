@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name SettingsMenu
 extends Control
-## The Studio settings on the plain backdrop, with the existing choices, the games floating switch and the sounds'
-## level, which left and right turn down and up.
+## The settings on the plain backdrop: the choices, the games floating switch and the sounds' level, which left
+## and right turn down and up.
 
 ## [param choice] names a row, or `close` (B).
 signal chosen(choice: StringName)
@@ -10,16 +10,14 @@ signal transition_frame(subject: float, rail: float, chrome: float)
 ## Left or right on the sounds' line set them to [param steps].
 signal sound_level_changed(steps: int)
 
-static var DURATION_S: float:
-	get: return maxf(StudioTokens.TR_SETTINGS_OPEN_S, StudioTokens.TR_SETTINGS_CARD_AT_S + StudioTokens.TR_SETTINGS_CARD_S)
+enum State { OPENING, OPEN, CLOSING, CLOSED }
+
 const _PITCH := 89.6 # Row height plus the 7.68 px gap.
 const _ROW_SIZE := Vector2(624.64, 81.92)
 const _CARD_TOP := 128.0
 const _HEADING_INSET := Vector2(43.52, 37.4)
-## The first row's top in the card: the design's line boxes put its text and frame a px higher than centring does.
+## The first row's top in the card, in px: a pixel above where centring puts its text and frame.
 const _ITEMS_TOP := 143.64
-static var _ENTER_DROP: float:
-	get: return StudioTokens.TR_SETTINGS_RISE_PX
 const _KNOB_TRAVEL := 38.4
 const _KNOB_MIDDLE := Color("#f4efe7")
 const _KNOB_EDGE := Color("#e2d9cc")
@@ -29,7 +27,8 @@ const SAVE_ESCAPE_MS := 2000
 const _STEP_SIZE := Vector2(10.24, 23.04)
 const _STEP_GAP := 6.4
 
-enum State { OPENING, OPEN, CLOSING, CLOSED }
+static var DURATION_S: float:
+	get: return maxf(StudioTokens.TR_SETTINGS_OPEN_S, StudioTokens.TR_SETTINGS_CARD_AT_S + StudioTokens.TR_SETTINGS_CARD_S)
 
 var games_float := false:
 	set(value):
@@ -53,8 +52,8 @@ var saving := false:
 	set(value):
 		saving = value
 		_save_started_ms = Time.get_ticks_msec()
-var _save_started_ms := 0
 var state := State.OPEN
+var _save_started_ms := 0
 var _time := DURATION_S
 var _direction := 1.0
 var _closing := false
@@ -72,7 +71,6 @@ var _ink: Control
 
 @onready var _panel: Control = $Panel
 @onready var _items: Control = $Panel/Items
-
 @onready var _platforms: FieldButton = %Platforms
 @onready var _button_style: FieldButton = %ButtonStyle
 @onready var _graphics: FieldButton = %Graphics
@@ -183,15 +181,21 @@ func _duration() -> float:
 
 
 func _sample() -> void:
-	var card := _portion(0.0, StudioTokens.TR_SETTINGS_CARD_OUT_S, StudioTokens.TR_SETTINGS_CARD_OUT_S_CURVE) if _closing else 1.0 - _portion(StudioTokens.TR_SETTINGS_CARD_AT_S, StudioTokens.TR_SETTINGS_CARD_S, StudioTokens.TR_SETTINGS_CARD_S_CURVE)
+	var card := _portion(0.0, StudioTokens.TR_SETTINGS_CARD_OUT_S, StudioTokens.TR_SETTINGS_CARD_OUT_S_CURVE) if _closing \
+		else 1.0 - _portion(StudioTokens.TR_SETTINGS_CARD_AT_S, StudioTokens.TR_SETTINGS_CARD_S, StudioTokens.TR_SETTINGS_CARD_S_CURVE)
 	_panel.modulate.a = 1.0 - card
-	_panel.position.y = _CARD_TOP + card * (25.6 if _closing else _ENTER_DROP)
+	_panel.position.y = _CARD_TOP + card * (25.6 if _closing else StudioTokens.TR_SETTINGS_RISE_PX)
 	_panel.scale = Vector2.ONE * lerpf(1.0, 0.98 if _closing else 0.97, card)
-	($Dim as ColorRect).modulate.a = 1.0 - _portion(0.06, 0.2, Motion.Easing.EASE_IN) if _closing else _portion(StudioTokens.TR_SETTINGS_VEIL_AT_S, StudioTokens.TR_SETTINGS_VEIL_S, Motion.Easing.EASE_OUT)
-	($Hints as Control).modulate.a = 1.0 - _portion(0.0, 0.12, Motion.Easing.LINEAR) if _closing else _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
-	var subject := _portion(StudioTokens.TR_SETTINGS_BACK_AT_S, maxf(0.001, StudioTokens.TR_SETTINGS_CLOSE_S - StudioTokens.TR_SETTINGS_BACK_AT_S), Motion.Easing.ARRIVE) if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_LEAVE_S, StudioTokens.TR_SETTINGS_LEAVE_S_CURVE)
-	var rail := _portion(StudioTokens.TR_SETTINGS_BACK_AT_S, maxf(0.001, StudioTokens.TR_SETTINGS_CLOSE_S - StudioTokens.TR_SETTINGS_BACK_AT_S), Motion.Easing.ARRIVE) if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_SINK_S, StudioTokens.TR_SETTINGS_SINK_S_CURVE)
-	var chrome := _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR) if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
+	($Dim as ColorRect).modulate.a = 1.0 - _portion(0.06, 0.2, Motion.Easing.EASE_IN) if _closing \
+		else _portion(StudioTokens.TR_SETTINGS_VEIL_AT_S, StudioTokens.TR_SETTINGS_VEIL_S, Motion.Easing.EASE_OUT)
+	($Hints as Control).modulate.a = 1.0 - _portion(0.0, 0.12, Motion.Easing.LINEAR) if _closing \
+		else _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
+	var back_s := maxf(0.001, StudioTokens.TR_SETTINGS_CLOSE_S - StudioTokens.TR_SETTINGS_BACK_AT_S)
+	var back := _portion(StudioTokens.TR_SETTINGS_BACK_AT_S, back_s, Motion.Easing.ARRIVE)
+	var subject := back if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_LEAVE_S, StudioTokens.TR_SETTINGS_LEAVE_S_CURVE)
+	var rail := back if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_SINK_S, StudioTokens.TR_SETTINGS_SINK_S_CURVE)
+	var chrome := _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR) if _closing \
+		else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
 	transition_frame.emit(subject, rail, chrome)
 
 
@@ -200,9 +204,7 @@ func _portion(start: float, duration: float, curve: Motion.Easing) -> float:
 
 
 func _focus_row(index: int) -> void:
-	if _cursor_tween:
-		_cursor_tween.kill()
-	_cursor_tween = create_tween()
+	_cursor_tween = Motion.restart(self, _cursor_tween)
 	var start := _cursor_y
 	_cursor_tween.tween_method(func(t: float) -> void:
 		_place_cursor(lerpf(start, index * _PITCH, Motion.eased(Motion.Easing.SNAP, t))), 0.0, 1.0, 0.24)
@@ -223,7 +225,8 @@ func _draw_card() -> void:
 		var has_note := row == _floating or row == _region
 		name_line.draw(_ink, Vector2(61.44, y + (2.08 if has_note else 18.4)), StudioTokens.INK)
 		if has_note:
-			var note := StudioText.new(row.shown_value() if row == _region else tr("The selected game gently rises and falls"), StudioTokens.Face.JAKARTA_500, 21.76)
+			var note := StudioText.new(row.shown_value() if row == _region else tr("The selected game gently rises and falls"),
+				StudioTokens.Face.JAKARTA_500, 21.76)
 			note.fit(460.0)
 			note.draw(_ink, Vector2(61.44, y + 47.2), StudioTokens.MUTE)
 		elif row == _sounds:
@@ -235,7 +238,8 @@ func _draw_card() -> void:
 			var at := Vector2(629.61, y + 40.96)
 			_ink.draw_polyline(PackedVector2Array([at + Vector2(-6.88, -6.88), at, at + Vector2(-6.88, 6.88)]), StudioTokens.MUTE, 3.584, true)
 		if i < _rows.size() - 1:
-			_ink.draw_line(Vector2(61.44, y + (_ROW_SIZE.y + _PITCH) / 2.0), Vector2(_items.position.x + _ROW_SIZE.x - 17.92, y + (_ROW_SIZE.y + _PITCH) / 2.0), StudioTokens.LINE, 1.0)
+			_ink.draw_line(Vector2(61.44, y + (_ROW_SIZE.y + _PITCH) / 2.0), Vector2(_items.position.x + _ROW_SIZE.x - 17.92,
+				y + (_ROW_SIZE.y + _PITCH) / 2.0), StudioTokens.LINE, 1.0)
 
 
 ## The sounds' level on the line at [param y]: its steps, the ones it reaches in the gel.
@@ -266,7 +270,8 @@ func _switch_piece(box: Vector2, radius: float, knob: bool) -> ColorRect:
 	parameters[&"radius"] = radius
 	parameters[&"stop_count"] = 3 if knob else 2
 	parameters[&"stops"] = [0.0, 0.6, 1.0] if knob else [0.0, 1.0]
-	parameters[&"colors"] = [Vector4(1, 1, 1, 1), _rgba(_KNOB_MIDDLE), _rgba(_KNOB_EDGE)] if knob else [Vector4(0.8667, 0.8314, 0.7804, 1), Vector4(0.8667, 0.8314, 0.7804, 1)]
+	parameters[&"colors"] = [Vector4(1, 1, 1, 1), _rgba(_KNOB_MIDDLE), _rgba(_KNOB_EDGE)] if knob else [Vector4(0.8667, 0.8314, 0.7804, 1),
+		Vector4(0.8667, 0.8314, 0.7804, 1)]
 	parameters[&"centre"] = Vector2(0.36, 0.3) if knob else Vector2(-1, -1)
 	parameters[&"shadow_count"] = 1
 	parameters[&"inset_count"] = 0 if knob else 1
@@ -302,9 +307,7 @@ static func _rgba(color: Color) -> Vector4:
 
 
 func _move_switch() -> void:
-	if _switch_tween:
-		_switch_tween.kill()
-	_switch_tween = create_tween().set_parallel()
+	_switch_tween = Motion.restart(self, _switch_tween).set_parallel()
 	var start := _knob_x
 	var end := _KNOB_TRAVEL if games_float else 0.0
 	var color_start := _switch_color

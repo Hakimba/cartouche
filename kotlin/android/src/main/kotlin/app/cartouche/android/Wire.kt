@@ -9,7 +9,6 @@ import app.cartouche.android.art.LabelDownload
 import app.cartouche.android.art.LabelFailure
 import app.cartouche.android.art.LabelNews
 import app.cartouche.android.art.OwnPicture
-import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.ScanReport
@@ -18,68 +17,59 @@ import app.cartouche.android.storage.EntryKind
 import app.cartouche.android.storage.Folder
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.core.art.Scraping
-import app.cartouche.core.art.Stall
-import app.cartouche.core.library.CountedReason
-import app.cartouche.core.library.Disc
-import app.cartouche.core.library.DiscGrouping
-import app.cartouche.core.library.FolderDepth
-import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
-import app.cartouche.core.library.IgnoredCount
-import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlacementError
-import app.cartouche.core.library.PlatformSetup
-import app.cartouche.core.library.SkipReason
-import app.cartouche.core.library.SkippedFolder
 import app.cartouche.core.library.VariantError
 import app.cartouche.core.platforms.Candidate
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.LaunchError
-import app.cartouche.core.platforms.MediaType
-import app.cartouche.core.platforms.MediumId
-import app.cartouche.core.platforms.PlatformId
-import app.cartouche.core.platforms.Player
 import app.cartouche.core.regions.PreferredRegion
-import app.cartouche.core.search.Mark
-import app.cartouche.core.search.View
-import app.cartouche.core.settings.ButtonStyle
-import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Settings
-import app.cartouche.core.shelves.Shelves
-import app.cartouche.core.storage.Volume
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.filterIsInstance
 import arrow.core.getOrElse
-import arrow.core.getOrNone
 import arrow.core.toOption
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.serializer
 import org.godotengine.godot.Dictionary
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
-// The Dictionary format shared with the GDScript adapter (app/adapters/android/android_services.gd).
-// Getters return plain Dictionaries; operations answer through the `answered` signal with
-// `{"request_id", "ok": true, …}` or `{"request_id", "ok": false, "code", "detail"}`.
-// A value that may be missing is an absent key, never null.
+// Dictionary format shared with app/adapters/android/android_services.gd: operations answer through `answered` with
+// `{"request_id", "ok": true, …}` or `{"request_id", "ok": false, "code", "detail"}`; a missing value is an absent key.
 
+// The Dictionary format shared with the GDScript adapter (app/adapters/android/android_services.gd). Getters return
+// plain Dictionaries; operations answer through the `answered` signal with `{"request_id", "ok": true, …}` or
+// `{"request_id", "ok": false, "code", "detail"}`. A value that may be missing is an absent key, never null.
 internal const val ANSWERED_SIGNAL = "answered"
+
+internal const val ART_SIGNAL = "art_changed"
+
+/** How the download of a game's label on screen goes ([LabelDownload.toWire]). */
+internal const val ART_PROGRESS_SIGNAL = "art_progress"
+
+internal const val VARIANT_SIGNAL = "label_variant_downloaded"
+
+/** The battery's level, or whether a charger is plugged in, changed. */
+internal const val BATTERY_SIGNAL = "battery_changed"
 
 internal const val TAG = "Cartouche"
 
-/** One `area: detail` line in the log of debug builds, read with `dev/logs.sh`; release builds skip [detail]. */
+/** One `area: detail` line in the debug log; release builds skip [detail]. */
 internal inline fun trace(area: String, detail: () -> String) {
     if (BuildConfig.DEBUG) Log.i(TAG, "$area: ${detail()}")
 }
 
-/** Stable error codes, for the UI to tell failures apart. Spelled out so renaming a constant cannot change them. */
+internal inline fun <T> timed(area: String, describe: (T, Duration) -> String, block: () -> T): T {
+    val started = TimeSource.Monotonic.markNow()
+    return block().also { result -> trace(area) { describe(result, started.elapsedNow()) } }
+}
+
+/** Spelled out so renaming a constant cannot change the codes. */
 internal enum class ErrorCode(val wire: String) {
     CANCELLED("cancelled"),
     NO_ACTIVITY("no_activity"),
@@ -105,17 +95,24 @@ internal enum class ErrorCode(val wire: String) {
     UNEXPECTED("unexpected"),
 }
 
+/** The enum's name in the stored format (`@SerialName`), so the two cannot drift; `WireTest` pins the strings. */
+internal inline val <reified E : Enum<E>> E.wire: String get() = serializer<E>().descriptor.getElementName(ordinal)
+
+internal val Enum<*>.plainWire: String get() = name.lowercase()
+
 internal fun dictionary(vararg entries: Pair<String, Any>): Dictionary = Dictionary().apply { putAll(entries) }
 
 internal fun success(vararg payload: Pair<String, Any>): Dictionary = dictionary("ok" to true, *payload)
 
 internal fun failure(code: ErrorCode, detail: String): Dictionary = dictionary("ok" to false, "code" to code.wire, "detail" to detail)
 
-/**
- * The wire form of a list of Dictionaries. Godot's JNI bridge only turns an `Object[]` into an
- * Array, and a String inside one stays an opaque JavaObject: lists of texts are sent as `String[]`,
- * which becomes a PackedStringArray. Any other typed array is an opaque object.
- */
+/** Where unexpected exceptions stop: logged, answered as a failure. */
+internal fun unexpected(e: Throwable): Dictionary {
+    Log.e(TAG, "Unexpected failure", e)
+    return failure(ErrorCode.UNEXPECTED, e.toString())
+}
+
+/** Godot's JNI bridge only turns an `Object[]` into an Array, and a String inside one stays opaque: texts are sent as `String[]`. */
 internal fun <T> List<T>.toWireArray(transform: (T) -> Dictionary): Array<Any> = map(transform).toTypedArray()
 
 /** Puts [value] under [key] when there is one: absence is an absent key. */
@@ -124,7 +121,7 @@ internal fun Dictionary.putSome(key: String, value: Option<Any>): Dictionary = a
 /** The String under [key]; none when it is absent or of another type. */
 internal fun Dictionary.text(key: String): Option<String> = this[key].toOption().filterIsInstance<String>()
 
-/** The integer under [key] (GDScript ints arrive as Long); none when it is absent, of another type or out of range. */
+/** GDScript ints arrive as Long. */
 internal fun Dictionary.integer(key: String): Option<Int> = this[key].toOption().flatMap { value ->
     when (value) {
         is Long -> Some(value).filter { it in Int.MIN_VALUE..Int.MAX_VALUE }.map(Long::toInt)
@@ -166,14 +163,7 @@ internal fun StorageFailure.toWire(): Dictionary = failure(
 /** `{"uri", "name", "path"?, "place"?: {"volume": "internal" or "card", "folders": [name]}}`. */
 internal fun Folder.toWire(): Dictionary = dictionary("uri" to uri.value, "name" to name)
     .putSome("path", path.map { it.value })
-    .putSome("place", place.map { dictionary("volume" to it.volume.wire, "folders" to it.folders.toTypedArray()) })
-
-private val Volume.wire: String
-    get() =
-        when (this) {
-            Volume.INTERNAL -> "internal"
-            Volume.CARD -> "card"
-        }
+    .putSome("place", place.map { dictionary("volume" to it.volume.plainWire, "folders" to it.folders.toTypedArray()) })
 
 internal fun DocumentEntry.toWire(): Dictionary = dictionary(
     "name" to name.value,
@@ -209,153 +199,13 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
     is LibraryFailure.TooManyEntries -> failure(ErrorCode.TOO_MANY_FILES, message)
 }
 
-/**
- * The library and its [shelves] as JSON text, read on the Godot side with its JSON parser: a few
- * hundred games as Dictionaries take about a second to cross the JNI bridge, as JSON a few
- * milliseconds. The shape is the one Dictionaries would have: `{"setups": {platform id: setup},
- * "games": [game], "not_games": {platform id: [file name]}, "ignored_counts": {platform id:
- * {"hidden" or "unsupported": {"count", "examples"}}}, "skipped_folders": {platform id: [{"path",
- * "reason"}]}, "shelves"?: {"shelves": [{"platform", "games": [index into games], "selected"}],
- * "selected"}}`, with the keys below; a missing value is an absent key. Each game carries the medium
- * [catalog]'s profile of its platform gives it, absent when the catalog does not know the platform.
- */
-internal fun Library.toWireJson(shelves: Option<Shelves>, catalog: Catalog): String = buildJsonObject {
-    val media = catalog.platforms.associate { it.id to it.profile.medium }
-    put("setups", setups.toJson(PlatformId::value) { it.toJson() })
-    put("games", games.toJson { game -> game.toJson(media.getOrNone(game.platform).map { it.of(game.regions) }) })
-    put("not_games", notGames.toJson(PlatformId::value) { files -> files.toJson { JsonPrimitive(it.name.value) } })
-    put("ignored_counts", ignoredCounts.toJson(PlatformId::value) { counts -> counts.toJson({ it.wire }) { it.toJson() } })
-    put("skipped_folders", skippedFolders.toJson(PlatformId::value) { folders -> folders.toJson { it.toJson() } })
-    put(
-        "console_variants",
-        buildJsonObject {
-            setups.keys.forEach { platform -> variantOf(platform).onSome { put(platform.value, it.wire) } }
-        },
-    )
-    shelves.onSome { put("shelves", it.toJson(games.withIndex().associate { (at, game) -> game.id to at })) }
-}.toString()
-
-private fun <K, V> Map<K, V>.toJson(key: (K) -> String, value: (V) -> JsonElement): JsonObject =
-    JsonObject(entries.associate { key(it.key) to value(it.value) })
-
-private fun <T> List<T>.toJson(item: (T) -> JsonElement): JsonArray = JsonArray(map(item))
-
-private fun JsonObjectBuilder.putSome(key: String, value: Option<String>) = value.onSome { put(key, it) }
-
-private fun PlatformSetup.toJson(): JsonObject = buildJsonObject {
-    put("disc_grouping", discs.wire)
-    put("folder_depth", depth.wire)
-    putSome("folder_uri", folder.map { it.value })
-    putSome("player_id", player.map { it.value })
-}
-
-private fun Game.toJson(medium: Option<MediumId>): JsonObject = buildJsonObject {
-    put("id", id.value)
-    put("platform_id", platform.value)
-    put("title", shownTitle)
-    putSome("original_title", displayName.map { title })
-    put("regions", regions.toJson(::JsonPrimitive))
-    putSome("medium", medium.map { it.value })
-    put("languages", languages.toJson(::JsonPrimitive))
-    put("serials", serials.toJson(::JsonPrimitive))
-    put("discs", discs.toJson { it.toJson() })
-    put("last_disc", lastDisc)
-    put("identified", identified)
-    putSome("version", version)
-    putSome("redump_name", redumpName)
-    when (val chosen = label) {
-        LabelChoice.Automatic -> Unit
-        is LabelChoice.Region -> {
-            put("label_region", chosen.region.name)
-            put("label_source", chosen.source.wire)
-        }
-        LabelChoice.Own -> put("label_own", true)
-    }
-}
-
-private fun Disc.toJson(): JsonObject = buildJsonObject {
-    put("name", file.name.value)
-    number.onSome { put("number", it) }
-}
-
-private fun IgnoredCount.toJson(): JsonObject = buildJsonObject {
-    put("count", count)
-    put("examples", examples.toJson { JsonPrimitive(it.value) })
-}
-
-/** [indexes] places each game in the library's games; the shelves are made of those games, so each has one. */
-private fun Shelves.toJson(indexes: Map<GameId, Int>): JsonObject = buildJsonObject {
-    put(
-        "shelves",
-        shelves.toJson { shelf ->
-            buildJsonObject {
-                put("platform", shelf.platform.value)
-                put("games", shelf.games.toJson { JsonPrimitive(indexes.getValue(it.id)) })
-                put("selected", shelf.selected)
-            }
-        },
-    )
-    put("selected", selected)
-}
-
-private fun SkippedFolder.toJson(): JsonObject = buildJsonObject {
-    put("path", path.value)
-    put("reason", reason.wire)
-}
-
-private val CountedReason.wire: String
-    get() =
-        when (this) {
-            CountedReason.HIDDEN -> "hidden"
-            CountedReason.UNSUPPORTED -> "unsupported"
-        }
-
-internal val SkipReason.wire: String
-    get() =
-        when (this) {
-            SkipReason.HIDDEN -> "hidden"
-            SkipReason.EMULATOR_DATA -> "emulator_data"
-            SkipReason.TOO_DEEP -> "too_deep"
-            SkipReason.UNREADABLE -> "unreadable"
-        }
-
-internal val DiscGrouping.wire: String
-    get() =
-        when (this) {
-            DiscGrouping.GROUPED -> "grouped"
-            DiscGrouping.SEPARATE -> "separate"
-        }
-
-internal val FolderDepth.wire: String
-    get() =
-        when (this) {
-            FolderDepth.TOP_LEVEL -> "top_level"
-            FolderDepth.SUBFOLDERS -> "subfolders"
-        }
-
 /** `{"level_percent": int (absent when unknown), "plugged": bool}` */
 internal fun BatteryState.toWire(): Dictionary = dictionary("plugged" to plugged).putSome("level_percent", levelPercent)
 
-internal val ButtonStyle.wire: String
-    get() =
-        when (this) {
-            ButtonStyle.XBOX -> "xbox"
-            ButtonStyle.NINTENDO -> "nintendo"
-            ButtonStyle.PLAYSTATION -> "playstation"
-        }
-
-internal val EdgeSmoothing.wire: String
-    get() =
-        when (this) {
-            EdgeSmoothing.FOUR_TIMES -> "4x"
-            EdgeSmoothing.TWICE -> "2x"
-            EdgeSmoothing.OFF -> "off"
-        }
-
 /**
  * `{"first_launch", "button_style"?, "edge_smoothing", "games_float", "sound_level", "preferred_region"?, "preferred_regions"}`:
- * the style and the region are absent until one is chosen; the regions are those a preference can
- * name, as [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes.
+ * the style and the region are absent until one is chosen; the regions are those a preference can name, as
+ * [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes.
  */
 internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
     "first_launch" to firstLaunch,
@@ -366,21 +216,13 @@ internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
 ).putSome("button_style", buttonStyle.map { it.wire })
     .putSome("preferred_region", preferredRegion.map { it.region })
 
-internal val MediaType.wire: String
-    get() =
-        when (this) {
-            MediaType.DVD -> "dvd"
-            MediaType.CARTRIDGE -> "cartridge"
-            MediaType.MINIDISC -> "minidisc"
-        }
-
 /**
- * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`,
- * and what it just learnt of games' labels, if anything: the art found under `"found"`
- * ([FoundArt.toWire]), or the ids of games no source has art for under `"absent"`.
+ * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`, and what it just
+ * learnt of games' labels, if anything: the art found under `"found"` ([FoundArt.toWire]), or the ids of games no
+ * source has art for under `"absent"`.
  */
 internal fun Scraping.toWire(news: Option<LabelNews>): Dictionary =
-    dictionary("done" to done, "total" to total).putSome("stall", stall.map { it.wire }).apply {
+    dictionary("done" to done, "total" to total).putSome("stall", stall.map { it.plainWire }).apply {
         news.onSome {
             when (it) {
                 is FoundArt -> put("found", it.toWire())
@@ -390,9 +232,8 @@ internal fun Scraping.toWire(news: Option<LabelNews>): Dictionary =
     }
 
 /**
- * What the `art_progress` signal carries of [game]'s label: `{"game_id", "fraction"}` while it
- * downloads, the fraction from 0 to 1, or -1 when the image's size is unknown; `{"game_id"}` once
- * its look is over.
+ * What the `art_progress` signal carries of [game]'s label: `{"game_id", "fraction"}` while it downloads, the fraction from 0 to 1,
+ * or -1 when the image's size is unknown; `{"game_id"}` once its look is over.
  */
 internal fun LabelDownload.toWire(game: GameId): Dictionary = when (this) {
     is LabelDownload.Running -> dictionary("game_id" to game.value, "fraction" to fraction.getOrElse { -1.0 })
@@ -402,35 +243,6 @@ internal fun LabelDownload.toWire(game: GameId): Dictionary = when (this) {
 /** `{"game_id", "path"}`, the path an absolute one to a JPEG. */
 internal fun FoundArt.toWire(): Dictionary = dictionary("game_id" to game.value, "path" to art.file.path)
 
-/**
- * What the carousel shows of a shelf of [count] games, as JSON text: `{"count", "games": [position
- * in the shelf], "groups": [{"label", "start"}], "keys": {key: position in games}}`, a key being a
- * lowercase letter, a digit or a space. Thousands of positions cost a few milliseconds this way.
- */
-internal fun View.toWireJson(count: Int): String {
-    // Answered at each key typed: thousands of positions written straight, not as a tree of elements.
-    val groups =
-        groups.toJson {
-            buildJsonObject {
-                put("label", it.label)
-                put("start", it.start)
-            }
-        }
-    val keys = keys.toJson(Char::toString, ::JsonPrimitive)
-    return """{"count":$count,"games":[${games.joinToString(",")}],"groups":$groups,"keys":$keys}"""
-}
-
-/** Where to underline a title, as JSON text: `[[start, length]]`, in characters. */
-internal fun List<Mark>.toWireJson(): String = toJson { JsonArray(listOf(JsonPrimitive(it.start), JsonPrimitive(it.length))) }.toString()
-
-/** Stored art as JSON text, `[{"game_id", "path"}]`: a library's worth of Dictionaries would cost as much as its games (see [toWireJson]). */
-internal fun List<FoundArt>.artWireJson(): String = toJson { found ->
-    buildJsonObject {
-        put("game_id", found.game.value)
-        put("path", found.art.file.path)
-    }
-}.toString()
-
 internal fun LabelFailure.toWire(): Dictionary = when (this) {
     LabelFailure.NotDownloaded -> failure(ErrorCode.NO_IMAGE, "The image is not downloaded")
     LabelFailure.NotPicked -> failure(ErrorCode.NO_IMAGE, "No picture is being framed")
@@ -438,24 +250,6 @@ internal fun LabelFailure.toWire(): Dictionary = when (this) {
     is LabelFailure.Library -> failure.toWire()
     is LabelFailure.Storage -> failure.toWire()
 }
-
-internal val VariantFailure.wire: String
-    get() =
-        when (this) {
-            VariantFailure.OFFLINE -> "offline"
-            VariantFailure.REFUSED -> "refused"
-            VariantFailure.NOT_FOUND -> "not_found"
-            VariantFailure.UNREADABLE -> "unreadable"
-            VariantFailure.STORAGE -> "storage"
-        }
-
-internal val Stall.wire: String
-    get() =
-        when (this) {
-            Stall.OFFLINE -> "offline"
-            Stall.REFUSED -> "refused"
-            Stall.STORAGE -> "storage"
-        }
 
 internal fun ScanReport.toWire(): Dictionary = dictionary(
     "files" to files,
@@ -466,7 +260,10 @@ internal fun ScanReport.toWire(): Dictionary = dictionary(
     "milliseconds" to milliseconds,
 )
 
-/** How scraping again went: the games of the library, how many of the labels looked for were found, the consoles not scanned and why. */
+/**
+ * How scraping again went: the games of the library, how many of the labels looked for were found, the consoles not
+ * scanned and why.
+ */
 internal data class Rescraped(val games: Int, val labels: Int, val failures: List<String>)
 
 internal fun Rescraped.toWire(): Dictionary = dictionary("games" to games, "labels" to labels, "failures" to failures.toTypedArray())
@@ -480,6 +277,5 @@ internal fun Catalog.toWire(): Dictionary = dictionary(
     "offered" to offeredToWire(),
 )
 
-internal fun Player.toWire(): Dictionary = dictionary("player_id" to id.value, "player_name" to name)
-
-internal fun Candidate.toWire(): Dictionary = player.toWire().apply { put("platform_name", platform.name) }
+internal fun Candidate.toWire(): Dictionary =
+    dictionary("player_id" to player.id.value, "player_name" to player.name, "platform_name" to platform.name)

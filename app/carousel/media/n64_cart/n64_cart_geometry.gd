@@ -16,7 +16,6 @@ const PARTS: Array[StringName] = [&"label", &"shell", &"grooves", &"screws", &"s
 ## then fits on the piece next to it at any detail.
 const ARCS := 8
 const WING_ARCS := 2
-## Steps round a rolled edge.
 const ROLL_STEPS := 3
 
 
@@ -83,7 +82,6 @@ static func recess(shape: N64CartShape, steps: int) -> PackedVector2Array:
 		shape.label_corners + Vector2.ONE * N64CartShape.LABEL_GAP, steps)
 
 
-## The layers, back to front, each sunk into the one under it, the grooves cut in them.
 static func _shell(mesh: MeshBuilder, shape: N64CartShape, steps: int) -> void:
 	var whole := shape.whole()
 	var back := -shape.depth / 2.0
@@ -176,9 +174,7 @@ static func _rolled(mesh: MeshBuilder, loop: PackedVector2Array, rolls: PackedFl
 	return turned
 
 
-## The linings of the grooves, a shade darker than the shell where light reaches less: down the front from the top to the bottom, over the top through
-## the front half and through the back one, and down the back from the top to the sticker and from
-## the sticker to the bottom.
+## The grooves' linings, a shade darker than the shell where light reaches less.
 static func _linings(mesh: MeshBuilder, shape: N64CartShape) -> void:
 	var whole := shape.whole()
 	var half := shape.groove / 2.0
@@ -254,7 +250,6 @@ static func _wing(shape: N64CartShape, steps: int, side: float) -> PackedVector2
 	return ShapeGeometry.filleted(right, radii, steps)
 
 
-## The oval's rim standing out of the back, around the moulded name.
 static func _rim(mesh: MeshBuilder, shape: N64CartShape, steps: int) -> void:
 	var whole := shape.whole()
 	var back := -shape.depth / 2.0
@@ -272,8 +267,6 @@ static func _rim(mesh: MeshBuilder, shape: N64CartShape, steps: int) -> void:
 	ShapeGeometry.sunk(mesh, inner, low, high, whole, false)
 
 
-## The back's outline, cut by the two indentations, and slit by its grooves from the top down to the
-## sticker and from the sticker down to the bottom.
 static func _back(shape: N64CartShape, steps: int) -> PackedVector2Array:
 	var low := shape.whole().position
 	var inner := low.x + shape.notch_from

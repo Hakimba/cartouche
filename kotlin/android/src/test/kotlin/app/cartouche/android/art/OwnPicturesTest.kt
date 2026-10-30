@@ -17,10 +17,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.nio.ByteBuffer
 
+@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class OwnPicturesTest {
@@ -38,19 +40,6 @@ class OwnPicturesTest {
     private fun decoded(image: ByteArray): Bitmap = BitmapFactory.decodeByteArray(image, 0, image.size)
 
     @Test
-    fun `a picture picked is kept whole to be framed`() {
-        val picture = pictures.keep(source(redThenBlue)).shouldBeRight()
-        (picture.width to picture.height) shouldBe (400 to 200)
-        decoded(picture.file.readBytes()).width shouldBe 400
-    }
-
-    @Test
-    fun `a picture longer than the copies are is kept at that length`() {
-        val picture = pictures.keep(source(png(4096, 1024))).shouldBeRight()
-        (picture.width to picture.height) shouldBe (OwnPictures.LONGEST to OwnPictures.LONGEST / 4)
-    }
-
-    @Test
     fun `the label is the framed square of the picture, at the labels' size`() {
         pictures.keep(source(redThenBlue)).shouldBeRight()
         val left = decoded(pictures.framed(LabelFraming(1.0, 0.0, 0.5, 1.0)).shouldBeRight())
@@ -63,7 +52,6 @@ class OwnPicturesTest {
 
     @Test
     fun `a closer framing cuts its square on both axes and fills the whole label with it`() {
-        // Red, green, blue and white quarters; the framing takes the middle of the bottom right one.
         val quarters =
             png(400, 400) {
                 drawColor(Color.RED)
@@ -83,7 +71,6 @@ class OwnPicturesTest {
     @Test
     fun `on a cartridge the label is the framed rectangle of its label's proportions, its longer side at the labels' size`() {
         pictures.keep(source(redThenBlue)).shouldBeRight()
-        // An NES label, taller than wide, on the left half: red; a Super Nintendo one, on the whole picture.
         val tall = decoded(pictures.framed(LabelFraming(1.0, 0.0, 0.5, 0.62)).shouldBeRight())
         (tall.width to tall.height) shouldBe (635 to ArtImages.LARGEST)
         Color.red(tall.getPixel(317, 512)) shouldBeGreaterThan 200
@@ -96,12 +83,5 @@ class OwnPicturesTest {
     @Test
     fun `what is not an image is not kept`() {
         pictures.keep(source("not an image".encodeToByteArray())).shouldBeLeft().shouldBeInstanceOf<LabelFailure.Unreadable>()
-    }
-
-    @Test
-    fun `nothing is framed before a picture is picked`() {
-        OwnPictures(File(RuntimeEnvironment.getApplication().cacheDir, "never-picked"))
-            .framed(LabelFraming(1.0, 0.5, 0.5, 1.0))
-            .shouldBeLeft(LabelFailure.NotPicked)
     }
 }

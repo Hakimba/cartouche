@@ -33,7 +33,7 @@ const _TOP_RINGS := 14
 const _SLIT_STEPS := 4
 ## How far the slits on the ramp sink into the top, and stand out of it.
 const _SLIT_DEPTHS := Vector2(-1.0, 0.3)
-## Estimated from the photos: the memory lid's corners, how far it sinks into the hill and stands out
+## The memory lid's corners, how far it sinks into the hill and stands out
 ## of it; its tab at the middle of its back edge (its width, its length, how far it reaches past
 ## the lid, how far it stands out of the hill); its lettering's top from the lid's back edge.
 const _LID_CORNER := 4.0
@@ -78,10 +78,8 @@ static func arrays(shape: N64Shape, part: StringName, detail: int) -> Array:
 				ShapeGeometry.block(mesh, shape.pod(side), Vector2.ONE * shape.pod_corner(), steps, N64Shape.FEET,
 					shape.pod_height, N64Shape.POD_ROUND, body)
 		&"well":
-			# Just above the lower shell's top, which it hides.
 			ShapeGeometry.flat(mesh, slot, shape.seam + 0.05, Vector3.BACK, shape.slot())
 		&"bezel":
-			# A hair inside the slot's walls, from under the flaps' hinges to just below the floor.
 			var inside := ShapeGeometry.rounded_box(shape.slot().grow(-N64Shape.BEZEL), 1.0, steps)
 			var bottom := shape.back_height - shape.flap_recess - shape.flap_thickness - 1.0
 			ShapeGeometry.block(mesh, shape.slot().grow(-0.05), Vector2.ONE * _SLOT_CORNER, steps, bottom,
@@ -101,13 +99,11 @@ static func arrays(shape: N64Shape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.prism(mesh, ShapeGeometry.square(tab), shape.height + _LID_DEPTHS.x,
 				shape.height + _LID_TAB.w)
 		&"lid_label":
-			# Ahead of the lid's tab.
 			var lid := shape.lid()
 			var size := LOGOS[part]
 			ShapeGeometry.decal(mesh, Rect2(Vector2(-size.x / 2.0, lid.end.y - size.y - _LID_LABEL_FROM_BACK), size),
 				shape.height + _LID_DEPTHS.y)
 		&"logo", &"maker_logo":
-			# A plate on the tongue behind the slot, where the maker's name stands.
 			var behind := Vector2(0.0, (shape.slot().end.y + body.end.y - shape.crown.x) / 2.0)
 			var logo := ShapeGeometry.centred(behind, N64Shape.LOGO)
 			if part == &"logo":
@@ -116,7 +112,6 @@ static func arrays(shape: N64Shape, part: StringName, detail: int) -> Array:
 			else:
 				ShapeGeometry.decal(mesh, ShapeGeometry.centred(behind, LOGOS[part]), shape.back_height + 0.4)
 		&"badge", &"badge_logo":
-			# On the front face, below the hill's rounded edge.
 			var face := Rect2(-N64Shape.BADGE_WIDTH / 2.0, shape.seam + _BADGE_MARGINS.x, N64Shape.BADGE_WIDTH,
 				shape.height - shape.crown.y - shape.seam - _BADGE_MARGINS.x - _BADGE_MARGINS.y)
 			if part == &"badge":
@@ -140,7 +135,6 @@ static func arrays(shape: N64Shape, part: StringName, detail: int) -> Array:
 				var ends := shape.vent(index)
 				_draped(mesh, shape, ends[0], ends[1])
 		&"side_vents":
-			# Towards the back of the lower shell.
 			var last := body.end.y - shape.corner
 			for i in N64Shape.SIDE_VENTS:
 				var y := last - (i + 0.5) * N64Shape.SIDE_VENT_PITCH
@@ -150,17 +144,14 @@ static func arrays(shape: N64Shape, part: StringName, detail: int) -> Array:
 				ShapeGeometry.prism(mesh, ShapeGeometry.square(slit), body.position.x - 0.3, body.position.x + 1.0)
 			at.basis = ShapeGeometry.SIDE
 		&"recesses":
-			# The switches' recesses, and the gap around the memory lid.
 			var lid_gap := shape.lid().grow(0.8)
 			for recess: Rect2 in [shape.recess(true), shape.recess(false), lid_gap]:
 				var rounding := 4.8 if recess == lid_gap else _RECESS_CORNER
-				# Laid on the top, a hair above it.
 				var on_top := PackedVector3Array()
 				for point in ShapeGeometry.rounded_box(recess, rounding, steps):
 					on_top.append(Vector3(point.x, point.y, shape.top_height(point) + 0.05))
 				ShapeGeometry.laid(mesh, on_top, Vector3.BACK, recess)
 		&"power_knob", &"reset_knob", &"power_label", &"reset_label", &"switch_label":
-			# Laid out around its recess's centre, then leant with the flank under it.
 			var power := part in [&"power_knob", &"power_label", &"switch_label"]
 			var knob := shape.knob(power)
 			var local := Rect2(-knob.size.x / 2.0, knob.position.y, knob.size.x, knob.size.y)
@@ -176,7 +167,6 @@ static func arrays(shape: N64Shape, part: StringName, detail: int) -> Array:
 					ShapeGeometry.decal(mesh, Rect2(Vector2(-room.size.x / 2.0 - size.x - SWITCH_LABEL_GAP,
 						room.get_center().y - 4.0 - size.y / 2.0), size), 0.3)
 				_:
-					# Across the knob's front end.
 					var size := LOGOS[part]
 					ShapeGeometry.decal(mesh, Rect2(Vector2(-size.x / 2.0, local.position.y + 3.0), size),
 						N64Shape.KNOB_HEIGHT)
@@ -251,7 +241,6 @@ static func _outline(box: Rect2, radius: float, centre: Vector2, rays: PackedVec
 		var point := centre + towards * reach
 		var nearest := point.clamp(inner.position, inner.end)
 		if nearest.x != point.x and nearest.y != point.y:
-			# Through a rounded corner: where the ray leaves its circle.
 			var from := centre - nearest
 			var along := from.dot(towards)
 			point = centre + towards * (-along + sqrt(along * along - from.length_squared() + radius * radius))

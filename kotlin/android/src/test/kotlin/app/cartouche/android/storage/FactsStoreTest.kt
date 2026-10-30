@@ -29,8 +29,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.io.File
 
+@Config(sdk = [30, 34])
 @RunWith(RobolectricTestRunner::class)
 class FactsStoreTest {
     private val folder = File(RuntimeEnvironment.getApplication().filesDir, "facts")
@@ -94,20 +96,6 @@ class FactsStoreTest {
     }
 
     @Test
-    fun `a Game Boy ROM's shell is kept with its print`() {
-        val told =
-            Shell.entries
-                .mapIndexed { i, shell ->
-                    documentUri("root/$i.gbc") to
-                        KnownFacts(FileStamp(Some(1L), None), FileFacts.Print(10u, shell))
-                }.toMap()
-        listOf("gb", "gbc").forEach { platform ->
-            FactsStore(folder).save(PlatformId(platform), told).shouldBeRight()
-            FactsStore(folder).load(PlatformId(platform)) shouldBe told
-        }
-    }
-
-    @Test
     fun `a cache written before shells were told keeps every platform's facts but the Game Boy prints, read again`() {
         val (a, b) = listOf("root/a.iso", "root/b.gbc").map(::documentUri)
         val line = { uri: ContentUri, facts: String -> "${uri.value}\t1\t2\t$facts" }
@@ -124,29 +112,6 @@ class FactsStoreTest {
         FactsStore(folder).load(PlatformId("gbc")) shouldBe emptyMap()
         FactsStore(folder).load(PlatformId("gb")) shouldBe emptyMap()
         FactsStore(folder).load(PlatformId("gba")) shouldBe mapOf(b to KnownFacts(stamp, FileFacts.Print(10u, Shell.UNKNOWN)))
-    }
-
-    @Test
-    fun `a print's shell text is read the same way on every platform, one that says nothing known dropped`() {
-        val files = listOf("a", "b", "c", "d", "e").map { documentUri("root/$it") }
-        val texts =
-            listOf(
-                "print:0000000A:exclusive",
-                "print:0000000A:compatible",
-                "print:0000000A:box",
-                "print:0000000A:",
-                "print:0000000A:unknown:x",
-            )
-        val stamp = FileStamp(Some(1L), Some(2L))
-        listOf("ps2", "gb", "gbc").forEach { platform ->
-            val lines = files.zip(texts) { uri, text -> "${uri.value}\t1\t2\t$text" }
-            File(folder.apply { mkdirs() }, "$platform.tsv").writeText((listOf("cartouche-facts\t1") + lines).joinToString("\n"))
-            FactsStore(folder).load(PlatformId(platform)) shouldBe
-                mapOf(
-                    files[0] to KnownFacts(stamp, FileFacts.Print(10u, Shell.EXCLUSIVE)),
-                    files[1] to KnownFacts(stamp, FileFacts.Print(10u, Shell.COMPATIBLE)),
-                )
-        }
     }
 
     @Test

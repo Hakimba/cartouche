@@ -62,7 +62,8 @@ func _draw() -> void:
 	var label := FormPaint.line(tr(text), StudioTokens.Face.JAKARTA_700, _NAME_PX)
 	label.fit(track.position.x - _PAD_LEFT)
 	label.draw(self, Vector2(_PAD_LEFT, (size.y - label.height) / 2.0), StudioTokens.INK)
-	draw_rect(Rect2(2.2 * FormPaint.CQW, size.y + _SEPARATOR_GAP - 1.0, size.x - 2.2 * FormPaint.CQW - _SEPARATOR_RIGHT, 1.0), StudioTokens.LINE)
+	draw_rect(Rect2(2.2 * FormPaint.CQW, size.y + _SEPARATOR_GAP - 1.0, size.x - 2.2 * FormPaint.CQW - _SEPARATOR_RIGHT, 1.0),
+		StudioTokens.LINE)
 
 
 func _turn(_on: bool) -> void:

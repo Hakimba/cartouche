@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Derives a console's launch steps (its folder's launch.json, described in docs/ONBOARDING.md)
+"""Derives a console's launch steps (its folder's launch.json, described in docs/adding-a-console.md)
 from a set of steps tuned outside the app and exported as JSON: a `choiceStep` index, its `steps`,
 each step's console under the key `--console-key` names and its moving parts under `parts`, and
 `model_hash`, the `hash` of the console's model.json (dev/export_console.sh) they were tuned on.

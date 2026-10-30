@@ -1,17 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
 
-const Fixtures := preload("res://test/carousel/fixtures.gd")
-const FAILURES: Array[StringName] = [&"not_installed", &"no_player", &"game_missing", &"activity_not_found", &"unexpected"]
-const BUTTONS: Array[StringName] = [&"carousel_left", &"carousel_right", &"screen_back", &"ui_accept", &"app_back"]
-## INV-E3-04's bound on waiting, in seconds, and the longest frame the test draws.
-const WAIT_S := 5.0
-const LONGEST_FRAME_S := 1.0 / 20.0
-const WAITING: Array[GameLaunch.Stage] = [GameLaunch.Stage.STARTING, GameLaunch.Stage.STARTING_LEFT,
-	GameLaunch.Stage.STARTING_BACK, GameLaunch.Stage.AWAY, GameLaunch.Stage.AWAY_LEFT]
-## Where leaving for another app and coming back must change nothing.
-const UNAFFECTED: Array[GameLaunch.Stage] = [GameLaunch.Stage.CHECKING, GameLaunch.Stage.INSERTING, GameLaunch.Stage.SHOWING]
-
 enum Outcome {
 	CHECK_REFUSED,
 	START_REFUSED,
@@ -26,9 +15,19 @@ enum Outcome {
 	CHECK_ANSWERED_TOO_LATE,
 	START_REFUSED_TOO_LATE,
 }
-
 ## What is under way as A is pressed.
 enum Press { NOTHING, DIRECTION, STICK, SELECT }
+
+const Fixtures := preload("res://test/carousel/fixtures.gd")
+const FAILURES: Array[StringName] = [&"not_installed", &"no_player", &"game_missing", &"activity_not_found", &"unexpected"]
+const BUTTONS: Array[StringName] = [&"carousel_left", &"carousel_right", &"screen_back", &"ui_accept", &"app_back"]
+## INV-21's bound on waiting, in seconds, and the longest frame the test draws.
+const WAIT_S := 5.0
+const LONGEST_FRAME_S := 1.0 / 20.0
+const WAITING: Array[GameLaunch.Stage] = [GameLaunch.Stage.STARTING, GameLaunch.Stage.STARTING_LEFT,
+	GameLaunch.Stage.STARTING_BACK, GameLaunch.Stage.AWAY, GameLaunch.Stage.AWAY_LEFT]
+## Where leaving for another app and coming back must change nothing.
+const UNAFFECTED: Array[GameLaunch.Stage] = [GameLaunch.Stage.CHECKING, GameLaunch.Stage.INSERTING, GameLaunch.Stage.SHOWING]
 
 ## Counts the failures of the launch under test, beside the carousel's own receiver.
 var _counting := func(_code: StringName) -> void: pass
@@ -37,7 +36,7 @@ var _console_frames := 0
 var _spun := 0.0
 
 
-func test_INV_E3_04_INV_E3_05_whatever_the_launch_comes_to_the_carousel_shows_again_as_it_was_and_nothing_acted_meanwhile() -> void:
+func test_inv_21_whatever_the_launch_comes_to_the_carousel_shows_again_as_it_was_and_nothing_acted_meanwhile() -> void:
 	# Games put into their console by its own steps (the black grown from the seat, the screen faded),
 	# and by the placeholder (the NES as if it had no steps of its own).
 	for platform: String in ["ps2", "gba", "nes"]:
@@ -210,7 +209,7 @@ func _assert_waited(outcome: Outcome, stages: Array[GameLaunch.Stage], waited_s:
 			assert_float(waited_s).is_greater_equal(WAIT_S - LONGEST_FRAME_S)
 
 
-func test_INV_E10_05_a_game_goes_into_its_console_from_as_far_as_its_own_medium_is_long() -> void:
+func test_a_game_goes_into_its_console_from_as_far_as_its_own_medium_is_long() -> void:
 	# Cartridges slid in, the NES as if it had no steps of its own: a Famicom cartridge, shorter, comes
 	# from nearer than an NES one.
 	var carousel := await _carousel("nes")
@@ -234,6 +233,26 @@ func test_INV_E10_05_a_game_goes_into_its_console_from_as_far_as_its_own_medium_
 		lifts[medium] = animation.value_track_interpolate(lift, LaunchAnimation.moment(animation, &"launch"))
 	assert_float(lifts["famicom_cart"]).is_less(lifts["nes_cart"])
 	assert_int(android.checks).is_equal(2)
+
+
+func test_a_preview_of_the_launch_starts_no_game_and_gives_the_carousel_back_at_its_end_or_once_ended() -> void:
+	var carousel := await _carousel("ps2")
+	var launch := carousel._game_launch
+	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
+	launch.android = android
+	for ended_early: bool in [false, true]:
+		launch.preview(0.0)
+		assert_bool(launch.is_previewing() and launch.is_inserting()).is_true()
+		Fixtures.step_frame(carousel)
+		if ended_early:
+			launch.end_preview()
+			assert_bool(launch.is_previewing()).is_false()
+		for frame in 1200:
+			if not launch.is_busy():
+				break
+			Fixtures.step_frame(carousel)
+		assert_bool(launch.is_busy() or launch.is_previewing()).is_false()
+	assert_int(android.checks + android.starts).is_equal(0)
 
 
 ## The carousel on the games screen of [param platform].

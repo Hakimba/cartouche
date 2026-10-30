@@ -51,8 +51,8 @@ import java.io.IOException
 import kotlin.time.TimeSource
 
 /**
- * A folder the user granted through the system picker; [path] is none when it has no filesystem path,
- * [place] when its provider is not the device's storage.
+ * A folder the user granted through the system picker; [path] is none when it has no filesystem path, [place] when
+ * its provider is not the device's storage.
  */
 internal data class Folder(val uri: ContentUri, val name: String, val path: Option<FilePath>, val place: Option<FolderPlace> = None)
 
@@ -94,10 +94,8 @@ internal sealed interface StorageFailure {
 }
 
 /**
- * Folder access through the Storage Access Framework. Cartouche never writes to ROM folders and
- * only keeps read access; the picker's own grant, which may include write, ends with the activity.
- * Every call is IPC with the documents provider and can take seconds on an SD card, so callers run
- * them off the main and render threads.
+ * Cartouche never writes to ROM folders and only keeps read access. Every call is IPC with the documents provider and can take seconds on
+ * an SD card: callers run them off the main and render threads.
  */
 internal class Folders(private val context: Context) {
     /** Keeps read access to a folder returned by the picker across reboots and app restarts. */
@@ -113,7 +111,10 @@ internal class Folders(private val context: Context) {
             .map { describe(it.uri, roots) }
     }
 
-    /** Gives up the access kept to the folders not in [used] (a platform removed or moved, a pick given up); answers how many. */
+    /**
+     * Gives up the access kept to the folders not in [used] (a platform removed or moved, a pick given up); answers
+     * how many.
+     */
     fun keepOnly(used: Set<ContentUri>): Either<StorageFailure, Int> = guard {
         context.contentResolver.persistedUriPermissions
             .filter { it.isReadPermission && DocumentsContract.isTreeUri(it.uri) && contentUri(it.uri) !in used }
@@ -144,10 +145,9 @@ internal class Folders(private val context: Context) {
         }
 
     /**
-     * What [file] tells of itself, as [FileReading] reads it for [platform]: the file is opened
-     * read-only, through its documents provider, and closed once read. A file that cannot be opened
-     * or read (storage removed, access revoked) is a failure; one that tells nothing is
-     * [FileFacts.Silent].
+     * What [file] tells of itself, as [FileReading] reads it for [platform]: the file is opened read-only, through
+     * its documents provider, and closed once read. A file that cannot be opened or read (storage removed, access
+     * revoked) is a failure; one that tells nothing is [FileFacts.Silent].
      */
     fun facts(platform: PlatformId, file: ListedFile): Either<StorageFailure, FileFacts> = guard {
         val started = TimeSource.Monotonic.markNow()
@@ -230,10 +230,8 @@ internal class Folders(private val context: Context) {
         ContentUri.parse(uri.toString()).getOrElse { raise(StorageFailure.Unavailable("$uri is not a content URI")) }
 
     /**
-     * Queries every row of [uri]. On Android the selection form of `query` only wraps this one;
-     * Robolectric reaches a `DocumentsProvider` through this one alone, which the tests need. The
-     * framework signals "no arguments" with nulls and "provider unavailable" with a null cursor;
-     * both stay inside this function.
+     * Robolectric reaches a `DocumentsProvider` through this one alone; the framework's nulls (no arguments, provider unavailable) stay
+     * inside.
      */
     private fun queryAll(uri: Uri, projection: Array<String>): Option<Cursor> =
         context.contentResolver.query(uri, projection, null as Bundle?, null).toOption()

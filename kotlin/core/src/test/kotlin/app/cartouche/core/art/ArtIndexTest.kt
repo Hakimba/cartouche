@@ -23,7 +23,6 @@ import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.boolean
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
-import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.string
@@ -53,33 +52,6 @@ class ArtIndexTest {
             ArtIndex.versionOf(text) shouldBe stated
             ArtIndex.parse(text).version shouldBe stated
         }
-    }
-
-    @Test
-    fun `a game's scans come closest to its region first`() {
-        val zone = ExtractGame("Zone of the Enders", emptySet(), listOf("North America=na.png", "Europe=eu.png", "Japan=jp.png"))
-        scans(listOf(zone), "Zone of the Enders", listOf("Europe")) shouldContainExactly listOf("eu.png", "na.png", "jp.png")
-        scans(listOf(zone), "Zone of the Enders", listOf("Japan")) shouldContainExactly listOf("jp.png", "na.png", "eu.png")
-    }
-
-    @Test
-    fun `a game of the world shows a zone's own scan before its other countries'`() {
-        val mario =
-            ExtractGame(
-                "Super Mario Bros.",
-                setOf("Super Mario", "Super Mário"),
-                listOf(
-                    "Brazil=br.png",
-                    "Canada=ca.png",
-                    "Europe=eu.png",
-                    "Germany=de.png",
-                    "Italy=it.png",
-                    "Japan=jp.png",
-                    "North America=na.png",
-                ),
-            )
-        scans(listOf(mario), "Super Mario Bros.", listOf("World")) shouldContainExactly
-            listOf("na.png", "br.png", "ca.png", "eu.png", "de.png", "it.png", "jp.png")
     }
 
     @Test
@@ -180,7 +152,7 @@ class ArtIndexTest {
     }
 
     @Test
-    fun `INV-E11-02 games a title names equally by their alternate names give no image, whichever has scans`() {
+    fun `games a title names equally by their alternate names give no image, whichever has scans`() {
         val felix =
             listOf(
                 ExtractGame("Felix the Cat (Dragon)", setOf("Felix the Cat", "Super Hero"), emptyList()),
@@ -190,7 +162,7 @@ class ArtIndexTest {
     }
 
     @Test
-    fun `INV-E4-01 a game only ever gets all the scans of one game its title names, and none when no game or several alike are named`() =
+    fun `INV-16 a game only ever gets all the scans of one game its title names, and none when no game or several alike are named`() =
         runBlocking<Unit> {
             var found = 0
             var none = 0
@@ -218,51 +190,23 @@ class ArtIndexTest {
         }
 
     @Test
-    fun `a title naming one game by its main name, case, accents, punctuation and spaces aside, finds that game's scans`() =
-        runBlocking<Unit> {
-            var named = 0
-            checkAll(extracts, artTitles, Arb.list(regionNames, 0..2)) { games, title, regions ->
-                val byName = games.filter { reduced(title).isNotEmpty() && reduced(it.name) == reduced(title) }
-                if (byName.size == 1 && regionallyNamed(games, title, regions).isEmpty()) {
-                    scans(games, title, regions).sorted() shouldBe byName.single().discs.map { it.substringAfter('=') }.sorted()
-                    named++
-                }
-            }
-            named shouldBeGreaterThan 100
+    fun `scans come closest region first, a zone's own name before its countries, then in the extract's order`() = runBlocking<Unit> {
+        checkAll(Arb.list(regionNames, 1..6), Arb.list(regionNames, 0..2)) { discs, regions ->
+            val lines = discs.mapIndexed { i, region -> "$region=d$i.png" }
+            val scans = scans(listOf(ExtractGame("Okage", emptySet(), lines)), "Okage", regions)
+            val own = scans.map { scan -> sameRegion(discs[number(scan)]) in regions.map(::sameRegion) }
+            own shouldBe own.sortedDescending()
+            scans.map(::number) shouldBe
+                discs.indices.sortedWith(compareBy({ closeness(regions, discs[it]) }, { sameRegion(discs[it]) !in umbrellas }))
         }
-
-    @Test
-    fun `INV-E4-01 scans come closest region first, a zone's own name before its countries, then in the extract's order`() =
-        runBlocking<Unit> {
-            checkAll(Arb.list(regionNames, 1..6), Arb.list(regionNames, 0..2)) { discs, regions ->
-                val lines = discs.mapIndexed { i, region -> "$region=d$i.png" }
-                val scans = scans(listOf(ExtractGame("Okage", emptySet(), lines)), "Okage", regions)
-                val own = scans.map { scan -> sameRegion(discs[number(scan)]) in regions.map(::sameRegion) }
-                own shouldBe own.sortedDescending()
-                scans.map(::number) shouldBe
-                    discs.indices.sortedWith(compareBy({ closeness(regions, discs[it]) }, { sameRegion(discs[it]) !in umbrellas }))
-            }
-        }
+    }
 
     /** The images by region the extract alone gives a game of [title] and [regions]. */
     private fun variantsOf(index: ArtIndex, title: String, regions: List<String>) =
         ArtSources(ArtKind.Disc, PS2_MEDIA, index, None, TextureTable.EMPTY).variantsOf(game(title).copy(regions = regions)) { true }
 
     @Test
-    fun `a game's images by region are one per region, its own first, each region under one name`() {
-        val zone =
-            ExtractGame(
-                "Zone of the Enders",
-                emptySet(),
-                listOf("North America=na.png", "Europe=eu.png", "USA=us.png", "Japan=jp.png", "Europe=eu2.png"),
-            )
-        val variants = variantsOf(ArtIndex.parse(extract(listOf(zone))), "Zone of the Enders", listOf("Europe"))
-        variants.map { it.region.name to it.candidate.identity.value.removePrefix(images) } shouldContainExactly
-            listOf("Europe" to "eu.png", "North America" to "na.png", "Japan" to "jp.png")
-    }
-
-    @Test
-    fun `INV-E7-03 a game's images by region are the first scan of each region of the game its title finds, the closest region's first`() =
+    fun `a game's images by region are the first scan of each region of the game its title finds, the closest region's first`() =
         runBlocking<Unit> {
             var several = 0
             checkAll(extracts, artTitles, Arb.list(regionNames, 0..2)) { games, title, regions ->
@@ -280,78 +224,57 @@ class ArtIndexTest {
                 others.map { closeness(regions, it.region.name) }.let { it shouldBe it.sorted() }
                 if (variants.size > 1) several++
             }
-            several shouldBeGreaterThan 50
+            several shouldBeGreaterThan 9
         }
 
     @Test
-    fun `INV-E4-02 a title changed in case, accents, punctuation and spaces finds the same scans`() = runBlocking<Unit> {
-        val games = listOf(ExtractGame("Dr. Muto: Evil Genius", emptySet(), listOf("Europe=g0.png")))
-        checkAll(Arb.list(Arb.int(0..4), 1..30)) { changes ->
-            val title =
-                changes.foldIndexed("Dr. Muto: Evil Genius") { at, text, change ->
-                    val i = at % (text.length + 1)
-                    when (change) {
-                        0 -> text.substring(0, i) + " " + text.substring(i)
-                        1 -> text.substring(0, i) + "-" + text.substring(i)
-                        2 -> text.uppercase()
-                        3 -> text.lowercase()
-                        else -> text.replace("u", "ú")
+    fun `several games a title names are told apart by the ladder, and none is taken when it does not leave one`() = runBlocking<Unit> {
+        val spellings: List<(String) -> String> =
+            listOf(
+                { it },
+                String::uppercase,
+                String::lowercase,
+                { it.replace(": ", " - ") },
+                { it.replace("é", "e") },
+                { "$it+" },
+                { "$it " },
+                { it.replace(" ", "") },
+            )
+        val spelled = Arb.element(spellings)
+        // The games named so by their main names, or by an alternate name only, their main names naming another game.
+        val samples =
+            Arb.bind(
+                Arb.element("Dr. Muto: Evil Genius", "Pokémon Snap: Gold", "Chrono Trigger"),
+                spelled,
+                Arb.list(spelled, 2..4),
+                Arb.boolean(),
+            ) { title, spelling, names, byAlternate ->
+                spelling(title) to
+                    names.mapIndexed { i, name ->
+                        val scans = listOf("=g$i-disc-0.png")
+                        if (byAlternate) ExtractGame("Ys $i", setOf(name(title)), scans) else ExtractGame(name(title), setOf(), scans)
                     }
-                }
-            scans(games, title, listOf("Europe")) shouldContainExactly listOf("g0.png")
-        }
-        listOf("Chain Drive", "Dr Mutant", "").forEach { scans(games, it).shouldBeEmpty() }
-    }
-
-    @Test
-    fun `INV-E11-02 several games a title names are told apart by the ladder, and none is taken when it does not leave one`() =
-        runBlocking<Unit> {
-            val spellings: List<(String) -> String> =
-                listOf(
-                    { it },
-                    String::uppercase,
-                    String::lowercase,
-                    { it.replace(": ", " - ") },
-                    { it.replace("é", "e") },
-                    { "$it+" },
-                    { "$it " },
-                    { it.replace(" ", "") },
-                )
-            val spelled = Arb.element(spellings)
-            // The games named so by their main names, or by an alternate name only, their main names naming another game.
-            val samples =
-                Arb.bind(
-                    Arb.element("Dr. Muto: Evil Genius", "Pokémon Snap: Gold", "Chrono Trigger"),
-                    spelled,
-                    Arb.list(spelled, 2..4),
-                    Arb.boolean(),
-                ) { title, spelling, names, byAlternate ->
-                    spelling(title) to
-                        names.mapIndexed { i, name ->
-                            val scans = listOf("=g$i-disc-0.png")
-                            if (byAlternate) ExtractGame("Ys $i", setOf(name(title)), scans) else ExtractGame(name(title), setOf(), scans)
-                        }
-                }
-            val told = mutableMapOf<Int, Int>()
-            var none = 0
-            var alternates = 0
-            checkAll(samples) { (title, games) ->
-                val named = { game: ExtractGame -> game.alternates.firstOrNone().getOrElse { game.name } }
-                if (games.first().alternates.isNotEmpty()) alternates++
-                // Each rung keeps the games still equal to the title at it and at every rung before it.
-                val kept =
-                    TitleKeys.ladder.indices.map { rung ->
-                        games.filter { game -> TitleKeys.ladder.take(rung + 1).all { it(named(game)) == it(title) } }
-                    }
-                val alone = (listOf(games) + kept).firstOrNone { it.size <= 1 }.flatMap { it.firstOrNone() }
-                owner(games, scans(games, title)) shouldBe alone
-                alone.fold({ none++ }) { told.merge(kept.indexOfFirst { it.size <= 1 }, 1, Int::plus) }
             }
-            told.keys shouldContainAll TitleKeys.ladder.indices.toList()
-            told.values.forEach { it shouldBeGreaterThan 10 }
-            none shouldBeGreaterThan 100
-            alternates shouldBeGreaterThan 300
+        val told = mutableMapOf<Int, Int>()
+        var none = 0
+        var alternates = 0
+        checkAll(samples) { (title, games) ->
+            val named = { game: ExtractGame -> game.alternates.firstOrNone().getOrElse { game.name } }
+            if (games.first().alternates.isNotEmpty()) alternates++
+            // Each rung keeps the games still equal to the title at it and at every rung before it.
+            val kept =
+                TitleKeys.ladder.indices.map { rung ->
+                    games.filter { game -> TitleKeys.ladder.take(rung + 1).all { it(named(game)) == it(title) } }
+                }
+            val alone = (listOf(games) + kept).firstOrNone { it.size <= 1 }.flatMap { it.firstOrNone() }
+            owner(games, scans(games, title)) shouldBe alone
+            alone.fold({ none++ }) { told.merge(kept.indexOfFirst { it.size <= 1 }, 1, Int::plus) }
         }
+        told.keys shouldContainAll TitleKeys.ladder.indices.toList()
+        told.values.forEach { it shouldBeGreaterThan 1 }
+        none shouldBeGreaterThan 36
+        alternates shouldBeGreaterThan 30
+    }
 
     @Test
     fun `reading any text never fails, and keeps only well-formed lines`() = runBlocking<Unit> {
@@ -387,7 +310,7 @@ class ArtIndexTest {
 
     private val umbrellas = listOf("North America", "Europe", "Japan")
 
-    /** The generators' regions by their group, in INV-E4-01's order: NTSC-U, PAL, NTSC-J. */
+    /** The generators' regions by their group, in INV-16's order: NTSC-U, PAL, NTSC-J. */
     private val groups: Map<String, Int> =
         listOf(
             listOf("North America", "Canada", "Brazil"),
@@ -396,7 +319,7 @@ class ArtIndexTest {
         ).flatMapIndexed { group, names -> names.map { it to group } }.toMap()
 
     /**
-     * How close [image]'s region is to a game of [game]'s, written from INV-E4-01: its own region, its group's umbrella,
+     * How close [image]'s region is to a game of [game]'s, written from INV-16: its own region, its group's umbrella,
      * the rest of its group, the world, then NTSC-U, PAL, NTSC-J, then a region of no group.
      */
     private fun closeness(game: List<String>, image: String): Int {

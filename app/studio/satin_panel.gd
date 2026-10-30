@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name SatinPanel
 extends Container
-## A piece of the Studio design: its material ([StudioMaterial]: satin, frost, a key's dark disc, the "+"
-## ball) drawn behind it with the design's gradient and shadows, its children laid over the whole of it. The
+## A piece of the Studio look: its material ([StudioMaterial]: satin, frost, a key's dark disc, the "+"
+## ball) drawn behind it with its gradient and shadows, its children laid over the whole of it. The
 ## frost's backdrop blur is not drawn: too costly on a handheld.
 
 @export var look := StudioTokens.Look.SATIN:
@@ -20,7 +20,7 @@ var _backing := Backing.new(self, StudioTokens.Look.SATIN)
 
 
 ## A Studio material on a box of its own, behind the canvas item it is made for: so that item's own drawing
-## (a mark, separators) stays above it, as a CSS background lies under the element's content.
+## (a mark, separators) stays above it.
 class Backing:
 	extends RefCounted
 

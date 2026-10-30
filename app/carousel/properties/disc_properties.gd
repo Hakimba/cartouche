@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name DiscProperties
 extends PropertiesScreen
-## The selected game's medium travels from its row pose into a still, front-facing staging.
-## Up and down select its projected label zone or its name. The callout names that focus.
-## A on the label offers source images and the system's picker for an own picture. Previewing,
-## framing with the stick or touch, and keeping an image use the row's original label material.
-## A on the name opens the existing keyboard. B returns from an editor or reverses the travel.
-## Each travel profile uses one clock; projected extents change only with the view or the medium.
+## The selected game's medium travels from its place in the row to a still staging, facing front.
+## Up and down select its label or its name, which the callout names. A on the label offers the
+## sources' images and the system's picker for a picture of the user's own, to preview, frame with
+## the stick or by touch, and keep. A on the name opens the keyboard ([NameEditor]). B goes back
+## from an editor, or the medium travels back into the row.
 
 ## The image picked could not be kept.
 signal choice_failed
@@ -16,43 +15,24 @@ signal name_kept
 signal rename_failed
 
 enum Step { CLOSED, PROPERTIES, LABELS, FRAMING, NAMING }
+enum Part { MEDIUM, POOL, NEIGHBOURS, BEHIND, ZONE, NAME, CALLOUT, HINTS }
 
 const _CAPTION_AWAY := 56.32
 const _NAME_GAP := 23.04
-static var _NAME_RISE: float:
-	get: return StudioTokens.TR_PROPERTIES_RISE_PX
 const _NAME_ROOM := 1098.56
 ## The caption beside the name stays this far inside the screen's edge.
 const _CAPTION_EDGE := 28.8
 const _RIM_ANGLE := -0.6
-## The glide occupies the first 360 ms of either profile's clock.
-static var _TRAVEL_S: float:
-	get: return StudioTokens.TR_PROPERTIES_TRAVEL_S
-## Opening lasts until the last zone and name fades finish, at 400 ms.
-static var _OPEN_S: float:
-	get: return StudioTokens.TR_PROPERTIES_OPEN_S
-## Returning lasts until the neighbours and games chrome finish arriving, at 380 ms.
-static var _BACK_S: float:
-	get: return StudioTokens.TR_PROPERTIES_BACK_S
-
-enum Part { MEDIUM, POOL, NEIGHBOURS, BEHIND, ZONE, NAME, CALLOUT, HINTS }
-
-var _opening_parts: Dictionary[Part, Interval] = {}
-var _back_parts: Dictionary[Part, Interval] = {}
-## How fast the stick moves a picture being framed, in label widths a second, and how many times
-## closer L1 / R1 frame it in a second.
-const _FRAMING_SPEED := 0.6
-const _ZOOM_SPEED := 1.8
 ## How long the cards take to fade before the picker opens.
 const _TO_PICKER_S := 0.2
 
-## The editing screens keep their established staging; properties use the medium's fitted size.
+## Where the disc stands on each screen; the properties screen's own staging ([member _on_properties])
+## is fitted to each medium instead.
 static var _in_row := Staging.new(0.0, 0.18, 1.0, 0.0, 400.0)
-var _on_properties := Staging.new(1.0, 0.2, 0.98, 1.0, 400.0)
 static var _on_labels := Staging.new(1.0, 0.34, 0.78, 0.45, 300.0)
-## Framing a picture of one's own: the disc back in the middle, 1.2 cm above the camera's axis.
+## Framing a picture of one's own: the disc back in the middle, a little above the camera's axis.
 static var _on_framing := Staging.new(1.0, 0.12, 1.1, 0.4, 400.0)
-## Typing its name: the disc high and small, 5.6 cm above the camera's axis, half its size.
+## Typing its name: the disc high, at half its size.
 static var _on_naming := Staging.new(1.0, 0.56, 0.5, 0.35, 220.0)
 ## The moves between the screens, in seconds.
 static var _to_labels := Move.new(Leave.FADE, 0.15, 0.42, Arrive.RISE, 0.24, 0.22)
@@ -60,35 +40,21 @@ static var _from_labels := Move.new(Leave.SLIDE, 0.15, 0.4, Arrive.FADE, 0.2, 0.
 ## The picker covered the screen: the disc was put in place as it closed, the framing fades in.
 static var _from_picker := Move.new(Leave.FADE, 0.0, 0.0, Arrive.FADE, 0.2, 0.0)
 static var _framing_left := Move.new(Leave.FADE, 0.15, 0.4, Arrive.FADE, 0.2, 0.22)
-
 static var _from_editing := Move.new(Leave.FADE, 0.15, 0.42, Arrive.FADE, 0.22, 0.26)
-
 static var _to_naming := Move.new(Leave.FADE, 0.15, 0.42, Arrive.RISE, 0.24, 0.22)
 
 ## Set by the carousel before the first [method open].
 var row: ShelfRow
 var art: GameArt
-
+var _opening_parts: Dictionary[Part, Interval] = {}
+var _back_parts: Dictionary[Part, Interval] = {}
+var _on_properties := Staging.new(1.0, 0.2, 0.98, 1.0, 400.0)
 var _step := Step.CLOSED
 var _game: AndroidServices.Game
-## The images of [member _game]'s label downloaded since they were asked for, by source and region
-## (see [method _image_key]): one may arrive before the list of its images.
-var _downloaded: Dictionary[String, String] = {}
-var _reader := ImageReader.new()
-## The picture of the user's own being framed, read from the plugin's copy.
-var _picture_reader := ImageReader.new()
-var _picture: AndroidServices.LabelPicture
-var _picture_texture: Texture2D
-var _framing := LabelFraming.new()
 ## The finger on the label (a tap opens its images) and on the picture being framed (a drag moves
 ## it); how wide the label shows, in pixels, which a drag across it moves the picture by.
 var _finger := Finger.new()
 var _label_px := 1.0
-## The last pinch counted: its frame, place and factor.
-var _pinched: Array = []
-## The game whose picture, as framed, shows on its disc until its kept image is read.
-var _framed_game := ""
-
 var _kind := LabelZone.Shape.DISC
 var _gel := StudioTokens.NEUTRAL
 var _medium: MediaView
@@ -116,8 +82,7 @@ var _pool_opacity := -1.0
 
 @onready var _zone: LabelZone = %Zone
 @onready var _labels: Control = %Labels
-@onready var _cards: HBoxContainer = %Cards
-@onready var _prompt: Label = %Prompt
+@onready var _chooser := LabelChooser.new(%Cards as HBoxContainer, %Prompt as Label)
 @onready var _framing_screen: Control = %Framing
 @onready var _hints: Control = $Properties/Hints
 @onready var _callout: FocusCallout = %Callout
@@ -138,10 +103,10 @@ func _ready() -> void:
 	add_to_group(SoundEffects.MOVES)
 	_name.pressed.connect(_open_naming)
 	_naming.submitted.connect(_keep_name)
-	add_child(_reader)
-	_reader.read.connect(_on_image_read)
-	add_child(_picture_reader)
-	_picture_reader.read.connect(_on_picture_read)
+	add_child(_chooser)
+	_chooser.card_pressed.connect(_choose)
+	_chooser.own_pressed.connect(_pick_own)
+	_chooser.picture_read.connect(_on_picture_read)
 	_callout.use_studio()
 	_name_text = _NameText.new()
 	_name.add_child(_name_text)
@@ -163,7 +128,7 @@ func _process(delta: float) -> void:
 	if not _medium:
 		return
 	if _step == Step.FRAMING and not _busy:
-		_frame(delta)
+		_chooser.frame(delta)
 	# The staged disc stands still: whatever its look became (label, ring) is drawn again once, as the row does.
 	var shown := _model_parent as ShelfRow.LabelledModel
 	if shown.dirty:
@@ -265,8 +230,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_close()
 
 
-# Pinching zooms the picture being framed. Godot hands the same pinch over twice in a frame: only
-# the first counts.
 func _input(event: InputEvent) -> void:
 	if _direction != 0 and event.is_pressed():
 		if event.is_action_pressed(&"screen_back"):
@@ -278,12 +241,7 @@ func _input(event: InputEvent) -> void:
 	var pinch := event as InputEventMagnifyGesture
 	if pinch and _step == Step.FRAMING and not _busy:
 		get_viewport().set_input_as_handled()
-		var seen := [Engine.get_process_frames(), pinch.position, pinch.factor]
-		if seen == _pinched:
-			return
-		_pinched = seen
-		_framing.zoom_by(pinch.factor, _picture.size)
-		row.preview_label(_picture_texture, _framing.window(_picture.size))
+		_chooser.pinch(pinch)
 
 
 ## Whether the properties show, or are coming or going.
@@ -305,6 +263,9 @@ func open() -> void:
 	_labels.hide()
 	if not art.loaded.is_connected(_on_art_loaded):
 		art.loaded.connect(_on_art_loaded)
+	_chooser.row = row
+	_chooser.art = art
+	_chooser.android = android
 	if not _lend_model():
 		_abort_model()
 		return
@@ -439,7 +400,8 @@ func _close() -> void:
 
 
 func _tick_travel(delta: float) -> void:
-	_travel = clampf(_travel + delta * _direction / (_BACK_S if _back_profile else _OPEN_S), 0.0, 1.0)
+	var length := StudioTokens.TR_PROPERTIES_BACK_S if _back_profile else StudioTokens.TR_PROPERTIES_OPEN_S
+	_travel = clampf(_travel + delta * _direction / length, 0.0, 1.0)
 	_apply_travel()
 	if _travel == 1.0 and _direction > 0:
 		_direction = 0
@@ -451,8 +413,8 @@ func _tick_travel(delta: float) -> void:
 		_direction = 0
 		_busy = false
 		_step = Step.CLOSED
-		if _framed_game:
-			_show_kept_label()
+		if _chooser.framed_game:
+			_chooser.show_kept_label()
 		row.stage = 0.0
 		row.neighbours = 1.0
 		row.pose_selected()
@@ -469,17 +431,20 @@ func _tick_travel(delta: float) -> void:
 
 func _refresh_profiles() -> void:
 	_opening_parts = {
-		Part.MEDIUM: Interval.new(0.0, _TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE),
+		Part.MEDIUM: Interval.new(0.0, StudioTokens.TR_PROPERTIES_TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE),
 		Part.POOL: Interval.new(0.0, StudioTokens.TR_PROPERTIES_POOL_S, StudioTokens.TR_PROPERTIES_POOL_S_CURVE),
 		Part.NEIGHBOURS: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
 		Part.BEHIND: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
-		Part.ZONE: Interval.new(StudioTokens.TR_PROPERTIES_ZONE_AT_S, maxf(0.001, _OPEN_S - StudioTokens.TR_PROPERTIES_ZONE_AT_S), Motion.Easing.EASE_OUT),
-		Part.NAME: Interval.new(StudioTokens.TR_PROPERTIES_NAME_AT_S, maxf(0.001, _OPEN_S - StudioTokens.TR_PROPERTIES_NAME_AT_S), Motion.Easing.ARRIVE),
-		Part.CALLOUT: Interval.new(StudioTokens.TR_PROPERTIES_CALLOUT_AT_S, maxf(0.001, _OPEN_S - StudioTokens.TR_PROPERTIES_CALLOUT_AT_S)),
+		Part.ZONE: Interval.new(StudioTokens.TR_PROPERTIES_ZONE_AT_S, maxf(0.001,
+			StudioTokens.TR_PROPERTIES_OPEN_S - StudioTokens.TR_PROPERTIES_ZONE_AT_S), Motion.Easing.EASE_OUT),
+		Part.NAME: Interval.new(StudioTokens.TR_PROPERTIES_NAME_AT_S, maxf(0.001,
+			StudioTokens.TR_PROPERTIES_OPEN_S - StudioTokens.TR_PROPERTIES_NAME_AT_S), Motion.Easing.ARRIVE),
+		Part.CALLOUT: Interval.new(StudioTokens.TR_PROPERTIES_CALLOUT_AT_S, maxf(0.001,
+			StudioTokens.TR_PROPERTIES_OPEN_S - StudioTokens.TR_PROPERTIES_CALLOUT_AT_S)),
 		Part.HINTS: Interval.new(0.2, 0.15),
 	}
 	_back_parts = {
-		Part.MEDIUM: Interval.new(0.0, _TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE, 1.0, 0.0),
+		Part.MEDIUM: Interval.new(0.0, StudioTokens.TR_PROPERTIES_TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE, 1.0, 0.0),
 		Part.POOL: Interval.new(0.0, 0.3, Motion.Easing.EASE_IN, 1.0, 0.0),
 		Part.NEIGHBOURS: Interval.new(0.28, 0.1),
 		Part.BEHIND: Interval.new(0.22, 0.16),
@@ -492,7 +457,7 @@ func _refresh_profiles() -> void:
 
 func _part(part: Part) -> float:
 	var profile := _back_parts if _back_profile else _opening_parts
-	var elapsed := (1.0 - _travel) * _BACK_S if _back_profile else _travel * _OPEN_S
+	var elapsed := (1.0 - _travel) * StudioTokens.TR_PROPERTIES_BACK_S if _back_profile else _travel * StudioTokens.TR_PROPERTIES_OPEN_S
 	return profile[part].at(elapsed)
 
 
@@ -523,7 +488,7 @@ func _apply_travel() -> void:
 
 
 func _name_drop() -> float:
-	return _NAME_RISE * (1.0 - _part(Part.NAME)) if _direction != 0 else 0.0
+	return StudioTokens.TR_PROPERTIES_RISE_PX * (1.0 - _part(Part.NAME)) if _direction != 0 else 0.0
 
 
 func _show_name(name_button: Button, title: String) -> void:
@@ -545,19 +510,10 @@ func _open_labels() -> void:
 	Sounds.play(SoundEffects.Cue.OPEN)
 	_busy = true
 	_release_focus()
-	_downloaded.clear()
-	if not android.label_variant_downloaded.is_connected(_on_label_variant_downloaded):
-		android.label_variant_downloaded.connect(_on_label_variant_downloaded)
-	var started := Time.get_ticks_msec()
-	var answer := await android.label_variants(_game)
-	if not answer.ok:
-		Diagnostics.trace("properties", "no images listed (%s): %s" % [answer.code, answer.detail])
-	Diagnostics.trace("properties", "%d images of %s listed in %d ms" % [
-		answer.variants.size(), _game.title, Time.get_ticks_msec() - started])
+	await _chooser.fill(_game, _kind)
 	_step = Step.LABELS
-	_fill_cards(answer.variants)
 	await _move([_properties, _zone], [_labels], _on_labels, _to_labels)
-	_focus_current()
+	_chooser.focus_current()
 
 
 ## Back to the properties from [param screen], the focus on [param focused], the disc showing its own
@@ -568,68 +524,8 @@ func _back_to_properties(screen: Control = _labels, move := _from_labels, focuse
 	if own_label:
 		row.show_own_label()
 	await _move([screen], [_properties, _zone], _on_properties, move)
-	_clear_cards()
+	_chooser.clear()
 	focused.grab_focus()
-
-
-func _fill_cards(variants: Array[AndroidServices.LabelVariant]) -> void:
-	_clear_cards()
-	for variant in variants:
-		var card := LabelCard.new(variant.region, variant.source,
-			"%s · %s" % [_region_name(variant.region), variant.source_name])
-		card.focus_entered.connect(_preview.bind(card))
-		card.pressed.connect(_choose.bind(card))
-		_cards.add_child(card)
-		_shape_card(card)
-		var path: String = variant.path if variant.has_path else _downloaded.get(_image_key(variant.region, variant.source), "")
-		if path:
-			_read(card, path)
-	var own := LabelCard.new("", "", tr("My own image"), true)
-	own.focus_entered.connect(row.show_own_label)
-	own.pressed.connect(_pick_own)
-	_cards.add_child(own)
-	_shape_card(own)
-	if _game.label_own:
-		if art.has_texture(_game):
-			own.show_label(art.texture(_game))
-		else:
-			art.request(_game)
-	_prompt.text = (tr("Choose the label's image") if variants
-		else tr("No other image of this game is known"))
-
-
-func _clear_cards() -> void:
-	_reader.cancel_all()
-	for card in _cards.get_children():
-		_cards.remove_child(card)
-		card.queue_free()
-
-
-## The focus on the card of the image the label shows: the one chosen (the user's own picture
-## included), else the first: the closest region's, or the user's own when there is none.
-func _focus_current() -> void:
-	var cards: Array[LabelCard] = []
-	cards.assign(_cards.get_children())
-	var chosen := cards.filter(func(card: LabelCard) -> bool:
-		return (card.own and _game.label_own) or (not card.own and _game.has_label_region
-			and card.region == _game.label_region and card.source == _game.label_source))
-	for card: LabelCard in chosen + cards:
-		card.grab_focus()
-		return
-
-
-func _region_cards() -> Array[LabelCard]:
-	var cards: Array[LabelCard] = []
-	for card: LabelCard in _cards.get_children():
-		if not card.own:
-			cards.append(card)
-	return cards
-
-
-func _preview(card: LabelCard) -> void:
-	if card.is_ready():
-		Diagnostics.trace("properties", "image of '%s' from %s on the disc" % [card.region, card.source])
-		row.preview_label(card.label)
 
 
 func _choose(card: LabelCard) -> void:
@@ -640,20 +536,13 @@ func _choose(card: LabelCard) -> void:
 		return
 	_busy = true
 	_release_focus()
-	var answer := await android.choose_label(_game, card.region, card.source)
+	var answer := await _chooser.choose(card)
 	_busy = false
 	if not answer.ok:
-		Diagnostics.trace("properties", "label not kept (%s): %s" % [answer.code, answer.detail])
 		card.grab_focus()
 		choice_failed.emit()
 		return
-	Diagnostics.trace("properties", "%s: label of region '%s' from %s kept" % [_game.title, card.region, card.source])
-	_game.has_label_region = true
-	_game.label_region = card.region
-	_game.label_source = card.source
-	_game.label_own = false
 	Sounds.play(SoundEffects.Cue.SUCCESS)
-	art.add(answer.art, card.label)
 	_back_to_properties()
 
 
@@ -666,20 +555,15 @@ func _pick_own() -> void:
 	_busy = true
 	_release_focus()
 	await create_tween().tween_property(_labels, ^"modulate:a", 0.0, _TO_PICKER_S).finished
-	var started := Time.get_ticks_msec()
-	_picture = await android.pick_label_picture()
-	if not _picture.ok:
-		Diagnostics.trace("properties", "no picture picked (%s): %s" % [_picture.code, _picture.detail])
+	var picture := await _chooser.pick()
+	if not picture.ok:
 		_back_from_picker()
 		# Closing the picker is no failure; a picture that cannot be read, or no picker, is.
-		if _picture.code != &"cancelled":
+		if picture.code != &"cancelled":
 			choice_failed.emit()
 		return
-	Diagnostics.trace("properties", "picture of %dx%d picked in %d ms" % [
-		_picture.size.x, _picture.size.y, Time.get_ticks_msec() - started])
 	# The disc goes where it is framed while nothing shows: the cards have gone.
 	_stage(1.0, _staging, _on_framing)
-	_picture_reader.request("picture", _picture.path, "%s, own picture" % _game.title)
 
 
 ## The cards as they were before the picker, the focus on the user's own card.
@@ -687,15 +571,10 @@ func _back_from_picker() -> void:
 	_stage(1.0, _staging, _on_labels)
 	_labels.modulate.a = 1.0
 	_busy = false
-	_own_card().grab_focus()
+	_chooser.own_card().grab_focus()
 
 
-## The card of the user's own picture: the last one.
-func _own_card() -> LabelCard:
-	return _cards.get_child(-1) as LabelCard
-
-
-func _on_picture_read(_key: String, picture: Texture2D) -> void:
+func _on_picture_read(picture: Texture2D) -> void:
 	if _step != Step.LABELS:
 		return
 	if not picture:
@@ -703,70 +582,39 @@ func _on_picture_read(_key: String, picture: Texture2D) -> void:
 		_back_from_picker()
 		choice_failed.emit()
 		return
-	_picture_texture = picture
-	_framing = LabelFraming.new(row.selected_label_proportion())
+	_chooser.start_framing(picture)
 	_step = Step.FRAMING
-	row.preview_label(_picture_texture, _framing.window(_picture.size))
 	await _move([_labels], [_framing_screen], _on_framing, _from_picker)
-
-
-## Moves and zooms the picture being framed as the stick and L1 / R1 are held, for [param delta]
-## seconds.
-func _frame(delta: float) -> void:
-	var push := Input.get_vector(&"ui_left", &"ui_right", &"ui_up", &"ui_down")
-	var zoom := Input.get_axis(&"label_zoom_out", &"label_zoom_in")
-	if push.is_zero_approx() and is_zero_approx(zoom):
-		return
-	# The picture follows the stick: what is right of the label comes into it as it goes left.
-	_framing.move(-push * _FRAMING_SPEED * delta, _picture.size)
-	_framing.zoom_by(pow(_ZOOM_SPEED, zoom * delta), _picture.size)
-	row.preview_label(_picture_texture, _framing.window(_picture.size))
 
 
 ## Keeps the picture as framed on the label, then goes back to the properties; stays on the
 ## framing when it cannot be kept.
 func _keep_own() -> void:
 	_busy = true
-	var answer := await android.keep_own_label(_game, _framing)
+	var answer := await _chooser.keep_own()
 	if not answer.ok:
-		Diagnostics.trace("properties", "own picture not kept (%s): %s" % [answer.code, answer.detail])
 		_busy = false
 		choice_failed.emit()
 		return
-	Diagnostics.trace("properties", "%s: own picture kept, zoom %.2f, centre %s" % [_game.title, _framing.zoom, _framing.centre])
 	Sounds.play(SoundEffects.Cue.SUCCESS)
-	_game.label_own = true
-	_game.has_label_region = false
-	# The picture as framed stays on the disc until the image the plugin cut is read.
-	art.add(answer.art)
-	_framed_game = _game.id
-	art.request(_game)
 	_back_to_properties(_framing_screen, _from_editing, _zone, false)
 
 
 ## Back to the cards from the framing, nothing kept; the focus on the user's own card.
 func _back_to_labels() -> void:
 	_step = Step.LABELS
-	row.show_own_label()
-	_picture_texture = null
+	_chooser.drop_picture()
 	await _move([_framing_screen], [_labels], _on_labels, _framing_left)
-	_own_card().grab_focus()
-
-
-## The disc shows the image kept for its label, read now, in place of the picture as framed.
-func _show_kept_label() -> void:
-	_framed_game = ""
-	_picture_texture = null
-	row.show_own_label()
+	_chooser.own_card().grab_focus()
 
 
 func _on_art_loaded(game_id: String) -> void:
 	if _medium and _game and game_id == _game.id:
 		_medium.crossfade(0.0 if art.has_texture(_game) else 1.0)
-	if game_id == _framed_game:
-		_show_kept_label()
+	if game_id == _chooser.framed_game:
+		_chooser.show_kept_label()
 	elif _step == Step.LABELS and game_id == _game.id and _game.label_own:
-		_own_card().show_label(art.texture(_game))
+		_chooser.own_card().show_label(art.texture(_game))
 
 
 func _naming_press(event: InputEvent) -> bool:
@@ -829,43 +677,6 @@ func _keep_name() -> void:
 	_back_to_properties(_naming, _from_editing, _name)
 
 
-func _on_label_variant_downloaded(variant: AndroidServices.LabelVariant) -> void:
-	if not _game or variant.game_id != _game.id:
-		return
-	if not variant.has_path:
-		Diagnostics.trace("properties", "image of '%s' from %s not downloaded: %s" % [
-			variant.region, variant.source, variant.failure])
-		return
-	_downloaded[_image_key(variant.region, variant.source)] = variant.path
-	for card in _region_cards():
-		if card.region == variant.region and card.source == variant.source:
-			_read(card, variant.path)
-
-
-func _read(card: LabelCard, path: String) -> void:
-	_reader.request(_image_key(card.region, card.source), path, "%s, %s from %s" % [_game.title, card.region, card.source])
-
-
-func _on_image_read(key: String, image: Texture2D) -> void:
-	if not image:
-		return
-	for card in _region_cards():
-		if _image_key(card.region, card.source) == key:
-			card.show_label(image)
-			if card.has_focus():
-				_preview(card)
-
-
-## What names an image among a game's: its [param source], then its [param region].
-func _image_key(region: String, source: String) -> String:
-	return source + "/" + region
-
-
-## How the art sources' [param region] reads on a card.
-func _region_name(region: String) -> String:
-	return tr(region) if region else tr("No region")
-
-
 func _place() -> void:
 	row.pose_selected()
 	row.stage = _staging.amount
@@ -892,15 +703,7 @@ func _on_framing_input(event: InputEvent) -> void:
 	var dragged := _finger.read(event, now) == Finger.Gesture.DRAG
 	if dragged and not _busy:
 		_framing_screen.accept_event()
-		_framing.move(-_finger.moved / _label_px, _picture.size)
-		row.preview_label(_picture_texture, _framing.window(_picture.size))
-
-
-func _shape_card(card: LabelCard) -> void:
-	var thumbnail := card.get_child(0).get_child(0) as TextureRect
-	var shader := thumbnail.material as ShaderMaterial
-	shader.set_shader_parameter(&"cartridge", _kind == LabelZone.Shape.RECTANGLE)
-	shader.set_shader_parameter(&"proportion", row.selected_label_proportion())
+		_chooser.move_picture(_finger.moved / _label_px)
 
 
 class _NameText extends Control:

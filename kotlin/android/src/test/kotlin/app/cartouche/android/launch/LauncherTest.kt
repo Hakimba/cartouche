@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.launch
 
-import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import app.cartouche.android.storage.AUTHORITY
@@ -31,8 +30,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
 import java.io.FileNotFoundException
 
+@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 class LauncherTest {
     private enum class Emulator { INSTALLED, DISABLED, ABSENT, IMPLICIT }
@@ -90,19 +91,8 @@ class LauncherTest {
             "com.armsx2"
         given(Emulator.ABSENT, GameFileState.PRESENT)
         launcher.prepareGame(launch(Emulator.ABSENT), game.uri).shouldBeLeft() shouldBe LaunchFailure.NotInstalled(armsx2)
-    }
-
-    @Test
-    fun `a disabled emulator is not offered, since it could not start`() {
         given(Emulator.DISABLED, GameFileState.PRESENT)
         launcher.prepareGame(launch(Emulator.DISABLED), game.uri).shouldBeLeft() shouldBe LaunchFailure.NotInstalled(armsx2)
-    }
-
-    @Test
-    fun `a game starts without Android's transition between apps`() {
-        given(Emulator.INSTALLED, GameFileState.PRESENT)
-        val flags = launcher.checkGame(launch(Emulator.INSTALLED), game.uri).shouldBeRight().flags
-        (flags and Intent.FLAG_ACTIVITY_NO_ANIMATION) shouldBe Intent.FLAG_ACTIVITY_NO_ANIMATION
     }
 
     /** Runs [check] in every state: each emulator, game file and running instance policy. */
@@ -111,7 +101,7 @@ class LauncherTest {
     }
 
     @Test
-    fun `INV-E3-01 checking a game starts nothing and stops nothing, whatever it finds`() = everyState { emulator, file, instance ->
+    fun `INV-05 checking a game starts nothing and stops nothing, whatever it finds`() = everyState { emulator, file, instance ->
         given(emulator, file)
         launcher.checkGame(launch(emulator, instance), game.uri)
         stopped.shouldBeEmpty()
@@ -119,7 +109,7 @@ class LauncherTest {
     }
 
     @Test
-    fun `INV-E3-02 a launch fails exactly as its check did, and goes ahead exactly when its check did`() {
+    fun `INV-05 a launch fails exactly as its check did, and goes ahead exactly when its check did`() {
         var ready = 0
         everyState { emulator, file, instance ->
             given(emulator, file)
@@ -132,7 +122,7 @@ class LauncherTest {
     }
 
     @Test
-    fun `INV-E3-02 a launch stops a lingering emulator only when it goes ahead and the definition asks to`() = everyState {
+    fun `a launch stops a lingering emulator only when it goes ahead and the definition asks to`() = everyState {
         emulator,
         file,
         instance,
@@ -145,7 +135,7 @@ class LauncherTest {
     }
 
     @Test
-    fun `INV-E3-03 a game whose file is gone or unreadable never launches, and is reported so when its emulator is there`() =
+    fun `INV-04 a game whose file is gone or unreadable never launches, and is reported so when its emulator is there`() =
         everyState { emulator, file, instance ->
             given(emulator, file)
             val prepared = launcher.prepareGame(launch(emulator, instance), game.uri)

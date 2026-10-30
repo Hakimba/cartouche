@@ -12,3 +12,4 @@ model_name = "Original"
 scene = "res://carousel/consoles/xbox/xbox.tscn"
 launch = "res://carousel/consoles/xbox/launch.json"
 triangle_budget = 11000
+ring_size = Vector2(2.155, -0.272)

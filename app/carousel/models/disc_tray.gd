@@ -88,7 +88,7 @@ static func plate(mesh: MeshBuilder, area: Rect2, levels: Vector2, centre: Vecto
 ## turntable, the laser's slot going back from it.
 static func window(centre: Vector2, radius: float, steps: int) -> PackedVector2Array:
 	var laser := Rect2(centre.x - LASER.x / 2.0, centre.y, LASER.x, LASER.y * radius)
-	return _ccw(Geometry2D.merge_polygons(ShapeGeometry.circle(centre, WINDOW_RADIUS, 8 * steps),
+	return ShapeGeometry.ccw(Geometry2D.merge_polygons(ShapeGeometry.circle(centre, WINDOW_RADIUS, 8 * steps),
 		ShapeGeometry.square(laser))[0])
 
 
@@ -139,7 +139,7 @@ static func opening(mesh: MeshBuilder, mouth: PackedVector2Array, tray: Rect2, f
 	var clear := Rect2(tray.position.x - LIP_GAP, uv.position.y - 1.0, tray.size.x + 2.0 * LIP_GAP,
 		tray.end.y + LIP_ROOM - uv.position.y + 1.0)
 	for lip in Geometry2D.clip_polygons(mouth, ShapeGeometry.square(clear)):
-		ShapeGeometry.prism(mesh, _ccw(lip), front - LIP, front, uv)
+		ShapeGeometry.prism(mesh, ShapeGeometry.ccw(lip), front - LIP, front, uv)
 
 
 ## The tray's middle, above its rails: as long as its plate, narrower by its rails.
@@ -169,17 +169,4 @@ static func _around(mesh: MeshBuilder, area: Rect2, holes: Array[PackedVector2Ar
 					left.append_array(Geometry2D.clip_polygons(piece, hole))
 				pieces = left
 			for piece in pieces:
-				ShapeGeometry.prism(mesh, _ccw(piece), low, high, area)
-
-
-## [param loop] counter-clockwise, its points closer than a hundredth of a millimetre made one.
-static func _ccw(loop: PackedVector2Array) -> PackedVector2Array:
-	var found := PackedVector2Array()
-	for point in loop:
-		if found.is_empty() or point.distance_to(found[-1]) > 0.01:
-			found.append(point)
-	if found[0].distance_to(found[-1]) <= 0.01:
-		found.remove_at(found.size() - 1)
-	if Geometry2D.is_polygon_clockwise(found):
-		found.reverse()
-	return found
+				ShapeGeometry.prism(mesh, ShapeGeometry.ccw(piece), low, high, area)

@@ -94,13 +94,11 @@ static func arrays(shape: GcShape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.flat(mesh, dimple, top + 0.05, Vector3.BACK, body)
 			at.origin = -shape.hinge()
 		&"lid_logo", &"maker_logo":
-			# The console's name a hair over the dark face.
 			var on_dimple := part == &"lid_logo"
 			var centre := shape.dimple_centre if on_dimple else shape.lid_box().end - MAKER_INSET
 			ShapeGeometry.decal(mesh, ShapeGeometry.centred(centre, LOGOS[part]), top + (0.05 if on_dimple else 0.0))
 			at.origin = -shape.hinge()
 		&"power_label", &"reset_label", &"open_label":
-			# Along the collar, the letters' tops away from the button.
 			var button: Vector2 = shape.buttons()[StringName(part.trim_suffix("_label"))]
 			var outwards := Vector2(-signf(button.x), 1.0).normalized()
 			var centre := button + outwards * LABEL_REACH
@@ -156,7 +154,6 @@ static func _front(mesh: MeshBuilder, shape: GcShape, part: StringName, steps: i
 		ShapeGeometry.prism(mesh, outline, -shape.bevel - 0.5, PANEL_RAISE, face)
 		return
 	if part == &"port_dots":
-		# Just over the ports.
 		var size_mm := LOGOS[part]
 		var over := bottom + PORT_HEIGHT * size.y + PORT_RADIUS * size.x + 1.5
 		ShapeGeometry.decal(mesh, Rect2(-size_mm.x / 2.0, over, size_mm.x, size_mm.y), PANEL_RAISE)
@@ -165,7 +162,6 @@ static func _front(mesh: MeshBuilder, shape: GcShape, part: StringName, steps: i
 	for x in PORTS:
 		var centre := Vector2(x * size.x, bottom + PORT_HEIGHT * size.y)
 		ShapeGeometry.flat(mesh, ShapeGeometry.circle(centre, PORT_RADIUS * size.x, 32), out, Vector3.BACK, face)
-	# Each memory card's slot: the groove round its flap.
 	for x in SLOTS:
 		var slot := Rect2(Vector2(x * size.x, bottom + SLOT_HEIGHT * size.y) - SLOT_SIZE * size / 2.0, SLOT_SIZE * size)
 		ShapeGeometry.band(mesh, ShapeGeometry.square(slot),

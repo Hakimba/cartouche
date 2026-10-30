@@ -6,25 +6,21 @@ extends ConsoleModel
 ## its back edge, the power knob slides back, the reset button goes down. Each part turns or slides from the
 ## rest the glb gives its node.
 
-## How far the flaps are turned down from flat, in degrees.
 var flaps_degrees := 0.0:
 	set(value):
 		if value != flaps_degrees and is_node_ready():
 			_place_flaps(value)
 		flaps_degrees = value
-## How far the eject lever is pressed, in degrees.
 var eject_degrees := 0.0:
 	set(value):
 		if value != eject_degrees and is_node_ready():
 			_eject.rotation.x = deg_to_rad(value)
 		eject_degrees = value
-## How far the power knob is slid back, towards on, in millimetres.
 var power_mm := 0.0:
 	set(value):
 		if value != power_mm and is_node_ready():
 			_knob.position.z = _knob_off - value * MeshBuilder.UNITS_PER_MM
 		power_mm = value
-## How far the reset button is pressed, in millimetres.
 var reset_mm := 0.0:
 	set(value):
 		if value != reset_mm and is_node_ready():
@@ -65,8 +61,6 @@ func approach() -> Vector3:
 	return Vector3.UP
 
 
-## The flaps hang down towards the middle of the slot: the back one turns by the degrees, the front one,
-## hinged on the other side, by minus them.
 func _place_flaps(degrees: float) -> void:
 	_back_flap.rotation.x = deg_to_rad(degrees)
 	_front_flap.rotation.x = -deg_to_rad(degrees)

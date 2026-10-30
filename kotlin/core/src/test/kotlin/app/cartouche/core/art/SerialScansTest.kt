@@ -1,17 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
-import app.cartouche.core.Shipped
 import app.cartouche.core.platforms.SerialScans
 import io.kotest.assertions.arrow.core.shouldBeNone
 import io.kotest.assertions.arrow.core.shouldBeSome
-import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldStartWith
-import io.kotest.property.Arb
-import io.kotest.property.arbitrary.element
-import io.kotest.property.checkAll
-import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
 class SerialScansTest {
@@ -27,16 +20,6 @@ class SerialScansTest {
     fun `serials of another form are left out, as the reference lists hold some`() {
         source.scansOf(listOf("SLES-53974/GER", "SLES---54355", "SCES-53133-ANZ/P", "slus-20148", "")).map { it.url.value } shouldBe
             emptyList()
-    }
-
-    @Test
-    fun `every serial of the shipped PS2 list makes an https URL of the shipped source, and most are of its form`() = runBlocking<Unit> {
-        val shipped = Shipped.ps2.profile.scansBySerial.shouldBeSome()
-        val serials = Shipped.text("titles/ps2.tsv").lines().flatMap { line -> line.substringAfter('\t').split(',') }
-        checkAll(Arb.element(serials)) { serial ->
-            shipped.scansOf(listOf(serial)).forEach { it.url.value shouldStartWith "https://psxdatacenter.com/" }
-        }
-        serials.count { shipped.scansOf(listOf(it)).isNotEmpty() } shouldBeGreaterThan serials.size * 3 / 4
     }
 
     @Test

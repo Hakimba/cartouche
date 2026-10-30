@@ -4,7 +4,6 @@ package app.cartouche.android
 import app.cartouche.android.art.AbsentArt
 import app.cartouche.android.art.FoundArt
 import app.cartouche.android.art.LabelDownload
-import app.cartouche.android.art.OwnPicture
 import app.cartouche.android.art.StoredArt
 import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.LaunchFailure
@@ -23,8 +22,11 @@ import app.cartouche.core.art.Stall
 import app.cartouche.core.art.web
 import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.ConsoleVariant
+import app.cartouche.core.library.CountedReason
 import app.cartouche.core.library.Disc
+import app.cartouche.core.library.DiscGrouping
 import app.cartouche.core.library.DisplayName
+import app.cartouche.core.library.FolderDepth
 import app.cartouche.core.library.FolderPath
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
@@ -44,6 +46,7 @@ import app.cartouche.core.library.listed
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.LaunchError
+import app.cartouche.core.platforms.MediaType
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.platforms.catalog
@@ -69,6 +72,7 @@ import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -132,7 +136,7 @@ class WireTest {
             )
 
     @Test
-    fun `INV-E0-16 everything sent to Godot is a value its bridge converts`() {
+    fun `INV-23 everything sent to Godot is a value its bridge converts`() {
         val uri = uri("content://p/tree/t")
         val folder = Folder(uri, "ps2", Some(FilePath("/storage/x")))
         val entry = DocumentEntry(FileName("g.chd"), EntryKind.FILE, DocumentId("x:g.chd"), uri, None, None, None)
@@ -254,7 +258,7 @@ class WireTest {
     }
 
     @Test
-    fun `INV-E1-13 the library sent to Godot does not grow with hidden or unsupported files`() {
+    fun `the library sent to Godot does not grow with hidden or unsupported files`() {
         fun sent(files: Int): Int {
             val ignored =
                 (1..files).flatMap {
@@ -301,64 +305,62 @@ class WireTest {
         }"""
     }
 
+    private fun sentGames(vararg games: Game, catalog: Catalog = ps2) = Json
+        .parseToJsonElement(Library(games = games.toList()).toWireJson(None, catalog))
+        .jsonObject
+        .getValue("games")
+        .jsonArray
+        .map { it.jsonObject }
+
+    private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
+
     @Test
-    fun `a renamed game reaches Godot under its name, with its title beside it`() {
-        fun sent(game: Game) = Json
-            .parseToJsonElement(Library(games = listOf(game)).toWireJson(None, ps2))
-            .jsonObject
-            .getValue("games")
-            .jsonArray
-            .single()
-            .jsonObject
+    fun `a renamed game reaches Godot under its name, its chosen label under its own keys, an automatic one under none`() {
         val okage = game("Okage")
-        sent(okage).getValue("title").jsonPrimitive.content shouldBe "Okage"
-        sent(okage).containsKey("original_title") shouldBe false
-        val renamed = sent(okage.copy(displayName = DisplayName.of("Okage: Shadow King")))
-        renamed.getValue("title").jsonPrimitive.content shouldBe "Okage: Shadow King"
-        renamed.getValue("original_title").jsonPrimitive.content shouldBe "Okage"
+        val (plain, renamed) = sentGames(okage, okage.copy(displayName = DisplayName.of("Okage: Shadow King")))
+        plain.text("title") shouldBe "Okage"
+        plain.containsKey("original_title") shouldBe false
+        renamed.text("title") shouldBe "Okage: Shadow King"
+        renamed.text("original_title") shouldBe "Okage"
+
+        fun label(choice: LabelChoice) = sentGames(okage.copy(label = choice)).single()
+        label(LabelChoice.Region(LabelRegion("Japan"))).let {
+            it.text("label_region") shouldBe "Japan"
+            it.text("label_source") shouldBe "launchbox"
+        }
+        label(LabelChoice.Region(LabelRegion("Japan"), ArtSource.SCREENSCRAPER)).text("label_source") shouldBe "screenscraper"
+        label(LabelChoice.Automatic).containsKey("label_region") shouldBe false
+        label(LabelChoice.Own).text("label_own") shouldBe "true"
+        label(LabelChoice.Own).containsKey("label_region") shouldBe false
     }
 
     @Test
-    fun `a game's chosen region reaches Godot under its own key, and an automatic label sends none`() {
-        fun sent(label: LabelChoice) = Json
-            .parseToJsonElement(Library(games = listOf(game("Okage").copy(label = label))).toWireJson(None, ps2))
-            .jsonObject
-            .getValue("games")
-            .jsonArray
-            .single()
-            .jsonObject
-        sent(LabelChoice.Region(LabelRegion("Japan"))).getValue("label_region").jsonPrimitive.content shouldBe "Japan"
-        sent(LabelChoice.Region(LabelRegion("Japan"))).getValue("label_source").jsonPrimitive.content shouldBe "launchbox"
-        sent(LabelChoice.Region(LabelRegion("Japan"), ArtSource.SCREENSCRAPER)).getValue("label_source").jsonPrimitive.content shouldBe
-            "screenscraper"
-        sent(LabelChoice.Region(LabelRegion(""))).getValue("label_region").jsonPrimitive.content shouldBe ""
-        sent(LabelChoice.Automatic).containsKey("label_region") shouldBe false
-        sent(LabelChoice.Own).getValue("label_own").jsonPrimitive.content shouldBe "true"
-        sent(LabelChoice.Own).containsKey("label_region") shouldBe false
-        VariantFailure.entries.map { it.wire }.distinct().size shouldBe VariantFailure.entries.size
+    fun `every enum reaches Godot as the word GDScript reads`() {
+        ButtonStyle.entries.map { it.wire } shouldBe listOf("xbox", "nintendo", "playstation")
+        EdgeSmoothing.entries.map { it.wire } shouldBe listOf("4x", "2x", "off")
+        DiscGrouping.entries.map { it.wire } shouldBe listOf("grouped", "separate")
+        FolderDepth.entries.map { it.wire } shouldBe listOf("top_level", "subfolders")
+        SkipReason.entries.map { it.wire } shouldBe listOf("hidden", "emulator_data", "too_deep", "unreadable")
+        IgnoreReason.entries.map { it.wire } shouldBe listOf("hidden", "unsupported", "not_a_game")
+        CountedReason.entries.map { it.wire } shouldBe listOf("hidden", "unsupported")
+        MediaType.entries.map { it.wire } shouldBe listOf("dvd", "cartridge", "minidisc")
+        Volume.entries.map { it.plainWire } shouldBe listOf("internal", "card")
+        VariantFailure.entries.map { it.plainWire } shouldBe listOf("offline", "refused", "not_found", "unreadable", "storage")
     }
 
     @Test
-    fun `INV-E10-05 each game reaches Godot with the medium its platform gives its regions, none when the platform is unknown`() {
+    fun `each game reaches Godot with the medium its platform gives its regions, none when the platform is unknown`() {
         val medium = """{"default": "nes_cart", "ntsc_j": "famicom_cart"}"""
         val profiles = """{"nes": {"media": "cartridge", "medium": $medium, "minimumGameBytes": 1}}"""
         val nes = Catalog.parse(listOf(definition(platform = "nes")), DefinitionSource("profiles.json", profiles))
-        val games =
-            listOf(game("A", "nes").copy(regions = listOf("Japan")), game("B", "nes").copy(regions = listOf("USA")), game("C", "gba"))
         val sent =
-            Json
-                .parseToJsonElement(Library(games = games).toWireJson(None, nes))
-                .jsonObject
-                .getValue("games")
-                .jsonArray
-                .map { it.jsonObject }
-        sent.take(2).map { it.getValue("medium").jsonPrimitive.content } shouldBe listOf("famicom_cart", "nes_cart")
+            sentGames(
+                game("A", "nes").copy(regions = listOf("Japan")),
+                game("B", "nes").copy(regions = listOf("USA")),
+                game("C", "gba"),
+                catalog = nes,
+            )
+        sent.take(2).map { it.text("medium") } shouldBe listOf("famicom_cart", "nes_cart")
         sent.last().containsKey("medium") shouldBe false
-    }
-
-    @Test
-    fun `a picture being framed is sent with its path and size`() {
-        OwnPicture(File("/own/picked.jpg"), 640, 480).toWire() shouldBe
-            dictionary("path" to "/own/picked.jpg", "width" to 640, "height" to 480)
     }
 }

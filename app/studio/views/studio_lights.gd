@@ -2,8 +2,8 @@
 class_name StudioLights
 extends RefCounted
 ## The lights designed for each model and screen (`data/studio_lights.json`, [method rig_of]), built
-## under a view's world about the model's box centre. A (model, screen) the file does not list keeps today's light, the Sun and the room of the
-## carousel.
+## under a view's world about the model's box centre. A (model, screen) the file does not list keeps the default light:
+## the Sun and the room of the carousel.
 
 const FILE := "res://data/studio_lights.json"
 ## Where a source of the games screen shines: on the chosen medium or on its neighbours (a source of
@@ -89,8 +89,8 @@ class Rig:
 
 
 ## The light of [param model] (a console's folder or a medium) in [param screen] (`consoles`,
-## `plinth`, `games`, `properties`), its « sans image » one when [param blank]: the one designed for
-## it, else today's.
+## `plinth`, `games`, `properties`), its one for a game without a picture when [param blank]: the one designed for
+## it, else the default one.
 static func rig_of(model: String, screen: StringName, blank := false) -> Rig:
 	var models: Dictionary = _file()["blank" if blank else "lights"]
 	var screens: Dictionary = models.get(model, {})
@@ -99,7 +99,7 @@ static func rig_of(model: String, screen: StringName, blank := false) -> Rig:
 
 
 ## The app's environment for a view of its own world: a copy of the one [param node]'s world has (its
-## sky shared), whose room light the view's lights set; a plain room of today's colour where there is
+## sky shared), whose room light the view's lights set; a plain room of the default colour where there is
 ## none.
 static func environment_of(node: Node) -> Environment:
 	var shown := node.get_viewport().find_world_3d().environment

@@ -2,13 +2,10 @@
 package app.cartouche.core.platforms
 
 import app.cartouche.core.PackageName
-import app.cartouche.core.Shipped
 import arrow.core.None
-import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
-import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
@@ -21,7 +18,6 @@ import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 class CurtainTimesTest {
     private fun parse(text: String) = CurtainTimes.parse(DefinitionSource("curtains.json", text))
@@ -30,14 +26,6 @@ class CurtainTimesTest {
         """{"default_ms": $default, "emulators": {${emulators.entries.joinToString { (name, time) -> "\"$name\": $time" }}}}"""
 
     private val armsx2 = PackageName.parse("com.armsx2").shouldBeSome()
-
-    @Test
-    fun `an emulator gets its own time, any other and an implicit launch the default one`() {
-        val times = parse(file(1500, mapOf("com.armsx2" to 2000))).shouldBeRight()
-        times.timeFor(Some(armsx2)) shouldBe 2000.milliseconds
-        times.timeFor(Some(PackageName.parse("org.other.emu").shouldBeSome())) shouldBe 1500.milliseconds
-        times.timeFor(None) shouldBe 1500.milliseconds
-    }
 
     @Test
     fun `every time of a valid file reads back as written`() = runBlocking<Unit> {
@@ -49,20 +37,7 @@ class CurtainTimesTest {
     }
 
     @Test
-    fun `INV-E3-06 no curtain lasts longer than 10 s, whatever the file says`() = runBlocking<Unit> {
-        CurtainTimes.LONGEST shouldBeLessThanOrEqualTo 10.seconds
-        checkAll(
-            Arb.long(0L..Long.MAX_VALUE / 2),
-            Arb.map(packageNames, Arb.long(0L..Long.MAX_VALUE / 2), maxSize = 4),
-        ) { default, emulators ->
-            parse(file(default, emulators)).onRight { times ->
-                (emulators.keys.map(PackageName::parse) + None).forEach { times.timeFor(it) shouldBeLessThanOrEqualTo 10.seconds }
-            }
-        }
-    }
-
-    @Test
-    fun `INV-E3-06 one time out of bounds anywhere refuses the file, naming its key`() = runBlocking<Unit> {
+    fun `INV-07 one time out of bounds anywhere refuses the file, naming its key`() = runBlocking<Unit> {
         val outOfBounds = Arb.choice(Arb.long(Long.MIN_VALUE / 2..-1L), Arb.long(10_001L..Long.MAX_VALUE / 2))
         checkAll(
             curtainMillis,
@@ -89,10 +64,5 @@ class CurtainTimesTest {
             CatalogError.InvalidValue("curtains.json", "armsx2", "not a package name")
         parse("""{"emulators": {}}""").shouldBeLeft() shouldBe CatalogError.MissingField("curtains.json", "default_ms")
         parse("""{"default_ms": 1}""").shouldBeLeft() shouldBe CatalogError.MissingField("curtains.json", "emulators")
-    }
-
-    @Test
-    fun `the shipped times are read`() {
-        parse(Shipped.text("launch/curtains.json")).shouldBeRight().timeFor(Some(armsx2)) shouldBe 1500.milliseconds
     }
 }

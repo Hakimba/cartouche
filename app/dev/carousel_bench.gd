@@ -40,9 +40,9 @@ const _ORDER_PRESSES: Array[StringName] = [&"ui_accept", &"carousel_right", &"ca
 const _HELD: Dictionary[String, StringName] = {
 	"scroll": &"carousel_right", "scrape": &"carousel_right", "turn": &"inspect_right",
 }
-## A bench approximation of the games row, until the games screen stands its own: the design's places
-## and sizes (for a disc the chosen one's place, for a cartridge its lift over its pose's place; the
-## chosen one's size, a neighbour's place (x, y) and size), and each medium family's pose.
+## A bench approximation of the games row: its places and sizes (for a disc the chosen one's place, for a
+## cartridge its lift over its pose's place; the chosen one's size, a neighbour's place (x, y) and size), and each
+## medium family's pose.
 const _DISC_ROW := {&"centre": Vector3(0.0, 0.15, 0.0), &"size": 0.78, &"side": Vector2(0.96, -0.25), &"side_size": 0.56}
 const _CART_ROW := {&"lift": 0.22, &"size": 0.85, &"side": Vector2(1.25, 0.02), &"side_size": 0.66}
 ## (position, rotation YXZ in degrees)

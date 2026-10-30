@@ -10,20 +10,16 @@ const _OPEN_DEGREES := 90.0
 ## How bright the power light is once on, as its material's emission energy.
 const _LIT := 2.5
 
-## How far the flaps are open, in degrees.
 var flaps_degrees := 0.0:
 	set(value):
-		# Given each frame by the launch animation: the parts are moved only when they move.
 		if value != flaps_degrees and is_node_ready():
 			_fold(value)
 		flaps_degrees = value
-## How far the power switch has slid back, in millimetres.
 var power_mm := 0.0:
 	set(value):
 		if value != power_mm and is_node_ready():
 			_power.position.z = -value * MeshBuilder.UNITS_PER_MM
 		power_mm = value
-## How far the reset button has slid back, in millimetres.
 var reset_mm := 0.0:
 	set(value):
 		if value != reset_mm and is_node_ready():
@@ -61,7 +57,6 @@ func approach() -> Vector3:
 	return Vector3.UP
 
 
-## Each flap turns down into the slot, the front one back and the back one forward.
 func _fold(degrees: float) -> void:
 	_front_flap.rotation.x = -deg_to_rad(degrees)
 	_back_flap.rotation.x = deg_to_rad(degrees)

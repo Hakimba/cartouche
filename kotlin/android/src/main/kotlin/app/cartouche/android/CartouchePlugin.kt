@@ -5,32 +5,20 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.ImageDecoder
 import android.net.ConnectivityManager
-import android.net.Network
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
-import android.util.Log
 import app.cartouche.android.apps.InstalledApps
-import app.cartouche.android.art.Answer
+import app.cartouche.android.art.ArtService
 import app.cartouche.android.art.ArtStore
 import app.cartouche.android.art.Credentials
-import app.cartouche.android.art.Fetch
-import app.cartouche.android.art.FetchFailure
 import app.cartouche.android.art.FoundArt
-import app.cartouche.android.art.Http
-import app.cartouche.android.art.HttpFetch
-import app.cartouche.android.art.JavaHttp
 import app.cartouche.android.art.LabelChoices
-import app.cartouche.android.art.LabelDownload
-import app.cartouche.android.art.LabelNews
 import app.cartouche.android.art.OwnPictures
-import app.cartouche.android.art.Scraper
-import app.cartouche.android.art.ScreenScraperFetch
-import app.cartouche.android.art.StoredArt
 import app.cartouche.android.art.Textures
-import app.cartouche.android.art.VariantDownloads
-import app.cartouche.android.art.VariantFailure
+import app.cartouche.android.art.artFetch
+import app.cartouche.android.art.screenScraperFetch
 import app.cartouche.android.launch.Curtain
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.launch.Launcher
@@ -46,14 +34,7 @@ import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
-import app.cartouche.core.art.ArtSources
-import app.cartouche.core.art.ArtVariant
-import app.cartouche.core.art.ArtVersion
-import app.cartouche.core.art.Candidate
-import app.cartouche.core.art.Day
 import app.cartouche.core.art.LabelFraming
-import app.cartouche.core.art.Scraping
-import app.cartouche.core.art.ScreenScraperState
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DemoLibrary
@@ -64,7 +45,6 @@ import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LibraryFormat
 import app.cartouche.core.library.PlatformSetup
-import app.cartouche.core.library.TitleIndex
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.CatalogError
 import app.cartouche.core.platforms.CurtainTimes
@@ -75,37 +55,30 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.regions.PreferredRegion
-import app.cartouche.core.search.Finder
 import app.cartouche.core.search.Finders
 import app.cartouche.core.search.Order
+import app.cartouche.core.search.View
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.SoundLevel
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
-import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.firstOrNone
 import arrow.core.flatMap
 import arrow.core.getOrElse
 import arrow.core.getOrNone
-import arrow.core.left
 import arrow.core.merge
 import arrow.core.raise.Raise
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.raise.option
 import arrow.core.recover
-import arrow.core.right
 import arrow.core.separateEither
 import arrow.core.toOption
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -116,100 +89,63 @@ import org.godotengine.godot.plugin.GodotPlugin
 import org.godotengine.godot.plugin.SignalInfo
 import org.godotengine.godot.plugin.UsedByGodot
 import java.io.File
-import java.net.HttpURLConnection
-import java.time.LocalDate
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 import app.cartouche.core.settings.Settings as AppSettings
 
 /**
- * Cartouche's Android services, reached from GDScript as `Engine.get_singleton("CartoucheAndroid")`
- * and wrapped by `app/adapters/android/android_services.gd`. The wire format is described in
- * `Wire.kt`.
- *
- * Methods are called on Godot's render thread. Getters answer directly, and [prepareTitles] only
- * starts its work. Operations take a request id and answer it exactly once, later, through the
- * `answered` signal: their work runs in [scope] on the IO dispatcher (the folder pick on the main
- * thread), activity starts on the main thread, and every exception stops at [answer], except the
- * cancellation of [scope] when the activity is destroyed.
+ * Cartouche's Android services, wrapped by `app/adapters/android/android_services.gd`; the wire format is in `Wire.kt`.
+ * Getters answer directly; operations answer their request id once through the `answered` signal,
+ * and every exception stops at [answer] but the scope's cancellation.
  */
-public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
-    // A failure no operation stops is logged, and ends only its own coroutine.
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e -> unexpected(e) })
+public class CartouchePlugin internal constructor(godot: Godot, private val threads: Threads) : GodotPlugin(godot) {
+    public constructor(godot: Godot) : this(godot, Threads.create())
+
+    private val scope = threads.scope
     private val folders by lazy { Folders(context) }
     private val launcher by lazy { Launcher(context, folders) }
     private val curtain by lazy { Curtain(context.applicationContext, scope) }
-    private val pendingPick = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
-    private val pendingPicture = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
+    private val pendingPick = pendingPicker()
+    private val pendingPicture = pendingPicker()
     private val ownPictures by lazy { OwnPictures(File(context.cacheDir, "own-label")) }
-    private val artStore by lazy { ArtStore(File(context.filesDir, "art")) }
-    private val screenScraper by lazy { screenScraperFetch() }
-    private val textures by lazy { screenScraper.getOrElse { Textures.NONE } }
-    private val fetch by lazy { artFetch() }
-    private val scraper by lazy { Scraper(artStore, fetch, scope, textures, ::artDownloading, ::artChanged) }
+    private val debug by lazy { DebugOptions(launchArguments().asList()) }
 
-    private val variantDownloads by lazy {
-        VariantDownloads(artStore, fetch, scope, Dispatchers.IO.limitedParallelism(VARIANT_DOWNLOADS), ::variantDownloaded)
-    }
+    private val artService =
+        lazy {
+            val screenScraper = screenScraperFetch(debug, File(context.filesDir, "art/screenscraper.json"))
+            ArtService(
+                threads,
+                ArtStore(File(context.filesDir, "art")),
+                { library.value },
+                { reference },
+                { storedSettings().preferredRegion },
+                artFetch(debug, screenScraper),
+                screenScraper.getOrElse { Textures.NONE },
+                { context.getSystemService(ConnectivityManager::class.java) },
+            ) { signal, payload -> emitSignal(signal, payload) }
+        }
+    private val art by artService
 
-    // Told on the render thread, after Godot has registered this plugin's signals there: at a cold
-    // start, the battery's first broadcast can come before.
+    // Told on the render thread: at a cold start the first broadcast can come before Godot registers the signals.
+    // Told on the render thread, after Godot has registered this plugin's signals there: at a cold start, the battery's
+    // first broadcast can come before.
     private val batteryWatch = BatteryWatch { runOnRenderThread { emitSignal(BATTERY_SIGNAL, it.toWire()) } }
 
-    private val network =
-        object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) = scraper.networkBack()
-        }
-
-    /** Watches the network from the first art looked for on, to resume as soon as it comes back. */
-    private val watchingNetwork = lazy { Either.catch { connectivity.registerDefaultNetworkCallback(network) }.isRight() }
-
-    private val connectivity by lazy { context.getSystemService(ConnectivityManager::class.java) }
-
     /** Written on the render thread, read by operations too; immutable, so publishing it is enough. */
-    @Volatile private var catalog = Catalog()
+    @Volatile private var reference = Reference()
 
-    /** Reference lists by platform, as loaded; each is indexed on first use, or ahead by [prepareTitles]. */
-    @Volatile private var titleLists: Map<PlatformId, String> = emptyMap()
+    private val catalog: Catalog get() = reference.catalog
 
-    /** The prints of cartridge platforms' games, as loaded, indexed with their reference lists. */
-    @Volatile private var printLists: Map<PlatformId, String> = emptyMap()
-
-    @Volatile private var titleIndexes = ConcurrentHashMap<PlatformId, TitleIndex>()
-
-    @Volatile private var dataFolders = DataFolders.NONE
-
-    @Volatile private var curtainTimes = CurtainTimes.NONE
-
-    /** Art extracts and ScreenScraper's texture tables by platform, as loaded; each is indexed on first use. */
-    @Volatile private var artLists: Map<PlatformId, String> = emptyMap()
-
-    @Volatile private var textureLists: Map<PlatformId, String> = emptyMap()
-
-    @Volatile private var artSources = ConcurrentHashMap<PlatformId, ArtSources>()
-
-    /** Whether the library shown is a demo one, whose games have no art to look for. */
-    @Volatile private var demo = false
-
-    /** Runs every library call, one at a time (see [LibraryService]). */
-    private val libraryThread = Dispatchers.IO.limitedParallelism(1)
-
-    /** Makes the finders of each library kept, one at a time (see [prepare]). */
     private val preparing =
         Executors
             .newSingleThreadExecutor {
                 Thread(it, "finders").apply { priority = Thread.MIN_PRIORITY }
             }.asCoroutineDispatcher()
 
-    /** Plans each look for art, one at a time, in the order asked. */
-    private val artPlanning = Dispatchers.IO.limitedParallelism(1)
-
     /**
-     * Used on [libraryThread], which [useDemoLibrary] replaces it on; read from Godot's thread too,
-     * by [browse] and [titleMarks], for the finders it publishes.
+     * Used on the library thread, which [useDemoLibrary] replaces it on; read from Godot's thread
+     * too, by [browse] and [titleMarks], for the finders it publishes.
      */
     @Volatile private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
 
@@ -232,33 +168,27 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     override fun onMainResume() {
         installed.clear()
         curtain.lower()
-        scraper.start()
+        art.start()
         batteryWatch.follow(context)
     }
 
-    // Nothing is downloaded, and the battery not followed, while a game is played.
+    // A game is played meanwhile: nothing is downloaded, and the battery not followed.
     override fun onMainPause() {
-        scraper.stop()
+        art.stop()
         batteryWatch.stop(context)
     }
 
     override fun onMainDestroy() {
         curtain.lower()
-        if (watchingNetwork.isInitialized() && watchingNetwork.value) {
-            Either.catch { connectivity.unregisterNetworkCallback(network) }
-        }
+        if (artService.isInitialized()) art.close()
         scope.cancel()
     }
 
-    // Getters
-
     /**
-     * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the
-     * profiles file's text, the reference lists as `{platform id: text}`, the emulator data folder
-     * names (`data_folders.json`), the curtain times (`curtains.json`), the art extracts, the
-     * cartridge prints and ScreenScraper's texture tables, each as `{platform id: text}`; [supported]
-     * names the platforms with a console model; returns the catalog summary, with the platforms a
-     * person may add under `offered` (see [Catalog.offered]).
+     * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the profiles file's text, the emulator
+     * data folder names (`data_folders.json`), the curtain times (`curtains.json`), and the reference lists, art extracts, cartridge
+     * prints and ScreenScraper texture tables, each as `{platform id: text}`; [supported] names the platforms with a console model.
+     * Returns the catalog summary, with the platforms a person may add under `offered` (see [Catalog.offered]).
      */
     @UsedByGodot
     public fun loadCatalog(
@@ -276,63 +206,56 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             definitions.keys.sorted().separateEither { name ->
                 definitions.text(name).map { DefinitionSource(name, it) }.toEither { CatalogError.InvalidJson(name, "not text") }
             }
-        titleLists = titles.textsByPlatform()
-        printLists = prints.textsByPlatform()
-        titleIndexes = ConcurrentHashMap()
-        artLists = art.textsByPlatform()
-        // A build without ScreenScraper's key offers no texture: one answered as not found would be remembered
-        // missing, and stay so once a build with the key is installed over it.
-        textureLists = Credentials.fromBuild().fold({ emptyMap() }) { textures.textsByPlatform() }
-        artSources = ConcurrentHashMap()
         val folderNames = DataFolders.parse(DefinitionSource("data_folders.json", dataFolderNames))
-        dataFolders = folderNames.getOrElse { DataFolders.NONE }
         val times = CurtainTimes.parse(DefinitionSource("curtains.json", curtains))
-        curtainTimes = times.getOrElse { CurtainTimes.NONE }
-        catalog =
+        val parsed =
             Catalog.parse(sources, DefinitionSource("profiles.json", profiles), supported.map(::PlatformId).toSet()).let {
                 it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + times.swap().getOrNone().toList() + it.rejected)
             }
-        return catalog.toWire()
+        reference =
+            Reference(
+                parsed,
+                titles.textsByPlatform(),
+                prints.textsByPlatform(),
+                folderNames.getOrElse { DataFolders.NONE },
+                times.getOrElse { CurtainTimes.NONE },
+                art.textsByPlatform(),
+                // Without ScreenScraper's key no texture is offered: a miss would be remembered once a keyed build is installed.
+                // A build without ScreenScraper's key offers no texture: one answered as not found would be remembered
+                // missing, and stay so once a build with the key is installed over it.
+                Credentials.fromBuild().fold({ emptyMap() }) { textures.textsByPlatform() },
+            )
+        return parsed.toWire()
     }
 
-    /**
-     * Looks for the art of [gameIds] (the game on screen and its neighbours) before the others':
-     * their requests, when still waiting, go to the front of the run, now and at each new plan.
-     */
+    /** Moves the art requests of [gameIds] (the game on screen and its neighbours) to the front of the run. */
     @UsedByGodot
-    public fun artFocus(gameIds: Array<String>) {
-        val games = gameIds.map(::GameId)
-        scope.launch(artPlanning) { scraper.focus(games) }
-    }
+    public fun artFocus(gameIds: Array<String>): Unit = art.focus(gameIds.map(::GameId))
 
-    /**
-     * Indexes the reference lists in the background, as the settings or the form adding a console
-     * open: a start that adds or changes no console does not pay for it, and the form's first count
-     * of a folder does not wait for it.
-     */
+    /** Indexes the reference lists in the background, so the first count of a folder does not wait. */
     @UsedByGodot
     public fun prepareTitles() {
-        scope.launch { titleLists.keys.forEach(::titles) }
+        val loaded = reference
+        scope.launch { loaded.titledPlatforms.forEach(loaded::titles) }
     }
 
-    /**
-     * What the carousel shows of [platformId]'s shelf (see [View.toWireJson]): the games found for
-     * [typed], or with nothing typed the index by `title` or by `region` ([order]). Answers at once,
-     * from the library last kept; a platform without games has none.
-     */
+    /** The shelf's view for [typed], or the index by `title` or `region` [order] when nothing is typed; JSON, at once. */
     @UsedByGodot
     public fun browse(platformId: String, order: String, typed: String): String {
-        val started = TimeSource.Monotonic.markNow()
         val finders = library.value.finders
         val platform = PlatformId(platformId)
-        val view = finders.view(platform, if (order == "region") Order.REGION else Order.TITLE, typed)
-        return view.toWireJson(finders.size(platform)).also {
-            val spent = started.elapsedNow().inWholeMicroseconds
-            trace("search") { "'$typed' ($order): ${view.games.size} games, ${view.keys.size} keys in $spent µs" }
-        }
+        return timed(
+            "search",
+            { (view, _): Pair<View, String>, took ->
+                "'$typed' ($order): ${view.games.size} games, ${view.keys.size} keys in ${took.inWholeMicroseconds} µs"
+            },
+        ) {
+            val view = finders.view(platform, if (order == "region") Order.REGION else Order.TITLE, typed)
+            view to view.toWireJson(finders.size(platform))
+        }.second
     }
 
-    /** Where [typed] is in the title of the game at [position] on [platformId]'s shelf (see [Finder.marks]): JSON text, at once. */
+    /** Where [typed] is in the title of the game at [position] on the shelf; JSON, at once. */
     @UsedByGodot
     public fun titleMarks(platformId: String, position: Int, typed: String): String =
         library.value.finders.marks(PlatformId(platformId), position, typed).toWireJson()
@@ -342,7 +265,10 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun candidates(fileName: String): Array<Any> =
         catalog.candidates(FileName(fileName)).filter { isAvailable(it.player) }.toWireArray { it.toWire() }
 
-    /** The installed players of [platformId], in definition order: `[{"player_id", "player_name", "emulator_name", "extensions"?}]`. */
+    /**
+     * The installed players of [platformId], in definition order: `[{"player_id", "player_name", "emulator_name",
+     * "extensions"?}]`.
+     */
     @UsedByGodot
     public fun installedPlayers(platformId: String): Array<Any> = catalog
         .platform(PlatformId(platformId))
@@ -367,12 +293,7 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     @UsedByGodot
     public fun deviceName(): String = "${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}"
 
-    /**
-     * Debug builds only: the `arguments` string array extra of the launch intent, such as
-     * `am start -n app.cartouche/com.godot.game.GodotAppLauncher --esa arguments --demo-games=150`,
-     * which sets up measurements. Godot's own command line is not passed through the launcher. A
-     * `String[]` reaches GDScript as a PackedStringArray.
-     */
+    /** Debug builds only: the launch intent's `arguments` extra, a PackedStringArray in GDScript. */
     @UsedByGodot
     public fun launchArguments(): Array<String> = activity
         .toOption()
@@ -380,9 +301,6 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         .filter { BuildConfig.DEBUG }
         .getOrElse { emptyArray() }
 
-    // Operations
-
-    /** Opens the system screen granting "All files access". */
     @UsedByGodot
     public fun requestAllFilesAccess(requestId: Int): Unit = openSetting(
         requestId,
@@ -395,11 +313,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     public fun requestCurtainPermission(requestId: Int): Unit =
         openSetting(requestId, Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
 
-    /** Opens the folder picker; answers with `{"folder"}` once the user picked one. */
+    /** Answers with `{"folder"}` once picked. */
     @UsedByGodot
     public fun pickFolder(requestId: Int): Unit = picking(requestId, pendingPick) { launcher.pickFolder(it, REQUEST_PICK_FOLDER) }
 
-    /** Opens a system picker with [open], on the main thread, as [pending]'s pick of [requestId]. */
+    /** Answers with `{"picture": {"path", "width", "height"}}`, the app's upright copy of the picked image. */
+    @UsedByGodot
+    public fun pickLabelPicture(requestId: Int): Unit =
+        picking(requestId, pendingPicture) { launcher.pickPicture(it, REQUEST_PICK_PICTURE) }
+
     private fun picking(requestId: Int, pending: PendingPick<Dictionary>, open: (Activity) -> Either<LaunchFailure, Unit>): Unit =
         onActivity(requestId) { act ->
             scope.launch(Dispatchers.Main) {
@@ -434,50 +356,35 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         }
     }
 
-    /**
-     * Opens the system's picker on images, for a picture of the user's own to put on a label; once
-     * one is picked, the app keeps an upright copy of it to be framed and answers with
-     * `{"picture": {"path", "width", "height"}}`.
-     */
-    @UsedByGodot
-    public fun pickLabelPicture(requestId: Int): Unit =
-        picking(requestId, pendingPicture) { launcher.pickPicture(it, REQUEST_PICK_PICTURE) }
-
     // A result reaching a restarted process belongs to no request: nothing is copied.
     private fun picturePicked(picked: Option<Uri>) = pendingPicture.end().onSome { requestId ->
         scope.launch {
-            val started = System.nanoTime()
-            answer(requestId) {
-                picked.fold(
-                    { failure(ErrorCode.CANCELLED, "Picker closed without a picture") },
-                    { uri ->
-                        ownPictures
-                            .keep(ImageDecoder.createSource(context.contentResolver, uri))
-                            .fold({ it.toWire() }, { success("picture" to it.toWire()) })
-                    },
-                )
+            timed("art", { _: Unit, took -> "picture picked and copied in ${took.inWholeMilliseconds} ms" }) {
+                answer(requestId) {
+                    picked.fold(
+                        { failure(ErrorCode.CANCELLED, "Picker closed without a picture") },
+                        { uri ->
+                            ownPictures
+                                .keep(ImageDecoder.createSource(context.contentResolver, uri))
+                                .fold({ it.toWire() }, { success("picture" to it.toWire()) })
+                        },
+                    )
+                }
             }
-            trace("art") { "picture picked and copied in ${(System.nanoTime() - started) / 1_000_000} ms" }
         }
     }
 
-    /**
-     * Shows the picture of the user's own picked last ([pickLabelPicture]) on [gameId]'s label from
-     * now on, framed [zoom] times closer than the largest rectangle of the label's [proportion] (its
-     * width over its height) that fits, and centred at [x], [y] (see [LabelFraming]), and remembers the choice (see [LabelChoices]); answers with
-     * `{"art": {"game_id", "path"}}`. The picture is cut in the background, the library only waiting
-     * for the choice to be recorded.
-     */
+    /** Puts the last picked picture on [gameId]'s label, framed per [LabelFraming]; answers `{"art": {"game_id", "path"}}`. */
     @UsedByGodot
     public fun keepOwnLabel(requestId: Int, gameId: String, zoom: Double, x: Double, y: Double, proportion: Double): Unit =
         answering(requestId) {
-            val started = System.nanoTime()
+            val started = TimeSource.Monotonic.markNow()
             val image = ownPictures.framed(LabelFraming(zoom, x, y, proportion)).mapLeft { it.toWire() }.bind()
-            withContext(libraryThread) {
+            withContext(threads.library) {
                 val game = game(GameId(gameId))
-                val art = LabelChoices(library.value, artStore).keepOwn(game, image).mapLeft { it.toWire() }.bind()
-                trace("art") { "${game.title}: own label kept in ${(System.nanoTime() - started) / 1_000_000} ms" }
-                success("art" to FoundArt(game.id, art).toWire())
+                val kept = LabelChoices(library.value, art.store).keepOwn(game, image).mapLeft { it.toWire() }.bind()
+                trace("art") { "${game.title}: own label kept in ${started.elapsedNow().inWholeMilliseconds} ms" }
+                success("art" to FoundArt(game.id, kept).toWire())
             }
         }
 
@@ -487,7 +394,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         folders.persisted().fold({ it.toWire() }, { list -> success("folders" to list.toWireArray { it.toWire() }) })
     }
 
-    /** Lists one level of `{"tree_uri", "document_id"?}` (its root without a document id); answers with `{"entries"}`. */
+    /**
+     * Lists one level of `{"tree_uri", "document_id"?}` (its root without a document id); answers with `{"entries"}`.
+     */
     @UsedByGodot
     public fun listFolder(requestId: Int, location: Dictionary): Unit = answering(requestId) {
         val tree = location.text("tree_uri").flatMap(ContentUri::parse)
@@ -510,41 +419,36 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             withActivity(requestId) { act -> start(act, launcher.appIntent(it)) }
         }
 
-    /**
-     * Answers with `{"library", "art", "absent"}`, the library read from its file on first use, the
-     * label images stored for its games (see [artWireJson]) and the ids of those without one that no
-     * source had art for when they were last looked for, in their sources' current version; then
-     * looks for the others' art.
-     */
+    /** Answers with `{"library", "art", "absent"}`, then looks for the art of the others. */
     @UsedByGodot
     public fun library(requestId: Int) {
         val asked = TimeSource.Monotonic.markNow()
-        answering(requestId, libraryThread) {
-            val started = asked.elapsedNow().inWholeMilliseconds
+        val since = { asked.elapsedNow().inWholeMilliseconds }
+        onLibrary(requestId) {
+            val started = since()
             library.value.run {
-                val loaded = asked.elapsedNow().inWholeMilliseconds
-                val stored = library().games.flatMap { game -> artStore.stored(game.id).map { FoundArt(game.id, it) }.toList() }
-                val absent = absentLabels(library().games)
-                val found = asked.elapsedNow().inWholeMilliseconds
+                val loaded = since()
+                val stored = library().games.flatMap { game -> art.store.stored(game.id).map { FoundArt(game.id, it) }.toList() }
+                val absent = art.absentLabels(library().games)
+                val found = since()
                 success("library" to wire(this), "art" to stored.artWireJson(), "absent" to absent.toTypedArray())
                     .putSome("load_problem", loadProblem)
                     .also {
                         trace("library") {
-                            "answered ${asked.elapsedNow().inWholeMilliseconds} ms after asked: started at $started ms, " +
-                                "library at $loaded ms, stored and absent art at $found ms"
+                            "answered ${since()} ms after asked: started at $started ms, library at $loaded ms, stored and absent art at $found ms"
                         }
                     }
             }
         }
-        lookForArt()
+        art.lookForArt()
     }
 
     /**
-     * Stores the choices `{"folder_uri"?, "player_id"?, "disc_grouping", "folder_depth"}` for
-     * [platformId]; answers with `{"library"}`.
+     * Stores the choices `{"folder_uri"?, "player_id"?, "disc_grouping", "folder_depth"}` for [platformId]; answers
+     * with `{"library"}`.
      */
     @UsedByGodot
-    public fun setUpPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = answering(requestId, libraryThread) {
+    public fun setUpPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = onLibrary(requestId) {
         val platform = platform(PlatformId(platformId))
         val choices = setupOf(setup)
         inLibrary { setUp(platform.id, choices, setup.text("variant")) }
@@ -553,140 +457,104 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Stores [variant] as [platformId]'s model and answers with the library. */
     @UsedByGodot
-    public fun setVariant(requestId: Int, platformId: String, variant: String): Unit = answering(requestId, libraryThread) {
+    public fun setVariant(requestId: Int, platformId: String, variant: String): Unit = onLibrary(requestId) {
         inLibrary { setVariant(PlatformId(platformId), variant) }
         trace("console") { "variant=$variant of $platformId" }
         success("library" to wire(library.value))
     }
 
-    /**
-     * Scans the folder of the choices [setup] (as [setUpPlatform] takes them) for [platformId]
-     * without reading a game file or saving anything; answers with `{"report"}`. Its files are known
-     * by what they told at the last scan ([LibraryService.preview]): the scan after saving the choices
-     * finds the same games but for files it reads for the first time, which their content may group
-     * or name otherwise.
-     */
+    /** Scans without reading game files or saving: its files are known by the last scan's facts ([LibraryService.preview]). */
     @UsedByGodot
-    public fun previewPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = answering(requestId, libraryThread) {
-        val platform = platform(PlatformId(platformId))
+    public fun previewPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = onLibrary(requestId) {
+        val loaded = reference
+        val platform = platform(PlatformId(platformId), loaded)
         val choices = setupOf(setup)
-        success("report" to inLibrary { preview(platform, choices, titles(platform.id), dataFolders) }.toWire())
+        success("report" to inLibrary { preview(platform, choices, loaded.titles(platform.id), loaded.dataFolders) }.toWire())
     }
 
-    /** Answers with the settings, as [AppSettings.toWire] has them. */
     @UsedByGodot
-    public fun settings(requestId: Int): Unit = answering(requestId, libraryThread) {
+    public fun settings(requestId: Int): Unit = onLibrary(requestId) {
         val settings = storedSettings()
         trace("settings") { "games_float=${settings.gamesFloat}" }
         success().apply { putAll(settings.toWire(settings.isFirstLaunch(library.value.library()))) }
     }
 
-    /** Stores the button style the user chose, [style] as [settings] names it. */
     @UsedByGodot
-    public fun saveButtonStyle(requestId: Int, style: String): Unit = answering(requestId, libraryThread) {
-        val chosen = code("button_style", Some(style), ButtonStyle.entries, ButtonStyle::wire)
-        settingsStore.save(storedSettings().copy(buttonStyle = Some(chosen))).mapLeft { it.toWire() }.bind()
-        trace("settings") { "button style: $style" }
+    public fun saveButtonStyle(requestId: Int, style: String): Unit = onLibrary(requestId) {
+        val chosen = code("button_style", Some(style), ButtonStyle.entries) { it.wire }
+        save("button style: $style") { it.copy(buttonStyle = Some(chosen)) }
         success()
     }
 
-    /** Stores the edge smoothing the user chose, [smoothing] as [settings] names it. */
     @UsedByGodot
-    public fun saveEdgeSmoothing(requestId: Int, smoothing: String): Unit = answering(requestId, libraryThread) {
-        val chosen = code("edge_smoothing", Some(smoothing), EdgeSmoothing.entries, EdgeSmoothing::wire)
-        settingsStore.save(storedSettings().copy(edgeSmoothing = chosen)).mapLeft { it.toWire() }.bind()
-        trace("settings") { "edge smoothing: $smoothing" }
+    public fun saveEdgeSmoothing(requestId: Int, smoothing: String): Unit = onLibrary(requestId) {
+        val chosen = code("edge_smoothing", Some(smoothing), EdgeSmoothing.entries) { it.wire }
+        save("edge smoothing: $smoothing") { it.copy(edgeSmoothing = chosen) }
         success()
     }
 
     /** Stores whether the selected game sways and bobs ([floating]); the consoles never do. */
     @UsedByGodot
-    public fun saveGamesFloat(requestId: Int, floating: Boolean): Unit = answering(requestId, libraryThread) {
-        settingsStore.save(storedSettings().copy(gamesFloat = floating)).mapLeft { it.toWire() }.bind()
-        trace("settings") { "games_float=$floating" }
+    public fun saveGamesFloat(requestId: Int, floating: Boolean): Unit = onLibrary(requestId) {
+        save("games_float=$floating") { it.copy(gamesFloat = floating) }
         success()
     }
 
     /** Stores how loud the sounds play, [steps] from 0 (silenced) to [SoundLevel.MAX]. */
     @UsedByGodot
-    public fun saveSoundLevel(requestId: Int, steps: Int): Unit = answering(requestId, libraryThread) {
+    public fun saveSoundLevel(requestId: Int, steps: Int): Unit = onLibrary(requestId) {
         val level = SoundLevel.of(steps).getOrElse { raise(invalid("sound_level is out of 0 to ${SoundLevel.MAX}")) }
-        settingsStore.save(storedSettings().copy(soundLevel = level)).mapLeft { it.toWire() }.bind()
-        trace("settings") { "sound_level=$steps" }
+        save("sound_level=$steps") { it.copy(soundLevel = level) }
         success()
     }
 
-    /**
-     * Stores the region whose images labels show first when nothing settles a game's own, [region]
-     * as [settings] names it among `preferred_regions` (empty for none), and answers; then looks up
-     * again the automatic labels whose first image it changes, planned as [lookForArt] plans; a
-     * label the user chose stays.
-     */
+    /** [region] as named in `preferred_regions`, empty for none; the automatic labels whose first image it changes are looked up again. */
     @UsedByGodot
-    public fun savePreferredRegion(requestId: Int, region: String): Unit = answering(requestId, libraryThread) {
+    public fun savePreferredRegion(requestId: Int, region: String): Unit = onLibrary(requestId) {
         val chosen =
-            if (region.isEmpty()) {
-                None
-            } else {
-                Some(
-                    code("preferred_region", Some(region), PreferredRegion.entries, PreferredRegion::region),
-                )
+            region.takeIf(String::isNotEmpty).toOption().map {
+                code("preferred_region", Some(it), PreferredRegion.entries) { r -> r.region }
             }
-        val before = storedSettings()
-        settingsStore.save(before.copy(preferredRegion = chosen)).mapLeft { it.toWire() }.bind()
-        trace("settings") { "preferred region: ${region.ifEmpty { "none" }}" }
-        if (chosen != before.preferredRegion) {
-            lookForArt { games ->
-                ArtSources
-                    .reordered(games, { sources(it, before.preferredRegion) }, { sources(it, chosen) }) { candidate, version ->
-                        !artStore.isMissing(candidate, version)
-                    }.also { trace("art") { "${it.size} labels to look up again in the preferred region's order" } }
-            }
-        }
+        val before = save("preferred region: ${region.ifEmpty { "none" }}") { it.copy(preferredRegion = chosen) }
+        art.preferredRegionChanged(before.preferredRegion, chosen)
         success()
     }
 
     /** Scans [platformId]'s folder; answers with `{"library", "report"}`. */
     @UsedByGodot
-    public fun scanPlatform(requestId: Int, platformId: String): Unit = answering(requestId, libraryThread) {
-        val platform = platform(PlatformId(platformId))
-        val titles = titles(platform.id)
+    public fun scanPlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
+        val loaded = reference
+        val platform = platform(PlatformId(platformId), loaded)
         val before = library.value.library().games
-        val report = inLibrary { scan(platform, titles, dataFolders) }.second
-        val preferred = storedSettings().preferredRegion
-        // A file's header may now tell a shell that moves its label's cut: those labels are cut anew.
-        success("library" to wire(library.value), "report" to report.toWire()).also {
-            lookForArt { games -> ArtSources.recut(before, games) { sources(it, preferred) } }
-        }
+        val report = inLibrary { scan(platform, loaded.titles(platform.id), loaded.dataFolders) }.second
+        success("library" to wire(library.value), "report" to report.toWire()).also { art.recutAfterScan(before) }
     }
 
     /**
-     * Removes [platformId] from the library (see [LibraryService.remove]), then the art of its
-     * games; answers with `{"library"}`.
+     * Removes [platformId] from the library (see [LibraryService.remove]), then the art of its games; answers with
+     * `{"library"}`.
      */
     @UsedByGodot
-    public fun removePlatform(requestId: Int, platformId: String): Unit = answering(requestId, libraryThread) {
+    public fun removePlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
         inLibrary { remove(PlatformId(platformId)) }
         trace("library") { "$platformId removed" }
-        success("library" to wire(library.value)).also { lookForArt() }
+        success("library" to wire(library.value)).also { art.lookForArt() }
     }
 
     /** Remembers [gameId] as the selected game of its platform, and that platform as the one shown. */
     @UsedByGodot
-    public fun selectGame(requestId: Int, gameId: String): Unit = answering(requestId, libraryThread) {
+    public fun selectGame(requestId: Int, gameId: String): Unit = onLibrary(requestId) {
         inLibrary { select(GameId(gameId)) }
         success()
     }
 
-    /**
-     * Debug builds only: replaces the library with a made-up one of [games] games spread over the
-     * supported consoles, or all on [platformId] unless it is empty (one shelf at fan size), stored
-     * apart (the user's library is left alone), for measuring at scale; answers with `{"library"}`.
-     */
+    /** Debug builds only: a made-up library of [games] games (all on [platformId] unless empty), stored apart from the user's. */
     @UsedByGodot
-    public fun useDemoLibrary(requestId: Int, games: Int, platformId: String): Unit = answering(requestId, libraryThread) {
+    public fun useDemoLibrary(requestId: Int, games: Int, platformId: String): Unit = onLibrary(requestId) {
         ensure(BuildConfig.DEBUG) { invalid("The demo library only exists in debug builds") }
-        val platforms = if (platformId.isEmpty()) catalog.offered.map { it.platform } else listOf(platform(PlatformId(platformId)).id)
+        val loaded = reference
+        val platforms =
+            if (platformId.isEmpty()) loaded.catalog.offered.map { it.platform } else listOf(platform(PlatformId(platformId), loaded).id)
         // Named after the library format: a library saved by an older build is never measured again.
         val name = "demo-${LibraryFormat.VERSION}-$games" + if (platformId.isEmpty()) "" else "-$platformId"
         val folder = File(context.filesDir, name).apply { mkdirs() }
@@ -695,108 +563,56 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
             store.save(DemoLibrary.of(games, platforms)).mapLeft { it.toWire() }.bind()
         }
         library = lazyOf(libraryIn(folder))
-        demo = true
-        withContext(artPlanning) { scraper.lookFor(emptyList()) }
+        art.demo = true
+        art.forgetLooks()
         success("library" to wire(library.value))
     }
 
     /**
-     * Debug builds only: scans every console with a folder again, reading all of their game files
-     * anew, forgets which games no source had art for, and looks every automatic label up again: the
-     * image found replaces the one stored, none found removes it. A label the user chose, their own
-     * picture or a region's image, is never touched. Answers once every label was looked for, so
-     * never while the network is down or a game is played (the run waits for them), with
-     * `{"library", "games", "labels", "failures"}`: how many games the library holds, how many of
-     * those looked for have a label, and why the consoles that could not be scanned were not. The
-     * images it removes are not told through [ART_SIGNAL]: it is asked from the device check, and
-     * the carousel reads the stored images anew when it comes back.
+     * Debug builds only: scans every console again, forgets the absent art and looks every automatic label up again;
+     * answers `{"library", "games", "labels", "failures"}` once all were looked for.
      */
     @UsedByGodot
-    public fun rescrape(requestId: Int): Unit = answering(requestId, libraryThread) {
+    public fun rescrape(requestId: Int): Unit = onLibrary(requestId) {
         ensure(BuildConfig.DEBUG) { invalid("Scraping again only exists in debug builds") }
-        ensure(!demo) { invalid("The demo library is shown: it has no folders to scan") }
+        ensure(!art.demo) { invalid("The demo library is shown: it has no folders to scan") }
         val service = library.value
+        val loaded = reference
         service.forgetFacts().mapLeft { it.toWire() }.bind()
         val failures =
             service.library().setups.filterValues { it.folder.isSome() }.keys.flatMap { id ->
-                catalog
+                loaded.catalog
                     .platform(id)
                     .toEither { LibraryFailure.UnknownPlatform(id) }
-                    .flatMap { service.scan(it, titles(id), dataFolders) }
+                    .flatMap { service.scan(it, loaded.titles(id), loaded.dataFolders) }
                     .fold({ listOf("${id.value}: ${it.message}") }) { emptyList() }
             }
-        val again = ArtSources.lookAgain(service.library().games) { sources(it, None) }
-        artStore.lookAgain(again).mapLeft { it.toWire() }.bind()
-        trace("art") { "${again.asked.size} labels looked up again, ${again.unfound.size} that no source can have removed" }
-        lookForArt().join()
-        scraper.awaitOver()
-        val labels = again.asked.count { artStore.stored(it).isSome() }
-        trace("art") { "scraped again: $labels labels found of ${again.asked.size}" }
+        val labels = art.lookAgain(service.library().games).bind()
         success("library" to wire(service)).apply { putAll(Rescraped(service.library().games.size, labels, failures).toWire()) }
     }
 
     /**
-     * The images the art sources have for [gameId]'s label, every one of both sources (see
-     * [offered]), in the order they are tried: answers with `{"variants": [{"region", "source",
-     * "source_name", "path"?}]}`, `source` naming the source for [chooseLabel] (`launchbox`,
-     * `screenscraper`), `source_name` as shown, `path` for the images already downloaded; then
-     * downloads the others, each telling the `label_variant_downloaded` signal `{"game_id",
-     * "region", "source", "path"}`, or `{"game_id", "region", "source", "failure"}` (`offline`,
-     * `refused`, `not_found`, `unreadable`, `storage`).
+     * Answers with `{"variants": [{"region", "source", "source_name", "path"?}]}` for [gameId]'s label (see [ArtService.offered]), in
+     * the order they are tried: `source` names the source for [chooseLabel] (`launchbox`, `screenscraper`), `source_name` as shown,
+     * `path` for the images already downloaded. Then downloads the others, each told by `label_variant_downloaded` as
+     * `{"game_id", "region", "source", "path"}`, or `{"game_id", "region", "source", "failure"}` (`offline`, `refused`,
+     * `not_found`, `unreadable`, `storage`).
      */
     @UsedByGodot
-    public fun labelVariants(requestId: Int, gameId: String): Unit = answering(requestId, libraryThread) {
-        val game = game(GameId(gameId))
-        val sources = sources(game.platform, storedSettings().preferredRegion)
-        val stored = sources.variantsOf(game, offered(sources.version)).map { it to artStore.variant(it.candidate) }
-        val missing = stored.filter { it.second.isNone() }.map { it.first }
-        trace("art") { "${game.title}: ${stored.size} images, ${missing.size} to download" }
-        variantDownloads.download(game.id, missing, sources.cutOf(game), sources.version)
-        success("variants" to stored.toWireArray { (variant, art) -> variant.toWire().putSome("path", art.map { it.file.path }) })
-    }
+    public fun labelVariants(requestId: Int, gameId: String): Unit = onLibrary(requestId) { art.labelVariants(game(GameId(gameId))) }
 
     /**
-     * Shows the image of [region] at [source] (as [labelVariants] names them, downloaded) on
-     * [gameId]'s label from now on, and remembers the choice (see [LabelChoices]); answers with
-     * `{"art": {"game_id", "path"}}`.
+     * Shows the image of [region] at [source] (as [labelVariants] names them, downloaded) on [gameId]'s label from
+     * now on, and remembers the choice (see [LabelChoices]); answers with `{"art": {"game_id", "path"}}`.
      */
     @UsedByGodot
-    public fun chooseLabel(requestId: Int, gameId: String, region: String, source: String): Unit = answering(requestId, libraryThread) {
-        val game = game(GameId(gameId))
-        val sources = sources(game.platform, storedSettings().preferredRegion)
-        val variant =
-            sources
-                .variantsOf(game, offered(sources.version))
-                .firstOrNone { it.region.name == region && it.candidate.source.wire == source }
-                .getOrElse { raise(failure(ErrorCode.NO_IMAGE, "No image of ${game.title} for region '$region' at '$source'")) }
-        val art = LabelChoices(library.value, artStore).choose(game, variant).mapLeft { it.toWire() }.bind()
-        trace("art") { "${game.title}: label of region '$region' at '$source' chosen" }
-        success("art" to FoundArt(game.id, art).toWire())
+    public fun chooseLabel(requestId: Int, gameId: String, region: String, source: String): Unit = onLibrary(requestId) {
+        art.chooseLabel(game(GameId(gameId)), region, source).bind()
     }
 
-    /**
-     * Which of a game's images the chooser offers: not a texture ScreenScraper answered it has none
-     * of (INV-E11-04), and no texture while ScreenScraper is not open or the app has no key: the
-     * region's scan alone then (INV-E7-03).
-     */
-    private fun offered(version: Option<ArtVersion>): (Candidate) -> Boolean = { candidate ->
-        !artStore.isMissing(candidate, version) &&
-            when (candidate) {
-                is Candidate.Web -> true
-                is Candidate.Texture -> textures.open
-            }
-    }
-
-    private fun ArtVariant.toWire(): Dictionary =
-        dictionary("region" to region.name, "source" to candidate.source.wire, "source_name" to candidate.source.label)
-
-    /**
-     * Shows [gameId] as [name] from now on (trimmed and cut, see [DisplayName]), or as its title
-     * again when [name] is blank; answers with `{"title", "original_title"?}`, what the game is now
-     * called and, once renamed, its title.
-     */
+    /** A blank [name] restores the title; answers with `{"title", "original_title"?}`. */
     @UsedByGodot
-    public fun renameGame(requestId: Int, gameId: String, name: String): Unit = answering(requestId, libraryThread) {
+    public fun renameGame(requestId: Int, gameId: String, name: String): Unit = onLibrary(requestId) {
         val game = library.value.rename(GameId(gameId), DisplayName.of(name)).mapLeft { it.toWire() }.bind()
         trace("library") { "${game.title}: shown as '${game.shownTitle}'" }
         success("title" to game.shownTitle).putSome("original_title", game.displayName.map { game.title })
@@ -804,20 +620,15 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
 
     /** Shows the consoles of [platformIds] in that order from now on, on the consoles screen and after a restart. */
     @UsedByGodot
-    public fun orderConsoles(requestId: Int, platformIds: Array<String>): Unit = answering(requestId, libraryThread) {
+    public fun orderConsoles(requestId: Int, platformIds: Array<String>): Unit = onLibrary(requestId) {
         library.value.orderConsoles(platformIds.map(::PlatformId)).mapLeft { it.toWire() }.bind()
         trace("library") { "consoles ordered: ${platformIds.joinToString()}" }
         success()
     }
 
-    /**
-     * Puts [platformId]'s console at [gap] among the others as the consoles screen shows them (0 to
-     * their number), the others keeping their order; answers with `{"order"}`, the platform ids of
-     * the consoles shown, first to last. A gap out of range or a console not in the library keeps
-     * the order and answers `gap_out_of_range` or `not_in_library`.
-     */
+    /** Puts [platformId] at [gap] among the consoles; answers with `{"order"}`. */
     @UsedByGodot
-    public fun placeConsole(requestId: Int, platformId: String, gap: Int): Unit = answering(requestId, libraryThread) {
+    public fun placeConsole(requestId: Int, platformId: String, gap: Int): Unit = onLibrary(requestId) {
         val platforms = catalog.platforms.map { it.id }
         val placed =
             library.value
@@ -830,33 +641,26 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         success("order" to order.toTypedArray())
     }
 
-    /**
-     * Checks that the library game `{"game_id", "disc"?}` can launch, as [launchGame] would, and
-     * answers with its failure if it cannot; starts and stops nothing.
-     */
+    /** Checks that the game `{"game_id", "disc"?}` can launch as [launchGame] would; starts and stops nothing. */
     @UsedByGodot
-    public fun checkLaunch(requestId: Int, request: Dictionary): Unit = answering(requestId, libraryThread) {
+    public fun checkLaunch(requestId: Int, request: Dictionary): Unit = onLibrary(requestId) {
         val (choice, launch) = libraryLaunch(request)
         launcher.checkGame(launch, choice.file.uri).mapLeft { it.toWire() }.bind()
         success()
     }
 
-    /**
-     * Launches the library game `{"game_id", "disc"?}` (a disc index; the last launched by default)
-     * with its platform's player, under the curtain when it is allowed.
-     */
+    /** Launches the game `{"game_id", "disc"?}` under the curtain when allowed. */
     @UsedByGodot
     public fun launchGame(requestId: Int, request: Dictionary): Unit = onActivity(requestId) { act ->
-        answering(requestId, libraryThread) {
+        onLibrary(requestId) {
             val (choice, launch) = libraryLaunch(request)
             trace("launch") { "${choice.file.name.value} in ${launch.spec.targetPackage.fold({ "the app Android picks" }) { it.value }}" }
             val intent = launcher.prepareGame(launch, choice.file.uri).mapLeft { it.toWire() }.bind()
             onMain {
-                curtain.over(curtainTimes.timeFor(launch.spec.targetPackage)) { launcher.start(act, intent) }
+                curtain.over(reference.curtainTimes.timeFor(launch.spec.targetPackage)) { launcher.start(act, intent) }
             }.mapLeft { it.toWire() }.bind()
-            // Answered at once, for the black to last no longer than the start; a failure to
-            // remember the disc must not report the launch as failed.
-            scope.launch(libraryThread) {
+            // Answered at once so the black lasts no longer than the start; a disc not saved is no failed launch.
+            scope.launch(threads.library) {
                 library.value.recordLaunch(choice.game.id, choice.disc).onLeft { trace("library") { "last disc not saved: ${it.message}" } }
             }
             success()
@@ -875,134 +679,9 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
                 )
             }
         game.fold({ answer(requestId) { invalid("launchFile needs a name and a content URI") } }) {
-            withActivity(requestId) { act -> start(act, prepared(PlayerId(playerId), it)) }
-        }
-    }
-
-    // Plumbing
-
-    /**
-     * Deletes the art of games no longer in the library, on [libraryThread] after the calls already
-     * there, then looks for the art of its games that have none, and of those [again] picks among
-     * them, in library order, planned on [artPlanning]: an answer never waits for it, and its
-     * failure fails no answer. The automatic labels no source can have art for are known absent
-     * then. Done once the scraper has the games to look for.
-     */
-    private fun lookForArt(again: (List<Game>) -> Set<GameId> = { emptySet() }): Job = scope.launch(libraryThread) {
-        if (demo) return@launch
-        library.value.gamesWithArt().onSome { kept ->
-            artStore
-                .keepOnly(kept)
-                .onRight { deleted -> if (deleted > 0) trace("art") { "$deleted images of games no longer in the library deleted" } }
-                .onLeft { trace("art") { "images of games no longer in the library not deleted: ${it.message}" } }
-        }
-        val games = library.value.library().games
-        val preferred = storedSettings().preferredRegion
-        // A child: the look is over once the scraper has its requests, but this thread is free at once.
-        launch(artPlanning) {
-            val versionOf = { platform: PlatformId -> ArtSources.versionOf(catalog, artLists, textureLists, platform) }
-            val asked = again(games)
-            val wants = { game: GameId, version: Option<ArtVersion> -> game in asked || artStore.wants(game, version) }
-            val plan = ArtSources.requests(games, wants, { artStore.provisional(it).isSome() }, versionOf) { sources(it, preferred) }
-            scraper.absent(plan.unfound)
-            scraper.lookFor(plan.requests, asked)
-        }
-        if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
-    }
-
-    private fun variantDownloaded(game: GameId, variant: ArtVariant, kept: Either<VariantFailure, StoredArt>) {
-        trace("art") {
-            "${variant.region.name} image of ${game.value} at ${variant.candidate.source.wire}: ${kept.fold({ it.wire }) { "downloaded" }}"
-        }
-        val told = variant.toWire().apply { put("game_id", game.value) }
-        kept.fold({ told.put("failure", it.wire) }) { told.put("path", it.file.path) }
-        emitSignal(VARIANT_SIGNAL, told)
-    }
-
-    private fun artChanged(run: Scraping, news: Option<LabelNews>): Unit = emitSignal(ART_SIGNAL, run.toWire(news))
-
-    /** The ids of [games] without a label that no source had art for when last looked for, in their sources' current version. */
-    private fun absentLabels(games: List<Game>): List<String> = games.groupBy { it.platform }.flatMap { (platform, games) ->
-        val version = ArtSources.versionOf(catalog, artLists, textureLists, platform)
-        games.filter { artStore.stored(it.id).isNone() && artStore.isAbsent(it.id, version) }.map { it.id.value }
-    }
-
-    private fun artDownloading(game: GameId, download: LabelDownload): Unit = emitSignal(ART_PROGRESS_SIGNAL, download.toWire(game))
-
-    /** [platform]'s sources, indexed once, for a user who prefers [preferred]'s images. */
-    private fun sources(platform: PlatformId, preferred: Option<PreferredRegion>): ArtSources = artSources
-        .computeIfAbsent(platform) {
-            val started = TimeSource.Monotonic.markNow()
-            ArtSources
-                .of(catalog, artLists, textureLists, platform)
-                .also {
-                    trace(
-                        "art",
-                    ) {
-                        "${platform.value}: ${it.size} games, ${it.releases} releases indexed in ${started.elapsedNow().inWholeMilliseconds} ms"
-                    }
-                }
-        }.preferring(preferred)
-
-    /** Downloads over HTTP; in debug builds, `--art-refused` makes every server refuse, to try the message and the retries. */
-    private fun artFetch(): Fetch {
-        if ("--art-refused" in launchArguments()) return Fetch { _, _ -> FetchFailure.Refused(503).left() }
-        val scans = HttpFetch(http())
-        return Fetch { candidate, progress ->
-            when (candidate) {
-                is Candidate.Web -> scans.get(candidate.url, progress)
-                is Candidate.Texture -> screenScraper.fold({ FetchFailure.NotFound.left() }) { it.get(candidate, progress) }
+            withActivity(requestId) { act ->
+                start(act, launchOf(PlayerId(playerId), it).flatMap { launch -> launcher.prepareGame(launch, it.uri) })
             }
-        }
-    }
-
-    /** HTTP for images; in debug builds, `--art-slow=MS` waits MS milliseconds after each chunk read, to see a download's progress. */
-    private fun http(): JavaHttp = JavaHttp(
-        USER_AGENT,
-        launchArguments()
-            .asList()
-            .firstOrNone { it.startsWith(ART_SLOW_ARGUMENT) }
-            .flatMap { it.removePrefix(ART_SLOW_ARGUMENT).toLongOrNull().toOption() }
-            .fold({ Duration.ZERO }) { it.milliseconds },
-    )
-
-    /** ScreenScraper with the credentials built into the app; none without a key, and the textures are then images no server gives. */
-    private fun screenScraperFetch(): Option<ScreenScraperFetch> = Credentials.fromBuild().map { credentials ->
-        // The device's local day: the quota resets on the server's day, so a closure may lift a few hours early or late.
-        val today = { Day(LocalDate.now().toString()) }
-        ScreenScraperFetch(
-            screenScraperHttp(),
-            credentials,
-            File(context.filesDir, "art/screenscraper.json"),
-            System::currentTimeMillis,
-            today,
-        ) { trace("art") { "ScreenScraper: $it" } }
-    }
-
-    /**
-     * Debug builds: `--screenscraper=quota` makes ScreenScraper answer that the day's quota is spent,
-     * `--screenscraper=wrong-key` that the app's key is refused, `--screenscraper=wrong-account` that
-     * the member is, to try each state on the device.
-     */
-    private fun screenScraperHttp(): Http {
-        val real = http()
-        val simulated =
-            launchArguments()
-                .asList()
-                .firstOrNone {
-                    it.startsWith(SCREENSCRAPER_ARGUMENT)
-                }.map { it.removePrefix(SCREENSCRAPER_ARGUMENT) }
-        return when (simulated) {
-            Some("quota") -> Http { _, _ -> Answer(ScreenScraperState.QUOTA_SPENT, None).right() }
-            Some(
-                "wrong-key",
-            ),
-            -> Http { _, _ -> Answer(HttpURLConnection.HTTP_OK, Some(ScreenScraperFetch.LOGIN_REFUSED.encodeToByteArray())).right() }
-            Some("wrong-account") ->
-                Http { url, progress ->
-                    if ("ssuserInfos" in url) Answer(HttpURLConnection.HTTP_FORBIDDEN, None).right() else real.get(url, progress)
-                }
-            else -> real
         }
     }
 
@@ -1014,40 +693,37 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         ::prepare,
     )
 
-    /**
-     * Makes [finders] in the background, once the library call that kept them is over (its answer
-     * is not slowed down), on a thread of low priority that leaves the first frames their time: the
-     * first search of a shelf of thousands then answers at once.
-     */
+    /** Makes [finders] once the library call that kept them is over, at low priority, so the first frames keep their time. */
     private fun prepare(finders: Finders) {
         scope.launch(preparing) {
             // Queued after the call under way on the library's single thread.
-            withContext(libraryThread) {}
-            val started = TimeSource.Monotonic.markNow()
-            finders.prepare()
-            trace("search") { "finders made in ${started.elapsedNow().inWholeMilliseconds} ms" }
+            withContext(threads.library) {}
+            timed("search", { _: Unit, took -> "finders made in ${took.inWholeMilliseconds} ms" }) { finders.prepare() }
         }
     }
 
-    /** Runs [block] on [libraryThread]; its failure becomes the answer. */
     private suspend fun <T> Raise<Dictionary>.inLibrary(block: LibraryService.() -> Either<LibraryFailure, T>): T =
-        withContext(libraryThread) { library.value.block() }.mapLeft { it.toWire() }.bind()
+        withContext(threads.library) { library.value.block() }.mapLeft { it.toWire() }.bind()
 
     /**
-     * Answers [requestId] with what [work] returns, or with the failure it raises. Library calls
-     * start on [libraryThread] itself, which runs them in the order they arrive.
+     * Answers [requestId] with what [work] returns, or with the failure it raises. Library calls start on
+     * [libraryThread] itself, which runs them in the order they arrive.
      */
     private fun answering(requestId: Int, on: CoroutineDispatcher = Dispatchers.IO, work: suspend Raise<Dictionary>.() -> Dictionary) {
         scope.launch(on) { answer(requestId) { either { work() }.merge() } }
     }
 
-    private fun prepared(player: PlayerId, file: GameFile): Either<LaunchFailure, Intent> =
-        launchOf(player, file).flatMap { launcher.prepareGame(it, file.uri) }
+    private fun onLibrary(requestId: Int, work: suspend Raise<Dictionary>.() -> Dictionary) = answering(requestId, threads.library, work)
+
+    private fun pendingPicker() = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
 
     private fun launchOf(player: PlayerId, file: GameFile): Either<LaunchFailure, Launch> =
         catalog.launch(player, file).mapLeft(LaunchFailure::Rejected)
 
-    /** Opens the settings screen [forCartouche], or [forEveryApp] on the Android builds that only offer the screen listing every app. */
+    /**
+     * Opens the settings screen [forCartouche], or [forEveryApp] on the Android builds that only offer the screen
+     * listing every app.
+     */
     private fun openSetting(requestId: Int, forCartouche: String, forEveryApp: String): Unit = withActivity(requestId) { act ->
         onMain {
             launcher.start(act, Intent(forCartouche, Uri.parse("package:${act.packageName}"))).recover { failure ->
@@ -1057,7 +733,6 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         }
     }
 
-    /** What launching the library game `{"game_id", "disc"?}` takes: its choice and its launch with its platform's player. */
     private suspend fun Raise<Dictionary>.libraryLaunch(request: Dictionary): Pair<LaunchChoice, Launch> {
         val id = request.text("game_id").map(::GameId).getOrElse { raise(invalid("the request needs a game_id")) }
         val choice = inLibrary { launchChoice(id, request.integer("disc")) }
@@ -1075,8 +750,8 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
         return PlatformSetup(
             folder,
             setup.text("player_id").map(::PlayerId),
-            code("disc_grouping", setup.text("disc_grouping"), DiscGrouping.entries, DiscGrouping::wire),
-            code("folder_depth", setup.text("folder_depth"), FolderDepth.entries, FolderDepth::wire),
+            code("disc_grouping", setup.text("disc_grouping"), DiscGrouping.entries) { it.wire },
+            code("folder_depth", setup.text("folder_depth"), FolderDepth.entries) { it.wire },
         )
     }
 
@@ -1084,32 +759,29 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private fun <T> Raise<Dictionary>.code(key: String, text: Option<String>, values: List<T>, wire: (T) -> String): T =
         text.flatMap { name -> values.firstOrNone { wire(it) == name } }.getOrElse { raise(invalid("$key is missing or unknown")) }
 
-    /** The stored settings; unreadable ones only mean starting without any, as on a first launch. */
+    /** Unreadable settings only mean starting without any. */
     private fun storedSettings(): AppSettings = settingsStore.load().getOrElse { problem ->
         trace("settings") { "not read, starting without: ${problem.detail}" }
         AppSettings()
     }
 
+    private fun Raise<Dictionary>.save(note: String, change: (AppSettings) -> AppSettings): AppSettings {
+        val before = storedSettings()
+        settingsStore.save(change(before)).mapLeft { it.toWire() }.bind()
+        trace("settings") { note }
+        return before
+    }
+
     private fun Raise<Dictionary>.game(id: GameId): Game =
         library.value.library().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id).toWire()) }
 
-    private fun Raise<Dictionary>.platform(id: PlatformId): Platform =
-        catalog.platform(id).getOrElse { raise(failure(ErrorCode.UNKNOWN_PLATFORM, "No platform ${id.value}")) }
+    private fun Raise<Dictionary>.platform(id: PlatformId, loaded: Reference = reference): Platform =
+        loaded.catalog.platform(id).getOrElse { raise(failure(ErrorCode.UNKNOWN_PLATFORM, "No platform ${id.value}")) }
 
-    private fun titles(platform: PlatformId): TitleIndex = titleIndexes.computeIfAbsent(platform) {
-        val started = TimeSource.Monotonic.markNow()
-        titleLists.getOrNone(platform).fold({ TitleIndex.EMPTY }) { TitleIndex.parse(it, printLists.getOrElse(platform) { "" }) }.also {
-            trace("titles") { "${platform.value}: ${it.size} indexed in ${started.elapsedNow().inWholeMilliseconds} ms" }
-        }
-    }
-
-    /** The library of [service] and its shelves, for Godot. */
-    private fun wire(service: LibraryService): String {
-        val started = TimeSource.Monotonic.markNow()
-        return service.library().toWireJson(service.shelves(catalog.platforms.map { it.id }), catalog).also {
-            trace("library") { "${it.length} characters of JSON in ${started.elapsedNow().inWholeMilliseconds} ms" }
-        }
-    }
+    private fun wire(service: LibraryService): String = timed(
+        "library",
+        { json: String, took -> "${json.length} characters of JSON in ${took.inWholeMilliseconds} ms" },
+    ) { with(reference.catalog) { service.library().toWireJson(service.shelves(platforms.map { it.id }), this) } }
 
     /** `{platform id: text}` as sent by the adapter, texts of another type left out. */
     private fun Dictionary.textsByPlatform(): Map<PlatformId, String> =
@@ -1118,13 +790,12 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     private fun invalid(detail: String): Dictionary = failure(ErrorCode.INVALID_REQUEST, detail)
 
     // The system resolves implicit intents, so they are always available.
-    private fun isAvailable(player: Player): Boolean =
-        player.template.targetPackage.fold({ true }) { installed.getOrPut(it) { isInstalled(it) } }
+    private fun isAvailable(player: Player): Boolean = player.template.targetPackage.fold({ true }) {
+        installed.getOrPut(it) {
+            InstalledApps.isInstalled(context.packageManager, it).also { yes -> trace("installed") { "${it.value}: $yes" } }
+        }
+    }
 
-    private fun isInstalled(packageName: PackageName): Boolean =
-        InstalledApps.isInstalled(context.packageManager, packageName).also { trace("installed") { "${packageName.value}: $it" } }
-
-    /** Runs [work] in the background with the current activity; activity starts go through [onMain]. */
     private fun withActivity(requestId: Int, work: suspend (Activity) -> Either<LaunchFailure, Unit>): Unit =
         onActivity(requestId) { act -> answering(requestId) { work(act).toWire() } }
 
@@ -1143,36 +814,12 @@ public class CartouchePlugin(godot: Godot) : GodotPlugin(godot) {
     /** The single place where unexpected exceptions stop. */
     private inline fun guarded(work: () -> Dictionary): Dictionary = Either.catch(work).getOrElse(::unexpected)
 
-    private fun unexpected(e: Throwable): Dictionary {
-        Log.e(TAG, "Unexpected failure", e)
-        return failure(ErrorCode.UNEXPECTED, e.toString())
-    }
-
     private companion object {
-        // Godot forwards every activity result to every plugin: this code only has to be unique
-        // among the plugins bundled with the app.
+        // Godot forwards every activity result to every plugin: unique among the bundled plugins.
         const val REQUEST_PICK_FOLDER = 0xCA27
 
         const val REQUEST_PICK_PICTURE = 0xCA28
 
         const val LIBRARY_FILE = "library.json"
-
-        const val ART_SIGNAL = "art_changed"
-
-        /** How the download of a game's label on screen goes ([LabelDownload.toWire]). */
-        const val ART_PROGRESS_SIGNAL = "art_progress"
-
-        const val VARIANT_SIGNAL = "label_variant_downloaded"
-
-        const val USER_AGENT = "Cartouche"
-
-        const val SCREENSCRAPER_ARGUMENT = "--screenscraper="
-
-        const val ART_SLOW_ARGUMENT = "--art-slow="
-
-        /** The battery's level, or whether a charger is plugged in, changed. */
-        const val BATTERY_SIGNAL = "battery_changed"
-
-        const val VARIANT_DOWNLOADS = 3
     }
 }

@@ -12,6 +12,30 @@ extends ModelShape
 ## positions are of centres, X to the right and Y towards the back, from the centre of the body;
 ## heights from its bottom. What hugs an edge is placed from that edge.
 
+## How deep the spindle's turntable goes under a seated disc (see spindle.tscn): it stands on the
+## drive's plate, the recess's floor, its motor under it.
+const TURNTABLE_DEPTH := 2.1
+## The lid opens past upright, so that it never leans over the well.
+const OPEN_DEGREES := 95.0
+## How far the buttons stand above the top, the gap around them, how deep they and their collars go:
+## down to the shelf under the lid, which they stand on.
+const BUTTON_RAISE := 0.4
+const BUTTON_CLEARANCE := 0.3
+const BUTTON_DEPTH := 4.0
+## The power light's window, a circular segment before the lid: its chord, how far it bulges
+## and the steps along its arc.
+const LAMP := Vector2(32.0, 3.5)
+const LAMP_STEPS := 16
+## The recess, which the drive's dark plate fills, is this much wider than the discs.
+const DRIVE_MARGIN := 5.0
+## The ledge round the recess: how wide it is, and how far below the shelf.
+const LEDGE := Vector2(8.0, 2.5)
+## The pickup's slot through the drive's plate, behind the spindle, in discs' radii from the seat.
+const SLOT := Rect2(-0.05, 0.35, 0.25, 0.67)
+const HANDLE_THICKNESS := 5.0
+## The points round every circle of the model.
+const CIRCLE_POINTS := 48
+
 @export var width := 150.0:
 	set(value):
 		width = value
@@ -131,30 +155,6 @@ extends ModelShape
 	set(value):
 		handle_band = value
 		emit_changed()
-
-## How deep the spindle's turntable goes under a seated disc (see spindle.tscn): it stands on the
-## drive's plate, the recess's floor, its motor under it.
-const TURNTABLE_DEPTH := 2.1
-## The lid opens past upright, so that it never leans over the well.
-const OPEN_DEGREES := 95.0
-## How far the buttons stand above the top, the gap around them, how deep they and their collars go:
-## down to the shelf under the lid, which they stand on.
-const BUTTON_RAISE := 0.4
-const BUTTON_CLEARANCE := 0.3
-const BUTTON_DEPTH := 4.0
-## The power light's window, a circular segment before the lid: its chord and how far it bulges
-## (measured on the photos, see the sheet), and the steps along its arc.
-const LAMP := Vector2(32.0, 3.5)
-const LAMP_STEPS := 16
-## The recess, which the drive's dark plate fills, is this much wider than the discs.
-const DRIVE_MARGIN := 5.0
-## The ledge round the recess: how wide it is, and how far below the shelf.
-const LEDGE := Vector2(8.0, 2.5)
-## The pickup's slot through the drive's plate, behind the spindle, in discs' radii from the seat.
-const SLOT := Rect2(-0.05, 0.35, 0.25, 0.67)
-const HANDLE_THICKNESS := 5.0
-## The points round every circle of the model.
-const CIRCLE_POINTS := 48
 
 
 func parts() -> Array[StringName]:

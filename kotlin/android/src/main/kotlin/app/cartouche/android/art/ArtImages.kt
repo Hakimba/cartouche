@@ -16,11 +16,9 @@ import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
 /**
- * Turns a downloaded image into what a model's label shows, a JPEG of at most [LARGEST] pixels on
- * its longer side, the image first cut to the medium (the transparent margin round it removed): of
- * a disc, a square covering its whole face, what was transparent turned black; of a cartridge's
- * front, its label alone, cut by the front of the scan's shape ([LabelCut]), at its own
- * proportions; a texture, the label as printed, whole.
+ * Turns a downloaded image into what a model's label shows: a JPEG of at most [LARGEST] pixels on its longer side, cut to the medium first
+ * (the transparent margin removed). A disc is a square covering its face, transparent turned black; a cartridge's front is its label
+ * alone, cut by [LabelCut]; a texture is the label as printed.
  */
 internal object ArtImages {
     const val LARGEST = 1024
@@ -31,8 +29,8 @@ internal object ArtImages {
     private const val MARGIN_ALPHA = 32
 
     /**
-     * The label [cut] gives of [image], [candidate]'s; none when it is not an image Android can
-     * read, or a scan of no shape [cut] knows.
+     * The label [cut] gives of [image], [candidate]'s; none when it is not an image Android can read, or a scan of no
+     * shape [cut] knows.
      */
     fun label(image: ByteArray, candidate: Candidate, cut: LabelCut): Option<ByteArray> = decoded(image).flatMap { bitmap ->
         try {
@@ -45,7 +43,6 @@ internal object ArtImages {
         }
     }
 
-    /** The [part] of [bitmap] drawn as a label of a medium of [kind], as a JPEG. */
     private fun drawn(bitmap: Bitmap, part: Rect, kind: ArtKind): ByteArray {
         val longest = maxOf(part.width(), part.height())
         val scale = minOf(1f, LARGEST.toFloat() / longest)
@@ -67,14 +64,10 @@ internal object ArtImages {
         }
     }
 
-    /** [bitmap] as a JPEG, as labels are stored. */
     fun jpeg(bitmap: Bitmap): ByteArray =
         ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }.toByteArray()
 
-    /**
-     * [image] decoded, halved as often as its longer side stays at least twice [LARGEST]: a decoded
-     * image then takes 64 MB at most, whatever was downloaded.
-     */
+    /** Halved as often as the longer side stays at least twice [LARGEST]: a decoded image takes 64 MB at most. */
     private fun decoded(image: ByteArray): Option<Bitmap> {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(image, 0, image.size, bounds)
@@ -87,7 +80,6 @@ internal object ArtImages {
         return BitmapFactory.decodeByteArray(image, 0, image.size, options).toOption()
     }
 
-    /** The smallest rectangle holding every pixel of [bitmap] that is not transparent; all of it when none is. */
     private fun opaquePart(bitmap: Bitmap): Rect {
         val row = IntArray(bitmap.width)
         var left = bitmap.width

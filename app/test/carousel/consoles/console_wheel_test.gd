@@ -16,7 +16,7 @@ func _drawn(random: RandomNumberGenerator) -> Array[String]:
 	return consoles.slice(0, random.randi_range(1, consoles.size()))
 
 
-func test_INV_E7_09_the_ring_has_no_end_n_steps_either_way_come_back_to_the_same_console() -> void:
+func test_the_ring_has_no_end_n_steps_either_way_come_back_to_the_same_console() -> void:
 	var random := Fixtures.cases(91)
 	for case in 200:
 		var consoles := _drawn(random)
@@ -35,7 +35,7 @@ func test_INV_E7_09_the_ring_has_no_end_n_steps_either_way_come_back_to_the_same
 		assert_array(wheel.order).is_equal(consoles)
 
 
-func test_INV_E7_09_the_order_holds_every_console_once_let_go_as_before_put_down_as_shown() -> void:
+func test_the_order_holds_every_console_once_let_go_as_before_put_down_as_shown() -> void:
 	var random := Fixtures.cases(92)
 	var moved := 0
 	var let_go := 0

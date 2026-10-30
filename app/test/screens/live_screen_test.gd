@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
-## Never a dead screen: whatever the presses, something shows and takes the next one (INV-E12-R4-03).
+## Never a dead screen: whatever the presses, something shows and takes the next one (INV-20).
 
 const Fixtures := preload("res://test/screens/fixtures.gd")
 
@@ -85,8 +85,9 @@ func test_after_a_console_added_A_on_a_platform_of_the_settings_shows_its_form_a
 
 
 ## From a library holding [param consoles], one console added through the form, then [param count] presses drawn by
-## [param random]: the pad's directions, A, B, X, Y, and the "+" (up held, A). After each, once what it started has
-## settled, a person can act; the walk reaches the form again.
+## [param random]: the pad's directions, A, B, X, Y, and the "+" (up held, A). After each, a person can act within the
+## wait's bound, whatever transition the press started; the walk reaches the form again. Frames are fixed at 60 a
+## second (dev/test_godot.sh), so a seed walks the same path whatever the machine's load.
 func _walk(consoles: Dictionary[String, int], test_seed: int, count := 150) -> void:
 	var shown := await _shown(consoles)
 	var device: Fixtures.NewDevice = shown[0]
@@ -116,17 +117,17 @@ func _walk(consoles: Dictionary[String, int], test_seed: int, count := 150) -> v
 	assert_dict(seen).contains_keys(["AddConsole"])
 
 
-func test_INV_E12_R4_03_a_walk_of_presses_from_no_console_never_leaves_a_dead_screen() -> void:
-	await _walk({}, 360401)
+func test_inv_20_a_walk_of_presses_from_no_console_never_leaves_a_dead_screen() -> void:
+	await _walk({}, 360411)
 
 
-func test_INV_E12_R4_03_a_walk_of_presses_from_one_console_never_leaves_a_dead_screen() -> void:
-	await _walk({"ps2": 3}, 360402)
+func test_inv_20_a_walk_of_presses_from_one_console_never_leaves_a_dead_screen() -> void:
+	await _walk({"ps2": 3}, 360412)
 
 
-func test_INV_E12_R4_03_a_walk_of_presses_from_two_consoles_never_leaves_a_dead_screen() -> void:
-	await _walk({"ps2": 3, "gc": 2}, 360403)
+func test_inv_20_a_walk_of_presses_from_two_consoles_never_leaves_a_dead_screen() -> void:
+	await _walk({"ps2": 3, "gc": 2}, 360413)
 
 
-func test_INV_E12_R4_03_a_walk_of_presses_from_three_consoles_never_leaves_a_dead_screen() -> void:
-	await _walk({"ps2": 3, "gc": 2, "gba": 2}, 360404)
+func test_inv_20_a_walk_of_presses_from_three_consoles_never_leaves_a_dead_screen() -> void:
+	await _walk({"ps2": 3, "gc": 2, "gba": 2}, 360414)

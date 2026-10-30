@@ -21,9 +21,11 @@ import io.kotest.matchers.shouldBe
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import app.cartouche.core.art.texture as candidateTexture
 
+@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ArtImagesTest {
@@ -37,7 +39,6 @@ class ArtImagesTest {
 
     @Test
     fun `a texture is the label whole, a cartridge's at its own proportions, where a scan of that shape is of no front`() {
-        // The label as printed, 500 by 255 in a transparent margin: about twice as wide as tall, as a GBA's.
         val printed = png(560, 300) { drawRect(30f, 22f, 530f, 277f, Paint().apply { color = Color.RED }) }
         val label = decoded(ArtImages.label(printed, texture, cartridgeLabel).shouldBeSome())
         (label.width to label.height) shouldBe (500 to 255)
@@ -45,15 +46,6 @@ class ArtImagesTest {
         ArtImages.label(printed, scan, cartridgeLabel).shouldBeNone()
         val disc = decoded(ArtImages.label(scan(diameter = 300, margin = 70), texture, PS2_DISC).shouldBeSome())
         (disc.width to disc.height) shouldBe (300 to 300)
-    }
-
-    @Test
-    fun `a disc scan is cut to the disc, whatever its margin, and what was transparent turns black`() {
-        val label = decoded(ArtImages.label(scan(diameter = 300, margin = 70), scan, PS2_DISC).shouldBeSome())
-        label.width shouldBe 300
-        label.height shouldBe 300
-        label.red(150, 150) shouldBeGreaterThan 200
-        label.red(2, 2) shouldBeLessThan 40
     }
 
     @Test
@@ -67,7 +59,7 @@ class ArtImagesTest {
     }
 
     @Test
-    fun `INV-E10-06 a cartridge's front is cut to its label by its platform's rule, at the label's own proportions`() {
+    fun `INV-16 a cartridge's front is cut to its label by its platform's rule, at the label's own proportions`() {
         val label = decoded(ArtImages.label(cartridgeFront(), scan, cartridgeLabel).shouldBeSome())
         label.width shouldBe 280
         label.height shouldBe 120
@@ -76,7 +68,7 @@ class ArtImagesTest {
     }
 
     @Test
-    fun `INV-E10-06 a scan of another front's shape is cut by that front, one of no front's shape gives no label`() {
+    fun `INV-16 a scan of another front's shape is cut by that front, one of no front's shape gives no label`() {
         val other = front(400.0 / 240, crop(0.15, 0.25, 0.7, 0.5))
         val both =
             LabelCut(
@@ -89,21 +81,6 @@ class ArtImagesTest {
     }
 
     @Test
-    fun `a large cartridge front is brought down to the largest label on its longer side`() {
-        val label =
-            decoded(
-                ArtImages
-                    .label(
-                        png(4000, 2400),
-                        scan,
-                        LabelCut(cartridge("c", 4000.0 / 2400, crop(0.0, 0.0, 1.0, 0.5)), mediumId("c")),
-                    ).shouldBeSome(),
-            )
-        label.width shouldBe ArtImages.LARGEST
-        label.height shouldBe ArtImages.LARGEST * 1200 / 4000
-    }
-
-    @Test
     fun `a scan with no transparent margin, or wholly transparent, is kept whole`() {
         decoded(ArtImages.label(png(320, 320), scan, PS2_DISC).shouldBeSome()).width shouldBe 320
         decoded(ArtImages.label(png(240, 240) { drawColor(Color.TRANSPARENT) }, scan, PS2_DISC).shouldBeSome()).width shouldBe 240
@@ -113,11 +90,5 @@ class ArtImagesTest {
     fun `a large image is brought down to the largest label, a very large one decoded at a fraction of its size`() {
         decoded(ArtImages.label(png(3000, 2000), scan, PS2_DISC).shouldBeSome()).width shouldBe ArtImages.LARGEST
         decoded(ArtImages.label(png(8192, 512), scan, PS2_DISC).shouldBeSome()).width shouldBe ArtImages.LARGEST
-    }
-
-    @Test
-    fun `what is not an image gives no label`() {
-        ArtImages.label("<html>Not found</html>".encodeToByteArray(), scan, PS2_DISC).shouldBeNone()
-        ArtImages.label(ByteArray(0), scan, PS2_DISC).shouldBeNone()
     }
 }

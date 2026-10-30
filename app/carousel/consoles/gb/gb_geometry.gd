@@ -43,8 +43,6 @@ static func arrays(shape: GbShape, part: StringName, detail: int) -> Array:
 		&"front_shell":
 			ShapeGeometry.slab(mesh, shape.face(0.0, steps), seam, front, Vector2(GbShape.SEAM_BEVEL, shape.bevel), uv)
 		&"back_shell":
-			# From the seam: the shell with the power switch's slot, the whole shell down to the bay's
-			# floor; the rails on the bay's floor; the shell around the cartridge's slot.
 			var slot_back := seam - shape.power().size.y
 			var bay_floor := back + shape.slot_thickness()
 			var slot := Rect2(shape.power().position.x, shape.height - GbShape.SLOT_SINK, shape.power_slot,
@@ -63,7 +61,6 @@ static func arrays(shape: GbShape, part: StringName, detail: int) -> Array:
 			for hole in holes:
 				ShapeGeometry.sunk(mesh, hole, front - GbShape.SCREW_SINK, front, uv)
 		&"plates":
-			# The plate stands on the back, the slot's back wall.
 			mesh.basis = ShapeGeometry.BEHIND
 			var top := front + GbShape.BACK_RISE
 			var sticker := ShapeGeometry.rounded_box(GbShape.STICKER, GbShape.STICKER_CORNER, steps, 0.0)
@@ -75,22 +72,18 @@ static func arrays(shape: GbShape, part: StringName, detail: int) -> Array:
 			mesh.basis = ShapeGeometry.BEHIND
 			ShapeGeometry.decal(mesh, GbShape.STICKER, front + GbShape.BACK_RISE - GbShape.STICKER_SINK)
 		&"battery_cover":
-			# Standing out of the back as the plate does, sunk into it as deep as its edges round; its
-			# ribs, and the grip on its latch, stand out of it.
 			var top := back - GbShape.BACK_RISE
 			ShapeGeometry.slab(mesh, shape.cover(0.0, steps), top, back + shape.back_bevel, Vector2(0.8, 0.0), uv)
 			for rib in shape.cover_ribs():
 				ShapeGeometry.slab(mesh, ShapeGeometry.square(rib), top - GbShape.COVER_RIB_RISE, top + 0.3,
 					Vector2.ZERO, uv)
 		&"cover_gap":
-			# The parting gap's dark at the foot of the cover.
 			ShapeGeometry.slab(mesh, shape.cover(GbShape.GAP, steps), back - _OVER, back + _SUNK, Vector2.ZERO, uv)
 		&"ribs":
 			for rib in shape.ribs():
 				ShapeGeometry.slab(mesh, ShapeGeometry.square(rib), back - GbShape.RIB_RISE, back + 0.5, Vector2.ZERO,
 					uv)
 		&"screws":
-			# Their heads at the foot of their holes.
 			mesh.basis = ShapeGeometry.BEHIND
 			var foot := front - GbShape.SCREW_SINK
 			for screw in shape.screws():
@@ -126,7 +119,6 @@ static func arrays(shape: GbShape, part: StringName, detail: int) -> Array:
 			for i in shape.speaker_slits:
 				ShapeGeometry.slab(mesh, shape.slit(i, steps), front - _SUNK, front + _OVER, Vector2.ZERO, uv)
 		&"band":
-			# A groove across the front, two short ones above it up to the top.
 			var across := shape.width / 2.0 - shape.bevel
 			var low := shape.band()
 			var grooves: Array[Rect2] = [Rect2(-across, low - _GROOVE / 2.0, 2.0 * across, _GROOVE)]
@@ -158,7 +150,6 @@ static func arrays(shape: GbShape, part: StringName, detail: int) -> Array:
 					middle - GbShape.WHEEL_THICKNESS / 2.0, middle + GbShape.WHEEL_THICKNESS / 2.0,
 					Vector2(0.3, 0.3), uv)
 		&"slot":
-			# The lock's hole in the bay's floor, then the connector at the slot's foot.
 			ShapeGeometry.slab(mesh, ShapeGeometry.square(shape.lock()), back + shape.slot_thickness() - _OVER,
 				back + shape.slot_thickness() + _SUNK, Vector2.ZERO, uv)
 			mesh.basis = ShapeGeometry.PLAN

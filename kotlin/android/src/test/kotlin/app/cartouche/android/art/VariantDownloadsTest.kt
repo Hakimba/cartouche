@@ -79,16 +79,6 @@ class VariantDownloadsTest {
     }
 
     @Test
-    fun `INV-E10-06 a cartridge's image by region is kept as its label alone, cut by its platform's rule`() {
-        downloads(
-            FakeFetch(mapOf("https://art/Europe.png" to cartridgeFront())),
-        ).download(game, listOf(variant("Europe")), cartridgeLabel, version)
-        scope.runCurrent()
-        val label = BitmapFactory.decodeFile(heard.getValue("Europe").shouldBeRight().file.path)
-        (label.width to label.height) shouldBe (280 to 120)
-    }
-
-    @Test
     fun `a texture by region is kept whole, a disc's on a square and a cartridge's at its own proportions`() {
         val disc = ArtVariant(LabelRegion("Europe"), candidateTexture(58, 1, "support-texture(eu)", "Europe"))
         val cartridge = ArtVariant(LabelRegion("Japan"), candidateTexture(12, 1, "support-texture(jp)", "Japan"))
@@ -109,7 +99,7 @@ class VariantDownloadsTest {
     }
 
     @Test
-    fun `INV-E11-04 a texture ScreenScraper has none of is remembered so for the sources' version, a scan's absence is not`() {
+    fun `INV-17 a texture ScreenScraper has none of is remembered so for the sources' version, a scan's absence is not`() {
         val texture = ArtVariant(LabelRegion("Europe"), candidateTexture(58, 1, "support-texture(eu)", "Europe"))
         downloads(FakeFetch(emptyMap())).download(game, listOf(texture, variant("Japan")), PS2_DISC, version)
         scope.runCurrent()

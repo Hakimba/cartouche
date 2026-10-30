@@ -9,8 +9,8 @@ import arrow.core.raise.option
 import arrow.core.toOption
 
 /**
- * The ISO 9660 file system of a disc image, read one [SECTOR] at a time: enough to find a PlayStation's SYSTEM.CNF
- * at the root and the serial it boots.
+ * The ISO 9660 file system of a disc image, read one [SECTOR] at a time: enough to find a PlayStation's SYSTEM.CNF at
+ * the root and the serial it boots.
  */
 internal object Iso9660 {
     /** A file's place: its first sector and its size in bytes. */

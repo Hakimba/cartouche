@@ -9,5 +9,10 @@ plugins {
 
 // Property tests draw the same cases on every run, so that a failure always comes back.
 subprojects {
-    tasks.withType<Test>().configureEach { systemProperty("kotest.proptest.default.seed", "27092026") }
+    tasks.withType<Test>().configureEach {
+        systemProperty("kotest.proptest.default.seed", "27092026")
+        useJUnitPlatform()
+        maxHeapSize = "1g"
+        maxParallelForks = 4
+    }
 }

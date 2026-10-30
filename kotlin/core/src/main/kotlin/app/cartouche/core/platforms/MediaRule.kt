@@ -31,13 +31,12 @@ public value class MediumId private constructor(public val value: String) {
     }
 }
 
-/** Profiles' media are checked when read, like any other value: decoding fails on a blank one. */
 private object MediumIdSerializer : KSerializer<MediumId> by ParsedSerializer("medium", String.serializer(), MediumId::of, MediumId::value)
 
 /**
- * The media a platform's games come in, by where they were sold: [default] for PAL games and games
- * of no known region, as Cartouche's references are PAL models; [ntscU] and [ntscJ], when declared,
- * for games of the Americas and of East Asia (a Japanese NES game is a Famicom cartridge).
+ * The media a platform's games come in, by where they were sold: [default] for PAL games and games of no known
+ * region, as Cartouche's references are PAL models; [ntscU] and [ntscJ], when declared, for games of the Americas and
+ * of East Asia (a Japanese NES game is a Famicom cartridge).
  */
 @Serializable
 public data class MediaRule(
@@ -46,9 +45,9 @@ public data class MediaRule(
     @SerialName("ntsc_j") public val ntscJ: Option<MediumId> = None,
 ) {
     /**
-     * The medium of a game of [regions]: that of the first of PAL, NTSC-U and NTSC-J the game was
-     * sold in, so a `(Japan, USA)` game takes the American one; the default when that group declares
-     * none or no region is known. Total.
+     * The medium of a game of [regions]: that of the first of PAL, NTSC-U and NTSC-J the game was sold in, so a
+     * `(Japan, USA)` game takes the American one; the default when that group declares none or no region is known.
+     * Total.
      */
     public fun of(regions: List<String>): MediumId {
         val sold = Regions.groupsOf(regions)

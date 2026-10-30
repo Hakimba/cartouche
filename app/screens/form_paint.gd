@@ -4,22 +4,26 @@ extends RefCounted
 ## What the add-console form draws its own way: the materials of its step chips, switches and pill buttons, the
 ## focus card that moves between them, and the plain look of the controls that only hold focus and a press.
 
-## One container width unit of the design, in px at the 1280 px frame.
+## One hundredth of the 1280 px frame's width, in px.
 const CQW := 12.8
-## A browser's "normal" line of the two families, and the ascent in it, in em: text set with a CSS `font`
-## shorthand keeps it, the rest of the design's text lines are 1.5 em tall.
+## The default line height of each of the two font families, and the ascent in it, in em: the text lines that
+## keep it; the other text lines are 1.5 em tall.
 const PLEX_LINE := 1.3
 const PLEX_ASCENT := 1.025
 const JAKARTA_LINE := 1.26
 const JAKARTA_ASCENT := 1.038
+## A screen's title and its step count above it ("02 / 03"), in px; the count sits this far up and left of its box.
+const TITLE_PX := 4.6 * CQW
+const _COUNT_PX := 1.7 * CQW
+const _COUNT_SHIFT := Vector2(-1.0, -1.0)
 ## The lines kept, so a text shaped once is not shaped again each time it is drawn.
 const _LINES_KEPT := 96
 
 static var _lines: Dictionary[String, StudioText] = {}
 
 
-## A Studio material of any recipe on a box of its own, drawn behind the canvas item it is made for (what
-## [SatinPanel.Backing] does for the design's own looks).
+## A Studio material of any recipe on a box of its own, drawn behind the canvas item it is made for (as
+## [SatinPanel.Backing] does for the standard looks).
 class Layer:
 	extends RefCounted
 
@@ -108,8 +112,8 @@ class Card:
 			_layer.place(Rect2(Vector2.ZERO, size), radius)
 
 
-## The card's material: the design's focused card as its picture shows it (the satin card and its drop shadow,
-## with no gel ring or glow), or the ring and glow alone with no fill and no inset highlight.
+## The card's material: the focused card (the satin card and its shadow, with no gel ring or glow), or the ring
+## and glow alone with no fill and no inset highlight.
 static func card_material(filled: bool) -> StudioMaterial:
 	var shown := StudioMaterial.new(StudioTokens.Look.FOCUS)
 	if not filled:
@@ -131,6 +135,13 @@ static func line(shown: String, face: StudioTokens.Face, px: float, tracking_em 
 	var text := _lines[key]
 	text.fit(INF)
 	return text
+
+
+## A step count on [param canvas]: [param number] in the gel [param rim], then [param rest] muted.
+static func draw_count(canvas: CanvasItem, number: String, rest: String, rim: Color) -> void:
+	var shown := line(number, StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
+	shown.draw(canvas, _COUNT_SHIFT, rim)
+	line(rest, StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08).draw(canvas, _COUNT_SHIFT + Vector2(shown.width, 0.0), StudioTokens.MUTE)
 
 
 ## A material of [param colors] over [param stops] and [param shadows] (each as [StudioTokens] lists them), on a

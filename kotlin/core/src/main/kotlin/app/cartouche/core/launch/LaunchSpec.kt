@@ -77,9 +77,9 @@ public object GrantFlags {
 }
 
 /**
- * A fully resolved launch. Only [Template.resolve] builds one, which guarantees that [flags] carries
- * no [GrantFlags] bit, that [grant] is the launched game's own URI, and that no other content URI is
- * handed where Android grants access along with the intent ([data], [ExtraValue.UriText]).
+ * A fully resolved launch. Only [Template.resolve] builds one, which guarantees that [flags] carries no [GrantFlags]
+ * bit, that [grant] is the launched game's own URI, and that no other content URI is handed where Android grants
+ * access along with the intent ([data], [ExtraValue.UriText]).
  */
 @ConsistentCopyVisibility
 public data class LaunchSpec internal constructor(

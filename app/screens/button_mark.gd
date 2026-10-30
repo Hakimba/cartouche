@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ButtonMark
 extends RefCounted
-## Draws a face button's mark in white: a letter in the design's key face, or one of PlayStation's shapes
+## Draws a face button's mark in white: a letter in the key face, or one of PlayStation's shapes
 ## drawn as strokes (fonts rarely have them); and, for the button style cards, the dark disc under it.
 
-## How wide the pad's two arrows are drawn on a key of the design's size, in px (2.8 cqw).
+## How wide the pad's two arrows are drawn on a full-size key, in px.
 const PAD_ARROWS_PX := 35.84
 
 ## Each letter shaped once, by its text, then by its scale.
@@ -55,7 +55,7 @@ static func draw_mark(canvas: CanvasItem, mark: String, at: Vector2, letter_scal
 			letters.draw(canvas, at - Vector2(letters.width, letters.height) / 2.0, white)
 
 
-## The pad's two arrows as the design draws them (a 26 x 12 box, a triangle at each end), [param unit] px to a unit of
+## The pad's two arrows (a 26 x 12 box, a triangle at each end), [param unit] px to a unit of
 ## it, centred on [param at]: the left one, then the right one.
 static func pad_arrows(at: Vector2, unit: float) -> Array[PackedVector2Array]:
 	var arrows: Array[PackedVector2Array] = []

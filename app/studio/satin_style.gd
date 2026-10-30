@@ -5,7 +5,7 @@ extends StyleBox
 ## control draws its StyleBox into its own canvas item, where no shader can go, so the material is drawn here as
 ## polygons: the fill as a gradient over the box's outline (exact for a fill from top to bottom), a hard inset
 ## highlight as the box less the box moved by its offset, and each outer shadow as rings outside the box whose
-## colours follow its Gaussian falloff; CSS draws no outer shadow under the box, nor do these rings. Each box size
+## colours follow its Gaussian falloff; no outer shadow is drawn under the box. Each box size
 ## is built once.
 
 ## Points on each quarter of a corner.
@@ -99,7 +99,7 @@ func build(size: Vector2) -> Mesh2D:
 	_fill(mesh, box)
 	for shadow in _material.shadows:
 		if shadow.inset:
-			# A hard highlight: the box less the box moved by the offset, over the fill (CSS clips it to the box).
+			# A hard highlight: the box less the box moved by the offset, over the fill, clipped to the box.
 			var lit := Rect2(box.position + shadow.offset.max(Vector2.ZERO), box.size - shadow.offset.abs())
 			var start := mesh.points.size()
 			var edge := _outline(box, 0.0).points
@@ -108,7 +108,7 @@ func build(size: Vector2) -> Mesh2D:
 	return mesh
 
 
-## A CSS outer shadow around [param box], outside it only: at a distance t past the box's edge along its normal
+## An outer shadow around [param box], outside it only: at a distance t past the box's edge along its normal
 ## n, the shadow's own edge lies spread + offset·n past the box's, and a Gaussian of standard deviation blur / 2
 ## leaves Φ((that − t) / σ) of its colour.
 func outer_shadow(mesh: Mesh2D, box: Rect2, shadow: StudioMaterial.Shadow) -> void:
@@ -145,7 +145,7 @@ func _fill(mesh: Mesh2D, box: Rect2) -> void:
 
 
 ## [param box] rounded by [param corner], filled with [param color_at] (a colour by point), its edge feathered over
-## [param feather] px across it, as a browser covers an edge (none for a box on whole pixels).
+## [param feather] px across it (none for a box on whole pixels).
 static func fill_rounded(mesh: Mesh2D, box: Rect2, corner: float, color_at: Callable, feather := _FEATHER) -> void:
 	var inner := _rounded(box, -feather / 2.0, corner).points
 	var outer := _rounded(box, feather / 2.0, corner).points

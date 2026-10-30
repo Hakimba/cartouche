@@ -28,8 +28,8 @@ public data class StoredLibrary(public val library: Library, public val version:
 }
 
 /**
- * The library as stored on the device: JSON with a format version, checked like any input when read
- * back. Format 1 kept every ignored file; format 2 counts hidden and unsupported ones.
+ * The library as stored on the device: JSON with a format version, checked like any input when read back. Format 1
+ * kept every ignored file; format 2 counts hidden and unsupported ones.
  */
 public object LibraryFormat {
     public const val VERSION: Int = 2

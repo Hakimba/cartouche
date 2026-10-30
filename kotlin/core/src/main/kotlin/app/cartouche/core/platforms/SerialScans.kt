@@ -23,7 +23,10 @@ public class SerialScans private constructor(internal val template: String, inte
         /** Where [template] names the serial. */
         internal const val PLACE = "{serial}"
 
-        /** The source at [template], an `https://` URL naming the serial as `{serial}`, of serials matching [serial]; none otherwise. */
+        /**
+         * The source at [template], an `https://` URL naming the serial as `{serial}`, of serials matching [serial];
+         * none otherwise.
+         */
         public fun of(template: String, serial: String): Option<SerialScans> = Either
             .catch { SerialScans(template, Regex(serial)) }
             .getOrNone()

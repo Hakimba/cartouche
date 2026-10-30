@@ -1,17 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name Motion
 extends RefCounted
-## The one way the Studio design moves: a spring that presses retarget, and the named curves of its
-## animations, solved as browsers solve a CSS `cubic-bezier`.
+## The one way the Studio screens move: a spring that presses retarget, and the named curves of their
+## animations, cubic Béziers solved for y at a given x.
+
+## The named curves: the standard ease curves and the app's own.
+enum Easing { LINEAR, EASE, EASE_IN, EASE_OUT, GLIDE, SNAP, ARRIVE, RISE, POP, FOCUS, FLIP, APPEAR, SINK, IN_OUT, OUT_BACK }
 
 ## A frame longer than this moves the spring by this much only: a hitch slows it rather than throwing it.
 const MAX_STEP_S := 1.0 / 30.0
 ## Closer than this to its target, and slower than this, the spring is still.
 const STILL := 1e-3
-
-## The design's named curves (reference 0.3, and the CSS ones).
-enum Easing { LINEAR, EASE, EASE_IN, EASE_OUT, GLIDE, SNAP, ARRIVE, RISE, POP, FOCUS, FLIP, APPEAR, SINK, IN_OUT, OUT_BACK }
-
 ## Each cubic Bézier curve's control points, (x1, y1, x2, y2).
 const _BEZIERS: Dictionary[Easing, Vector4] = {
 	Easing.EASE: Vector4(0.25, 0.1, 0.25, 1.0),
@@ -82,7 +81,7 @@ static func curve(shown: Easing) -> Callable:
 
 
 ## The y of the cubic Bézier [param points] where its x is [param x]: Newton's method from x, then bisection
-## when Newton does not converge, as browsers solve it.
+## when Newton does not converge.
 static func _bezier(points: Vector4, x: float) -> float:
 	if x <= 0.0 or x >= 1.0:
 		return clampf(x, 0.0, 1.0)
@@ -114,6 +113,23 @@ static func _coordinate(a: float, b: float, u: float) -> float:
 
 static func _slope(a: float, b: float, u: float) -> float:
 	return 3.0 * (1.0 - 3.0 * b + 3.0 * a) * u * u + 2.0 * (3.0 * b - 6.0 * a) * u + 3.0 * a
+
+
+## A new tween of [param node], [param old] killed first: one motion at a time, the latest wins.
+static func restart(node: Node, old: Tween) -> Tween:
+	if old:
+		old.kill()
+	return node.create_tween()
+
+
+## Plays [param apply] on a new tween of [param node], from 0 to 1 eased by [param easing] in [param seconds]; the
+## tween is kept in [param motions] under [param key], the one it replaces killed.
+static func animate(node: Node, motions: Dictionary[StringName, Tween], key: StringName, seconds: float, easing: Easing,
+		apply: Callable) -> void:
+	var old: Tween = motions.get(key)
+	var tween := restart(node, old)
+	motions[key] = tween
+	tween.tween_method(func(t: float) -> void: apply.call(eased(easing, t)), 0.0, 1.0, seconds)
 
 
 ## A timed part of a shared transition clock, at rest before its start and after its end.

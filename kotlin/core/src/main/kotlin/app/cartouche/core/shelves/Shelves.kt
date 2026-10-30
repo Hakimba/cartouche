@@ -31,7 +31,6 @@ public data class SelectedGame(public val id: GameId, public val title: String) 
 /** Where the user was: the platform shown last and, for each platform, the game selected last. */
 @Serializable
 public data class Selection(public val platform: Option<PlatformId> = None, public val games: Map<PlatformId, SelectedGame> = emptyMap()) {
-    /** [game] selected, and its platform shown. */
     public fun with(game: Game): Selection = copy(platform = Some(game.platform), games = games + (game.platform to SelectedGame.of(game)))
 
     /** Nothing remembered of [platform]: its game, and that it was shown. */
@@ -41,7 +40,10 @@ public data class Selection(public val platform: Option<PlatformId> = None, publ
 /** The games of one platform, in title order, and the index of the one shown first. */
 public data class Shelf(public val platform: PlatformId, public val games: NonEmptyList<Game>, public val selected: Int)
 
-/** One shelf per platform that has games, in the order the user put the consoles in, and the index of the shelf shown first. */
+/**
+ * One shelf per platform that has games, in the order the user put the consoles in, and the index of the shelf shown
+ * first.
+ */
 public data class Shelves(public val shelves: NonEmptyList<Shelf>, public val selected: Int) {
     public companion object {
         /**
@@ -68,7 +70,9 @@ public data class Shelves(public val shelves: NonEmptyList<Shelf>, public val se
             }
         }
 
-        /** Each platform's games of [library] in the order of its shelf, whether or not the catalog has the platform. */
+        /**
+         * Each platform's games of [library] in the order of its shelf, whether or not the catalog has the platform.
+         */
         public fun gamesByPlatform(library: Library): Map<PlatformId, List<Game>> {
             val order = titleOrder()
             return library.games.groupBy { it.platform }.mapValues { (_, games) -> games.sortedWith(compareBy(order, SelectedGame::of)) }

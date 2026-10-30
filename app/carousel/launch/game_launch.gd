@@ -58,7 +58,6 @@ var _start := Transform3D.IDENTITY
 var _clock_s := 0.0
 var _cues_played := 0
 var _players: Dictionary[Insertion.Cue, AudioStreamPlayer] = {}
-## Frame times of the insertion, traced once it is done, in debug builds.
 var _frames_ms := PackedFloat32Array()
 ## How present each control was as the launch began: they fade from it, and show so again after.
 var _presence: Dictionary[CanvasItem, float] = {}
@@ -122,10 +121,28 @@ func is_inserting() -> bool:
 	return _stage not in [Stage.READY, Stage.CHECKING, Stage.SHOWING]
 
 
-## Ends a launch that no game follows, such as the dev bridge's preview of the animation, and shows the
-## carousel again.
+## Plays the launch into the selected console from [param at_s] seconds after its start, the black over the
+## screen, with no game to start: the debug remote control previews a launch animation so. Past its end, or on
+## [method end_preview], the carousel shows again.
+func preview(at_s: float) -> void:
+	if not is_inserting():
+		_enter(Stage.INSERTING)
+		_inserted.connect(_show_carousel, CONNECT_ONE_SHOT)
+	_into_console = true
+	_clock_s = at_s
+	blackout.visible = true
+	_black.set_shader_parameter(&"opacity", 1.0)
+	_insert(0.0)
+
+
+func is_previewing() -> bool:
+	return _inserted.is_connected(_show_carousel)
+
+
 func end_preview() -> void:
-	_show_carousel()
+	if is_previewing():
+		_inserted.disconnect(_show_carousel)
+		_show_carousel()
 
 
 ## Makes the players of [param insertions]' sounds, once, rather than as a launch starts.
@@ -234,7 +251,6 @@ func _insert(delta: float) -> void:
 		origin = row.to_global(stand.origin)
 	var size := blackout.size
 	var centre := get_viewport().get_camera_3d().unproject_position(origin)
-	# The distance to the farthest corner of the screen.
 	var farthest := Vector2(maxf(centre.x, size.x - centre.x), maxf(centre.y, size.y - centre.y)).length()
 	_black.set_shader_parameter(&"centre", centre / size)
 	_black.set_shader_parameter(&"size", size)

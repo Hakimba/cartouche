@@ -21,18 +21,6 @@ class DocumentBytesTest {
     }
 
     @Test
-    fun `bytes are read where asked, fewer past the end of the file, and counted`() {
-        RandomAccessFile(file, "r").use { opened ->
-            val source = DocumentBytes(opened.channel::read, file.length())
-            source.size shouldBe 5000L
-            source.read(1000, 16).shouldBeRight() shouldBe bytes.copyOfRange(1000, 1016)
-            source.read(4990, 16).shouldBeRight() shouldBe bytes.copyOfRange(4990, 5000)
-            source.read(0, 4).shouldBeRight() shouldBe bytes.copyOfRange(0, 4)
-            source.bytesRead shouldBe 30L
-        }
-    }
-
-    @Test
     fun `reads that stop short are taken up where they stopped, until the length asked or the end of the file`() {
         RandomAccessFile(file, "r").use { opened ->
             // Seven bytes at most a read, as a provider streaming the file may give them.

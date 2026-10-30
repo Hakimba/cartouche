@@ -26,12 +26,12 @@ class SettingsTest {
         }
 
     @Test
-    fun `INV-E6-05 an app with a platform set up is past its first launch, whatever its settings`() = runBlocking<Unit> {
+    fun `an app with a platform set up is past its first launch, whatever its settings`() = runBlocking<Unit> {
         checkAll(settings, setUpLibraries) { settings, library -> settings.isFirstLaunch(library) shouldBe false }
     }
 
     @Test
-    fun `INV-E6-05 once a button style is chosen, the first launch is over, even with no platform yet`() = runBlocking<Unit> {
+    fun `once a button style is chosen, the first launch is over, even with no platform yet`() = runBlocking<Unit> {
         checkAll(Arb.enum<ButtonStyle>()) { style -> Settings(Some(style)).isFirstLaunch(Library()) shouldBe false }
     }
 
@@ -43,17 +43,9 @@ class SettingsTest {
     }
 
     @Test
-    fun `INV-E6-05 a fresh install, with no settings and no platform, is on its first launch`() {
+    fun `a fresh install is on its first launch, smooths the edges 4x and leaves the games still`() {
         Settings().isFirstLaunch(Library()) shouldBe true
-    }
-
-    @Test
-    fun `INV-E8-02 a fresh install smooths the edges 4x`() {
         Settings().edgeSmoothing shouldBe EdgeSmoothing.FOUR_TIMES
-    }
-
-    @Test
-    fun `INV-E12-C1-02 games float off by default`() {
         Settings().gamesFloat shouldBe false
     }
 }

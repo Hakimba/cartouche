@@ -78,14 +78,14 @@ internal object Regions {
     }
 
     /**
-     * Regions closest to [game]'s first ([rank]); at equal rank a zone's own name (an umbrella) before
-     * its other countries, so that a game of the world shows North America's scan before Brazil's.
+     * Regions closest to [game]'s first ([rank]); at equal rank a zone's own name (an umbrella) before its other
+     * countries, so that a game of the world shows North America's scan before Brazil's.
      */
     fun closestTo(game: List<String>): Comparator<String> = compareBy({ rank(game, it) }, { same(it) !in umbrellas })
 
     /**
-     * Where [image]'s region comes for a user who prefers [preferred]'s images: 0 that region, 1 the
-     * zone holding it (Europe for France), 2 the world or no region named, 3 any other.
+     * Where [image]'s region comes for a user who prefers [preferred]'s images: 0 that region, 1 the zone holding it
+     * (Europe for France), 2 the world or no region named, 3 any other.
      */
     fun preferredFirst(preferred: PreferredRegion, image: String): Int {
         val region = same(image)
@@ -103,7 +103,10 @@ internal object Regions {
     /** The umbrella regions, in the order of their groups: North America, Europe, Japan. */
     val umbrellas: List<String> = Group.entries.map(Group::umbrella)
 
-    /** The umbrella region of the first of [game]'s regions whose group is known; none for the world or unknown regions. */
+    /**
+     * The umbrella region of the first of [game]'s regions whose group is known; none for the world or unknown
+     * regions.
+     */
     fun umbrellaOf(game: List<String>): Option<String> = groupsOf(game).firstOrNone().map(Group::umbrella)
 
     /** The name [region] goes by here, whichever source named it (`USA` is `North America`). */

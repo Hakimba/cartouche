@@ -15,8 +15,8 @@ public sealed interface FileFacts {
     }
 
     /**
-     * A cartridge's CRC32 as No-Intro counts it: of the ROM alone, without a copier's or an emulator's header; and, for a
-     * Game Boy ROM, the [shell] its header's colour flag says it was sold in.
+     * A cartridge's CRC32 as No-Intro counts it: of the ROM alone, without a copier's or an emulator's header; and,
+     * for a Game Boy ROM, the [shell] its header's colour flag says it was sold in.
      */
     public data class Print(public val crc32: UInt, public val shell: Shell = Shell.UNKNOWN) : FileFacts {
         /** As the prints lists write it: eight upper-case hexadecimal digits. */
@@ -27,7 +27,10 @@ public sealed interface FileFacts {
     public data object Silent : FileFacts
 }
 
-/** The kind of Game Boy Color cartridge a ROM's colour flag (header byte 0x143) says: its sticker sits lower on an exclusive's. */
+/**
+ * The kind of Game Boy Color cartridge a ROM's colour flag (header byte 0x143) says: its sticker sits lower on an
+ * exclusive's.
+ */
 @Serializable
 public enum class Shell {
     /** Flag `0xC0`: runs on a Game Boy Color only. */

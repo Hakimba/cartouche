@@ -2,6 +2,7 @@
 package app.cartouche.core.launch
 
 import app.cartouche.core.PackageName
+import app.cartouche.core.longOrNone
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
@@ -95,7 +96,6 @@ public object LaunchTemplate {
             parseTokens(rest, next)
         }
 
-    /** Applies one option to [acc]; returns the updated template and the tokens left to parse. */
     private fun Raise<TemplateError>.parseOption(option: String, args: List<String>, acc: Template): Pair<Template, List<String>> {
         fun arg(index: Int): String = args.getOrElse(index) { raise(TemplateError.MissingValue(option)) }
 
@@ -200,7 +200,7 @@ public data class Template internal constructor(
                 ExtraKind.EMPTY_STRING -> ExtraValue.EmptyText
                 ExtraKind.BOOLEAN -> typed(extra) { decodeBoolean(it).map(ExtraValue::Flag) }
                 ExtraKind.INT -> typed(extra) { decodeInt(it).map(ExtraValue::IntNumber) }
-                ExtraKind.LONG -> typed(extra) { it.toLongOrNull().toOption().map(ExtraValue::LongNumber) }
+                ExtraKind.LONG -> typed(extra) { it.longOrNone().map(ExtraValue::LongNumber) }
                 ExtraKind.FLOAT -> typed(extra) { it.toFloatOrNull().toOption().map(ExtraValue::FloatNumber) }
                 ExtraKind.URI -> ExtraValue.UriText(uri(extra.raw))
                 // Split the template text, then fill: a file name with commas stays one item.

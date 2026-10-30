@@ -36,3 +36,7 @@ fun web(url: String, region: String = ""): Candidate.Web = Candidate.Web(ArtUrl(
 /** A texture with the system, game, media name and region written by the test. */
 fun texture(system: Int, game: Int, media: String, region: String): Candidate.Texture =
     Candidate.Texture(ScreenScraperSystem(system), ScreenScraperGame(game), TextureMedia(media), region)
+
+/** A PlayStation 2 texture of [game], as ScreenScraper has it for Europe unless the test says otherwise. */
+fun texture(game: Int, media: String = "support-texture(eu)", region: String = "Europe"): Candidate.Texture =
+    texture(58, game, media, region)

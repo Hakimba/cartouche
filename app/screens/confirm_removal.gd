@@ -7,8 +7,6 @@ extends Control
 ## [param remove] is false when cancelled.
 signal answered(remove: bool)
 
-@onready var _title: Label = %Title
-@onready var _text: Label = %Text
 ## The card's corners, the focus ring's reach past a pill and its corners, as the settings' card and rows have them.
 const _CARD_RADIUS := 28.16
 const _RING := 6.4
@@ -17,6 +15,8 @@ const _RING_RADIUS := 17.92
 var _card: SatinPanel.Backing
 var _ring: SatinPanel.Backing
 
+@onready var _title: Label = %Title
+@onready var _text: Label = %Text
 @onready var _panel: Control = %Panel
 @onready var _buttons: Control = %Buttons
 @onready var _cancel: FormPill = %Cancel

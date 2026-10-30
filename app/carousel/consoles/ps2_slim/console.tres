@@ -12,4 +12,5 @@ model_name = "Slim"
 scene = "res://carousel/consoles/ps2_slim/ps2_slim.tscn"
 launch = "res://carousel/consoles/ps2_slim/launch.json"
 triangle_budget = 9000
+ring_size = Vector2(1.533, -0.367)
 variants = PackedStringArray("ps2_fat")

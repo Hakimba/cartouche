@@ -53,11 +53,8 @@ internal sealed interface LaunchFailure {
 }
 
 /**
- * Starts emulators, apps and system screens. Preparing an intent does IO and runs off the main
- * thread; [start] and the pickers run on the main thread, which owns activity starts.
- *
- * Never grants a URI to a package directly: only the documents provider could revoke such a grant,
- * so it would last until reboot. The intent's own grant ([IntentMapper]) ends with the emulator.
+ * Preparing an intent does IO and runs off the main thread; [start] and the pickers run on the main thread.
+ * Never grants a URI to a package directly: only the documents provider could revoke it, so it would last until reboot.
  */
 internal class Launcher(
     private val context: Context,
@@ -66,10 +63,8 @@ internal class Launcher(
     private val stopInstance: (PackageName) -> Unit = { stopBackgroundInstance(context, it) },
 ) {
     /**
-     * The intent that starts [launch] of the game file [game], once its emulator is installed and
-     * the file is still there. Starts and stops nothing, so that a game can be checked before the
-     * launch animation plays. Android's own transition between apps is left out: the animation
-     * ends on black, and the emulator appears straight from it.
+     * Starts and stops nothing, so a game can be checked before the launch animation plays; Android's transition is
+     * left out as the animation ends on black.
      */
     fun checkGame(launch: Launch, game: ContentUri): Either<LaunchFailure, Intent> = either {
         launch.spec.targetPackage.onSome { packageName ->
@@ -96,8 +91,8 @@ internal class Launcher(
         Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).let { starting(it) { activity.startActivityForResult(it, requestCode) } }
 
     /**
-     * Opens the system document picker on images (the gallery, the device's folders, its other
-     * sources); the choice arrives in the activity result for [requestCode].
+     * Opens the system document picker on images (the gallery, the device's folders, its other sources); the choice
+     * arrives in the activity result for [requestCode].
      */
     fun pickPicture(activity: Activity, requestCode: Int): Either<LaunchFailure, Unit> = Intent(Intent.ACTION_OPEN_DOCUMENT)
         .addCategory(Intent.CATEGORY_OPENABLE)
@@ -122,10 +117,8 @@ internal class Launcher(
 }
 
 /**
- * Some emulators (RetroArch) keep running in the background and would resume the previous game
- * instead of loading the new one. Stopping them only works up to Android 13: from Android 14,
- * [ActivityManager.killBackgroundProcesses] can only stop the caller's own processes, so newer
- * devices rely on the template's clear-task switches.
+ * Emulators like RetroArch resume the previous game while kept in the background. Stopping them only works
+ * up to Android 13; newer devices rely on the template's clear-task switches.
  */
 private fun stopBackgroundInstance(context: Context, packageName: PackageName) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return

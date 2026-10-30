@@ -17,7 +17,8 @@ func _ready() -> void:
 	look(Vector2.ZERO, 0.0, 0.0)
 
 
-## Console properties retain their circular operating light.
+## A round pool of light at [param centre], reaching [param radius] pixels, the room around it
+## [param darkness] dark, from 0 to 1.
 func look(centre: Vector2, radius: float, darkness: float) -> void:
 	if not _shaped and centre == _centre and radius == _radius and darkness == _darkness:
 		return

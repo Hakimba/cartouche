@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name StudioPill
 extends SatinPanel
-## One line of text on a frost pill, centred in it as the design's pills centre their content, cut with an
+## One line of text on a frost pill, centred in it with what it holds beside the text, cut with an
 ## ellipsis when it does not fit. The pill keeps the size it is given.
 
 ## The text's role.

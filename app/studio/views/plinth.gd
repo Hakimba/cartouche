@@ -219,7 +219,7 @@ func show_console(folder: String) -> void:
 	_console = folder
 	_plate.show_logo(LogoView.Slot.PLINTH_PLATE, folder)
 	_place_logo()
-	_base.gel = Cyclorama.gel_of(ConsoleManifest.of(folder))
+	_base.gel = ConsoleManifest.of(folder).gel()
 	_turntable.texture = null
 	_asked = _show_still.bind(folder)
 	request_still(folder, _asked)
@@ -271,7 +271,7 @@ func _rise_in() -> void:
 	_rise.tween_property(_turntable, ^"position:y", rest_y, _RISE_S).set_custom_interpolator(Motion.curve(Motion.Easing.RISE))
 
 
-## The logo at the plate's centre, on whole pixels as the browser lays it.
+## The logo at the plate's centre, on whole pixels.
 func _place_logo() -> void:
 	var logo := _plate.texture.get_size()
 	_plate.size = logo

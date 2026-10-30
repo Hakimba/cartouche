@@ -12,10 +12,8 @@ const _LEAN_DEGREES := 15.0
 ## How bright the power light is once on, as its material's emission energy.
 const _LIT := 2.5
 
-## How far the power switch has slid right, in millimetres.
 var power_mm := 0.0:
 	set(value):
-		# Given each frame by the launch animation: the knob is moved only when it slides.
 		if value != power_mm and is_node_ready():
 			_power.position.x = value * MeshBuilder.UNITS_PER_MM
 		power_mm = value

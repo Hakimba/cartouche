@@ -11,8 +11,6 @@ const _BUTTON := Vector2(330.0, 46.0)
 ## Half the length of each stroke of the "+", its round ends left out.
 const _ARM := (StudioTokens.PLUS_BAR.x - StudioTokens.PLUS_BAR.y) / 2.0
 const _STROKE := StudioTokens.PLUS_BAR.y
-static var _MORPH_S: float:
-	get: return StudioTokens.TR_BALL_MORPH_S
 const _TEXT_SIZE := 20
 ## How far into the morph the text starts to show.
 const _TEXT_FROM := 0.85
@@ -54,10 +52,8 @@ func _morph(to_open: bool) -> void:
 	if to_open:
 		Sounds.play(SoundEffects.Cue.ADD_BALL)
 	Diagnostics.trace("carousel", "add ball %s" % ("opened" if to_open else "closed"))
-	if _tween:
-		_tween.kill()
-	_tween = create_tween()
-	_tween.tween_property(self, ^"_opened", 1.0 if to_open else 0.0, _MORPH_S).set_ease(Tween.EASE_OUT) \
+	_tween = Motion.restart(self, _tween)
+	_tween.tween_property(self, ^"_opened", 1.0 if to_open else 0.0, StudioTokens.TR_BALL_MORPH_S).set_ease(Tween.EASE_OUT) \
 		.set_trans(Tween.TRANS_BACK if to_open else Tween.TRANS_CUBIC)
 
 
@@ -103,9 +99,9 @@ func white_box() -> Rect2:
 	return Rect2(size / 2.0 - white / 2.0, white)
 
 
-## A stroke of the "+" from [param from] to [param to] (along an axis): a bar of ink with rounded ends, its edge
-## covered as a browser covers it. A [param boxed] stroke is the closed ball's flat bar, a box the browser paints on
-## whole pixels; the other bar is turned, so not.
+## A stroke of the "+" from [param from] to [param to] (along an axis): a bar of ink with rounded, smoothed ends.
+## A [param boxed] stroke, the closed ball's flat bar, lies on whole pixels with a sharp edge; the other bar is
+## turned, so it keeps its smoothed edge.
 func _stroke(from: Vector2, to: Vector2, boxed := false) -> void:
 	var bar := SatinStyle.Mesh2D.new()
 	var box := Rect2(from.min(to), (to - from).abs()).grow(_STROKE / 2.0)

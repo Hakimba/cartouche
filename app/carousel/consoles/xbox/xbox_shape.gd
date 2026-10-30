@@ -10,6 +10,29 @@ extends ModelShape
 ## grilles on both sides. Plan positions are X to the right and Y towards the back, from the centre
 ## of the body.
 
+## The gap around the tray in its slot; the tray's plate, above the slot's floor and its thickness;
+## and the room left between the disc and the bezel.
+const TRAY_GAP := 0.5
+const PLATE_ABOVE := 1.5
+const PLATE_THICKNESS := 4.0
+const DISC_ROOM := 3.0
+## The vents' floor drawn just above what it lies on, which it would fight; half a DVD's thickness.
+const VENTS_RAISE := 0.05
+const DISC_HALF_THICKNESS := 0.6
+## The front's middle panel, its width and how far it stands out; the height the buttons and ports
+## on the front reach, below the strip (see [XboxGeometry]).
+const MODULE_SIZE := Vector2(66.0, 1.0)
+const FRONT_TOP := 44.0
+## The eject and power buttons on the front's middle panel, each its centre (X, height) and radius;
+## how far they stand out of the panel.
+const EJECT := Vector3(0.0, 34.0, 9.0)
+const POWER := Vector3(0.0, 15.0, 5.0)
+const BUTTON_RAISE := 0.5
+## Each fin's and grille bar's share of its pitch; how far the grilles stand out of the sides.
+const FIN_SHARE := 0.4
+const BAR_SHARE := 0.25
+const GRILLE_RAISE := 1.6
+
 @export var width := 320.0:
 	set(value):
 		width = value
@@ -95,7 +118,6 @@ extends ModelShape
 	set(value):
 		bezel_thickness = value
 		emit_changed()
-## The discs the tray takes.
 @export var disc_radius := 60.0:
 	set(value):
 		disc_radius = value
@@ -113,29 +135,6 @@ extends ModelShape
 	set(value):
 		grille_pitch = value
 		emit_changed()
-
-## The gap around the tray in its slot; the tray's plate, above the slot's floor and its thickness;
-## and the room left between the disc and the bezel.
-const TRAY_GAP := 0.5
-const PLATE_ABOVE := 1.5
-const PLATE_THICKNESS := 4.0
-const DISC_ROOM := 3.0
-## The vents' floor drawn just above what it lies on, which it would fight; half a DVD's thickness.
-const VENTS_RAISE := 0.05
-const DISC_HALF_THICKNESS := 0.6
-## The front's middle panel, its width and how far it stands out; the height the buttons and ports
-## on the front reach, below the strip (see [XboxGeometry]).
-const MODULE_SIZE := Vector2(66.0, 1.0)
-const FRONT_TOP := 44.0
-## The eject and power buttons on the front's middle panel, each its centre (X, height) and radius;
-## how far they stand out of the panel.
-const EJECT := Vector3(0.0, 34.0, 9.0)
-const POWER := Vector3(0.0, 15.0, 5.0)
-const BUTTON_RAISE := 0.5
-## Each fin's and grille bar's share of its pitch; how far the grilles stand out of the sides.
-const FIN_SHARE := 0.4
-const BAR_SHARE := 0.25
-const GRILLE_RAISE := 1.6
 
 
 func parts() -> Array[StringName]:
@@ -220,7 +219,6 @@ func fins() -> Array[Rect2]:
 	var outer := width / 2.0 - bevel
 	for i in count:
 		var y := side_wedge.x + (span - count * fin_pitch) / 2.0 + (i + 0.5) * fin_pitch
-		# Short of the arm at both its edges.
 		var inner := 0.0
 		for edge: float in [y - thick / 2.0, y + thick / 2.0]:
 			var end := side_wedge.x if edge < side_wedge_apex.y else side_wedge.y
@@ -287,7 +285,6 @@ func _rules() -> Dictionary[StringName, bool]:
 		&"tray_in_its_slot": tray_span.x > straight.position.x and tray_span.y < straight.end.x
 			and slot_back < body().end.y - corner and strip_top - strip_bottom > 2.0 * TRAY_GAP + PLATE_ABOVE
 			+ PLATE_THICKNESS + 2.0,
-		# Its logo too, which comes out with it.
 		&"logo_on_the_bezel": strip_top - strip_bottom - 2.0 * TRAY_GAP > XboxGeometry.LOGOS[&"bezel_logo"].y + 1.0
 			and bezel().size.x > XboxGeometry.LOGOS[&"bezel_logo"].x + 10.0,
 		&"disc_fits_the_tray": DiscTray.fits(plate(), plate_levels(), disc_centre(), disc_radius),
@@ -297,7 +294,6 @@ func _rules() -> Dictionary[StringName, bool]:
 	}
 
 
-## Whether no two of [param triangles] overlap.
 static func _apart(triangles: Array[PackedVector2Array]) -> bool:
 	for i in triangles.size():
 		for j in range(i + 1, triangles.size()):

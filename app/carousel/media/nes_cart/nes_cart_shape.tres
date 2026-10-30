@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="NesCartShape" format=3]
 
-[ext_resource type="Script" path="res://carousel/models/nes_cart_shape.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/media/nes_cart/nes_cart_shape.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

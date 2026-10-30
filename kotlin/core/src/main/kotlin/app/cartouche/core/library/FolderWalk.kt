@@ -49,9 +49,9 @@ public data class SkippedFolder(public val path: FolderPath, public val reason: 
 public data class FolderContents(public val files: List<ListedFile>, public val skipped: List<SkippedFolder>)
 
 /**
- * The names emulators give the folders of their own data (`memcards`, `sstates`, `textures`…),
- * matched ignoring case. Emulators often keep them next to the games, and some hold tens of
- * thousands of files; they are read from `app/data/scan/data_folders.json`.
+ * The names emulators give the folders of their own data (`memcards`, `sstates`, `textures`…), matched ignoring case.
+ * Emulators often keep them next to the games, and some hold tens of thousands of files; they are read from
+ * `app/data/scan/data_folders.json`.
  */
 public class DataFolders private constructor(private val names: Set<String>) {
     public operator fun contains(name: FileName): Boolean = name.value.lowercase() in names
@@ -72,9 +72,9 @@ public sealed interface WalkFailure<out E> {
     public data class Unlisted<out E>(public val error: E) : WalkFailure<E>
 
     /**
-     * The walk met more than [limit] entries. [largest] is the folder that listed the most of them,
-     * [entries] how many, and [stoppedIn] the one being listed when the limit was passed (none for
-     * the scanned folder itself): where to look for what is not games.
+     * The walk met more than [limit] entries. [largest] is the folder that listed the most of them, [entries] how
+     * many, and [stoppedIn] the one being listed when the limit was passed (none for the scanned folder itself):
+     * where to look for what is not games.
      */
     public data class TooManyEntries(
         public val limit: Int,

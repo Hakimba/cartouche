@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ButtonGlyph
 extends Control
-## The mark of a controller button on the design's dark key, as the [Controls] style draws it.
+## The mark of a controller button on a dark key, as the [Controls] style draws it.
 
 ## Every glyph, redrawn when the style changes.
 const GROUP := &"button_glyphs"

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name GamesLayout
 extends RefCounted
-## The games row's poses in the fitted design frame. MediaView owns the arc and pose interpolation.
+## The games row's poses in the fitted frame. MediaView owns the arc and pose interpolation.
 
 const FILE := "res://data/media_poses.json"
 

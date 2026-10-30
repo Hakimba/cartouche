@@ -69,17 +69,15 @@ const LOGOS: Dictionary[StringName, Vector2] = {
 const _GRAIN_MM := 40.0
 ## Half a DVD's thickness: what lies under a seated disc stays below its underside.
 const _DISC_HALF_THICKNESS := 0.6
-## Where the logos on the top lie, measured on the straight top photo of the verified sheet: the
-## strip's logo from this far short of the strip's back end; the maker's name from the body's back
-## left corner (right, then towards the front); the disc marks from the lid's front right corner
-## (left, then back), along its front.
+## Where the logos on the top lie: the strip's logo from this far short of the strip's back end; the
+## maker's name from the body's back left corner (right, then towards the front); the disc marks from
+## the lid's front right corner (left, then back), along its front.
 const _STRIP_LOGO_FROM_BACK := 1.95
 const _SONY_FROM_CORNER := Vector2(5.8, 8.6)
 const _DISC_MARKS_FROM_CORNER := Vector2(2.5, 1.0)
-## The drive, measured on a photo of the open well (see [method _tray]). Its tray's deck stays this
-## far under a disc at most, and leaves it this much room in its recess; the ledge round the
-## opening, under the lid's edge, is this wide at most. The spindle's hole, the laser's slot (as
-## wide), and the bridge over the slot's far end (its length, from the back), in millimetres.
+## The drive (see [method _tray]). Its tray's deck stays this far under a disc at most, and leaves it
+## this much room in its recess; the ledge round the opening, under the lid's edge, is this wide at most.
+## The spindle's hole, the laser's slot (as wide), and the bridge over the slot's far end (its length, from the back), in millimetres.
 const _UNDER_DISC := 2.0
 const _RECESS_ROOM := 1.5
 const _LEDGE := 2.0
@@ -120,7 +118,6 @@ static func arrays(shape: Ps2SlimShape, part: StringName, detail: int) -> Array:
 	var opening := ShapeGeometry.rounded_box(shape.opening(), shape.lid_corner + shape.lid_gap, steps)
 	match part:
 		&"dark":
-			# The base and the grooves' backs, which the slabs shade, and the strip across the top.
 			ShapeGeometry.prism(mesh, _base(shape), 0.0, shape.seam, body)
 			for groove in shape.grooves():
 				ShapeGeometry.block(mesh, shape.groove_box(), Vector2.ONE * shape.groove_corner(), steps, groove.x,
@@ -187,7 +184,6 @@ static func arrays(shape: Ps2SlimShape, part: StringName, detail: int) -> Array:
 					return Vector4(centre.x, centre.y, box.z, box.w)), _face(shape, on), depths)
 			at = Transform3D.IDENTITY
 		_:
-			# Upright on its face, in the model's space.
 			var on: StringName = ON_FRONT[part][0]
 			var place: Vector3 = ON_FRONT[part][1]
 			var centre := _centre(shape, Vector2(place.x, place.y))
@@ -293,12 +289,12 @@ static func _tray(mesh: MeshBuilder, shape: Ps2SlimShape, steps: int, opening: P
 		var pocket := ShapeGeometry.circle(centre + Vector2(side * _POCKET.x, -_POCKET.y) * radius, _POCKET.z * radius,
 			int(count / 2.0))
 		pocket = Geometry2D.intersect_polygons(pocket, inside)[0]
-		ShapeGeometry.prism(mesh, _ccw(pocket), shape.seam, levels.x, uv)
+		ShapeGeometry.prism(mesh, ShapeGeometry.ccw(pocket), shape.seam, levels.x, uv)
 		sunk = Geometry2D.merge_polygons(sunk, pocket)[0]
 		bottom = Geometry2D.clip_polygons(bottom, pocket)[0]
 	for deck in Geometry2D.clip_polygons(opening, sunk):
-		ShapeGeometry.prism(mesh, _ccw(deck), shape.seam, levels.w, uv)
-	ShapeGeometry.prism(mesh, _ccw(bottom), shape.seam, levels.y, uv)
+		ShapeGeometry.prism(mesh, ShapeGeometry.ccw(deck), shape.seam, levels.w, uv)
+	ShapeGeometry.prism(mesh, ShapeGeometry.ccw(bottom), shape.seam, levels.y, uv)
 	ShapeGeometry.prism(mesh, ShapeGeometry.square(_bridge(shape)), shape.seam,
 		(levels.w + shape.seat_height - _DISC_HALF_THICKNESS) / 2.0, uv)
 	var ledge := _ledge(shape)
@@ -388,17 +384,4 @@ static func _ring(mesh: MeshBuilder, outer: PackedVector2Array, inner: PackedVec
 ## [param high].
 static func _bar(mesh: MeshBuilder, from: Vector2, to: Vector2, low: float, high: float, uv: Rect2) -> void:
 	var side := (to - from).orthogonal().normalized() * _RIB.x / 2.0
-	ShapeGeometry.prism(mesh, _ccw(PackedVector2Array([from - side, to - side, to + side, from + side])), low, high, uv)
-
-
-## [param loop] counter-clockwise, its points closer than a hundredth of a millimetre made one.
-static func _ccw(loop: PackedVector2Array) -> PackedVector2Array:
-	var found := PackedVector2Array()
-	for point in loop:
-		if found.is_empty() or point.distance_to(found[-1]) > 0.01:
-			found.append(point)
-	if found[0].distance_to(found[-1]) <= 0.01:
-		found.remove_at(found.size() - 1)
-	if Geometry2D.is_polygon_clockwise(found):
-		found.reverse()
-	return found
+	ShapeGeometry.prism(mesh, ShapeGeometry.ccw(PackedVector2Array([from - side, to - side, to + side, from + side])), low, high, uv)

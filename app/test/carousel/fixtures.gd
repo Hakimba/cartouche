@@ -13,7 +13,7 @@ const DVD := preload("res://carousel/media/ps2_dvd/ps2_dvd.tscn")
 ## The games of [method games], which have no medium, on [constant DVD].
 const DVDS: Dictionary[String, PackedScene] = {"": DVD}
 const CAROUSEL := preload("res://carousel/carousel.tscn")
-## Loaded, never preloaded: a script holding a console's scene keeps it cached, and INV-E10-04 tells
+## Loaded, never preloaded: a script holding a console's scene keeps it cached, and the loading tests tell
 ## which consoles were loaded by the cache.
 const PS2_SLIM := "res://carousel/consoles/ps2_slim/ps2_slim.tscn"
 
@@ -255,99 +255,6 @@ static func new_console(scene: String) -> ConsoleModel:
 	return (load(scene) as PackedScene).instantiate()
 
 
-## A new console of [param scene], shown in [param suite]'s tree and freed with it.
-static func shown_console(suite: GdUnitTestSuite, scene: String) -> ConsoleModel:
-	var console: ConsoleModel = suite.auto_free(new_console(scene))
-	suite.add_child(console)
-	return console
-
-
-## Asserts that [param console], drawn from a glb whose root node is [param glb], moves the nodes [param nodes]
-## names (by moving part, each an array of node names), that with its `body` they are the glb's whole, and that
-## it draws [param count] triangles of them within its manifest's budget.
-static func assert_glb(suite: GdUnitTestSuite, console: ConsoleModel, glb: String, nodes: Dictionary,
-		count: int) -> void:
-	var root: Node = console.get_node("Model/%s" % glb)
-	var named: Array[String] = ["body"]
-	for each: Array in nodes.values():
-		named.append_array(each)
-	var drawn := 0
-	for node in named:
-		var part := root.get_node_or_null(node) as MeshInstance3D
-		suite.assert_object(part).override_failure_message("no node %s in the glb" % node).is_not_null()
-		if not part:
-			return
-		for surface in part.mesh.get_surface_count():
-			var indices: PackedInt32Array = part.mesh.surface_get_arrays(surface)[Mesh.ARRAY_INDEX]
-			drawn += int(indices.size() / 3.0)
-	var moved: Array[StringName] = []
-	moved.assign(console.moving_parts().map(func(part: MovingPart) -> StringName: return part.property))
-	suite.assert_array(moved).contains_exactly_in_any_order(nodes.keys())
-	suite.assert_int(drawn).is_equal(count).is_less_equal(
-		ConsoleManifest.of(console.scene_file_path.get_base_dir().get_file()).triangle_budget)
-	suite.assert_int(root.get_child_count()).is_equal(named.size())
-
-
-## How far [param console]'s part [param property] goes, fully moved; NaN for a part it lacks.
-static func open_of(console: ConsoleModel, property: StringName) -> float:
-	for part in console.moving_parts():
-		if part.property == property:
-			return part.open
-	return NAN
-
-
-## A console of [param scene] built from [param shape] rather than its own, in [param suite]'s tree.
-static func built(suite: GdUnitTestSuite, scene: String, shape: ModelShape) -> ConsoleModel:
-	var model: ConsoleModel = suite.auto_free(new_console(scene))
-	var own := model.shape
-	model.shape = shape
-	for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
-		if geometry.mesh is ShapedMesh and (geometry.mesh as ShapedMesh).shape == own:
-			var copy: ShapedMesh = geometry.mesh.duplicate()
-			copy.shape = shape
-			geometry.mesh = copy
-	suite.add_child(model)
-	return model
-
-
-## [param count] shapes [param draw] gives, a generator of shapes their rules accept: each accepted,
-## and nine in ten of them at least different from one another, or the generator is stuck.
-static func accepted(suite: GdUnitTestSuite, count: int, draw: Callable) -> Array[ModelShape]:
-	var shapes: Array[ModelShape] = []
-	var seen := {}
-	for i in count:
-		var shape: ModelShape = draw.call()
-		suite.assert_array(shape.problems()).override_failure_message("drawn though %s" % [shape.problems()]) \
-			.is_empty()
-		seen[var_to_str(shape.dimensions())] = true
-		shapes.append(shape)
-	suite.assert_int(seen.size()).override_failure_message("%d shapes of %d alike" % [count - seen.size(), count]) \
-		.is_greater_equal(ceili(count * 0.9))
-	return shapes
-
-
-## [param shape], which its rules accept, refused by the rule [param broken] names (`[name, breaking]`)
-## once its Callable has broken it, and built into nothing.
-static func assert_refused(suite: GdUnitTestSuite, shape: ModelShape, broken: Array) -> void:
-	suite.assert_array(shape.problems()).is_empty()
-	var breaking: Callable = broken[1]
-	breaking.call(shape)
-	suite.assert_array(shape.problems()).override_failure_message("%s not refused: %s" % [broken[0],
-		shape.problems()]).contains([broken[0]])
-	for part in shape.parts():
-		suite.assert_array(shape.mesh_arrays(part, 32)).is_empty()
-
-
-## [param shipped]'s dimensions changed to each of [param found] (shapes a property once found built
-## wrong), refused by [param rule].
-static func assert_found_refused(suite: GdUnitTestSuite, shipped: ModelShape, rule: StringName,
-		found: Array[Dictionary]) -> void:
-	for dimensions in found:
-		assert_refused(suite, shipped.duplicate() as ModelShape, [rule, func(shape: ModelShape) -> void:
-			for dimension: StringName in dimensions:
-				shape.set(dimension, dimensions[dimension])])
-
-
 ## [param shipped]'s dimensions drawn again by [param random] until its rules accept them, a thousand
 ## times at most (the last one drawn then, which [method accepted] refuses): [param share] of them each
 ## time, each number from [param spread].x to [param spread].y times itself, each count up to
@@ -378,38 +285,6 @@ static func drawn_around(shipped: ModelShape, random: RandomNumberGenerator, spr
 		if shape.problems().is_empty():
 			break
 	return shape
-
-
-## Where [param part]'s mesh stands in [param console].
-static func box_of(console: Node3D, part: MeshInstance3D) -> AABB:
-	return console.global_transform.affine_inverse() * part.global_transform * part.get_aabb()
-
-
-## The smallest box around [param found].
-static func bounds(found: PackedVector3Array) -> AABB:
-	var box := AABB(found[0], Vector3.ZERO)
-	for point in found:
-		box = box.expand(point)
-	return box
-
-
-## Asserts that a cartridge filling [param seated] (in millimetres, in the console's space) stands in
-## the slot of [param shape]: nothing of the console in its way, down to the connector it rests on,
-## and half a millimetre past the slot's [param play] on any side but the top (each side's and the
-## front's or the back's, the larger; none below), it meets the slot's walls or the connector.
-static func assert_in_slot(suite: GdUnitTestSuite, shape: ModelShape, seated: AABB, play: Vector2,
-		detail: int) -> void:
-	var walls := PackedVector3Array()
-	for part in shape.parts():
-		for corners in triangles(shape.mesh_arrays(part, detail)):
-			walls.append_array(Transform3D.IDENTITY.scaled(Vector3.ONE / MeshBuilder.UNITS_PER_MM) * corners)
-	suite.assert_bool(meets(walls, seated.grow(-0.05))).override_failure_message(
-		"the console is in the cartridge's way").is_false()
-	for side: Vector3 in [Vector3.LEFT, Vector3.RIGHT, Vector3.DOWN, Vector3.FORWARD, Vector3.BACK]:
-		var reach := 0.5 + absf(side.x) * play.x + absf(side.z) * play.y
-		var grown := seated.merge(AABB(seated.position + side * reach, seated.size)).grow(-0.05)
-		suite.assert_bool(meets(walls, grown)).override_failure_message("room beyond the cartridge %s" % side) \
-			.is_true()
 
 
 ## Whether a triangle of [param corners] (three by three) meets [param box]: one of its edges goes
@@ -448,36 +323,6 @@ static func media(id: String) -> Array[String]:
 		if declared[group] not in found:
 			found.append(declared[group])
 	return found
-
-
-## [param shape]'s dimensions drawn again around the shipped ones by [param random]: one in four of
-## them, four times in five near the shipped one, else far from it (see [method _redrawn]); a count a
-## few more or fewer, now and then none or one. Whether one was drawn far.
-static func disturb(shape: ModelShape, random: RandomNumberGenerator) -> bool:
-	var far := false
-	var dimensions := shape.dimensions()
-	for dimension in dimensions:
-		var value: Variant = dimensions[dimension]
-		if random.randf() < 0.75:
-			continue
-		var drawn_far := random.randf() < 0.2
-		far = far or drawn_far
-		if value is float:
-			var number: float = value
-			shape.set(dimension, _redrawn(number, drawn_far, random))
-		elif value is Vector2:
-			var vector: Vector2 = value
-			shape.set(dimension, Vector2(_redrawn(vector.x, drawn_far, random), _redrawn(vector.y, drawn_far, random)))
-		elif value is Vector3:
-			var vector: Vector3 = value
-			shape.set(dimension, Vector3(_redrawn(vector.x, drawn_far, random), _redrawn(vector.y, drawn_far, random),
-				_redrawn(vector.z, drawn_far, random)))
-		elif value is int:
-			var count: int = value
-			shape.set(dimension, random.randi_range(0, 1) if drawn_far else maxi(0, count + random.randi_range(-3, 3)))
-		elif value is bool:
-			shape.set(dimension, not value)
-	return far
 
 
 ## A console with no shape nor mesh, made of what the launch knows of one: its [member moving]
@@ -557,34 +402,10 @@ class FakeAndroid extends AndroidServices:
 		return AndroidServices.Result.new({"ok": true} if code.is_empty() else {"ok": false, "code": code, "detail": "fake"})
 
 
-## Counts the transforms its parent passes on to it, the same one set again included: what a
-## transform set costs every part of a model. Heard once the frame's notifications are sent.
-class TransformProbe extends Node3D:
-	var heard := 0
-
-	func _init() -> void:
-		set_notify_transform(true)
-
-	func _notification(what: int) -> void:
-		if what == NOTIFICATION_TRANSFORM_CHANGED:
-			heard += 1
-
-
 ## The profile `data/platforms/profiles.json` gives [param id].
 static func _profile(id: String) -> Dictionary:
 	var profiles: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/platforms/profiles.json"))
 	return profiles[id]
-
-
-## [param number] drawn again by [param random], as a size and as a place: near it, a tenth larger
-## or smaller and a millimetre either way at most; [param far] from it, from a twentieth to four
-## times as large and ten millimetres either way; one time in twenty nought.
-static func _redrawn(number: float, far: bool, random: RandomNumberGenerator) -> float:
-	if random.randf() < 0.05:
-		return 0.0
-	if far:
-		return number * random.randf_range(0.05, 4.0) + random.randf_range(-10.0, 10.0)
-	return number * random.randf_range(0.9, 1.1) + random.randf_range(-1.0, 1.0)
 
 
 ## The centre of a box of [param size] that [param random] puts anywhere within [param room], a
@@ -636,31 +457,8 @@ static func triangles(arrays: Array) -> Array[PackedVector3Array]:
 	return found
 
 
-## The triangles of [param meshes], as their three corners.
-static func all_triangles(meshes: Array[Array]) -> Array[PackedVector3Array]:
-	var found: Array[PackedVector3Array] = []
-	for arrays in meshes:
-		found.append_array(triangles(arrays))
-	return found
-
-
 static func points(arrays: Array) -> PackedVector3Array:
 	return arrays[Mesh.ARRAY_VERTEX]
-
-
-## The nearest point where the ray from [param origin] (in millimetres) along [param ray] meets
-## [param arrays]' faces, in millimetres; infinite where it meets none.
-static func hit(arrays: Array, origin: Vector3, ray: Vector3) -> Vector3:
-	var corners := Transform3D.IDENTITY.scaled(Vector3.ONE / MeshBuilder.UNITS_PER_MM) * points(arrays)
-	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-	var nearest := Vector3.INF
-	for t in range(0, indices.size(), 3):
-		var met: Variant = Geometry3D.ray_intersects_triangle(origin, ray, corners[indices[t]], corners[indices[t + 1]],
-			corners[indices[t + 2]])
-		if met is Vector3:
-			var at: Vector3 = met
-			nearest = at if origin.distance_to(at) < origin.distance_to(nearest) else nearest
-	return nearest
 
 
 ## The edges of [param meshes]' faces, as their two ends, that no face goes back along: none on a

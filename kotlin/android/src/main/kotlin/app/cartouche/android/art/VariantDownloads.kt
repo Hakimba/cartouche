@@ -26,9 +26,9 @@ internal enum class VariantFailure {
 }
 
 /**
- * Downloads the images of games' labels by region (see `ArtSources.variantsOf`) on [downloads], a
- * few at a time beside the scraper, and keeps them in [store]; [done] hears how each went. An image
- * already under way is not asked for again.
+ * Downloads the images of games' labels by region (see `ArtSources.variantsOf`) on [downloads], a few at a time
+ * beside the scraper, and keeps them in [store]; [done] hears how each went. An image already under way is not asked
+ * for again.
  */
 internal class VariantDownloads(
     private val store: ArtStore,
@@ -52,7 +52,7 @@ internal class VariantDownloads(
         }
     }
 
-    /** The image, cut and kept; a texture ScreenScraper has none of is remembered so (INV-E11-04). */
+    /** The image, cut and kept; a texture ScreenScraper has none of is remembered so. */
     private suspend fun kept(variant: ArtVariant, cut: LabelCut, version: Option<ArtVersion>): Either<VariantFailure, StoredArt> = fetch
         .get(variant.candidate, Progress.NONE)
         .mapLeft { failure ->

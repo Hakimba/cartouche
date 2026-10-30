@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name GbaSpModel
 extends ConsoleModel
-## The bench's SP, open at rest: the lid folds forwards and the switch slides towards its ON marking.
+## The Game Boy Advance SP, open at rest: the lid folds forwards and the switch slides towards its ON marking.
 
 var lid_degrees := 0.0:
 	set(value):

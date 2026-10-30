@@ -18,10 +18,8 @@ internal data class BatteryState(val levelPercent: Option<Int>, val plugged: Boo
         val NONE = BatteryState(None, plugged = false)
 
         /**
-         * As a battery broadcast ([Intent.ACTION_BATTERY_CHANGED]) tells it. Plugged means into any
-         * charger, charging or full, as the system's own bolt shows. A device without a battery tells
-         * nothing; a level without its scale, or at 0 (what some devices report when they do not know),
-         * is unknown.
+         * Plugged means into any charger, charging or full. A level without its scale, or at 0 (what some devices report
+         * when unknown), is unknown.
          */
         fun of(broadcast: Intent): BatteryState {
             if (!broadcast.getBooleanExtra(BatteryManager.EXTRA_PRESENT, true)) return NONE
@@ -31,7 +29,6 @@ internal data class BatteryState(val levelPercent: Option<Int>, val plugged: Boo
             return BatteryState(percent, broadcast.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0)
         }
 
-        /** The battery now, from the system's last battery broadcast. */
         fun now(context: Context): BatteryState = context.registerReceiver(null, BATTERY).toOption().fold({ NONE }, ::of)
 
         private val BATTERY = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -39,10 +36,9 @@ internal data class BatteryState(val levelPercent: Option<Int>, val plugged: Boo
 }
 
 /**
- * Follows the battery from [follow] to [stop] and tells [changed] each new state, as soon as the
- * system knows it: the system's last battery broadcast comes at once, then each new one. The
- * broadcast also repeats for the temperature or the voltage alone, several times a minute, which
- * tells nothing new. Only used on the main thread, where broadcasts arrive.
+ * Tells [changed] each new state, the system's last broadcast first; the broadcast also repeats for
+ * temperature or voltage alone, which tells nothing new.
+ * Main thread only.
  */
 internal class BatteryWatch(private val changed: (BatteryState) -> Unit) : BroadcastReceiver() {
     private var told: Option<BatteryState> = None

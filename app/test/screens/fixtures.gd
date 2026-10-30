@@ -6,6 +6,12 @@ extends RefCounted
 const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 const CAROUSEL := preload("res://carousel/carousel.tscn")
 const NAVIGATION: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_right"]
+## The flags a screen sets while it takes no press (a screen without one, or a signal of that name, is not guarded),
+## and must have cleared once it is shown and still.
+const _GUARDS: Array[StringName] = [&"_busy", &"_leaving", &"_closing", &"saving"]
+const _FRAME_MS := 16
+
+static var clock := Clock.new()
 
 
 ## The carousel on [param device], the welcome as short as can be, not added yet.
@@ -115,20 +121,23 @@ static func on(suite: GdUnitTestSuite, carousel: Carousel, screen_name: String) 
 	return shown
 
 
-## Frames until [param condition] holds, four seconds at most; whether it did.
+## Frames until [param condition] holds, four seconds of the game's time at most (not the machine's, which load
+## stretches); whether it did.
 static func until(suite: GdUnitTestSuite, condition: Callable) -> bool:
-	var started := Time.get_ticks_msec()
-	while Time.get_ticks_msec() - started < 4000:
+	var waited := 0.0
+	while waited < 4.0:
 		if condition.call():
 			return true
 		await suite.await_idle_frame()
+		waited += suite.get_process_delta_time()
 	return condition.call()
 
 
 ## Forty moves drawn by [param random] on [param carousel]'s screen [param screen_name], once it
-## shows: after each, exactly one control of that screen has the focus, visible and whole in view (INV-E6-01).
+## shows: after each, exactly one control of that screen has the focus, visible and whole in view (INV-20).
 static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: String, random: RandomNumberGenerator) -> void:
 	suite.assert_bool(await on(suite, carousel, screen_name)).is_true()
+	await until(suite, func() -> bool: return focus(suite) != null and in_view(focus(suite)))
 	for move in 40:
 		await action(suite, NAVIGATION[random.randi() % NAVIGATION.size()])
 		var focused := focus(suite)
@@ -140,11 +149,7 @@ static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: Stri
 		suite.assert_bool(shown_screen(carousel).is_ancestor_of(focused)).is_true()
 
 
-## The flags a screen sets while it takes no press (a screen without one, or a signal of that name, is not guarded), and must have cleared once it is shown and still.
-const _GUARDS: Array[StringName] = [&"_busy", &"_leaving", &"_closing", &"saving"]
-
-
-## Whether a person can act on [param carousel] now (INV-E12-R4-03): the focus is on a control seen (no ancestor fully
+## Whether a person can act on [param carousel] now (INV-20): the focus is on a control seen (no ancestor fully
 ## faded) that takes presses, inside the screen in front when one shows, and no input guard of that screen is left set;
 ## or no screen is in front and the carousel, shown and processing, or its ring takes the presses.
 static func alive(carousel: Carousel) -> bool:
@@ -249,10 +254,6 @@ class Clock:
 
 	func now() -> int:
 		return ms
-
-
-static var clock := Clock.new()
-const _FRAME_MS := 16
 
 
 ## A finger on the screen at [param points]' first (in the screen's own pixels, the window being
@@ -372,9 +373,25 @@ class NewDevice extends AndroidServices:
 	var art_focus_calls: Array[PackedStringArray] = []
 	## The images chosen for a label, in order, each as `source/region`.
 	var chosen_labels: Array[String] = []
+	## The picture of the user's own [method pick_label_picture] answers with: this size, drawn in
+	## two halves (red, then blue) at [member picture_path]; when it is [member failing], none, for
+	## [member picture_failure].
+	var picture_size := Vector2i(64, 48)
+	var picture_failure := &"cancelled"
+	## Whether the picture answered is one the app then cannot read.
+	var picture_unreadable := false
+	var picture_path := "user://picked.png"
+	## The framings kept with [method keep_own_label], as `{"zoom", "centre", "proportion"}`, in order.
+	var kept_framings: Array[Dictionary] = []
+	## How many launches were asked for ([method check_launch] is a launch's first call).
+	var launches := 0
+	## The names given with [method rename_game], in order.
+	var names_given: Array[String] = []
+	## The orders the consoles were put in ([method order_consoles]), in turn.
+	var orders: Array[PackedStringArray] = []
 
 	func _init() -> void:
-		catalog = AndroidServices.CatalogSummary.new(AndroidServices._desktop_demo("catalog"))
+		catalog = AndroidServices.CatalogSummary.new(DesktopPlugin.demo("catalog"))
 
 	func _ready() -> void:
 		pass
@@ -396,7 +413,7 @@ class NewDevice extends AndroidServices:
 	func library() -> AndroidServices.LibraryAnswer:
 		await _frames(1)
 		if has_games:
-			return AndroidServices.LibraryAnswer.new({"ok": true, "library": JSON.stringify(AndroidServices._desktop_demo("library"))})
+			return AndroidServices.LibraryAnswer.new({"ok": true, "library": JSON.stringify(DesktopPlugin.demo("library"))})
 		return AndroidServices.LibraryAnswer.new({"ok": true, "library": _library()})
 
 	func curtain_allowed() -> bool:
@@ -541,17 +558,6 @@ class NewDevice extends AndroidServices:
 			answer["art"] = {"game_id": game.id, "path": "chosen.jpg"}
 		return AndroidServices.ArtAnswer.new(answer)
 
-	## The picture of the user's own [method pick_label_picture] answers with: this size, drawn in
-	## two halves (red, then blue) at [member picture_path]; when it is [member failing], none, for
-	## [member picture_failure].
-	var picture_size := Vector2i(64, 48)
-	var picture_failure := &"cancelled"
-	## Whether the picture answered is one the app then cannot read.
-	var picture_unreadable := false
-	var picture_path := "user://picked.png"
-	## The framings kept with [method keep_own_label], as `{"zoom", "centre", "proportion"}`, in order.
-	var kept_framings: Array[Dictionary] = []
-
 	func pick_label_picture() -> AndroidServices.LabelPicture:
 		await _frames(3)
 		if &"pick_label_picture" in failing:
@@ -574,18 +580,9 @@ class NewDevice extends AndroidServices:
 			answer["art"] = {"game_id": game.id, "path": ProjectSettings.globalize_path(picture_path)}
 		return AndroidServices.ArtAnswer.new(answer)
 
-	## How many launches were asked for ([method check_launch] is a launch's first call).
-	var launches := 0
-
 	func check_launch(_game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
 		launches += 1
 		return AndroidServices.Result.new({"ok": false, "code": &"unavailable"})
-
-	## The names given with [method rename_game], in order.
-	var names_given: Array[String] = []
-
-	## The orders the consoles were put in ([method order_consoles]), in turn.
-	var orders: Array[PackedStringArray] = []
 
 	## Puts [member consoles] in [param platform_ids]' order, as the library sends them from then on.
 	func order_consoles(platform_ids: PackedStringArray) -> AndroidServices.Result:

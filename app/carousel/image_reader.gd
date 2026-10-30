@@ -12,9 +12,7 @@ signal read(key: String, texture: Texture2D)
 var _next_ticket := 0
 ## The latest request of each key under way, as its ticket.
 var _asked: Dictionary[String, int] = {}
-## Worker tasks, by ticket.
 var _tasks: Dictionary[int, int] = {}
-## Images read, waiting for their texture, by key.
 var _waiting: Dictionary[String, Image] = {}
 
 

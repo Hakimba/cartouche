@@ -46,7 +46,6 @@ var _chip := FormPaint.Layer.new(self, _chip_material())
 ## How far the chip's number is lit, 0 (muted) to 1 (white).
 var _lit := 0.0
 var _lighting: Tween
-var _shown_width := 0.0
 
 
 func _init() -> void:
@@ -68,19 +67,9 @@ func show_value(shown: String, chosen := true) -> void:
 	queue_redraw()
 
 
-## The width of the value as drawn, cut with an ellipsis when it does not fit.
-func shown_width() -> float:
-	return _shown_width
-
-
 ## The width the value has: between the chip and the chevron.
 func room() -> float:
 	return size.x - _PAD_RIGHT - _CHEVRON - _GAP - (_PAD_LEFT + _CHIP + _GAP)
-
-
-## The colour the chip is filled with: the gel once chosen, none before.
-func chip_color() -> Color:
-	return _chip.shown.colors[1] if done else Color.TRANSPARENT
 
 
 func _draw() -> void:
@@ -98,7 +87,6 @@ func _draw() -> void:
 	var top := (size.y - kick_line - value.height) / 2.0
 	kick.draw(self, Vector2(left, top + FormPaint.PLEX_ASCENT * _KICK_PX - kick.baseline), StudioTokens.MUTE)
 	value.fit(room())
-	_shown_width = value.width
 	var ink := StudioTokens.INK if done else StudioTokens.MUTE
 	ink.a = 1.0 if has_focus() else _UNCHOSEN_ALPHA
 	value.draw(self, Vector2(left, top + kick_line), ink)
@@ -106,7 +94,7 @@ func _draw() -> void:
 	draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), StudioTokens.LINE)
 
 
-## The design's chevron, a 10 × 16 stroke `m2 2 6 6-6 6`, round-capped.
+## The chevron: a 10 × 16 round-capped stroke from (2, 2) to (8, 8) and back to (2, 14).
 func _draw_chevron(at: Vector2) -> void:
 	var k := _CHEVRON / 10.0
 	var points := PackedVector2Array([at + Vector2(2.0, 2.0) * k, at + Vector2(8.0, 8.0) * k, at + Vector2(2.0, 14.0) * k])
@@ -120,10 +108,8 @@ func _value_face() -> StudioTokens.Face:
 
 
 func _light(to: float) -> void:
-	if _lighting:
-		_lighting.kill()
 	var from := _lit
-	_lighting = create_tween()
+	_lighting = Motion.restart(self, _lighting)
 	_lighting.tween_method(func(t: float) -> void:
 		_lit = lerpf(from, to, Motion.eased(Motion.Easing.EASE, t))
 		queue_redraw(), 0.0, 1.0, _LIT_S)

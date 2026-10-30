@@ -5,9 +5,8 @@ extends Control
 ## clockwise from the top as [member fraction] goes from 0 to 1; a quarter of it turns while the
 ## image's size is unknown ([member fraction] below 0), [member turn] radians from the top.
 
-## A fraction of the smaller side: thin, as printed rings are.
+## The line's width, as a fraction of the smaller side.
 const _WIDTH := 0.022
-## A quarter, turning, while the size is unknown.
 const _UNKNOWN_SWEEP := 0.25
 const _POINTS := 64
 

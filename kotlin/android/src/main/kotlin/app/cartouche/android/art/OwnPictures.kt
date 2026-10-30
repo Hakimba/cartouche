@@ -21,9 +21,8 @@ import kotlin.math.roundToInt
 internal data class OwnPicture(val file: File, val width: Int, val height: Int)
 
 /**
- * The pictures of their own the user puts on labels, once picked: copied upright and at most
- * [LONGEST] pixels long into [folder] while they are framed, then cut to the framed rectangle at the
- * labels' size ([ArtImages.LARGEST]).
+ * The pictures of their own the user puts on labels, once picked: copied upright and at most [LONGEST] pixels long
+ * into [folder] while they are framed, then cut to the framed rectangle at the labels' size ([ArtImages.LARGEST]).
  */
 internal class OwnPictures(private val folder: File) {
     private val picked = File(folder, "picked.jpg")
@@ -40,7 +39,10 @@ internal class OwnPictures(private val folder: File) {
         }
     }
 
-    /** The rectangle [framing] shows of the picture being framed, [ArtImages.LARGEST] pixels on its longer side, as a JPEG. */
+    /**
+     * The rectangle [framing] shows of the picture being framed, [ArtImages.LARGEST] pixels on its longer side, as a
+     * JPEG.
+     */
     fun framed(framing: LabelFraming): Either<LabelFailure, ByteArray> = either {
         ensure(picked.isFile) { LabelFailure.NotPicked }
         val picture = decode(ImageDecoder.createSource(picked)).bind()
@@ -62,7 +64,6 @@ internal class OwnPictures(private val folder: File) {
         }
     }
 
-    /** Decodes [source] upright, scaled down to [LONGEST] pixels on its longer side when it is longer. */
     private fun decode(source: ImageDecoder.Source): Either<LabelFailure, Bitmap> = Either
         .catch {
             ImageDecoder.decodeBitmap(source) { decoder, info, _ ->

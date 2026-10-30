@@ -7,7 +7,10 @@ import arrow.core.raise.Raise
 import arrow.core.raise.option
 import java.util.zip.CRC32
 
-/** How a platform's ROM files are read for the print No-Intro lists: the CRC32 of the ROM alone, in its own byte order. */
+/**
+ * How a platform's ROM files are read for the print No-Intro lists: the CRC32 of the ROM alone, in its own byte
+ * order.
+ */
 internal enum class Rom {
     /** Without the 16-byte iNES header, when the file starts with one. */
     NES,
@@ -15,7 +18,10 @@ internal enum class Rom {
     /** Without the 512-byte header copiers add, told by the size. */
     SNES,
 
-    /** In big-endian order, as dumped: byte-swapped (`.v64`) and word-swapped (`.n64`) files are put back, told by their first word. */
+    /**
+     * In big-endian order, as dumped: byte-swapped (`.v64`) and word-swapped (`.n64`) files are put back, told by
+     * their first word.
+     */
     N64,
 
     /** The whole file, which also tells its [Shell] by its header's colour flag. */
@@ -59,7 +65,10 @@ internal fun Raise<ReadFailure>.cartridgePrint(rom: Rom, source: ByteSource): Op
 private fun Raise<ReadFailure>.gameBoyShell(source: ByteSource): Shell =
     bytes(source, COLOUR_FLAG, 1).fold({ Shell.UNKNOWN }) { Shell.of(it.unsignedByte(0)) }
 
-/** Each byte exchanged with the one at its index xor [mask], within groups of mask + 1 bytes; a last, partial group left as is. */
+/**
+ * Each byte exchanged with the one at its index xor [mask], within groups of mask + 1 bytes; a last, partial group
+ * left as is.
+ */
 private fun swapped(mask: Int): (ByteArray) -> ByteArray = { chunk ->
     // In place: each chunk is read anew, megabytes of a ROM, and only hashed once reordered.
     for (at in chunk.indices) {
@@ -76,8 +85,8 @@ private const val ENTRY_SIGNATURE = 0x504B0102L
 private const val ENTRY_HEADER = 46
 
 /**
- * The print a zip archive records for its only entry, in its central directory (found from the end record,
- * which a comment may follow); none for an archive of several entries, or in the zip64 format.
+ * The print a zip archive records for its only entry, in its central directory (found from the end record, which a
+ * comment may follow); none for an archive of several entries, or in the zip64 format.
  */
 internal fun Raise<ReadFailure>.zipEntryPrint(source: ByteSource): Option<FileFacts> = option {
     val tailLength = minOf(source.size, (END_RECORD + MAX_COMMENT).toLong()).toInt()

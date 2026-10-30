@@ -20,12 +20,9 @@ const _FRAME_RADIUS := 29.44
 ## The pool of light under the frame: its box, and the rim's alpha at its centre.
 const POOL := Rect2(513.28, 788.48, 253.44, 64.0)
 const _POOL_ALPHA := 0.32
-## The frame's pop: its scale keyframes (offset, scale) over [constant POP_S], eased `ease-out` as a whole.
+## The frame's pop: its scale keyframes (offset, scale) over [constant POP_S], eased out as a whole.
 const POP_S := 0.32
 const _POP_KEYS: Array[Vector2] = [Vector2(0.0, 1.0), Vector2(0.3, 0.95), Vector2(0.65, 1.025), Vector2(1.0, 1.0)]
-## How far the rail sinks, in px, when it leaves.
-static var SINK_PX: float:
-	get: return StudioTokens.TR_GAMES_DROP_PX
 ## What [method slot_under] says for a point off the rail.
 const NO_TILE := 1 << 30
 ## How far the rail has sunk: 0 at rest, 1 down and gone. [method sink] and [method rise] move it.
@@ -130,7 +127,7 @@ static func shown(slots: float) -> bool:
 
 
 ## The frame's scale [param seconds] after a press: the keyframes, read at the progress the whole animation's
-## `ease-out` gives.
+## ease-out gives.
 static func pop_scale(seconds: float) -> float:
 	var progress := Motion.eased(Motion.Easing.EASE_OUT, clampf(seconds / POP_S, 0.0, 1.0))
 	for i in range(1, _POP_KEYS.size()):
@@ -196,13 +193,14 @@ func go_to(target: int) -> void:
 	_pop()
 
 
-## Moves the rail 4 cqw down to nothing in [param duration_s], after [param delay_s], from where it is.
+## Moves the rail [constant StudioTokens.TR_GAMES_DROP_PX] down to nothing in [param duration_s], after
+## [param delay_s], from where it is.
 func sink(duration_s: float, delay_s := 0.0) -> Tween:
 	return _slide_to(1.0, duration_s, delay_s, Motion.Easing.SINK)
 
 
-## Brings the rail from 4 cqw lower and clear to rest in [param duration_s], after [param delay_s], from where
-## it is.
+## Brings the rail from [constant StudioTokens.TR_GAMES_DROP_PX] lower and clear to rest in [param duration_s], after
+## [param delay_s], from where it is.
 func rise(duration_s: float, delay_s := 0.0) -> Tween:
 	return _slide_to(0.0, duration_s, delay_s, Motion.Easing.ARRIVE)
 
@@ -243,11 +241,6 @@ func pool() -> TextureRect:
 	return _pool
 
 
-## The gel the frame and the pool show now.
-func shown_gel() -> Color:
-	return _gel
-
-
 ## The spring, for those who watch it.
 func spring() -> Motion.Spring:
 	return _spring
@@ -269,7 +262,7 @@ func _place() -> void:
 func _apply_sink() -> void:
 	if is_node_ready():
 		for group: CanvasGroup in [_cloth, _mirrors_root]:
-			group.position.y = sunk * SINK_PX
+			group.position.y = sunk * StudioTokens.TR_GAMES_DROP_PX
 			group.modulate.a = 1.0 - sunk
 
 
@@ -280,18 +273,14 @@ func _apply_ground() -> void:
 
 
 func _slide_to(value: float, duration_s: float, delay_s: float, curve: Motion.Easing) -> Tween:
-	if _slide_fade:
-		_slide_fade.kill()
-	_slide_fade = create_tween()
+	_slide_fade = Motion.restart(self, _slide_fade)
 	_slide_fade.tween_property(self, ^"sunk", value, duration_s).set_delay(delay_s) \
 		.set_custom_interpolator(Motion.curve(curve))
 	return _slide_fade
 
 
 func _pop() -> void:
-	if _pop_fade:
-		_pop_fade.kill()
-	_pop_fade = create_tween()
+	_pop_fade = Motion.restart(self, _pop_fade)
 	_pop_fade.tween_method(_set_pop, 0.0, POP_S, POP_S)
 
 
@@ -302,7 +291,7 @@ func _set_pop(seconds: float) -> void:
 ## The gel of the console [param target] stands for on the ring.
 func _gel_of(target: int) -> Color:
 	var folder := _folders[posmod(target, _folders.size())]
-	return StudioTokens.GEL.get(StringName(folder), StudioTokens.NEUTRAL)
+	return ConsoleManifest.gel_of(folder)
 
 
 ## The frame and the pool in [param gel], crossfaded from the one shown when [param animated].
@@ -328,8 +317,8 @@ func _tint(gel: Color) -> void:
 	gradient.set_color(1, Color(gel, 0.0))
 
 
-## The pool: the gel's alpha at its centre fading to nothing at the edge of its ellipse (a CSS
-## `radial-gradient(closest-side, …)`).
+## The pool: the gel's alpha at its centre fading to nothing at the edge of the ellipse that touches the
+## texture's sides.
 static func _pool_texture() -> GradientTexture2D:
 	var texture := GradientTexture2D.new()
 	texture.gradient = Gradient.new()

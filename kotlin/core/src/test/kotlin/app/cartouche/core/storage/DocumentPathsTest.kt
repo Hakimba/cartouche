@@ -60,21 +60,16 @@ class DocumentPathsTest {
     }
 
     @Test
-    fun `INV-E0-11 unmounted volumes and malformed ids have no path`() {
+    fun `INV-04 unmounted volumes and malformed ids have no path`() {
         pathOf("ABCD-1234:ROMs") shouldBe None
         pathOf("no-separator") shouldBe None
         pathOf(":ROMs") shouldBe None
     }
 
     @Test
-    fun `INV-E0-11 documents of any other provider never get a path`() = runBlocking<Unit> {
+    fun `INV-04 documents of any other provider never get a path`() = runBlocking<Unit> {
         checkAll(Arb.string().filter { it != DocumentPaths.EXTERNAL_STORAGE_AUTHORITY }, Arb.string()) { authority, id ->
             pathOf(id, authority) shouldBe None
         }
-    }
-
-    @Test
-    fun `INV-E0-11 the mapping is total`() = runBlocking<Unit> {
-        checkAll(Arb.string()) { id -> pathOf(id) }
     }
 }

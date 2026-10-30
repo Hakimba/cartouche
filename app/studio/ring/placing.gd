@@ -28,21 +28,16 @@ enum Press { LEFT, RIGHT, A, B }
 ## What a press asks the screen to do.
 enum Action { IGNORED, MOVE, FLY, LEAVE }
 
-## How long the flight back plays (seconds); the other timed states (the console's arrival, its flight, its bounce, the
-## pause after it, the morph) are the design's, in [StudioTokens].
-static var BACK_S: float:
-	get: return StudioTokens.TR_PLACE_BACK_S
 ## The gap the ring opens (radians), how much bigger the new console stands in the middle and where its silhouette's
-## centre stands there, in px of the 1280 × 960 frame (4 cqw above the ring's centre).
+## centre stands there, in px of the 1280 × 960 frame (51.2 px above the ring's centre).
 const OPENING := 0.34
 const MIDDLE_GROWTH := 1.5
 const MIDDLE := Vector2(640.0, 419.84)
-## The plinth the console comes from (and goes back to): its silhouette's centre in px and its picture's width in cqw.
+## The plinth the console comes from (and goes back to): its silhouette's centre in px and its picture's width in
+## [constant FormPaint.CQW] units.
 const PLINTH := Vector2(263.68, 588.8)
 const PLINTH_WIDTH := 40.0
-## How high (px) the console is lifted along its arrival, its flight and its flight back, at the most.
-static var ARRIVE_LIFT: float:
-	get: return StudioTokens.TR_PLACE_ARC_PX
+## How high (px) the console is lifted along its flight, at the most.
 const FLY_LIFT := 64.0
 const BOUNCE := 0.12
 ## The room the middle's text keeps under the console (px).
@@ -66,7 +61,7 @@ func m() -> int:
 	return others.size()
 
 
-## Ajouter: the console comes to the middle of the ring.
+## Add: the console comes to the middle of the ring.
 func start() -> void:
 	if state == State.FORM:
 		state = State.ARRIVING

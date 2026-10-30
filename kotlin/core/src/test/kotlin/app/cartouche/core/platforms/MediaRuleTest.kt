@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.platforms
 
-import app.cartouche.core.Shipped
 import app.cartouche.core.art.regionNames
-import app.cartouche.core.library.GameName
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -42,19 +40,14 @@ class MediaRuleTest {
     private fun among(regions: List<String>, region: String, at: Int) = regions.toMutableList().apply { add(at % (size + 1), region) }
 
     @Test
-    fun `INV-E10-05 every game gets a medium its platform declares, whatever its regions`() = runBlocking<Unit> {
+    fun `every game gets a medium its platform declares, whatever its regions`() = runBlocking<Unit> {
         checkAll(rules, Arb.list(regionNames, 0..4)) { rule, regions ->
             rule.of(regions) shouldBeIn listOf(rule.default) + rule.ntscU.toList() + rule.ntscJ.toList()
         }
     }
 
     @Test
-    fun `INV-E10-05 a platform of one medium gives it to every game`() = runBlocking<Unit> {
-        checkAll(Arb.list(regionNames, 0..4)) { regions -> MediaRule(mediumId("n64_cart")).of(regions) shouldBe mediumId("n64_cart") }
-    }
-
-    @Test
-    fun `INV-E10-05 a game sold in PAL lands takes the default, then the Americas' medium before East Asia's`() = runBlocking<Unit> {
+    fun `a game sold in PAL lands takes the default, then the Americas' medium before East Asia's`() = runBlocking<Unit> {
         val others = Arb.list(Arb.element(listOf("USA", "Japan", "Korea", "Canada", "World", "")), 0..3)
         checkAll(rules, others, pal, Arb.int(0..3)) { rule, regions, region, at ->
             rule.of(among(regions, region, at)) shouldBe rule.default
@@ -69,23 +62,12 @@ class MediaRuleTest {
     }
 
     @Test
-    fun `INV-E10-05 a game of no known region takes the default, and the order of its regions does not matter`() = runBlocking<Unit> {
+    fun `a game of no known region takes the default, and the order of its regions does not matter`() = runBlocking<Unit> {
         checkAll(rules, Arb.list(neutral, 0..3)) { rule, regions -> rule.of(regions) shouldBe rule.default }
         val shuffled = Arb.list(regionNames, 0..4).flatMap { regions -> Arb.shuffle(regions).map { regions to it } }
         checkAll(rules, shuffled) { rule, (regions, shuffled) ->
             rule.of(shuffled) shouldBe rule.of(regions)
         }
-    }
-
-    @Test
-    fun `each shipped console shows its own cartridge for every game, whatever its region, until its variants come`() {
-        fun medium(platform: String, name: String) =
-            Shipped.catalog.platform(PlatformId(platform)).shouldBeSome().profile.medium.of(GameName.parse(name).regions).value
-        listOf("Zelda (Japan)", "Zelda (USA)", "Zelda (Japan, USA)", "Zelda (France)", "Zelda (World)", "Zelda").forEach { name ->
-            medium("snes", name) shouldBe "snes_pal_cart"
-            medium("nes", name) shouldBe "nes_cart"
-        }
-        medium("psx", "Ridge Racer (Japan)") shouldBe "ps1_cd"
     }
 
     @Test

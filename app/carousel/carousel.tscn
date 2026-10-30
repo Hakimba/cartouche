@@ -1,4 +1,4 @@
-[gd_scene load_steps=35 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=36 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -30,6 +30,7 @@
 [ext_resource type="PackedScene" path="res://carousel/search/game_search.tscn" id="30"]
 [ext_resource type="Script" path="res://carousel/search/title_marks.gd" id="31"]
 [ext_resource type="PackedScene" path="res://studio/rail/console_rail.tscn" id="rail"]
+[ext_resource type="Script" path="res://carousel/art_bar.gd" id="art_bar"]
 
 [sub_resource type="ShaderMaterial" id="studio_material"]
 shader = ExtResource("4")
@@ -217,6 +218,7 @@ offset_left = -230.0
 offset_right = 230.0
 offset_bottom = 48.0
 mouse_filter = 2
+script = ExtResource("art_bar")
 
 [node name="Content" type="VBoxContainer" parent="ArtProgress"]
 unique_name_in_owner = true

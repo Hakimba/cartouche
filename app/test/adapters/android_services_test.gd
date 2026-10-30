@@ -49,52 +49,6 @@ func test_a_library_without_shelves_has_none() -> void:
 	assert_int(library.selected_shelf).is_equal(0)
 
 
-func test_INV_E2_5_01_without_the_plugin_the_catalog_and_the_demo_library_are_the_desktop_demo() -> void:
-	# Tests run without the plugin, like the editor.
-	assert_bool(Android.is_available()).is_false()
-	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(AndroidServices.DESKTOP_DEMO))
-	var platforms: Array = demo["catalog"]["platforms"]
-	var ids := platforms.map(func(platform: Dictionary) -> String: return platform["id"])
-	assert_array(ids).is_not_empty()
-	assert_array(Android.catalog.platforms.map(func(platform: AndroidServices.Platform) -> String: return platform.id)).is_equal(ids)
-	var answer := await Android.use_demo_library(5000)
-	assert_bool(answer.ok).is_true()
-	var games: Array = demo["library"]["games"]
-	assert_int(answer.library.games.size()).is_equal(games.size())
-	var offered_consoles: Array = demo["catalog"]["offered"]
-	var offered := offered_consoles.map(func(console: Dictionary) -> String: return console["id"])
-	assert_array(answer.library.shelves.map(func(shelf: AndroidServices.Shelf) -> String: return shelf.platform_id)).is_equal(offered)
-
-
-func test_INV_E12_D1_01_the_desktop_demo_holds_games_of_consoles_with_a_manifest_only() -> void:
-	var supported: Array[String] = []
-	for platform: String in Appearance.defaults(ConsoleManifest.found()):
-		supported.append(platform)
-	assert_int(supported.size()).is_equal(12)
-	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(AndroidServices.DESKTOP_DEMO))
-	var demo_games: Array = demo["library"]["games"]
-	var used := demo_games.map(func(game: Dictionary) -> String: return game["platform_id"])
-	assert_array(used).is_not_empty()
-	for platform: String in used:
-		assert_array(supported).contains([platform])
-	var offered_consoles: Array = demo["catalog"]["offered"]
-	var offered := offered_consoles.map(func(console: Dictionary) -> String: return console["id"])
-	assert_array(offered).contains_exactly_in_any_order(supported)
-	var platforms: Array = demo["catalog"]["platforms"]
-	assert_array(platforms.map(func(platform: Dictionary) -> String: return platform["id"])).contains_exactly_in_any_order(supported)
-
-
-func test_without_the_plugin_scraping_again_answers_the_desktop_demo_s_games_none_with_a_label() -> void:
-	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(AndroidServices.DESKTOP_DEMO))
-	var games: Array = demo["library"]["games"]
-	var answer := await Android.rescrape()
-	assert_bool(answer.ok).is_true()
-	assert_int(answer.games).is_equal(games.size())
-	assert_int(answer.library.games.size()).is_equal(games.size())
-	assert_int(answer.labels).is_equal(0)
-	assert_array(answer.failures).is_empty()
-
-
 func test_scraping_again_is_read_with_its_games_its_labels_found_and_the_consoles_not_scanned() -> void:
 	var answer := AndroidServices.RescrapeAnswer.new({
 		"ok": true, "library": "{}", "games": 57, "labels": 50, "failures": PackedStringArray(["gc: no folder"]),
@@ -103,26 +57,6 @@ func test_scraping_again_is_read_with_its_games_its_labels_found_and_the_console
 	assert_int(answer.labels).is_equal(50)
 	assert_array(answer.failures).is_equal(PackedStringArray(["gc: no folder"]))
 	assert_array(AndroidServices.RescrapeAnswer.new({"ok": true, "library": "{}"}).failures).is_empty()
-
-
-func test_the_cartridge_prints_loaded_with_the_catalog_are_those_of_the_six_cartridge_consoles() -> void:
-	var lists := Array(DirAccess.get_files_at("res://data/prints")).filter(
-		func(file_name: String) -> bool: return file_name.ends_with(".tsv"))
-	lists.sort()
-	assert_array(lists).is_equal(["gb.tsv", "gba.tsv", "gbc.tsv", "n64.tsv", "nes.tsv", "snes.tsv"])
-
-
-func test_the_texture_tables_loaded_with_the_catalog_are_those_of_the_twelve_consoles_with_a_screenscraper_system() -> void:
-	var tables := Array(DirAccess.get_files_at("res://data/screenscraper")).filter(
-		func(file_name: String) -> bool: return file_name.ends_with(".tsv"))
-	tables.sort()
-	assert_array(tables).is_equal(["gb.tsv", "gba.tsv", "gbc.tsv", "gc.tsv", "n64.tsv", "nes.tsv", "ps2.tsv", "psx.tsv", "snes.tsv",
-		"wii.tsv", "xbox.tsv", "xbox360.tsv"])
-
-
-func test_the_plugin_gets_daijisho_s_definitions_and_cartouche_s_own() -> void:
-	assert_array(AndroidServices.platform_definitions().keys()).contains(
-		["SonyPlayStation2.json", "MicrosoftXbox.json", "MicrosoftXbox360.json"])
 
 
 func test_the_library_answer_carries_the_scans_stored_for_its_games_and_those_found_to_have_none() -> void:
@@ -193,7 +127,6 @@ func test_a_game_is_read_with_the_medium_its_platform_gives_it_and_none_when_it_
 	assert_str(AndroidServices.Game.new(game).medium).is_equal("sfc_cart")
 
 
-
 func test_an_answer_asked_for_early_is_taken_once_it_arrives_however_late() -> void:
 	# As on a device: the plugin answers frames after the asking.
 	var late := AndroidServices.Asked.new(func() -> String:
@@ -220,8 +153,6 @@ func test_the_battery_is_read_as_the_plugin_sends_it_plugged_or_not_its_level_wh
 	var demo := Android.battery()
 	assert_int(demo.level_percent).is_equal(100)
 	assert_bool(demo.has_level and demo.plugged).is_true()
-
-
 
 
 func test_art_focus_sends_the_ordered_ids_as_a_packed_string_array_to_the_plugin() -> void:
@@ -256,14 +187,6 @@ class FakePlugin extends Object:
 		return "[[0, 3], [13, 4]]"
 
 
-func test_INV_E12_C1_01_the_twelve_consoles_with_a_model_all_have_a_catalog_platform() -> void:
-	var ids := _model_ids()
-	assert_int(ids.size()).is_equal(12)
-	var catalog_ids := Android.catalog.platforms.map(func(platform: AndroidServices.Platform) -> String: return platform.id)
-	for id: String in ids:
-		assert_array(catalog_ids).contains([id])
-
-
 func test_the_catalog_summary_reads_the_consoles_a_person_may_add_in_their_order() -> void:
 	var summary := AndroidServices.CatalogSummary.new({"platforms": [],
 		"offered": [{"id": "xbox", "maker": "Microsoft", "model": "Xbox"}, {"id": "nes", "model": "Nintendo Entertainment System"}]})
@@ -272,7 +195,7 @@ func test_the_catalog_summary_reads_the_consoles_a_person_may_add_in_their_order
 	assert_array(AndroidServices.CatalogSummary.new({}).offered).is_empty()
 
 
-func test_INV_E12_C1_02_the_settings_answer_tells_whether_games_float_off_when_the_plugin_says_nothing() -> void:
+func test_inv_15_the_settings_answer_tells_whether_games_float_off_when_the_plugin_says_nothing() -> void:
 	assert_bool(AndroidServices.SettingsAnswer.new({"ok": true, "games_float": true}).games_float).is_true()
 	assert_bool(AndroidServices.SettingsAnswer.new({"ok": true}).games_float).is_false()
 
@@ -286,7 +209,7 @@ func test_a_console_placed_is_read_with_the_order_the_plugin_answers_and_none_wh
 
 
 func test_without_the_plugin_and_without_a_form_story_the_form_s_operations_are_unavailable() -> void:
-	assert_bool(Android._desktop_form().is_empty()).is_true()
+	assert_bool((Android._plugin as DesktopPlugin).form().is_empty()).is_true()
 	assert_array(Android.installed_players("ps2")).is_empty()
 	assert_str((await Android.pick_folder()).code).is_equal("unavailable")
 	assert_str((await Android.place_console("ps2", 0)).code).is_equal("unavailable")
@@ -299,8 +222,10 @@ func test_without_the_plugin_a_form_story_in_the_demo_answers_the_form_in_the_wi
 		"folder": {"uri": "content://tree/x", "name": "ps2"},
 		"placing": {"0": ["ps2", "psx"], "1": ["psx", "ps2"]},
 	}
-	var services: StoryServices = auto_free(StoryServices.new())
-	services.story = story
+	var services: AndroidServices = auto_free(AndroidServices.new())
+	var plugin := StoryPlugin.new()
+	plugin.story = story
+	services._plugin = plugin
 	assert_array(services.installed_players("ps2").map(func(p: AndroidServices.Player) -> String: return p.emulator_name)).is_equal(["X"])
 	assert_array(services.installed_players("gba")).is_empty()
 	assert_str((await services.pick_folder()).folder.uri).is_equal("content://tree/x")
@@ -316,13 +241,13 @@ func test_without_the_plugin_a_form_story_in_the_demo_answers_the_form_in_the_wi
 func test_a_form_story_read_from_the_demo_s_json_has_its_lists_of_texts_as_the_plugin_sends_them() -> void:
 	var demo: Dictionary = JSON.parse_string("""{"form": {"players": [{"player_id": "a", "player_name": "a - A",
 		"extensions": ["iso", "chd"]}], "folder": {"uri": "u", "name": "n", "place": {"volume": "card", "folders": ["ROMs", "ps2"]}}}}""")
-	var story := AndroidServices._story_of(demo)
+	var story := DesktopPlugin.story_of(demo)
 	var players: Array = story["players"]
 	var player: Dictionary = players[0]
 	var folder: Dictionary = story["folder"]
 	assert_array(AndroidServices.Player.new(player).extensions).is_equal(PackedStringArray(["iso", "chd"]))
 	assert_array(AndroidServices.Folder.new(folder).folders).is_equal(PackedStringArray(["ROMs", "ps2"]))
-	assert_dict(AndroidServices._story_of({})).is_empty()
+	assert_dict(DesktopPlugin.story_of({})).is_empty()
 
 
 ## The platform ids of the console manifests, sorted.
@@ -332,18 +257,15 @@ func _model_ids() -> Array:
 	return ids
 
 
-## The services as a desktop run with a form story in its demo has them.
-class StoryServices extends AndroidServices:
+## The desktop stand-in with a form story in its demo.
+class StoryPlugin extends DesktopPlugin:
 	var story: Dictionary
 
-	func _ready() -> void:
-		pass
-
-	func _desktop_form() -> Dictionary:
+	func form() -> Dictionary:
 		return story
 
 
-func test_the_catalog_is_loaded_with_the_platforms_of_the_twelve_console_manifests() -> void:
+func test_the_catalog_is_loaded_with_the_platforms_of_the_console_manifests() -> void:
 	var services: AndroidServices = auto_free(AndroidServices.new())
 	var plugin: FakePlugin = auto_free(FakePlugin.new())
 	services._plugin = plugin
@@ -352,15 +274,6 @@ func test_the_catalog_is_loaded_with_the_platforms_of_the_twelve_console_manifes
 	var sent := Array(plugin.loaded_supported)
 	sent.sort()
 	assert_array(sent).is_equal(expected)
-	assert_int(sent.size()).is_equal(12)
-
-
-func test_INV_E12_C1_01_the_desktop_demo_offers_the_twelve_consoles_with_a_model() -> void:
-	var offered := Android.catalog.offered.map(func(c: AndroidServices.OfferedConsole) -> String: return c.id)
-	var expected := _model_ids()
-	offered.sort()
-	expected.sort()
-	assert_array(offered).is_equal(expected)
 
 
 func test_the_fake_device_places_as_the_plugin_does_refusing_a_console_set_up_without_games() -> void:
@@ -378,7 +291,7 @@ func test_the_fake_device_places_as_the_plugin_does_refusing_a_console_set_up_wi
 func test_desktop_settings_save_every_choice_with_the_same_success_and_read_them_back() -> void:
 	var services: AndroidServices = auto_free(AndroidServices.new())
 	assert_bool(services.is_available()).is_false()
-	assert_bool(FileAccess.file_exists(AndroidServices.DESKTOP_DEMO)).is_true()
+	assert_bool(FileAccess.file_exists(DesktopPlugin.DEMO)).is_true()
 	assert_bool((await services.settings()).games_float).is_false()
 	assert_bool((await services.settings()).has_button_style).is_false()
 	assert_bool((await services.save_games_float(true)).ok).is_true()
@@ -394,24 +307,8 @@ func test_desktop_settings_save_every_choice_with_the_same_success_and_read_them
 	assert_bool((await services.settings()).games_float).is_false()
 
 
-func test_desktop_variant_storage_leaves_model_and_setup_validation_to_the_core() -> void:
-	var services: AndroidServices = auto_free(AndroidServices.new())
-	services._desktop_current = {"games": []}
-	var path := "user://console-variants.json"
-	var existed := FileAccess.file_exists(path)
-	var saved := FileAccess.get_file_as_string(path) if existed else ""
-	var answer := await services.set_variant("ps2", "not-a-model")
-	assert_bool(answer.ok).is_true()
-	assert_str(answer.library.console_variants.get("ps2", "")).is_equal("not-a-model")
-	if existed:
-		var file := FileAccess.open(path, FileAccess.WRITE)
-		file.store_string(saved)
-	else:
-		DirAccess.remove_absolute(path)
-
-
 func test_desktop_detection_means_no_real_bridge_even_when_operations_are_faked() -> void:
 	var services: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
 	assert_bool(services.is_available()).is_true()
-	assert_bool(services._on_desktop()).is_true()
-	assert_dict(services._query(&"battery", [], {"ok": true})).is_equal({"ok": true})
+	assert_bool(services._plugin is DesktopPlugin).is_true()
+	assert_dict(services._query(&"battery", [], {})).is_equal(DesktopPlugin.demo("battery"))

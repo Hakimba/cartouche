@@ -2,7 +2,7 @@
 @tool
 class_name Ps2FatShape
 extends GlbShape
-## The bench's tray pivot and disc recess, in millimetres in the model's frame.
+## The tray's pivot and the disc's recess, in millimetres in the model's frame.
 
 @export var tray_pivot := Vector3(58.8519, 58.43225, 0.0):
 	set(value):

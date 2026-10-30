@@ -9,6 +9,7 @@ arrow = "2.1.2"            # built against Kotlin 2.1.21
 coroutines = "1.10.2"      # built against Kotlin 2.1
 serialization = "1.8.1"    # built against Kotlin 2.1.20
 junit = "4.13.2"
+junit-platform = "5.13.4"   # runs the JUnit 4 tests, and lets a listener set the property tests' size
 kotest = "5.9.1"           # 6.x requires Kotlin 2.2
 kotest-arrow = "2.0.0"
 ktlint-gradle = "13.1.0"
@@ -22,6 +23,8 @@ arrow-serialization = { module = "io.arrow-kt:arrow-core-serialization", version
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 junit = { module = "junit:junit", version.ref = "junit" }
+junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit-platform" }
+junit-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.13.4" }
 kotest-property = { module = "io.kotest:kotest-property", version.ref = "kotest" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

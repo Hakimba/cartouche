@@ -11,7 +11,6 @@ const _LIT := 2.5
 ## in degrees, so that the slot shows as the cartridge comes down into it.
 const _LEAN_DEGREES := 15.0
 
-## How far the power switch has slid down to on, in millimetres.
 var power_mm := 0.0:
 	set(value):
 		if value != power_mm and is_node_ready():

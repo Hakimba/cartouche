@@ -1,11 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name EdgeSmoothingScreen
-extends Control
-## "Which edge smoothing?", a note that the choice only changes the 3D's edges, and three cards side
-## by side, left and right to choose: 4× (the default), 2× or none. B goes back.
-
-## The user chose [param smoothing]; empty when they went back.
-signal chosen(smoothing: StringName)
+extends ChoiceScreen
+## "Which edge smoothing?", a note that the choice only changes the 3D's edges, and three cards: 4× (the default),
+## 2× or none. B goes back.
 
 const MSAA: Dictionary[StringName, Viewport.MSAA] = {
 	&"4x": Viewport.MSAA_4X,
@@ -15,17 +12,8 @@ const MSAA: Dictionary[StringName, Viewport.MSAA] = {
 const NAMES: Dictionary[StringName, String] = {&"4x": "Smoothing 4×", &"2x": "Smoothing 2×", &"off": "No smoothing"}
 
 
-func _ready() -> void:
-	add_to_group(SoundEffects.MOVES)
-	for card: SmoothingCard in %Cards.get_children():
-		card.chosen.connect(_on_card_chosen)
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
-		get_viewport().set_input_as_handled()
-		Sounds.play(SoundEffects.Cue.BACK)
-		chosen.emit(&"")
+func _init() -> void:
+	can_go_back = true
 
 
 ## The smoothing [param viewport]'s 3D is drawn with.
@@ -33,14 +21,5 @@ static func of(viewport: Viewport) -> StringName:
 	return MSAA.find_key(viewport.msaa_3d)
 
 
-## Puts the focus on the card of the smoothing drawn now.
-func focus() -> void:
-	for card: SmoothingCard in %Cards.get_children():
-		if card.smoothing == of(get_viewport()):
-			card.grab_focus()
-
-
-func _on_card_chosen(smoothing: StringName) -> void:
-	Diagnostics.trace("screens", "edge smoothing %s" % smoothing)
-	Sounds.play(SoundEffects.Cue.SELECT)
-	chosen.emit(smoothing)
+func _current() -> StringName:
+	return of(get_viewport())

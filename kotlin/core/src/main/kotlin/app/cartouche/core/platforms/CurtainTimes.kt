@@ -33,8 +33,8 @@ public class CurtainTimes private constructor(private val default: Duration, pri
         public val LONGEST: Duration = 10_000.milliseconds
 
         /**
-         * Reads `{"default_ms": time, "emulators": {package name: time}}`, times in milliseconds from
-         * zero to [LONGEST].
+         * Reads `{"default_ms": time, "emulators": {package name: time}}`, times in milliseconds from zero to
+         * [LONGEST].
          */
         @OptIn(ExperimentalSerializationApi::class)
         public fun parse(source: DefinitionSource): Either<CatalogError, CurtainTimes> = either {

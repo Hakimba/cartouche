@@ -50,7 +50,10 @@ internal class ChdImage(
         layout.data(hunk(n / perHunk).bind(), n % perHunk * layout.stride).bind()
     }
 
-    /** MAME's writer makes a hunk repeat the first copy of its bytes, which is held in the file, never another repetition. */
+    /**
+     * MAME's writer makes a hunk repeat the first copy of its bytes, which is held in the file, never another
+     * repetition.
+     */
     private fun Raise<ReadFailure>.hunk(n: Int): Option<ByteArray> = option {
         val entry = map.entry(n).bind()
         when (val held = if (entry is Hunk.Self) map.entry(entry.hunk).bind() else entry) {
@@ -97,8 +100,8 @@ private fun Raise<ReadFailure>.hunkMap(source: ByteSource, at: Long, hunks: Int,
 }
 
 /**
- * The layout the image's metadata gives, from the entry at [at] on: a CD's by its first track's type, a DVD's when
- * no track is written. Each entry: its tag, flags, a 3-byte length, the offset of the next, then its text.
+ * The layout the image's metadata gives, from the entry at [at] on: a CD's by its first track's type, a DVD's when no
+ * track is written. Each entry: its tag, flags, a 3-byte length, the offset of the next, then its text.
  */
 private tailrec fun Raise<ReadFailure>.layout(source: ByteSource, at: Long, left: Int = MAX_METADATA): Option<Layout> {
     if (at == 0L || left == 0) return Some(Layout.DVD)
@@ -118,8 +121,8 @@ private const val MAX_METADATA = 32
 
 /**
  * Where a sector's data lies in the image's units: a DVD's sectors are the data; a CD's frames hold a raw sector,
- * whose data starts after its headers, by the track's type. [stride] is a unit's length in a hunk, [length] what
- * a unit at least holds.
+ * whose data starts after its headers, by the track's type. [stride] is a unit's length in a hunk, [length] what a
+ * unit at least holds.
  */
 internal enum class Layout(val stride: Int, private val length: Int) {
     DVD(SECTOR, SECTOR),
@@ -128,14 +131,16 @@ internal enum class Layout(val stride: Int, private val length: Int) {
     MODE2(FRAME, RAW_SECTOR),
     ;
 
-    /** The data of the unit at [at] in [units]. */
     fun data(units: ByteArray, at: Int): Option<ByteArray> = option {
         ensure(at >= 0 && at + length <= units.size)
         val start = at + headerLength(units, at)
         units.copyOfRange(start, start + SECTOR)
     }
 
-    /** Before the data: nothing, a mode 2 subheader, or a raw sector's sync and header, whose mode byte says whether a subheader follows. */
+    /**
+     * Before the data: nothing, a mode 2 subheader, or a raw sector's sync and header, whose mode byte says whether a
+     * subheader follows.
+     */
     private fun headerLength(units: ByteArray, at: Int): Int = when (this) {
         DVD, COOKED -> 0
         MODE2 -> 8
@@ -374,7 +379,10 @@ private fun cd(compressed: ByteArray, hunkBytes: Int, decompress: (ByteArray, In
     ByteArray(hunkBytes).also { hunk -> repeat(frames) { sectors.copyInto(hunk, it * FRAME, it * RAW_SECTOR, (it + 1) * RAW_SECTOR) } }
 }
 
-/** MAME's LZMA: raw, lc 3, lp 0, pb 2 (as one byte, (pb * 5 + lp) * 9 + lc), the dictionary its encoder settles on for the hunk's size. */
+/**
+ * MAME's LZMA: raw, lc 3, lp 0, pb 2 (as one byte, (pb * 5 + lp) * 9 + lc), the dictionary its encoder settles on for
+ * the hunk's size.
+ */
 private const val LZMA_PROPERTIES: Byte = 93
 
 private fun lzma(compressed: ByteArray, size: Int): Option<ByteArray> =

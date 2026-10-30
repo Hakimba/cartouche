@@ -35,8 +35,7 @@ static func tune(carousel: Carousel, values: Dictionary) -> Dictionary:
 	var animation := LaunchAnimation.build(data, model)
 	var sequence := carousel._sequence
 	var launch := carousel._game_launch
-	var previewing := launch._inserted.is_connected(launch.end_preview)
-	if launch.is_busy() and not (previewing and launch.is_inserting()):
+	if launch.is_busy() and not (launch.is_previewing() and launch.is_inserting()):
 		return _error("a launch is running")
 	if animation.get_track_count() == 0 or sequence.is_processing():
 		return _error("no launch animation to play")
@@ -48,15 +47,8 @@ static func tune(carousel: Carousel, values: Dictionary) -> Dictionary:
 	# The carousel is in a launch, as the engine's time resumes it: the launch then plays on its own.
 	if not launch.is_inserting():
 		carousel._row.freeze()
-		launch._enter(GameLaunch.Stage.INSERTING)
-		# Nothing awaits this launch's end: past it, the preview gives the carousel back.
-		launch._inserted.connect(launch.end_preview, CONNECT_ONE_SHOT)
 		sequence.behind_amount = 1.0
-	launch._into_console = true
-	launch._clock_s = at - _float(moments[&"launch"])
-	launch.blackout.visible = true
-	launch._black.set_shader_parameter(&"opacity", 1.0)
-	launch._insert(0.0)
+	launch.preview(at - _float(moments[&"launch"]))
 	carousel._row._arrange()
 	RenderingServer.force_draw()
 	var parts: Array[Dictionary] = []
@@ -183,8 +175,7 @@ static func stop(carousel: Carousel) -> Dictionary:
 	if carousel == null:
 		return _error("no carousel")
 	var launch := carousel._game_launch
-	if launch._inserted.is_connected(launch.end_preview):
-		launch._inserted.disconnect(launch.end_preview)
+	if launch.is_previewing():
 		launch.end_preview()
 		# A launch ends on the games screen; a preview started from another screen goes back to it.
 		if carousel.screen() != Carousel.Screen.GAMES:

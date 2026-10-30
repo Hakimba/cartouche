@@ -13,9 +13,9 @@ import arrow.core.raise.option
 import arrow.core.toOption
 
 /**
- * A disc as a reference list knows it: its exact name ([text], read as [name]) and its serials, such
- * as `SLES-53047`. The list files it by its title alone ([filing]): the whole name is read only once
- * a file could be the disc, a few of the list's thousands.
+ * A disc as a reference list knows it: its exact name ([text], read as [name]) and its serials, such as `SLES-53047`.
+ * The list files it by its title alone ([filing]): the whole name is read only once a file could be the disc, a few
+ * of the list's thousands.
  */
 public data class KnownTitle(public val text: String, public val serials: List<String>) {
     public val name: GameName by lazy { GameName.parse(text) }
@@ -27,7 +27,6 @@ public sealed interface Identification {
     /** The reference name of the title, for its display. */
     public val title: GameName
 
-    /** The regions the game is of. */
     public val regions: List<String>
     public val serials: List<String>
 
@@ -39,9 +38,9 @@ public sealed interface Identification {
     }
 
     /**
-     * The file is one of several discs of one game (versions, languages) that the list cannot tell
-     * apart: [serials] are those they all have, [regions] the file name's when found by its name, or
-     * those they all have when found by its content. Found by its name, it always has [serials].
+     * The file is one of several discs of one game (versions, languages) that the list cannot tell apart: [serials]
+     * are those they all have, [regions] the file name's when found by its name, or those they all have when found by
+     * its content. Found by its name, it always has [serials].
      */
     public data class Release(override val title: GameName, override val regions: List<String>, override val serials: List<String>) :
         Identification
@@ -66,8 +65,8 @@ public class TitleIndex private constructor(
     public val size: Int get() = titles.size
 
     /**
-     * The disc a file named [text] (without its extension) is: the entry written exactly so, else
-     * the one its name designates ([judge]).
+     * The disc a file named [text] (without its extension) is: the entry written exactly so, else the one its name
+     * designates ([judge]).
      */
     public fun identifyByName(text: String): Option<Identification> =
         byText.getOrNone(text).fold({ judge(GameName.parse(text)) }) { Some(Identification.Disc(it)) }
@@ -139,8 +138,8 @@ public class TitleIndex private constructor(
         private val DISC_ID = Regex("""^(?:DL-DOL|RVL)-([^-]+)""")
 
         /**
-         * Reads a reference list and its cartridges' prints; lines that are not `name<TAB>serials`,
-         * or `name<TAB>CRC32` of a listed name, are skipped.
+         * Reads a reference list and its cartridges' prints; lines that are not `name<TAB>serials`, or
+         * `name<TAB>CRC32` of a listed name, are skipped.
          */
         public fun parse(titles: String, prints: String = ""): TitleIndex {
             val known = titles.lines().map(::parseLine).filterOption()
@@ -179,7 +178,6 @@ public class TitleIndex private constructor(
 
         private fun oneTitle(titles: List<KnownTitle>): Boolean = titles.map { it.filing.key }.distinct().size == 1
 
-        /** Whether nothing in [known]'s name contradicts [file]'s. */
         private fun canBe(file: GameName, known: GameName): Boolean =
             file.otherTags.map(String::lowercase).toSet() == known.otherTags.map(String::lowercase).toSet() &&
                 (file.regions.isEmpty() || file.regions.any(known.regions::contains)) &&

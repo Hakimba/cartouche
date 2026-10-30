@@ -10,8 +10,8 @@ import arrow.core.Either
 import java.io.File
 
 /**
- * The library file in the app's private storage. Writes go through [AtomicFile], so an interrupted
- * write leaves the previous library intact.
+ * The library file in the app's private storage. Writes go through [AtomicFile], so an interrupted write leaves the
+ * previous library intact.
  */
 internal class LibraryStore(private val file: File) {
     private val atomic = AtomicFile(file)

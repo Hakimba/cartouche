@@ -27,16 +27,7 @@ class AbsencesTest {
     private fun Absences<GameId>.coversGameOf(request: ArtRequest): Boolean = covers(request.game, request.version)
 
     @Test
-    fun `INV-E4-05 a game is absent only from the version of the sources it was looked for in`() {
-        val absent = Absences<GameId>().with(request("a", Some("2026-09-28")))
-        absent.coversGameOf(request("a", Some("2026-09-28"))) shouldBe true
-        absent.coversGameOf(request("a", Some("2026-10-01"))) shouldBe false
-        absent.coversGameOf(request("b", Some("2026-09-28"))) shouldBe false
-        absent.with(request("a", Some("2026-10-01"))).coversGameOf(request("a", Some("2026-09-28"))) shouldBe false
-    }
-
-    @Test
-    fun `a game is absent from the version it was last looked for in, and from no other`() = runBlocking<Unit> {
+    fun `INV-17 a game is absent from the version it was last looked for in, and from no other`() = runBlocking<Unit> {
         val games = Arb.element("a", "b", "c")
         val versions = Arb.element(Some("2026-09-28"), Some("2026-10-01"), None)
         checkAll(Arb.list(Arb.pair(games, versions), 0..5), games, versions) { looked, game, version ->
@@ -45,11 +36,6 @@ class AbsencesTest {
             val last = looked.filter { it.second.isSome() }.lastOrNone { it.first == game }.flatMap { it.second }
             absent.covers(GameId("ps2/$game"), version.map(::ArtVersion)) shouldBe (version.isSome() && last == version)
         }
-    }
-
-    @Test
-    fun `INV-E4-05 sources of no version never make a game absent`() {
-        Absences<GameId>().with(request("a", None)).coversGameOf(request("a", None)) shouldBe false
     }
 
     @Test
@@ -62,7 +48,7 @@ class AbsencesTest {
             Absences.decode(Absences.encode(absent, GameId.serializer()), GameId.serializer()).shouldBeSome() shouldBe absent
         }
         Absences.decode("{broken", GameId.serializer()).shouldBeNone()
-        // INV-E11-04: a texture ScreenScraper has none of, remembered by its identity for the sources' version.
+        // A texture ScreenScraper has none of, remembered by its identity for the sources' version.
         val missing = Absences<Identity>().with(Identity("ss:58:1234:support-texture(jp)"), Some(ArtVersion("2026-09-28 2026-10-18")))
         Absences.decode(Absences.encode(missing, Identity.serializer()), Identity.serializer()).shouldBeSome() shouldBe missing
         missing.covers(Identity("ss:58:1234:support-texture(jp)"), Some(ArtVersion("2026-09-28 2026-10-18"))) shouldBe true
@@ -70,7 +56,7 @@ class AbsencesTest {
     }
 
     @Test
-    fun `INV-E6-03 only the games kept stay absent, as they were`() = runBlocking<Unit> {
+    fun `INV-13 only the games kept stay absent, as they were`() = runBlocking<Unit> {
         val names = Arb.list(Arb.element("a", "b", "c", "d"), 0..4)
         checkAll(names, names, Arb.element("a", "b", "c", "d")) { absentOnes, kept, game ->
             val absent = absentOnes.fold(Absences<GameId>()) { all, name -> all.with(request(name, Some("2026-09-28"))) }

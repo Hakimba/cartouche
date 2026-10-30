@@ -2,7 +2,7 @@
 @tool
 class_name GbaSpShape
 extends GlbShape
-## The bench's front slot: the cartridge lies label down and goes in towards the hinge.
+## Where a cartridge sits in the front slot, in millimetres in the model's frame: label down, going in towards the hinge.
 
 @export var cartridge_centre := Vector3(0.0, -2.815, 24.4):
 	set(value):

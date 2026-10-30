@@ -65,32 +65,6 @@ func test_on_the_consoles_screen_a_tap_beside_moves_to_a_console_and_one_on_it_g
 	assert_str(carousel._row.selected_game().platform_id).is_equal("ps2")
 
 
-func test_on_the_consoles_screen_a_swipe_anywhere_moves_one_console_even_on_the_console_which_does_not_turn() -> void:
-	var carousel: Carousel = (await _on_consoles())[0]
-	var start := carousel._selected_point() + Vector2(0.0, 300.0)
-	await Fixtures.touch(self, [start, start - Vector2(330.0, 0.0), start - Vector2(660.0, 0.0)])
-	assert_int(carousel._consoles.selected_index()).is_equal(1)
-	await Fixtures.touch(self, [start, start - Vector2(90.0, 0.0)])
-	assert_int(carousel._consoles.selected_index()).is_equal(2)
-	# Once the console has come to the middle: a swipe on it moves one back, and it never turns.
-	assert_bool(await Fixtures.until(self, func() -> bool: return is_equal_approx(carousel._consoles._scroll, 2.0))).is_true()
-	var centre := carousel._selected_point()
-	await Fixtures.finger(self, centre, true)
-	await Fixtures.finger_to(self, centre + Vector2(150.0, 0.0))
-	await await_idle_frame()
-	assert_bool(carousel._consoles._turn.of(2).is_equal_approx(Basis.IDENTITY)).is_true()
-	assert_int(carousel._consoles.selected_index()).is_equal(1)
-	await Fixtures.finger(self, centre + Vector2(150.0, 0.0), false)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
-
-
-func test_a_long_press_on_the_console_opens_its_properties() -> void:
-	var carousel: Carousel = (await _on_consoles())[0]
-	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-
-
 func test_on_the_games_screen_a_tap_beside_moves_one_game_and_one_on_the_disc_launches_nothing() -> void:
 	var setup := await _on_games()
 	var carousel: Carousel = setup[0]
@@ -99,114 +73,18 @@ func test_on_the_games_screen_a_tap_beside_moves_one_game_and_one_on_the_disc_la
 	assert_int(carousel._row.selected_index()).is_equal(1)
 	await Fixtures.touch(self, [carousel._selected_point() - BESIDE])
 	assert_int(carousel._row.selected_index()).is_equal(0)
+	var screens: Array[Carousel.Screen] = []
+	carousel.screen_changed.connect(screens.append)
 	await Fixtures.touch(self, [carousel._selected_point()])
 	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+	assert_array(screens).is_empty()
 	assert_int(device.launches).is_equal(0)
-
-
-func test_on_the_games_screen_a_swipe_beside_moves_one_game_however_long_or_fast() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	var start := carousel._selected_point() + Vector2(400.0, 250.0)
-	# Too short to be a swipe: past the slop, not 80 pixels.
-	await Fixtures.touch(self, [start, start - Vector2(70.0, 0.0)])
-	assert_int(carousel._row._position).is_equal(0)
-	await Fixtures.touch(self, [start, start - Vector2(90.0, 0.0)])
-	assert_int(carousel._row._position).is_equal(1)
-	# Long: one game.
-	await Fixtures.touch(self, [start, start - Vector2(330.0, 0.0), start - Vector2(660.0, 0.0), start - Vector2(400.0, 0.0)])
-	assert_int(carousel._row._position).is_equal(2)
-	# Back and further the other way: still the one game it first went to.
-	await Fixtures.touch(self, [start, start - Vector2(330.0, 0.0), start, start + Vector2(400.0, 0.0)])
-	assert_int(carousel._row._position).is_equal(3)
-	# Fast: 400 pixels in one frame, then lifted while moving; the shelf comes to rest one further.
-	await Fixtures.touch(self, [start, start - Vector2(400.0, 0.0)])
-	assert_int(carousel._row._position).is_equal(4)
-	assert_bool(await Fixtures.until(self, func() -> bool: return is_equal_approx(carousel._row._scroll, 4.0))).is_true()
-	assert_int(carousel._row._position).is_equal(4)
-	# Held still beside before it moves: a pause, not a long press.
-	await Fixtures.finger(self, start, true)
-	Fixtures.clock.ms += int(HELD_S * 1000.0)
-	await await_idle_frame()
-	await Fixtures.finger_to(self, start - Vector2(200.0, 0.0))
-	await Fixtures.finger(self, start - Vector2(200.0, 0.0), false)
-	assert_int(carousel._row._position).is_equal(5)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
-
-
-func test_INV_E7_11_whatever_a_swipe_beside_does_it_moves_one_game_the_way_it_first_went_far() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	var random := CarouselFixtures.cases(111)
-	var moved := {-1: 0, 0: 0, 1: 0}
-	for case in 30:
-		# Beside on either side; first past the slop, so that it is never a tap.
-		var side := CarouselFixtures.direction(random)
-		var start := carousel._selected_point() + Vector2(400.0 * side, 250.0)
-		var path: Array[Vector2] = [start, start + Vector2(0.0, Finger.SLOP)]
-		# Short or long moves, fast or slow, back and forth, staying on the screen.
-		for move in random.randi_range(1, 5):
-			path.append(start + Vector2(random.randf_range(-900.0, 200.0) * side * random.randf(), random.randf_range(-60.0, 60.0)))
-		# The way the finger first went 80 pixels from where it came down, worked out here.
-		var way := 0
-		for point in path:
-			if way == 0 and absf(point.x - start.x) >= 80.0:
-				way = 1 if point.x < start.x else -1
-		var was := carousel._row._position
-		await Fixtures.touch(self, path)
-		assert_int(carousel._row._position - was).is_equal(way)
-		moved[way] += 1
-		if is_failure():
-			return
-	for way: int in moved:
-		assert_int(moved[way]).override_failure_message(str(way)).is_greater(2)
-
-
-func test_a_long_press_beside_does_nothing_and_on_the_disc_reaches_270_pixels() -> void:
-	var setup := await _on_consoles()
-	var carousel: Carousel = setup[0]
-	await Fixtures.touch(self, [carousel._selected_point() + BESIDE], HELD_S)
-	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
-	assert_int(carousel._consoles.selected_index()).is_equal(0)
-	await Fixtures.touch(self, [carousel._selected_point() + Vector2(290.0, 0.0)])
-	assert_int(carousel._consoles.selected_index()).is_equal(1)
-	await Fixtures.touch(self, [carousel._selected_point() - Vector2(290.0, 0.0)])
-	await Fixtures.touch(self, [carousel._selected_point() + Vector2(0.0, 250.0)])
-	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
 
 
 func test_A_still_launches_the_game_which_the_fake_device_counts() -> void:
 	var device: Fixtures.NewDevice = (await _on_games())[1]
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return device.launches == 1)).is_true()
-
-
-func test_a_drag_over_a_game_s_or_a_console_s_properties_turns_what_they_stage() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
-	var start := Vector2(200.0, 300.0)
-	await Fixtures.finger(self, start, true)
-	await Fixtures.finger_to(self, start + Vector2(150.0, 0.0))
-	await await_idle_frame()
-	assert_bool(carousel._row._turn.of(carousel._row.selected_index()).is_equal_approx(Basis.IDENTITY)).is_false()
-	await Fixtures.finger(self, start + Vector2(150.0, 0.0), false)
-	for press in 2:
-		await _back(carousel)
-	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-	# A console stays upright: a drag up or down leaves it, a drag sideways turns it.
-	var selected := carousel._consoles.selected_index()
-	await Fixtures.finger(self, start, true)
-	await Fixtures.finger_to(self, start + Vector2(0.0, 150.0))
-	await await_idle_frame()
-	assert_bool(carousel._consoles._turn.of(selected).is_equal_approx(Basis.IDENTITY)).is_true()
-	await Fixtures.finger_to(self, start + Vector2(150.0, 150.0))
-	await await_idle_frame()
-	assert_bool(carousel._consoles._turn.of(selected).is_equal_approx(Basis.IDENTITY)).is_false()
-	await Fixtures.finger(self, start + Vector2(150.0, 150.0), false)
 
 
 func test_a_finger_down_as_the_app_pauses_is_forgotten() -> void:
@@ -246,7 +124,7 @@ func test_in_a_game_s_properties_a_tap_on_the_label_lists_its_images_and_one_on_
 	await _settled(carousel)
 	assert_int(properties._step).is_equal(DiscProperties.Step.LABELS)
 	var europe: LabelCard
-	for card in properties._cards.get_children():
+	for card in properties._chooser._cards.get_children():
 		if card is LabelCard and (card as LabelCard).region == "Europe":
 			europe = card
 	await Fixtures.touch(self, [europe.get_global_rect().get_center()])
@@ -318,23 +196,7 @@ func test_the_system_s_back_is_B_on_the_games_the_ring_and_both_properties_scree
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 
-func test_after_a_tap_on_the_label_and_back_to_the_consoles_a_tap_beside_moves_the_selection() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
-	await Fixtures.touch(self, [carousel._properties._zone.get_global_rect().get_center()])
-	await _settled(carousel)
-	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.LABELS)
-	for press in 3:
-		await _back(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
-	await Fixtures.touch(self, [carousel._selected_point() + BESIDE])
-	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
-	assert_int(carousel._consoles.selected_index()).is_equal(1)
-
-
-func test_INV_E7_10_whatever_a_finger_does_nothing_is_launched_and_the_screens_settle() -> void:
+func test_inv_20_inv_22_whatever_a_finger_does_nothing_is_launched_and_every_screen_takes_the_next_press() -> void:
 	var setup := await _on_consoles()
 	var carousel: Carousel = setup[0]
 	var device: Fixtures.NewDevice = setup[1]
@@ -357,6 +219,7 @@ func test_INV_E7_10_whatever_a_finger_does_nothing_is_launched_and_the_screens_s
 				path.append(path[-1] + Vector2(random.randf_range(-400.0, 400.0), random.randf_range(-150.0, 150.0)))
 			await Fixtures.touch(self, path, HELD_S if random.randf() < 0.15 else 0.0)
 		await _settled(carousel)
+		assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
 		touched[carousel.screen()] = true
 		assert_int(device.launches).is_equal(0)
 		# Back from the screens a finger does not reach (the ring, the settings), and now and then

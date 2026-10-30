@@ -12,7 +12,6 @@ const _PRESSED_MM := 1.5
 ## How bright the power light is once on, as its material's emission energy.
 const _LIT := 3.0
 
-## Given each frame by the launch animation: each part is moved only when it changes.
 var lid_degrees := 0.0:
 	set(value):
 		if value != lid_degrees and is_node_ready():

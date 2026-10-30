@@ -23,9 +23,10 @@ class Tile:
 		add_theme_constant_override(&"outline_size", 0)
 		auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		custom_minimum_size = Vector2(230.4, 153.6)
-		var tint: Color = StudioTokens.GEL.get(StringName(folder), StudioTokens.NEUTRAL)
+		var tint: Color = ConsoleManifest.gel_of(folder)
 		SatinStyle.apply_to(self, tint)
-		for state: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color", &"font_hover_pressed_color", &"font_disabled_color"]:
+		for state: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color", &"font_hover_pressed_color",
+			&"font_disabled_color"]:
 			add_theme_color_override(state, Color.TRANSPARENT)
 		logo.show_logo(LogoView.Slot.RAIL_TILE, folder)
 		add_child(logo)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.library
 
+import app.cartouche.core.intOrNone
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.firstOrNone
@@ -11,9 +12,8 @@ import arrow.core.toOption
 import java.text.Normalizer
 
 /**
- * A game name read the Redump and No-Intro way, `Title (Region) (Languages) (Version) (Disc 2)`,
- * as ROM sets and Redump lists write them. Tags in parentheses or brackets are classified; the
- * title is what remains.
+ * A game name read the Redump and No-Intro way, `Title (Region) (Languages) (Version) (Disc 2)`, as ROM sets and
+ * Redump lists write them. Tags in parentheses or brackets are classified; the title is what remains.
  */
 public data class GameName(
     public val title: String,
@@ -79,7 +79,10 @@ public data class GameName(
         private val DISC = Regex("""(?i)(?:disc|disk|cd)\s*(\d+)(?:\s+of\s+\d+)?""")
         private val ARTICLE = Regex("""^(.*), (The|A|An)$""")
 
-        /** Redump region names, with the short forms ROM sets also use. */
+        /**
+         * ScreenScraper's regions (`regionsListe.php` short names) under the app's names (see `Regions`): the
+         * American continent is the zone North America stands for; the codes of [SKIPPED_CODES] are not regions.
+         */
         private val REGIONS: Map<String, String> =
             """Asia, Australia, Austria, Belgium, Brazil, Canada, China, Croatia, Denmark, Europe, Finland, France, Germany, Greece,
             Hong Kong, India, Ireland, Italy, Japan, Korea, Latin America, Mexico, Netherlands, New Zealand, Norway, Poland, Portugal,
@@ -88,7 +91,6 @@ public data class GameName(
                 .associateBy { it.lowercase() } +
                 mapOf("eu" to "Europe", "eur" to "Europe", "us" to "USA", "jp" to "Japan", "jpn" to "Japan")
 
-        /** The regions a tag lists, such as `Europe, Australia`; empty when it is not a region tag. */
         private fun regionsOf(tag: String): List<String> =
             option { tag.split(',').map { REGIONS.getOrNone(it.trim().lowercase()).bind() } }.getOrElse { emptyList() }
 
@@ -99,14 +101,12 @@ public data class GameName(
         private fun mainKeyOf(shown: String): Option<TitleKey> =
             Some(shown.split(SUBTITLE)).filter { it.size > 1 }.map { TitleKey.of(it.first()) }
 
-        /** [text] without its tags, including those that removing others brings together. */
         private tailrec fun withoutTags(text: String): String {
             val stripped = TAG.replace(text, "")
             return if (stripped == text) text else withoutTags(stripped)
         }
 
-        private fun discOf(tag: String): Option<Int> =
-            DISC.matchEntire(tag).toOption().flatMap { it.groupValues[1].toIntOrNull().toOption() }
+        private fun discOf(tag: String): Option<Int> = DISC.matchEntire(tag).toOption().flatMap { it.groupValues[1].intOrNone() }
 
         private fun uninvertArticle(part: String): String =
             ARTICLE.matchEntire(part).toOption().fold({ part }) { "${it.groupValues[2]} ${it.groupValues[1]}" }
@@ -121,7 +121,10 @@ public data class GameName(
 
         public fun of(title: String): TitleKey = TitleKey(unaccented(title).lowercase().replace(NON_ALPHANUMERIC, " ").trim())
 
-        /** [text] without its accents and other marks, its letters decomposed (`é` is `e`, `ﬁ` is `fi`), its case and punctuation kept. */
+        /**
+         * [text] without its accents and other marks, its letters decomposed (`é` is `e`, `ﬁ` is `fi`), its case and
+         * punctuation kept.
+         */
         internal fun unaccented(text: String): String = MARKS.replace(Normalizer.normalize(text, Normalizer.Form.NFKD), "")
     }
 }

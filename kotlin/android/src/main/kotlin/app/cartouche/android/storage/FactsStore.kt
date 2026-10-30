@@ -5,6 +5,7 @@ import android.util.AtomicFile
 import app.cartouche.core.ContentUri
 import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.Shell
+import app.cartouche.core.longOrNone
 import app.cartouche.core.platforms.PlatformId
 import arrow.core.Either
 import arrow.core.None
@@ -26,11 +27,7 @@ internal data class FileStamp(val size: Option<Long>, val modified: Option<Long>
 /** What a file told when it was read, and its stamp then. */
 internal data class KnownFacts(val stamp: FileStamp, val facts: FileFacts)
 
-/**
- * What the game files of each platform told when they were last read ([Folders.facts]), one file
- * per platform in [folder]: a scan reads only the files new or changed since. Unreadable, or
- * written by another [VERSION] of the readers, it only means reading the files again.
- */
+/** Unreadable, or written by another [VERSION] of the readers, it only means reading the files again. */
 internal class FactsStore(private val folder: File) {
     fun load(platform: PlatformId): Map<ContentUri, KnownFacts> =
         atomic(platform).read(emptyMap(), { it }) { decode(platform, it).right() }.getOrElse { emptyMap() }
@@ -77,9 +74,7 @@ internal class FactsStore(private val folder: File) {
         ContentUri.parse(uri).bind() to KnownFacts(FileStamp(number(size), number(modified)), decoded(platform, facts))
     }
 
-    /** None for an empty field. */
-    private fun SingletonRaise<None>.number(text: String): Option<Long> =
-        if (text.isEmpty()) None else Some(text.toLongOrNull().toOption().bind())
+    private fun SingletonRaise<None>.number(text: String): Option<Long> = if (text.isEmpty()) None else Some(text.longOrNone().bind())
 
     /** A Game Boy print kept before the shell was told has none: it is read again, the other platforms' prints keep their facts. */
     private fun SingletonRaise<None>.decoded(platform: PlatformId, text: String): FileFacts {

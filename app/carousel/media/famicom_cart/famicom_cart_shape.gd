@@ -85,11 +85,9 @@ func _rules() -> Dictionary[StringName, bool]:
 		&"sizes_positive": width > 0.0 and height > 0.0 and recess > 0.0 and opening.x > 0.0 and opening.y > 0.0,
 		&"bevel_fits": bevel > 0.0 and bevel < minf(corner, top_corner) and 2.0 * bevel < depth
 			and recess < depth - 2.0 * bevel,
-		# Each side of the outline longer than the corners at its ends, the opening within the foot.
 		&"foot_fits": foot.y >= corner and height - foot.y >= corner + top_corner and foot.x > 2.0 * corner
 			and width - foot.x >= 2.0 * corner and opening.x < foot.x - 2.0 * corner
 			and opening.y < depth - 2.0 * bevel,
-		# The recess lies within the front above the shoulders, with some plastic left around it.
 		&"label_on_body": label_corner >= 0.0 and 2.0 * label_corner < minf(label_size.x, label_size.y)
 			and ShapeGeometry.fits(label_box().grow(RIM), label_corner + RIM, body().grow(-bevel),
 				Vector2(corner, top_corner) - Vector2.ONE * bevel),

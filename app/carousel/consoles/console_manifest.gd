@@ -24,6 +24,9 @@ const _VERSION := "^[a-z0-9]+(-[a-z0-9]+)*$"
 @export_file("*.json") var launch: String
 ## The most triangles its model may be drawn with.
 @export var triangle_budget := 0
+## Its real size over its fitted pose, and the depth its pose pushed it back to, for the ordering ring ([RingFit]);
+## zero when not measured, and the ring weighs it as the PS2.
+@export var ring_size := Vector2.ZERO
 ## Other model folders of this platform, in the order shown after its base model.
 @export var variants := PackedStringArray()
 
@@ -38,12 +41,17 @@ func models() -> Array[ConsoleManifest]:
 	return choices
 
 
-## The platform's decided colour, shared by all its models.
+## The platform's colour, shared by all its models.
 func gel() -> Color:
 	for base in found():
 		if base.platform == platform and base.is_default:
-			return StudioTokens.GEL.get(StringName(ConsoleManifest.folder_of(base)), StudioTokens.NEUTRAL)
+			return gel_of(ConsoleManifest.folder_of(base))
 	return StudioTokens.NEUTRAL
+
+
+## The colour of console folder [param folder]; neutral for one without a colour of its own.
+static func gel_of(folder: String) -> Color:
+	return StudioTokens.GEL.get(StringName(folder), StudioTokens.NEUTRAL)
 
 
 ## The containing model folder, for a manifest or a scene; empty when there is no resource.

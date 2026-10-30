@@ -33,7 +33,10 @@ internal sealed interface LabelNews
 /** A game's label image, just stored. */
 internal data class FoundArt(val game: GameId, val art: StoredArt) : LabelNews
 
-/** No source has an image of these [games]' labels: remembered so ([ArtStore.markAbsent]), their blanks show their titles. */
+/**
+ * No source has an image of these [games]' labels: remembered so ([ArtStore.markAbsent]), their blanks show their
+ * titles.
+ */
 internal data class AbsentArt(val games: List<GameId>) : LabelNews
 
 /** How the download of a game's label goes, told while the game is on screen ([Scraper.focus]). */
@@ -46,16 +49,10 @@ internal sealed interface LabelDownload {
 }
 
 /**
- * Looks for games' art in the background, [WORKERS] downloads at a time, and stores what it finds
- * (see [Scraping] for the rules of a run). A stall (no network, a busy server) stops the run until
- * [networkBack] or a delay that grows with each stall in a row. After [stop] (the app leaves the
- * screen, a game is played), no download starts until [start]: the ones under way end, and their
- * games wait again. [changed] hears every change, in order. A ScreenScraper texture skipped because
- * it is not open ([textures]) leaves the label found after it provisional: at a later run with
- * ScreenScraper open, the game is asked again for the images before it (see [ProvisionalArt]); a
- * walk that skipped one and found nothing leaves the label as it was, still wanted. A label asked
- * again while its look is under way ([lookFor]'s `again`) is looked for again once it ends, as the
- * latest plan says. [downloading] hears how the downloads of the games on screen go.
+ * After [stop] no download starts until [start]; the ones under way end. A stall stops the run until [networkBack] or a delay that grows
+ * with each stall in a row. A ScreenScraper texture skipped because it is not open leaves the label found after it provisional (see
+ * [ProvisionalArt]); a walk that skipped one and found nothing leaves the label as it was. A label asked again while its look is under way
+ * is looked for again once it ends.
  */
 internal class Scraper(
     private val store: ArtStore,
@@ -69,7 +66,10 @@ internal class Scraper(
         /** [art] stored, or the label the user chose meanwhile, kept. */
         data class Found(val art: StoredArt) : Outcome
 
-        /** The label stored stays: the images before it were asked for, with ScreenScraper skipped ([provisional]) or not. */
+        /**
+         * The label stored stays: the images before it were asked for, with ScreenScraper skipped ([provisional]) or
+         * not.
+         */
         data class Kept(val provisional: Boolean) : Outcome
 
         data object Absent : Outcome
@@ -83,7 +83,6 @@ internal class Scraper(
         data object SetAside : Outcome
     }
 
-    /** What one image's attempt came to. */
     private sealed interface Tried {
         /** Not this image: the next, after ScreenScraper was [skipped] or not. */
         data class Next(val skipped: Boolean) : Tried
@@ -98,7 +97,6 @@ internal class Scraper(
 
     private var run = Scraping.NONE
 
-    /** The workers running. */
     private var working = 0
     private var retrying: Option<Job> = None
 
@@ -110,16 +108,9 @@ internal class Scraper(
     /** The games looked for first, as the carousel last said ([focus]); kept through a new plan, read by the downloads too. */
     @Volatile private var focused: List<GameId> = emptyList()
 
-    /** Whether the run is over, as of its last change. */
     private val over = MutableStateFlow(true)
 
-    /**
-     * Makes the run look for the art of [requests]' games that want it (see [ArtStore.wants]), of
-     * those whose label is provisional while ScreenScraper is open, and of those asked [again], in
-     * place of what it looked for; returns once they are in the run. Calls made in turn, on one
-     * thread, change the run in that order (the lock is fair): a later plan always replaces an
-     * earlier one.
-     */
+    /** Calls made in turn, on one thread, change the run in that order (the lock is fair): a later plan always replaces an earlier one. */
     suspend fun lookFor(requests: List<ArtRequest>, again: Set<GameId> = emptySet()) {
         textures.newRun()
         val provisional = requests.filter { store.provisional(it.game).isSome() && !store.wants(it.game, it.version) }.map { it.game }
@@ -136,7 +127,10 @@ internal class Scraper(
         startWorkers()
     }
 
-    /** Remembers that no source has art for the [unfound] games, of their sources' version, and tells those without a label. */
+    /**
+     * Remembers that no source has art for the [unfound] games, of their sources' version, and tells those without a
+     * label.
+     */
     suspend fun absent(unfound: Map<GameId, Option<ArtVersion>>) {
         val told =
             unfound.filter { (game, version) ->
@@ -174,7 +168,10 @@ internal class Scraper(
         scope.launch { if (lock.withLock { run.stall.isSome() }) scheduleRetry() else startWorkers() }
     }
 
-    /** Looks for [games]' art first, now and at each new plan: their requests, when still waiting, go to the front of the run. */
+    /**
+     * Looks for [games]' art first, now and at each new plan: their requests, when still waiting, go to the front of
+     * the run.
+     */
     suspend fun focus(games: List<GameId>) = update(None) {
         focused = games
         run.ahead(games)
@@ -243,8 +240,8 @@ internal class Scraper(
     }
 
     /**
-     * The next request, now under way, with the [Ask] its label is looked up again under, if any;
-     * none, and one worker fewer, when stopped, stalled or when none waits.
+     * The next request, now under way, with the [Ask] its label is looked up again under, if any; none, and one
+     * worker fewer, when stopped, stalled or when none waits.
      */
     private suspend fun next(): Option<Pair<ArtRequest, Option<Ask>>> = lock.withLock {
         run
@@ -254,11 +251,7 @@ internal class Scraper(
             .onNone { working-- }
     }
 
-    /**
-     * The first of [candidates] that downloads, stored; the next is tried when one is not found, not
-     * an image, a scan of no shape its label can be cut from (see [ArtImages.label]), or skipped.
-     * A provisional label's own image ends the walk: the images before it were the better ones.
-     */
+    /** A provisional label's own image ends the walk: the images before it were the better ones. */
     private suspend fun lookUp(
         request: ArtRequest,
         candidates: List<Candidate>,
@@ -281,14 +274,7 @@ internal class Scraper(
         }
     }
 
-    /**
-     * [candidate]'s image stored (as a provisional label when it shows for want of a skipped
-     * texture, [shownFor] naming it), or why the run stalls, or the next image to try (not found,
-     * not an image, of no known shape, or ScreenScraper skipped). A texture ScreenScraper answered
-     * it has none of is remembered so, and never asked again until a new table (INV-E11-04).
-     * Anything unexpected (a bug, a broken image) only skips this image: the worker goes on. Only
-     * the exception's class is logged: its message may hold a URL with the credentials (INV-E11-06).
-     */
+    /** Anything unexpected only skips this image. Only the exception's class is logged: its message may hold a URL with the credentials. */
     private suspend fun attempt(
         request: ArtRequest,
         candidate: Candidate,
@@ -349,7 +335,9 @@ internal class Scraper(
             )
     }
 
-    /** Applies [change] and tells [changed], in the order changes are made; a change that changes nothing is not told. */
+    /**
+     * Applies [change] and tells [changed], in the order changes are made; a change that changes nothing is not told.
+     */
     private suspend fun update(news: Option<LabelNews>, change: () -> Scraping): Unit = lock.withLock {
         val next = change()
         if (next != run) {

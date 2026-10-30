@@ -12,8 +12,8 @@ import arrow.core.raise.option
 internal data class LaunchableApp(val packageName: PackageName, val label: String)
 
 /**
- * Installed-app queries. Visibility of other apps comes from the `<queries>` launcher intent in the
- * manifest, which covers every emulator since they all have a launcher icon.
+ * Installed-app queries. Visibility of other apps comes from the `<queries>` launcher intent in the manifest, which
+ * covers every emulator since they all have a launcher icon.
  */
 internal object InstalledApps {
     /** Whether [packageName] is installed and enabled: a disabled app cannot be started. */
@@ -26,7 +26,7 @@ internal object InstalledApps {
         }
     }) { _: PackageManager.NameNotFoundException -> false }
 
-    /** Apps with a launcher icon, sorted by label. Loading labels is slow: call off the main thread. */
+    /** Loading labels is slow: call off the main thread. */
     fun launchable(packageManager: PackageManager): List<LaunchableApp> {
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val activities =

@@ -12,10 +12,8 @@ const _LIT := 2.5
 ## Standing, it shows a thin front: turned about its height, its right side shows too.
 const _TURN_DEGREES := -30.0
 
-## How far the power and eject buttons are pressed in, in millimetres.
 var power_mm := 0.0:
 	set(value):
-		# Given each frame by the launch animation: the parts are changed only when they move.
 		if value != power_mm and is_node_ready():
 			_power.position.z = -value * MeshBuilder.UNITS_PER_MM
 		power_mm = value
@@ -24,7 +22,6 @@ var eject_mm := 0.0:
 		if value != eject_mm and is_node_ready():
 			_eject.position.z = -value * MeshBuilder.UNITS_PER_MM
 		eject_mm = value
-## How far the SD door is open, in degrees.
 var door_degrees := 0.0:
 	set(value):
 		if value != door_degrees and is_node_ready():

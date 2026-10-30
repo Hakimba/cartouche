@@ -31,8 +31,8 @@ internal sealed interface LabelFailure {
 /** Keeps an image as a game's label: the choice recorded in [library], the image stored in [store]. */
 internal class LabelChoices(private val library: LibraryService, private val store: ArtStore) {
     /**
-     * Shows [variant] (downloaded) on [game]'s label from now on. The choice is recorded first;
-     * when its image cannot be stored then, the choice is given up and the label stays as it was.
+     * Shows [variant] (downloaded) on [game]'s label from now on. The choice is recorded first; when its image cannot
+     * be stored then, the choice is given up and the label stays as it was.
      */
     fun choose(game: Game, variant: ArtVariant): Either<LabelFailure, StoredArt> = either {
         ensure(store.variant(variant.candidate).isSome()) { LabelFailure.NotDownloaded }

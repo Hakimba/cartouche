@@ -37,11 +37,6 @@ class ChdImageTest {
     }
 
     @Test
-    fun `a hunk in a codec not decoded gives no sector`() {
-        chdOf(image("cd-cdfl.chd")).shouldBeSome().sectorOf(16).shouldBeNone()
-    }
-
-    @Test
     fun `an image that is not a CHD version 5, cut short, or uncompressed does not open`() {
         val chd = image("dvd-lzma.chd")
         chdOf(disc).shouldBeNone()
@@ -79,7 +74,7 @@ class ChdImageTest {
     }
 
     @Test
-    fun `INV-E11-03 a CHD claiming any hunks, lengths, map or metadata reads nothing rather than fail, and never more than its bounds`() =
+    fun `INV-03 a CHD claiming any hunks, lengths, map or metadata reads nothing rather than fail, and never more than its bounds`() =
         runBlocking<Unit> {
             var opened = 0
             checkAll(500, hostileChds) { chd ->

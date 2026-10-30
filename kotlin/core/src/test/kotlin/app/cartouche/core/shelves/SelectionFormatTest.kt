@@ -12,14 +12,14 @@ import org.junit.Test
 
 class SelectionFormatTest {
     @Test
-    fun `INV-E2-05 a stored selection reads back the same`() = runBlocking<Unit> {
+    fun `INV-15 a stored selection reads back the same`() = runBlocking<Unit> {
         checkAll(selectedLibraries) { (_, selection) ->
             SelectionFormat.decode(SelectionFormat.encode(selection)).shouldBeRight(selection)
         }
     }
 
     @Test
-    fun `INV-E2-05 a selection file that is damaged or of another format is not read, whatever the reason`() {
+    fun `INV-15 a selection file that is damaged or of another format is not read, whatever the reason`() {
         listOf(
             "",
             "not json",

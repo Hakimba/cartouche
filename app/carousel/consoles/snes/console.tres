@@ -12,3 +12,4 @@ model_name = "PAL"
 scene = "res://carousel/consoles/snes/snes.tscn"
 launch = "res://carousel/consoles/snes/launch.json"
 triangle_budget = 6000
+ring_size = Vector2(1.334, -0.955)

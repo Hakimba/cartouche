@@ -4,6 +4,7 @@ package app.cartouche.core
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.getOrElse
+import arrow.core.toOption
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -11,6 +12,10 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+
+public fun String.intOrNone(): Option<Int> = toIntOrNull().toOption()
+
+public fun String.longOrNone(): Option<Long> = toLongOrNull().toOption()
 
 /** An Android application id, such as `org.dolphinemu.dolphinemu`. */
 @JvmInline public value class PackageName private constructor(public val value: String) {
@@ -42,7 +47,6 @@ public value class FileName(public val value: String) {
     public val isHidden: Boolean get() = value.startsWith('.')
 }
 
-/** Stored URIs are checked when read back, like any other: decoding fails on anything else. */
 private object ContentUriSerializer : KSerializer<ContentUri> by ParsedSerializer(
     "content URI",
     String.serializer(),
@@ -51,8 +55,8 @@ private object ContentUriSerializer : KSerializer<ContentUri> by ParsedSerialize
 )
 
 /**
- * Values checked when read, like any other: [T] written as its [surrogate], and read back through
- * [parse], decoding failing on anything it refuses ([what] names [T] in the failure).
+ * Values checked when read, like any other: [T] written as its [surrogate], and read back through [parse], decoding
+ * failing on anything it refuses ([what] names [T] in the failure).
  */
 internal class ParsedSerializer<S, T>(
     private val what: String,

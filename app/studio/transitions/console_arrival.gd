@@ -19,7 +19,7 @@ func play(row: ConsoleRow) -> bool:
 	row.tree_exiting.connect(_stop, CONNECT_ONE_SHOT)
 	_motion = create_tween().bind_node(row)
 	_motion.tween_method(func(progress: float) -> void:
-		stand.centre = Placing.flight(Placing.PLINTH, target, progress, Placing.ARRIVE_LIFT)
+		stand.centre = Placing.flight(Placing.PLINTH, target, progress, StudioTokens.TR_PLACE_ARC_PX)
 		stand.size = lerpf(Placing.PLINTH_WIDTH / 100.0, 1.0, Motion.eased(Motion.Easing.GLIDE, progress))
 		row.arrange(), 0.0, 1.0, DURATION_S)
 	_motion.finished.connect(_over.emit, CONNECT_ONE_SHOT)

@@ -2,11 +2,11 @@
 class_name TrackedText
 extends RefCounted
 ## The theme's tracked text roles, drawn through [StudioText]: Godot's whole-pixel glyph spacing and font sizes
-## put the right edge of a tracked line up to 10 px off the browser's, a [StudioText] line is exact.
+## put the right edge of a tracked line up to 10 px off its exact place, a [StudioText] line is exact.
 ## The theme keeps each role's font and size (the layout measures with them); this is the face and the tracking in
 ## em the roles are drawn with.
 
-## Each role's face and tracking in em, as the design sets them.
+## Each role's face and tracking in em.
 const ROLES: Dictionary[StringName, Array] = {
 	&"ScreenTitle": [StudioTokens.Face.JAKARTA_800, -0.04],
 	&"PanelTitle": [StudioTokens.Face.JAKARTA_800, -0.04],

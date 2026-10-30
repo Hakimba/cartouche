@@ -13,12 +13,11 @@ const EJECT_PRESS := 4.78
 ## How far the reset button goes down pressed, in millimetres.
 const RESET_PRESS := 0.45
 
-## Where a seated cartridge's centre is.
 @export var seat_at := Vector3(0.0, 66.2, -25.69):
 	set(value):
 		seat_at = value
 		emit_changed()
-## How far the power knob slides back, from off to on.
+## How far the power knob slides back, from off to on, in millimetres.
 @export var power_travel := 4.5:
 	set(value):
 		power_travel = value

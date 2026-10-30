@@ -108,7 +108,7 @@ class Staging:
 	var height: float
 	var size: float
 	## How dark the room is round it, from 0 to 1, and how far its pool of light reaches (in pixels
-	## of the 1280×960 design).
+	## of the 1280×960 layout frame).
 	var darkness: float
 	var radius: float
 

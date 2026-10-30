@@ -4,8 +4,7 @@ extends RefCounted
 ## The first finger on the screen, read as the person means it: put down, then a tap (lifted
 ## soon, having barely moved), a long press (held still), or a drag (moved past the slop). A touch
 ## the system takes back (its back gesture, a second finger's pinch) ends as nothing. Times come
-## from the caller, so that the reading is the same whatever the frame rate. The thresholds are the
-## design's.
+## from the caller, so that the reading is the same whatever the frame rate.
 
 enum Gesture { NONE, DOWN, TAP, DRAG }
 

@@ -23,7 +23,7 @@ class Face:
 			_backing.place(Rect2(Vector2.ZERO, size), RADIUS)
 
 
-## The face of a reflection: the satin box without its outer shadows, which the browser leaves out of the mirror.
+## The face of a reflection: the satin box without its outer shadows, which the mirror does not show.
 class Plain:
 	extends Control
 

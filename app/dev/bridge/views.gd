@@ -106,7 +106,8 @@ func tune(scene: Node, message: Dictionary) -> Dictionary:
 				"energy": 0, "range": 0, "angle": 0, "softness": 0, "shadow": -1}):
 			return _error("invalid light values")
 		var light := lights[int(_float(index))]
-		var record: Dictionary = _light_values.get(light.get_instance_id(), {"node": weakref(light), "values": {}, "rig": shown["rig"], "index": int(_float(index))})
+		var record: Dictionary = _light_values.get(light.get_instance_id(), {"node": weakref(light), "values": {}, "rig": shown["rig"],
+			"index": int(_float(index))})
 		var edited: Dictionary = record["values"]
 		edited.merge(values, true)
 		_light_values[light.get_instance_id()] = record
@@ -123,7 +124,7 @@ func tune(scene: Node, message: Dictionary) -> Dictionary:
 	return answer
 
 
-## Tries other seconds for the design's timings until the app starts again.
+## Tries other durations for the app's motion timings until the app starts again.
 static func _motion(values: Dictionary) -> Dictionary:
 	for key: Variant in values:
 		if StringName(str(key)) not in StudioTokens.LIVE or not _number(values[key]) or _float(values[key]) < 0.0:
@@ -131,7 +132,7 @@ static func _motion(values: Dictionary) -> Dictionary:
 		if str(key).ends_with("_CURVE") and (_float(values[key]) != int(_float(values[key])) or _float(values[key]) > Motion.Easing.OUT_BACK):
 			return _error("invalid motion values")
 	for key: String in values:
-		StudioTokens.try_timing(StringName(key), _float(values[key]))
+		(StudioTokens as Script).set(key, _float(values[key]))
 	return {"ok": true}
 
 
@@ -225,7 +226,7 @@ func hide_model(scene: Node) -> Callable:
 		_redraw(shown)
 
 
-## Today's light, which a console without a designed one keeps: the scene's Sun and its environment.
+## The default light, which a console without a light of its own keeps: the scene's Sun and its environment.
 static func _today(scene: Node) -> Dictionary:
 	var sun := scene.get_node_or_null("Sun") as DirectionalLight3D
 	var world := scene.get_node_or_null("Environment") as WorldEnvironment

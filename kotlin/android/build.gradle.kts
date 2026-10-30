@@ -86,6 +86,7 @@ dependencies {
     testImplementation(libs.bundles.test)
     testImplementation(testFixtures(project(":core")))
     testImplementation(libs.robolectric)
+    testRuntimeOnly(libs.junit.vintage)
 }
 
 // The Godot export only bundles files it is told about: the plugin AARs, the core jar, and the

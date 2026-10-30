@@ -21,9 +21,7 @@ internal object IntentMapper {
         spec.extras.forEach { put(it) }
         // `am start` always starts a new task, and templates written for it rely on that.
         flags = spec.switches.fold(spec.flags or Intent.FLAG_ACTIVITY_NEW_TASK) { acc, switch -> acc or switch.flag }
-        // ClipData carries the game URI to emulators that read it from an extra (Dolphin's
-        // AutoStartFile). Setting it also stops Android from moving a `--eu` extra into ClipData
-        // (share and capture intents); LaunchSpec keeps other content URIs out of the data URI.
+        // Emulators that read the game from an extra need it in ClipData; setting it also stops Android moving a `--eu` extra there.
         spec.grant.onSome {
             clipData = ClipData.newRawUri("", Uri.parse(it.value))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -33,7 +31,7 @@ internal object IntentMapper {
     private fun Intent.put(extra: Extra) {
         when (val v = extra.value) {
             is ExtraValue.Text -> putExtra(extra.key, v.value)
-            // `--esn` means "key present, no value", which Android models as a null String extra.
+            // `--esn`: key present, no value.
             ExtraValue.EmptyText -> putExtra(extra.key, null as String?)
             is ExtraValue.Flag -> putExtra(extra.key, v.value)
             is ExtraValue.IntNumber -> putExtra(extra.key, v.value)

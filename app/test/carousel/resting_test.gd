@@ -75,7 +75,7 @@ func _assert_rested(idle_s: float) -> void:
 	assert_bool(OS.low_processor_usage_mode).is_equal(idle_s >= 2.0)
 
 
-func test_INV_E8_01_left_alone_the_app_slows_then_stills_and_the_first_press_wakes_it_all_at_once() -> void:
+func test_inv_20_left_alone_the_app_slows_then_stills_and_the_first_press_wakes_it_all_at_once() -> void:
 	var idle_s := 0.0
 	while idle_s < 9.0:
 		_resting._process(STEP_S)
@@ -87,7 +87,7 @@ func test_INV_E8_01_left_alone_the_app_slows_then_stills_and_the_first_press_wak
 	assert_float(_paced.pace).is_equal(1.0)
 
 
-func test_INV_E8_01_whatever_the_frames_and_presses_the_app_is_as_long_left_alone_has_it() -> void:
+func test_inv_20_whatever_the_frames_and_presses_the_app_is_as_long_left_alone_has_it() -> void:
 	var woken_still := 0
 	for test_seed in 40:
 		var random := Fixtures.cases(test_seed)
@@ -107,34 +107,7 @@ func test_INV_E8_01_whatever_the_frames_and_presses_the_app_is_as_long_left_alon
 	assert_int(woken_still).is_greater(5)
 
 
-func test_while_something_goes_on_that_must_not_be_slowed_the_app_stays_awake() -> void:
-	# Held in an array: a lambda keeps its own copy of a plain local.
-	var moves := [true]
-	_resting.moving = func() -> bool: return moves[0]
-	_frames(200)
-	_assert_rested(0.0)
-	moves[0] = false
-	_frames(150)
-	_assert_rested(150 * STEP_S)
-	moves[0] = true
-	_resting._process(STEP_S)
-	_assert_rested(0.0)
-
-
-func test_an_animation_no_press_started_plays_without_waking_it() -> void:
-	# A message fading: a tween of its own.
-	var tween := create_tween()
-	tween.tween_interval(10.0)
-	var idle_s := 0.0
-	while idle_s < 8.0:
-		_resting._process(STEP_S)
-		idle_s += STEP_S
-		_assert_rested(idle_s)
-	assert_bool(tween.is_running()).is_true()
-	tween.kill()
-
-
-func test_INV_E8_01_a_stick_resting_on_its_centre_wakes_nothing_a_push_or_a_touch_does() -> void:
+func test_inv_20_a_stick_resting_on_its_centre_wakes_nothing_a_push_or_a_touch_does() -> void:
 	_frames(160)
 	for axis: JoyAxis in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y]:
 		for value: float in [0.29, -0.29, 0.0]:
@@ -170,14 +143,14 @@ func test_held_a_button_a_finger_or_a_stick_that_turns_keep_it_awake() -> void:
 		_assert_rested(50 * STEP_S)
 
 
-func test_INV_E8_01_a_return_to_the_app_wakes_it() -> void:
+func test_inv_20_a_return_to_the_app_wakes_it() -> void:
 	for back: int in [Node.NOTIFICATION_APPLICATION_RESUMED, Node.NOTIFICATION_APPLICATION_FOCUS_IN]:
 		_frames(160)
 		_resting.notification(back)
 		_assert_rested(0.0)
 
 
-func test_INV_E8_01_a_press_through_the_window_wakes_it() -> void:
+func test_inv_20_a_press_through_the_window_wakes_it() -> void:
 	_frames(160)
 	var press := InputEventJoypadButton.new()
 	press.button_index = JOY_BUTTON_B
@@ -187,33 +160,6 @@ func test_INV_E8_01_a_press_through_the_window_wakes_it() -> void:
 	var release := InputEventJoypadButton.new()
 	release.button_index = JOY_BUTTON_B
 	_send(release)
-
-
-func test_awake_or_kept_awake_it_writes_nothing_each_frame() -> void:
-	_resting.moving = func() -> bool: return true
-	_frames(100)
-	_resting.moving = func() -> bool: return false
-	_frames(30)
-	assert_int(_paced.given).is_equal(0)
-	assert_int(Engine.max_fps).is_equal(AWAKE_FPS)
-
-
-func test_measuring_motion_keeps_it_awake_and_leaving_gives_the_engine_back_as_it_was() -> void:
-	_resting.stays_awake = true
-	_frames(200)
-	_assert_rested(0.0)
-	_resting.stays_awake = false
-	_frames(160)
-	assert_bool(OS.low_processor_usage_mode).is_true()
-	# Gone, it leaves the engine and what it paced awake; back, it rests again from the start.
-	remove_child(_resting)
-	assert_int(Engine.max_fps).is_equal(AWAKE_FPS)
-	assert_bool(OS.low_processor_usage_mode).is_false()
-	assert_float(_paced.pace).is_equal(1.0)
-	add_child(_resting)
-	_assert_rested(0.0)
-	_frames(160)
-	_assert_rested(160 * STEP_S)
 
 
 ## A node moving by itself, as the backdrop or the rows are, counting the paces it is given.

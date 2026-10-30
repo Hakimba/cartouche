@@ -17,7 +17,7 @@ func _input_map() -> Dictionary:
 	return map
 
 
-func test_INV_E6_02_the_device_s_a_confirms_and_its_b_goes_back_whatever_style_is_chosen() -> void:
+func test_the_device_s_a_confirms_and_its_b_goes_back_whatever_style_is_chosen() -> void:
 	var standard := _input_map()
 	for style_index in STYLES.size():
 		var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())

@@ -90,7 +90,6 @@ static func cross(across: Rect2, upright: Rect2) -> PackedVector2Array:
 		Vector2(left, upright.position.y), Vector2(right, upright.position.y), Vector2(right, low)])
 
 
-## The smallest box around [param loop].
 static func bounds(loop: PackedVector2Array) -> Rect2:
 	var box := Rect2(loop[0], Vector2.ZERO)
 	for point in loop:
@@ -341,8 +340,8 @@ static func behind(box: Rect2) -> Rect2:
 
 
 ## Adds the face a logo is drawn on: [param box], laid a hair over the surface at height [param z]
-## so as not to flicker with it, its UV square the logo's image, upright (see ONBOARDING, "Adding a
-## console": a logo).
+## so as not to flicker with it, its UV square the logo's image, upright (see docs/adding-a-console.md,
+## "Logos").
 static func decal(mesh: MeshBuilder, box: Rect2, z: float) -> void:
 	flat(mesh, square(box), z + _DECAL_OFF, Vector3.BACK, box)
 
@@ -413,7 +412,6 @@ static func overlap(one: Rect2, other: Rect2) -> bool:
 	return one.has_area() and other.has_area() and one.intersects(other)
 
 
-## Whether every point of [param points] lies inside [param loop].
 static func inside(points: PackedVector2Array, loop: PackedVector2Array) -> bool:
 	return Array(points).all(func(point: Vector2) -> bool: return Geometry2D.is_point_in_polygon(point, loop))
 
@@ -570,6 +568,19 @@ static func moved_in(loop: PackedVector2Array, by: float) -> PackedVector2Array:
 	var outwards := _outwards(loop)
 	for i in loop.size():
 		found.append(loop[i] - outwards[i] * by)
+	return found
+
+
+## [param loop] counter-clockwise, its points closer than [param merged] (a hundredth of a millimetre) made one.
+static func ccw(loop: PackedVector2Array, merged := 0.01) -> PackedVector2Array:
+	var found := PackedVector2Array()
+	for point in loop:
+		if found.is_empty() or point.distance_to(found[-1]) > merged:
+			found.append(point)
+	if found[0].distance_to(found[-1]) <= merged:
+		found.remove_at(found.size() - 1)
+	if Geometry2D.is_polygon_clockwise(found):
+		found.reverse()
 	return found
 
 

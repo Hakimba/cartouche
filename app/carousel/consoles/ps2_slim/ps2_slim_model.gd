@@ -4,13 +4,10 @@ extends ConsoleModel
 ## The PS2 slim, built from its [Ps2SlimShape]: the lid turns about its hinge, and the drive's
 ## [Spindle] sits in the well, where a seated disc's centre is the spindle's origin.
 
-## The lid fully open, in degrees.
 const _OPEN_DEGREES := 88.0
 
-## How far the lid is open, in degrees.
 var lid_degrees := 0.0:
 	set(value):
-		# Given each frame by the launch animation: the lid is moved only when it turns.
 		if value != lid_degrees and is_node_ready():
 			_lid.rotation.x = -deg_to_rad(value)
 		lid_degrees = value

@@ -2,13 +2,13 @@
 extends Node
 
 var folder := ""
-var _plinth: Plinth
-var _view: SubViewport
 var model: Node3D
 var lights: StudioLights
 var camera: Camera3D
 ## The start the model stands at, the file's until a tune gives another.
 var start: Plinth.Start
+var _plinth: Plinth
+var _view: SubViewport
 var _spin := Node3D.new()
 var _stand := Node3D.new()
 

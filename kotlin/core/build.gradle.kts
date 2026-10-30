@@ -20,6 +20,8 @@ dependencies {
     testImplementation(libs.bundles.test)
     // Generators, fixtures and fakes shared by the tests of both modules.
     testFixturesImplementation(libs.kotest.property)
+    testFixturesImplementation(libs.junit.launcher)
+    testRuntimeOnly(libs.junit.vintage)
 }
 
 // The tests check the definition files shipped with the app, not copies.

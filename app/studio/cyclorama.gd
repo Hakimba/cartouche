@@ -2,8 +2,8 @@
 class_name Cyclorama
 extends Control
 ## The backdrop of every screen: a small lit photo studio. The paper wall curving into the floor and its
-## vignette are one picture baked from the design; over it, in one shader, the key light and the floor's pool of
-## light, as the design paints them, without the console's colour. Nothing moves, so nothing is drawn again.
+## vignette are one baked picture; over it, in one shader, the key light and the floor's pool of
+## light, without the console's colour. Nothing moves, so nothing is drawn again.
 
 var _glows := ShaderMaterial.new()
 
@@ -40,8 +40,3 @@ func _ready() -> void:
 	over.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	over.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(over)
-
-
-## The gel of [param console], its platform's (a variant takes its base model's).
-static func gel_of(console: ConsoleManifest) -> Color:
-	return console.gel()

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name Ps2FatModel
 extends ConsoleModel
-## The bench's fat PS2: its tray moves towards the front, carrying the disc; both buttons press in.
+## The original PS2: its tray moves towards the front, carrying the disc; both buttons press in.
 
 var tray_mm := 0.0:
 	set(value):

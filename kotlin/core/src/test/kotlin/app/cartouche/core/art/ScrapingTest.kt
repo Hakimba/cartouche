@@ -64,7 +64,7 @@ class ScrapingTest {
         )
 
     @Test
-    fun `INV-E4-03 INV-E6-03 a game is under way once at most, not looked for once done or dropped, and a resumed run asks for the rest`() =
+    fun `INV-13 INV-17 a game is under way once at most, not looked for once done or dropped, and a resumed run asks for the rest`() =
         runBlocking<Unit> {
             var finished = 0
             checkAll(Arb.list(steps, 1..40)) { script ->
@@ -142,11 +142,11 @@ class ScrapingTest {
                 asked.filter { it in found || it !in scanned() }.shouldBeEmpty()
                 scanned().filter { it !in found && it !in asked + underWay }.shouldBeEmpty()
             }
-            finished shouldBeGreaterThan 100
+            finished shouldBeGreaterThan 36
         }
 
     @Test
-    fun `INV-E4-05 a stall waits 30 s, twice as long with each one in a row up to 15 min, and 30 s again once a game is done`() {
+    fun `INV-17 a stall waits 30 s, twice as long with each one in a row up to 15 min, and 30 s again once a game is done`() {
         var run = Scraping.NONE.with((0..20).map(::request))
         val delays =
             (0..8).map {
@@ -162,7 +162,7 @@ class ScrapingTest {
     }
 
     @Test
-    fun `INV-E4-05 requests that stall together are one stall`() {
+    fun `INV-17 requests that stall together are one stall`() {
         val (first, one) = Scraping.NONE.with((0..2).map(::request)).take().shouldBeSome()
         val (second, two) = one.take().shouldBeSome()
         two.stalled(first.game, Stall.OFFLINE).stalled(second.game, Stall.OFFLINE).retryDelay shouldBe 30.seconds

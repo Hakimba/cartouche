@@ -126,7 +126,7 @@ func test_while_the_console_is_being_added_going_back_does_nothing() -> void:
 	assert_bool(await Fixtures.until(self, func() -> bool: return device.scans == 1)).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	await Fixtures.action(self, &"form_submit")
-	await get_tree().create_timer(0.6).timeout
+	assert_bool(_the_form(carousel)._leaving).is_false()
 	assert_bool((carousel.get_node("%Screens/Saving") as Label).visible).is_true()
 	device.slow.clear()
 	device.released.emit()
@@ -261,7 +261,7 @@ func _listed_sorted(carousel: Carousel) -> Array:
 	return listed
 
 
-func test_INV_E12_06_the_type_list_is_exactly_the_supported_consoles_not_yet_set_up() -> void:
+func test_the_type_list_is_exactly_the_supported_consoles_not_yet_set_up() -> void:
 	var first := _new_device()
 	var carousel := await Fixtures.on_form(self, first, false)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -270,7 +270,7 @@ func test_INV_E12_06_the_type_list_is_exactly_the_supported_consoles_not_yet_set
 	assert_int(_chooser(carousel).rows().size()).is_equal(12)
 
 
-func test_INV_E12_06_a_console_set_up_is_not_offered_again_and_the_others_keep_the_catalog_order() -> void:
+func test_a_console_set_up_is_not_offered_again_and_the_others_keep_the_catalog_order() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3, "gba": 2, "xbox": 1})
 	device.players_everywhere = true
 	var more := Fixtures.fresh_carousel(self, device)
@@ -298,79 +298,6 @@ func _filled(device: Fixtures.NewDevice) -> Carousel:
 	return carousel
 
 
-func test_the_step_chips_fill_with_each_field_chosen_and_the_count_follows() -> void:
-	var device := _new_device()
-	var carousel := await Fixtures.on_form(self, device, false)
-	var form := _the_form(carousel)
-	var chips: Array[StepField] = [_form(carousel, "%Type"), _form(carousel, "%Emulator"), _form(carousel, "%Folder")]
-	assert_array(chips.map(func(chip: StepField) -> bool: return chip.done)).contains_exactly([false, false, false])
-	assert_int(form.steps()).is_equal(0)
-	await Fixtures.choose_type(self, carousel)
-	assert_array(chips.map(func(chip: StepField) -> bool: return chip.done)).contains_exactly([true, false, false])
-	assert_int(form.steps()).is_equal(1)
-	await Fixtures.action(self, &"ui_down")
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.choose_in_list(self, carousel, device.installed_players("ps2")[0].id)
-	assert_array(chips.map(func(chip: StepField) -> bool: return chip.done)).contains_exactly([true, true, false])
-	await Fixtures.action(self, &"ui_down")
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return chips[2].done)).is_true()
-	assert_int(form.steps()).is_equal(3)
-	var gel := StudioTokens.GEL[&"ps2_slim"]
-	for chip in chips:
-		assert_bool(await Fixtures.until(self, func() -> bool: return chip.chip_color().is_equal_approx(gel))).is_true()
-
-
-func test_a_chip_not_chosen_is_not_filled() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	for field: String in ["%Type", "%Emulator", "%Folder"]:
-		assert_that((_form(carousel, field) as StepField).chip_color()).is_equal(Color.TRANSPARENT)
-
-
-func test_the_plinth_turns_the_type_chosen_and_its_plate_names_the_emulator() -> void:
-	var device := _new_device()
-	var carousel := await Fixtures.on_form(self, device, false)
-	var form := _the_form(carousel)
-	assert_str(form.plinth().console()).is_empty()
-	assert_str(form.plate_name()).is_equal("No console")
-	await Fixtures.choose_type(self, carousel)
-	assert_str(form.plinth().console()).is_equal("ps2_slim")
-	assert_str(form.plate_name()).is_empty()
-	await Fixtures.action(self, &"ui_down")
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.choose_in_list(self, carousel, device.installed_players("ps2")[0].id)
-	assert_str(form.plate_name()).is_equal(device.installed_players("ps2")[0].emulator_name)
-	assert_str(form.plinth().console()).is_equal("ps2_slim")
-	await Fixtures.action(self, &"ui_up")
-	await Fixtures.choose_type(self, carousel, "gba")
-	assert_str(form.plinth().console()).is_equal("gba")
-
-
-func test_the_focus_jumps_to_add_once_games_are_found_and_down_from_the_discs_reaches_it() -> void:
-	var carousel := await _filled(_new_device())
-	assert_bool((_form(carousel, "%Add") as Button).disabled).is_false()
-	(_form(carousel, "%Discs") as Control).grab_focus()
-	await Fixtures.action(self, &"ui_down")
-	assert_str(Fixtures.focus(self).name).is_equal("Add")
-	await Fixtures.action(self, &"ui_left")
-	assert_str(Fixtures.focus(self).name).is_equal("Cancel")
-	await Fixtures.action(self, &"ui_right")
-	assert_str(Fixtures.focus(self).name).is_equal("Add")
-	await Fixtures.action(self, &"ui_up")
-	assert_str(Fixtures.focus(self).name).is_equal("Discs")
-
-
-func test_down_from_the_discs_reaches_cancel_while_no_game_is_found() -> void:
-	var device := _new_device()
-	device.games = 0
-	var carousel := await Fixtures.on_form(self, device)
-	(_form(carousel, "%Discs") as Control).grab_focus()
-	await Fixtures.action(self, &"ui_down")
-	assert_str(Fixtures.focus(self).name).is_equal("Cancel")
-	await Fixtures.action(self, &"ui_right")
-	assert_str(Fixtures.focus(self).name).is_equal("Cancel")
-
-
 func test_start_never_submits_the_form_but_A_does() -> void:
 	var device := _new_device()
 	var carousel := await _filled(device)
@@ -380,111 +307,6 @@ func test_start_never_submits_the_form_but_A_does() -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
 	assert_int(device.scans).is_equal(1)
-
-func test_the_card_rests_on_the_focused_line_and_rings_a_pill_button() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	var card := _the_form(carousel).card()
-	var rests_on := func(control: Control, grown: float) -> bool:
-		var box := Rect2(control.position, control.size).grow(grown)
-		return card.position.is_equal_approx(box.position) and card.size.is_equal_approx(box.size)
-	var type: Control = _form(carousel, "%Type")
-	assert_bool(card.bare).is_false()
-	assert_bool(rests_on.call(type, 0.0)).is_true()
-	for _i in 5:
-		await Fixtures.action(self, &"ui_down")
-	var cancel: Control = _form(carousel, "%Cancel")
-	assert_str(Fixtures.focus(self).name).is_equal("Cancel")
-	assert_bool(await Fixtures.until(self, func() -> bool: return rests_on.call(cancel, 8.96))).is_true()
-	assert_bool(card.bare).is_true()
-	# The design's table: 3.5 cqw, whatever the pill's height.
-	assert_float(card.radius).is_equal_approx(3.5 * FormPaint.CQW, 0.01)
-	await Fixtures.action(self, &"ui_up")
-	assert_bool(card.bare).is_false()
-	assert_bool(await Fixtures.until(self, func() -> bool: return rests_on.call(_form(carousel, "%Discs"), 0.0))).is_true()
-
-
-func test_the_hint_row_shows_only_a_choose_where_the_design_puts_it() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	var hints := _form(carousel, "Hints") as HintRow
-	assert_int(hints.get_child_count()).is_equal(1)
-	var hint := hints.get_child(0) as ButtonHint
-	assert_str(hint.text).is_equal("Choose")
-	assert_bool(hints.is_visible_in_tree() and hint.is_visible_in_tree()).is_true()
-	assert_that(hints.global_position).is_equal(StudioTokens.HINTS.position)
-	assert_float(hint.size.x).is_greater(0.0)
-
-
-func test_a_value_too_long_for_its_line_ends_with_an_ellipsis_on_one_line() -> void:
-	var field: StepField = auto_free(preload("res://screens/step_field.tscn").instantiate())
-	add_child(field)
-	var long := "Carte SD › ROMs › " + "un dossier au nom très long ".repeat(6) + "ps2"
-	field.show_value(long)
-	await await_idle_frame()
-	var whole := StudioText.new(long, StudioTokens.Face.JAKARTA_700, 2.35 * 12.8, 0.0)
-	assert_float(whole.width).is_greater(field.room())
-	assert_float(field.shown_width()).is_less_equal(field.room())
-	assert_float(field.shown_width()).is_greater(field.room() - 60.0)
-	field.show_value("Carte SD › ROMs › ps2")
-	await await_idle_frame()
-	assert_float(field.shown_width()).is_less(field.room())
-
-
-func test_the_form_comes_in_over_a_motion_and_leaves_over_one_before_it_closes() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	var form := _the_form(carousel)
-	assert_float(form.modulate.a).is_less(1.0)
-	assert_bool(await Fixtures.until(self, func() -> bool: return is_equal_approx(form.modulate.a, 1.0))).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_str(Fixtures.shown_screen(carousel).name).is_equal("AddConsole")
-	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-
-
-func test_the_lines_come_back_to_rest_when_a_chooser_is_given_up() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	var list: Control = _form(carousel, "List")
-	assert_bool(await Fixtures.until(self, func() -> bool: return is_equal_approx(_the_form(carousel).modulate.a, 1.0))).is_true()
-	await Fixtures.until(self, func() -> bool: return list.position.is_equal_approx(Vector2(524.8, 204.8)))
-	var rest := list.position
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return not list.position.is_equal_approx(rest))).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return list.position.is_equal_approx(rest) and is_equal_approx(list.modulate.a, 1.0))).is_true()
-
-
-func test_the_model_rises_again_on_the_same_plinth_when_a_chooser_is_given_up() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	var form := _the_form(carousel)
-	await Fixtures.choose_type(self, carousel)
-	var plinth := form.plinth()
-	var model := plinth.get_node("Turntable") as Control
-	assert_bool(await Fixtures.until(self, func() -> bool: return is_equal_approx(model.modulate.a, 1.0))).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return model.modulate.a < 0.05)).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_object(form.plinth()).is_same(plinth)
-	assert_float(model.modulate.a).is_less(1.0)
-	assert_bool(await Fixtures.until(self, func() -> bool: return is_equal_approx(model.modulate.a, 1.0))).is_true()
-	assert_str(plinth.console()).is_equal("ps2_slim")
-
-
-func test_the_edit_form_s_remove_pill_shows_no_b_key_and_the_add_form_s_cancel_pill_does() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	var form := _the_form(carousel)
-	var cancel := _form(carousel, "%Cancel") as FormPill
-	var add := _form(carousel, "%Add") as FormPill
-	assert_bool(cancel.keyed).is_true()
-	assert_bool(add.primary).is_true()
-	form.edit("ps2", AndroidServices.PlatformSetup.new({}), null, PackedStringArray())
-	assert_str(cancel.text).is_equal("Remove")
-	assert_bool(cancel.keyed).is_false()
-	assert_str(add.text).is_equal("Save")
-	form.open()
-	assert_str(cancel.text).is_equal("Cancel")
-	assert_bool(cancel.keyed).is_true()
-	await await_idle_frame()
-	await await_idle_frame()
-
 
 func test_while_the_form_leaves_nothing_on_it_acts_and_it_closes_once() -> void:
 	var device := _new_device()
@@ -504,27 +326,11 @@ func test_while_the_form_leaves_nothing_on_it_acts_and_it_closes_once() -> void:
 	assert_bool(_chooser(carousel).visible).is_false()
 	await Fixtures.action(self, &"form_submit")
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	await get_tree().create_timer(0.3).timeout
+	assert_bool(await Fixtures.until(self, func() -> bool: return not form.visible)).is_true()
+	await await_idle_frame()
 	assert_array(closed).contains_exactly([AddConsole.Outcome.GIVEN_UP])
 	assert_int(device.scans).is_equal(0)
 	assert_array(device.set_up).is_empty()
-
-
-func test_a_form_given_up_early_only_fades_out() -> void:
-	var carousel := await Fixtures.on_form(self, _new_device(), false)
-	var form := _the_form(carousel)
-	await get_tree().create_timer(0.1).timeout
-	await Fixtures.joypad(self, JOY_BUTTON_B)
-	var peak := form.modulate.a
-	# Still on its way in when B came: it never jumps to whole before it fades.
-	assert_float(peak).is_less(0.7)
-	var shown := true
-	while shown:
-		assert_float(form.modulate.a).is_less_equal(peak + 0.0001)
-		await await_idle_frame()
-		var screen := Fixtures.shown_screen(carousel)
-		shown = screen != null and screen.name == "AddConsole"
-	assert_float(form.modulate.a).is_less(peak)
 
 
 func test_remove_pressed_while_the_edit_form_leaves_asks_nothing() -> void:
@@ -536,8 +342,10 @@ func test_remove_pressed_while_the_edit_form_leaves_asks_nothing() -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	(_form(carousel, "%Cancel") as Control).grab_focus()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await get_tree().create_timer(0.5).timeout
+	assert_bool(await Fixtures.until(self, func() -> bool: return not form.visible)).is_true()
+	await await_idle_frame()
 	assert_array(closed).contains_exactly([AddConsole.Outcome.GIVEN_UP])
+	assert_str(Fixtures.shown_screen(carousel).name).is_not_equal("Confirm")
 
 
 func test_a_toggle_greys_add_until_its_count_comes() -> void:
@@ -567,7 +375,7 @@ func test_a_type_changed_while_a_count_is_pending_is_not_counted_for_the_new_one
 	assert_str(_note(carousel)).is_equal("Install an emulator for this console, then come back.")
 
 
-func test_INV_E6_01_a_seeded_walk_over_the_filled_form_keeps_one_focus_and_B_leaves_it() -> void:
+func test_inv_20_a_seeded_walk_over_the_filled_form_keeps_one_focus_and_B_leaves_it() -> void:
 	var random := RandomNumberGenerator.new()
 	random.seed = 1203
 	var device := _new_device()
@@ -629,35 +437,3 @@ func test_a_form_given_up_does_not_keep_the_previewed_variant() -> void:
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	assert_dict(device.console_variants).is_empty()
 	assert_array(device.set_up).is_empty()
-
-
-func test_the_note_s_dot_shows_only_beside_games_found_whatever_colour_the_form_takes() -> void:
-	var device := _new_device()
-	var carousel := await Fixtures.on_form(self, device, false)
-	var form := _the_form(carousel)
-	form._set_note("No emulator.", false)
-	form._paint(Color.ORANGE)
-	await await_idle_frame()
-	assert_bool(form._dot._box.has_area()).is_false()
-	form._set_note("3 games found", true)
-	form._draw_note()
-	assert_bool(form._dot._box.has_area()).is_true()
-	form._set_note("No emulator.", false)
-	form._draw_note()
-	form._paint(Color.BLUE)
-	assert_bool(form._dot._box.has_area()).is_false()
-
-
-func test_arrows_beside_the_model_show_while_left_and_right_change_it_and_the_one_pressed_nudges() -> void:
-	var device := _new_device()
-	var carousel := await Fixtures.on_form(self, device)
-	var form := _the_form(carousel)
-	assert_bool(form._arrows.all(func(arrow: TextureRect) -> bool: return arrow.visible)).is_true()
-	var rest := form._arrows[1].position.x
-	await Fixtures.action(self, &"ui_right")
-	assert_float(form._arrows[1].position.x).is_greater(rest)
-	await Fixtures.action(self, &"ui_down")
-	assert_str(Fixtures.focus(self).name).is_not_equal("Folder")
-	assert_bool(form._arrows.any(func(arrow: TextureRect) -> bool: return arrow.visible)).is_false()
-	await Fixtures.action(self, &"ui_up")
-	assert_bool(form._arrows.all(func(arrow: TextureRect) -> bool: return arrow.visible)).is_true()

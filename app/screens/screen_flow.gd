@@ -205,7 +205,6 @@ func _choose_preferred_region(first_launch := false) -> void:
 		Diagnostics.trace("screens", "preferred region not saved (%s): %s" % [saved.code, saved.detail])
 
 
-
 ## "No console" until the form adds one and it glides to the carousel. Returns at once when a console of
 ## the settings finds games.
 func _add_first_console() -> void:

@@ -7,9 +7,9 @@ import arrow.core.Option
 import arrow.core.Some
 
 /**
- * One word of a title as the search reads it: [text] in lowercase Latin letters and digits, accents
- * left out, and where it stands in the title, in code points: it starts at [start], and its first
- * `n` letters end at `ends[n - 1]` (a letter may come from a ligature, or carry its accent apart).
+ * One word of a title as the search reads it: [text] in lowercase Latin letters and digits, accents left out, and
+ * where it stands in the title, in code points: it starts at [start], and its first `n` letters end at `ends[n - 1]`
+ * (a letter may come from a ligature, or carry its accent apart).
  */
 internal data class Word(val text: String, val start: Int, val ends: List<Int>)
 
@@ -49,8 +49,8 @@ internal object Words {
     fun folded(text: String): String = text.codePoints().toArray().joinToString("") { codePoint -> Folding.of(codePoint).ifEmpty { " " } }
 
     /**
-     * Prefixes typed, each on another of [words] (never on word [skip]), in any order: how many
-     * letters of each word one took (0 for none), the first such choice; none when there is none.
+     * Prefixes typed, each on another of [words] (never on word [skip]), in any order: how many letters of each word
+     * one took (0 for none), the first such choice; none when there is none.
      */
     fun taking(words: List<Word>, prefixes: List<String>, skip: Int = -1): Option<IntArray> {
         // Run on thousands of titles at each key typed: one array, filled and emptied as it goes.

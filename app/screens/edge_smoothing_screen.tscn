@@ -65,6 +65,7 @@ theme_override_constants/separation = 60
 custom_minimum_size = Vector2(300, 340)
 layout_mode = 2
 script = ExtResource("2")
+value = &"4x"
 title = "4× (default)"
 note = "The smoothest edges."
 
@@ -72,7 +73,7 @@ note = "The smoothest edges."
 custom_minimum_size = Vector2(300, 340)
 layout_mode = 2
 script = ExtResource("2")
-smoothing = &"2x"
+value = &"2x"
 title = "2×"
 note = "Slightly sharper edges; a little less work for the graphics card."
 
@@ -80,7 +81,7 @@ note = "Slightly sharper edges; a little less work for the graphics card."
 custom_minimum_size = Vector2(300, 340)
 layout_mode = 2
 script = ExtResource("2")
-smoothing = &"off"
+value = &"off"
 title = "Off"
 note = "Edges in small steps; much less work for the graphics card."
 

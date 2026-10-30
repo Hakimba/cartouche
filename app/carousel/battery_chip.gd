@@ -6,8 +6,16 @@ extends StudioPill
 ## character.
 
 var _plugged := false
-## The bolt, rasterised once.
 var _bolt: ImageTexture
+
+
+## Anchored to the right edge whatever the window's width: the offsets count from the right edge of the 1280-wide
+## layout frame, not the window's.
+func _ready() -> void:
+	offset_left = StudioTokens.BATTERY.position.x - CarouselLayout.FRAME.x
+	offset_right = StudioTokens.BATTERY.end.x - CarouselLayout.FRAME.x
+	offset_top = StudioTokens.BATTERY.position.y
+	offset_bottom = StudioTokens.BATTERY.end.y
 
 
 func _draw() -> void:
@@ -21,7 +29,7 @@ func _draw() -> void:
 		picture.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d"><path d="M%sz" fill="#%s"/></svg>'
 			% [room.x, room.y, path, StudioTokens.BOLT.to_html(false)])
 		_bolt = ImageTexture.create_from_image(picture)
-	# The browser draws the bolt's SVG rasterised, its box on whole pixels.
+	# On whole pixels, the rasterised bolt stays sharp.
 	draw_texture(_bolt, _bolt_corner().round())
 
 
@@ -40,7 +48,6 @@ func _bolt_scale() -> float:
 	return StudioTokens.BOLT_HEIGHT / StudioTokens.BOLT_VIEW.y
 
 
-## The bolt's top left: after the level, centred with it.
 func _bolt_corner() -> Vector2:
 	return Vector2(_text_left() + _line.width + _beside_text() - StudioTokens.BOLT_VIEW.x * _bolt_scale(),
 		(size.y - StudioTokens.BOLT_HEIGHT) / 2.0)
@@ -54,7 +61,6 @@ func show_battery(battery: AndroidServices.Battery) -> void:
 	Diagnostics.trace("battery", "%s, %s" % [text if text else "level unknown", "plugged in" if _plugged else "unplugged"])
 
 
-## The bolt after the level, the design's gap between them (none without a level).
 func _beside_text() -> float:
 	if not _plugged:
 		return 0.0

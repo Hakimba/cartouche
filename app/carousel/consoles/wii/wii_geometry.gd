@@ -75,7 +75,6 @@ static func arrays(shape: WiiShape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.block(mesh, slot, Vector2.ONE * shape.slot_rim / 2.0, steps, front - 0.5,
 				front + WiiShape.RIM_RAISE, WiiShape.RIM_BEVEL, slot, NAN, true, through)
 		&"gap":
-			# The dark inside of the slot, a millimetre below its rim, that lights up.
 			var inside := shape.gap().grow(-0.05)
 			ShapeGeometry.block(mesh, inside, Vector2.ONE * inside.size.x / 2.0, steps, front - 0.4,
 				front + WiiShape.RIM_RAISE - 1.0, 0.05, inside)
@@ -99,7 +98,6 @@ static func arrays(shape: WiiShape, part: StringName, detail: int) -> Array:
 		&"logo":
 			ShapeGeometry.decal(mesh, shape.logo(), front)
 		&"power_label", &"reset_label", &"eject_label":
-			# Under the power and reset buttons, over the eject one.
 			var button := shape.button([&"power_label", &"reset_label", &"eject_label"].find(part))
 			var size := LOGOS[part]
 			var low := button.end.y + LABEL_GAP if part == &"eject_label" else button.position.y - LABEL_GAP - size.y
@@ -112,7 +110,6 @@ static func arrays(shape: WiiShape, part: StringName, detail: int) -> Array:
 			ShapeGeometry.decal(mesh, ShapeGeometry.centred(shape.sync_button().get_center(), LOGOS[part]),
 				front - WiiShape.DOOR_WELL + 1.0)
 		&"ati_logo", &"maker_logo":
-			# On the right side's panel, near its top: one by its front, the other by its back.
 			var panel := shape.side_panel()
 			var size := LOGOS[part]
 			var start := panel.position.x + SIDE_INSETS.x if part == &"ati_logo" else panel.end.x - SIDE_INSETS.y - size.x

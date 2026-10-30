@@ -7,8 +7,7 @@ extends Control
 ## view is drawn again only when the console moves or peels, and it is window-sized only while the
 ## ring shows ([method watch]): a full-size view with its MSAA weighs some tens of megabytes.
 
-## The border and the shadow's offset, in pixels of the screen, once peeled off, and the shadow's colour: the design's
-## white outline (0.3 cqw) and drop shadow (1.4 cqw down).
+## The border and the shadow's offset, in pixels of the screen, once peeled off, and the shadow's colour.
 const _BORDER := 3.84
 const _SHADOW := Vector2(0.0, 17.92)
 const _SHADOW_COLOR := Color(60.0 / 255.0, 40.0 / 255.0, 20.0 / 255.0, 0.38)

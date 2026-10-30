@@ -49,7 +49,7 @@ class GameNameTest {
     }
 
     @Test
-    fun `INV-E1-03 reading names is total, never gives a blank title, and is idempotent on titles`() = runBlocking<Unit> {
+    fun `INV-03 reading names is total, never gives a blank title, and is idempotent on titles`() = runBlocking<Unit> {
         checkAll(Arb.string().filter { it.isNotBlank() }) { text ->
             val name = GameName.parse(text)
             name.displayTitle.shouldNotBeBlank()

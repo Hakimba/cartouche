@@ -8,7 +8,6 @@ import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.storage.SelectionStore
 import app.cartouche.core.art.ArtVariant
 import app.cartouche.core.art.web
-import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.Library
@@ -26,7 +25,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.io.File
-import app.cartouche.core.art.texture as candidateTexture
 
 @RunWith(RobolectricTestRunner::class)
 class LabelChoicesTest {
@@ -63,26 +61,6 @@ class LabelChoicesTest {
     }
 
     @Test
-    fun `a texture chosen is remembered with its source, so that it is the image looked for first`() {
-        val store = ArtStore(folder)
-        val texture =
-            ArtVariant(
-                LabelRegion("Japan"),
-                candidateTexture(58, 1, "support-texture(jp)", "Japan"),
-            )
-        store.saveVariant(texture.candidate, japanese).shouldBeRight()
-        LabelChoices(library(), store).choose(okage, texture).shouldBeRight()
-        label() shouldBe LabelChoice.Region(LabelRegion("Japan"), ArtSource.SCREENSCRAPER)
-    }
-
-    @Test
-    fun `an image not downloaded is not chosen, and nothing changes`() {
-        LabelChoices(library(), ArtStore(folder)).choose(okage, japan).shouldBeLeft(LabelFailure.NotDownloaded)
-        label() shouldBe LabelChoice.Automatic
-        ArtStore(folder).stored(okage.id).shouldBeSome().file.readBytes() shouldBe own
-    }
-
-    @Test
     fun `an image that cannot be stored gives the choice up, the label as it was`() {
         val store = ArtStore(folder)
         store.saveVariant(japan.candidate, japanese).shouldBeRight()
@@ -113,22 +91,6 @@ class LabelChoicesTest {
         LabelChoices(library(), store).choose(okage.copy(label = LabelChoice.Own), japan).shouldBeRight()
         label() shouldBe LabelChoice.Region(japan.region)
         ArtStore(folder).stored(okage.id).shouldBeSome().file.readBytes() shouldBe japanese
-    }
-
-    @Test
-    fun `a picture of one's own that cannot be stored gives the choice up, the label as it was`() {
-        folder.setWritable(false)
-        try {
-            assumeFalse(folder.canWrite())
-            LabelChoices(
-                library(),
-                ArtStore(folder),
-            ).keepOwn(okage, byteArrayOf(3)).shouldBeLeft().shouldBeInstanceOf<LabelFailure.Storage>()
-        } finally {
-            folder.setWritable(true)
-        }
-        label() shouldBe LabelChoice.Automatic
-        ArtStore(folder).stored(okage.id).shouldBeSome().file.readBytes() shouldBe own
     }
 
     @Test

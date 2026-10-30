@@ -11,16 +11,18 @@ import arrow.core.nonEmptyListOf
 import arrow.core.toNonEmptyListOrNone
 
 /**
- * Made-up libraries, for trying the carousel and measuring it at scale without game files. Their
- * games cannot be launched. Titles mix short and long ones, accents and Japanese, like a real
- * collection.
+ * Made-up libraries, for trying the carousel and measuring it at scale without game files. Their games cannot be
+ * launched. Titles mix short and long ones, accents and Japanese, like a real collection.
  */
 public object DemoLibrary {
     private val FIRST = listOf("Crystal", "Shadow", "Neon", "Iron", "Silent", "Solar", "Wild", "Ōkami no", "Étoile", "Last")
     private val SECOND = listOf("Knights", "Racer", "Tactics", "Legends of the Northern Seas", "Hunter", "Drift", "Saga", "ファンタジー")
     private val SUFFIX = listOf("", " II", ": Director's Cut", " 3", "")
 
-    /** [games] games spread in turn over [platforms] (none without platforms); the same arguments always give the same library. */
+    /**
+     * [games] games spread in turn over [platforms] (none without platforms); the same arguments always give the same
+     * library.
+     */
     public fun of(games: Int, platforms: List<PlatformId>): Library = platforms.toNonEmptyListOrNone().fold({ Library() }) { cycle ->
         Library(games = (0 until games).flatMap { game(it, cycle[it % cycle.size]).toList() })
     }

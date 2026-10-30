@@ -12,8 +12,8 @@ import kotlinx.serialization.json.Json
 public value class SelectionUnreadable(public val detail: String)
 
 /**
- * The selection as stored on the device, in its own small file: saving it costs the same whatever
- * the size of the library. JSON with a format version, checked like any input when read back.
+ * The selection as stored on the device, in its own small file: saving it costs the same whatever the size of the
+ * library. JSON with a format version, checked like any input when read back.
  */
 public object SelectionFormat {
     private const val VERSION: Int = 1

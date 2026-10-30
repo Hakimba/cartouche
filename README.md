@@ -51,19 +51,21 @@ Game Boy Color, Game Boy Advance, GameCube, Wii, PlayStation, Xbox and Xbox 360.
 ## Building
 
 Requirements: Godot 4.7.2 with its export templates, JDK 17, the Android SDK (platform 36, build
-tools 36.1.0), and `adb` for installing on a device.
+tools 36.1.0), Python 3, gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), and `adb` for
+installing on a device.
 
 ```sh
 export JAVA_HOME=/path/to/jdk-17 ANDROID_HOME=/path/to/android-sdk
 export GODOT=/path/to/godot   # if `godot` is not on PATH
-dev/build.sh            # lint, Kotlin and GDScript tests, Kotlin build, debug APK in build/
+dev/build.sh            # docs check, lint, Kotlin and GDScript tests, Kotlin build, debug APK in build/
 dev/build.sh --install  # same, then installs and starts it on the connected device
 dev/logs.sh             # follows the debug build's traces on the device
 dev/bench.sh            # measures the installed debug build at several library sizes
 ```
 
-How the code is organised: [docs/ONBOARDING.md](docs/ONBOARDING.md). Guarantees every change must
-keep, each enforced by tests: [docs/INVARIANTS.md](docs/INVARIANTS.md).
+New to the code? Start at [docs/ONBOARDING.md](docs/ONBOARDING.md): the three layers, the commands, and for
+each task (add a console, a screen, a setting, a sound…) the page and the files to open. Guarantees every change
+must keep, each enforced by tests: [docs/INVARIANTS.md](docs/INVARIANTS.md).
 
 ## How a label is found
 
@@ -85,7 +87,8 @@ keep, each enforced by tests: [docs/INVARIANTS.md](docs/INVARIANTS.md).
    is tried again at a later scan.
 
 ScreenScraper is used with Cartouche's developer key, which builds take from `kotlin/local.properties`
-(`screenscraper.devid`, `screenscraper.devpassword`), never from the repository; see `docs/ONBOARDING.md`.
+(`screenscraper.devid`, `screenscraper.devpassword`), never from the repository; see
+[Credentials](docs/ONBOARDING.md#credentials).
 
 ## Open-source work used
 

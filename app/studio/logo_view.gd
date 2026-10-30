@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name LogoView
 extends TextureRect
-## A console's logo in one of the design's slots, at its pixel size: each slot's pictures are made ready
+## A console's logo in one of the fixed slots, at its pixel size: each slot's pictures are made ready
 ## for it, so the app fits nothing.
 
 enum Slot { RAIL_TILE, GAMES_TOP, PLINTH_PLATE, RING_MIDDLE, BETWEEN_MINI, FORM_PLATE }
