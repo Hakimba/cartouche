@@ -10,6 +10,9 @@ enum Slot { RAIL_TILE, GAMES_TOP, PLINTH_PLATE, RING_MIDDLE, BETWEEN_MINI, FORM_
 const FOLDERS: Array[String] = ["rail-tile", "games-top", "plinth-plate", "ring-middle", "between-mini", "form-plate"]
 ## What shows for a console without a logo in the slot: nothing, no room taken.
 const _NONE := preload("res://studio/no_logo.tres")
+## The logos read so far, by path (null for none): Godot drops a picture nobody shows, and a list moving
+## through the consoles shows a new one at every step.
+static var _read: Dictionary[String, Texture2D] = {}
 
 
 func _init() -> void:
@@ -22,9 +25,11 @@ func _init() -> void:
 ## [param slot]; nothing, and false, when the slot has none for it.
 func show_logo(slot: Slot, console: String) -> bool:
 	var path := "res://studio/logos/%s/%s.png" % [FOLDERS[slot], console]
-	if not ResourceLoader.exists(path):
+	if path not in _read:
+		_read[path] = load(path) if ResourceLoader.exists(path) else null
+	if not _read[path]:
 		Diagnostics.trace("studio", "no %s logo for %s" % [FOLDERS[slot], console])
 		texture = _NONE
 		return false
-	texture = load(path)
+	texture = _read[path]
 	return true

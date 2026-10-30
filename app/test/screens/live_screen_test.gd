@@ -87,7 +87,7 @@ func test_after_a_console_added_A_on_a_platform_of_the_settings_shows_its_form_a
 ## From a library holding [param consoles], one console added through the form, then [param count] presses drawn by
 ## [param random]: the pad's directions, A, B, X, Y, and the "+" (up held, A). After each, a person can act within the
 ## wait's bound, whatever transition the press started; the walk reaches the form again. Frames are fixed at 60 a
-## second (dev/test_godot.sh), so a seed walks the same path whatever the machine's load.
+## second (scripts/test_godot.sh), so a seed walks the same path whatever the machine's load.
 func _walk(consoles: Dictionary[String, int], test_seed: int, count := 150) -> void:
 	var shown := await _shown(consoles)
 	var device: Fixtures.NewDevice = shown[0]

@@ -15,7 +15,7 @@ extends Node
 ## screen and `idle_consoles` on the consoles screen without a press, and `settings` opens the
 ## settings over the games and stays: these are measured once the app rests, still, to see what it
 ## costs when nothing moves. Then traces one `bench` line of `key=value` frame statistics, read by
-## `dev/bench.sh`. `launch` presses A once: [GameLaunch] traces its own `bench: launch:` line, with
+## `scripts/bench.sh`. `launch` presses A once: [GameLaunch] traces its own `bench: launch:` line, with
 ## the launch's frames and the times to check and to start the game. `type_chooser` opens the Type
 ## chooser over the consoles screen, traces the time to its first drawn frame, and moves its cursor down
 ## then up a row every [constant _STEP_EVERY_S] while the model turns. `plinth` turns a console on the

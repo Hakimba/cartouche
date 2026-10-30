@@ -2,7 +2,7 @@
 class_name StartTrace
 extends Node
 ## Traces the carousel's start in debug builds, once it shows: when each step of the start ended, how long the first
-## frames took, how long after it the selected game's label replaced its title (for `dev/bench.sh`); then starts the
+## frames took, how long after it the selected game's label replaced its title (for `scripts/bench.sh`); then starts the
 ## bench or the frame pictures the arguments ask for ([CarouselBench], [FrameShots]).
 
 var _carousel: Carousel

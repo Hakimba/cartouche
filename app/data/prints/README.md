@@ -18,4 +18,4 @@ by name. The DATs list a ROM in each form it is shared in, and each is kept unde
 the plain ROM (an NES ROM without its iNES header, `.unh`; an N64 ROM in big-endian order, `.z64`),
 whose CRC32 the app counts from a ROM file, and the headered NES ROM (`.nes`) and byte-swapped N64
 ROM (`.v64`), whose CRC32 a zip archive records for its entry.
-`dev/dat_titles.py --prints` regenerates a file from a DAT; a platform's file is named after its id.
+`scripts/dat_titles.py --prints` regenerates a file from a DAT; a platform's file is named after its id.

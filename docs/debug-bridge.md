@@ -20,7 +20,7 @@ The bridge's first message, `hello`, carries the OS, the screen size and `protoc
 can refuse an app it does not know.
 
 `Diagnostics` loads the bridge by path. The export filter (`app/addons/cartouche_dev/export_filter.gd`) leaves
-`app/dev/bridge/` out of release exports, and `dev/check_release.sh` inspects a real release pack to prove it.
+`app/dev/bridge/` out of release exports, and `scripts/check_release.sh` inspects a real release pack to prove it.
 
 The bridge may read private members of the app's classes (the carousel's screen, a launch's stage, a view's
 tweens). That is the one exception to the rule that no class reaches into another's privates, and it holds only
@@ -95,4 +95,4 @@ the dev folder.
 - [architecture/godot.md](architecture/godot.md#developer-tools-in-the-app): the other tools in the app.
 - [architecture/studio.md](architecture/studio.md): the timings, poses and lights the bridge tunes.
 - [testing.md](testing.md): the tests a harness on the bridge complements.
-- Back to the entry: [ONBOARDING.md](ONBOARDING.md).
+- Back to the entry: [README.md](README.md).

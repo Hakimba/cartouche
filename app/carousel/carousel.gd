@@ -27,7 +27,7 @@ extends Control
 ## ([ConsoleOrder]). The carousel waits for the screens in front to close.
 ##
 ## In debug builds, holding Select opens the device check. See the diagnostics section of
-## docs/ONBOARDING.md for the debug arguments. Without the Android plugin (the editor, a desktop
+## docs/README.md for the debug arguments. Without the Android plugin (the editor, a desktop
 ## run), the demo library is shown.
 
 ## The screen changed; in between, the animation into or out of the console plays.

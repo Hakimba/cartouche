@@ -3,7 +3,7 @@ extends Node
 ## Traces what the app receives to the log in debug builds, registered as the `Diagnostics`
 ## autoload: input events with the actions they match, focus changes, lifecycle notifications,
 ## frames that miss their rate (60 a second, 30 at rest), and whatever other code passes to
-## [method trace] (plugin traffic, for instance). On a device, `dev/logs.sh` follows them together
+## [method trace] (plugin traffic, for instance). On a device, `scripts/logs.sh` follows them together
 ## with the Kotlin plugin's traces. Release builds trace nothing.
 
 const _MAX_DETAIL := 500
@@ -125,7 +125,7 @@ func trace(area: String, detail: String) -> void:
 
 
 ## `key=value` statistics of frames lasting [param frames_ms] over [param seconds], as the
-## `bench` lines `dev/bench.sh` reads write them.
+## `bench` lines `scripts/bench.sh` reads write them.
 func frame_statistics(frames_ms: PackedFloat32Array, seconds: float) -> String:
 	if frames_ms.is_empty() or seconds <= 0.0:
 		return "frames=0"

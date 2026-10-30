@@ -31,4 +31,4 @@ distributed under the same license.
 
 Changes: only each game's name and serials are kept, one line per name (`name<TAB>serials`), and
 serials repeated with a disc suffix (`SLPM-65002-0`) are reduced to the plain serial.
-`dev/dat_titles.py` regenerates a file from a DAT; a platform's list is named after its id.
+`scripts/dat_titles.py` regenerates a file from a DAT; a platform's list is named after its id.

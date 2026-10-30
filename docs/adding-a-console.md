@@ -118,19 +118,19 @@ in `dur` seconds along its `ease`, then held `hold` seconds. A step groups its v
 `fx`. Distances are centimetres, angles degrees. A missing value takes its default, a moving part its rest
 (`LaunchAnimation`). `fx.black` grows the black from the seat, and `fx.fade` darkens the whole screen.
 
-Steps are tuned outside the app, then become the folder's `launch.json` with `dev/launch_steps.py`, which refuses
+Steps are tuned outside the app, then become the folder's `launch.json` with `scripts/launch_steps.py`, which refuses
 them once the model's fingerprint has changed:
 
 ```sh
-dev/launch_steps.py <exported.json> --console ps2_slim --console-key ps2
+scripts/launch_steps.py <exported.json> --console ps2_slim --console-key ps2
 ```
 
 ## Tools
 
 | Command | What it does |
 |---|---|
-| `dev/export_console.sh <folder> [out_dir]` | writes `build/models/<folder>.glb` and `build/models/<folder>.model.json` (presentation, seat, moving parts, fingerprint) for a three.js viewer, or into `out_dir` |
-| `dev/render_console.sh <folder> [png] [label image]` | renders the console as the carousel lights it, from six points of view, into `build/renders/<folder>.png` by default. Needs a display. |
+| `scripts/export_console.sh <folder> [out_dir]` | writes `build/models/<folder>.glb` and `build/models/<folder>.model.json` (presentation, seat, moving parts, fingerprint) for a three.js viewer, or into `out_dir` |
+| `scripts/render_console.sh <folder> [png] [label image]` | renders the console as the carousel lights it, from six points of view, into `build/renders/<folder>.png` by default. Needs a display. |
 
 Both take a medium's folder too.
 
@@ -147,7 +147,7 @@ drawn around the shipped ones until the rules accept them), `meets` (whether tri
 looks go in a test of its own, using them. Run the folder's tests with:
 
 ```sh
-GODOT=$GODOT dev/test_godot.sh res://test/carousel/consoles
+GODOT=$GODOT scripts/test_godot.sh res://test/carousel/consoles
 ```
 
 ## Neighbours
@@ -155,4 +155,4 @@ GODOT=$GODOT dev/test_godot.sh res://test/carousel/consoles
 - [adding-a-medium.md](adding-a-medium.md): the disc or cartridge that goes in.
 - [architecture/godot.md](architecture/godot.md#consoles): the code that shows and launches consoles.
 - [architecture/studio.md](architecture/studio.md): the gel, the plinth, the lights.
-- [testing.md](testing.md#gdscript). Back to the entry: [ONBOARDING.md](ONBOARDING.md).
+- [testing.md](testing.md#gdscript). Back to the entry: [README.md](README.md).

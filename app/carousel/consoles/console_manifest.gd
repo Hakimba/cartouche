@@ -9,6 +9,12 @@ const FOLDERS := "res://carousel/consoles/"
 const FILE := "console.tres"
 const _VERSION := "^[a-z0-9]+(-[a-z0-9]+)*$"
 
+## The manifests read so far, by folder (null for none): Godot drops a resource nobody holds, and the form's
+## Console list asks for one at every step.
+static var _read: Dictionary[String, ConsoleManifest] = {}
+## Each platform's colour once found: finding it reads every console's manifest.
+static var _gels: Dictionary[String, Color] = {}
+
 ## The platform it plays, as `data/platforms/profiles.json` names it; which of its versions it is,
 ## its model code in lower case, hyphens between its words (`dol-001`, `scph-70004`), and whether the
 ## one shown unless the user chooses another.
@@ -43,10 +49,13 @@ func models() -> Array[ConsoleManifest]:
 
 ## The platform's colour, shared by all its models.
 func gel() -> Color:
-	for base in found():
-		if base.platform == platform and base.is_default:
-			return gel_of(ConsoleManifest.folder_of(base))
-	return StudioTokens.NEUTRAL
+	if platform not in _gels:
+		_gels[platform] = StudioTokens.NEUTRAL
+		for base in found():
+			if base.platform == platform and base.is_default:
+				_gels[platform] = gel_of(ConsoleManifest.folder_of(base))
+				break
+	return _gels[platform]
 
 
 ## The colour of console folder [param folder]; neutral for one without a colour of its own.
@@ -74,10 +83,10 @@ static func found(folders := FOLDERS) -> Array[ConsoleManifest]:
 ## The manifest of the console folder [param folder], by its name under [constant FOLDERS]; none
 ## when there is no such folder.
 static func of(folder: String) -> ConsoleManifest:
-	var path := FOLDERS.path_join(folder).path_join(FILE)
-	if not ResourceLoader.exists(path):
-		return null
-	return load(path)
+	if folder not in _read:
+		var path := FOLDERS.path_join(folder).path_join(FILE)
+		_read[folder] = load(path) if ResourceLoader.exists(path) else null
+	return _read[folder]
 
 
 ## The rules this manifest breaks, by name; none when the console can be shown.

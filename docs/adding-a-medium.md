@@ -58,7 +58,7 @@ is left out. `console_folders_test.gd` checks every medium comes down its consol
 of the console's parts ([adding-a-console.md](adding-a-console.md#the-tests-that-hold-it)). The disc family has its
 own tests in `app/test/carousel/model_geometry_test.gd`.
 
-`dev/render_console.sh <medium>` and `dev/export_console.sh <medium>` take a medium's folder as they take a
+`scripts/render_console.sh <medium>` and `scripts/export_console.sh <medium>` take a medium's folder as they take a
 console's ([adding-a-console.md](adding-a-console.md#tools)).
 
 ## Neighbours
@@ -66,4 +66,4 @@ console's ([adding-a-console.md](adding-a-console.md#tools)).
 - [adding-a-console.md](adding-a-console.md): the console a medium goes into.
 - [architecture/godot.md](architecture/godot.md#models-and-shaders): the model code.
 - [architecture/core.md](architecture/core.md#platforms-and-launches): profiles and `MediaRule`.
-- [testing.md](testing.md#gdscript). Back to the entry: [ONBOARDING.md](ONBOARDING.md).
+- [testing.md](testing.md#gdscript). Back to the entry: [README.md](README.md).

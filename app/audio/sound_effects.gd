@@ -3,8 +3,8 @@ class_name SoundEffects
 extends Node
 ## Plays the app's sound effects on the `UI` bus, registered as the `Sounds` autoload: one player per
 ## [enum Cue], so that a cue played again cuts its previous play rather than piling up. Cues are the
-## app's gestures; each plays one sound or none, as [constant CUES] has it (made by `dev/audio/sfx.py`
-## from `dev/audio/sounds.json`, the table of every screen's gestures and their sounds). A held
+## app's gestures; each plays one sound or none, as [constant CUES] has it (made by `scripts/audio/sfx.py`
+## from `scripts/audio/sounds.json`, the table of every screen's gestures and their sounds). A held
 ## direction repeats its cue up to 20 times a second: the [constant REPEATED] cues play once per
 ## [constant REPEAT_GAP_S] at most, each a little higher or lower, so that a fast scroll does not
 ## rattle.

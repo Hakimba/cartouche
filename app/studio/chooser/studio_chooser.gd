@@ -31,8 +31,9 @@ class Row:
 
 	var on := false:
 		set(value):
-			on = value
-			queue_redraw()
+			if on != value:
+				on = value
+				queue_redraw()
 	var rim := StudioTokens.NEUTRAL:
 		set(value):
 			rim = value

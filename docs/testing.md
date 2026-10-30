@@ -56,7 +56,7 @@ tests `Scan.kt`. Shared helpers live in `kotlin/core/src/testFixtures/`, one `Ge
 | `FakeFetch`, `FakeHttp` (plugin tests) | downloads without a network |
 
 The disc images the file readers decode are in `kotlin/core/src/test/resources/files`, made by
-`dev/file_fixtures.py`.
+`scripts/file_fixtures.py`.
 
 ### Property counts
 
@@ -74,12 +74,12 @@ behaviour depends on the API level lists its own with `@Config(sdk = [30, 33, 34
 ## GDScript
 
 ```sh
-GODOT=$GODOT dev/test_godot.sh                                      # every GDScript test
-GODOT=$GODOT dev/test_godot.sh res://test/screens                   # one folder
-GODOT=$GODOT dev/test_godot.sh res://test/carousel/finger_test.gd   # one file
+GODOT=$GODOT scripts/test_godot.sh                                      # every GDScript test
+GODOT=$GODOT scripts/test_godot.sh res://test/screens                   # one folder
+GODOT=$GODOT scripts/test_godot.sh res://test/carousel/finger_test.gd   # one file
 ```
 
-`dev/test_godot.sh` downloads the pinned GdUnit4 release once into `build/`, then runs one Godot process per test
+`scripts/test_godot.sh` downloads the pinned GdUnit4 release once into `build/`, then runs one Godot process per test
 file, four at a time, largest file first. Each process has its own user data folder, so no suite sees what another
 left behind. `GODOT_TESTS_JOBS` sets how many run at once, and `GODOT_TESTS_S` bounds each file's time. Each file's
 log is in `build/test-godot/`, named after its path below `app/test/`, all of them merged in
@@ -125,12 +125,12 @@ $GODOT --path app --fixed-fps 60 --resolution 1280x960 -- --welcome=skip --shelf
 Run it before and after a change, once on a console with its own model and once on a platform drawn by its medium,
 and compare the pictures. An optimisation must leave all of them identical.
 
-`dev/bench.sh` measures the debug build installed on a device: cold starts, then each `CarouselBench` scenario
+`scripts/bench.sh` measures the debug build installed on a device: cold starts, then each `CarouselBench` scenario
 (`app/dev/carousel_bench.gd`) for a fixed time, at several library sizes. `--record FILE` appends each measure as
 one JSON line, and `--label` names the run:
 
 ```sh
-dev/build.sh --install && dev/bench.sh --record build/bench.jsonl --label my-change 150 1000
+scripts/build.sh --install && scripts/bench.sh --record build/bench.jsonl --label my-change 150 1000
 ```
 
 ## Neighbours
@@ -139,4 +139,4 @@ dev/build.sh --install && dev/bench.sh --record build/bench.jsonl --label my-cha
 - [architecture/core.md](architecture/core.md), [architecture/android.md](architecture/android.md),
   [architecture/godot.md](architecture/godot.md): the code under test.
 - [debug-bridge.md](debug-bridge.md): driving a running build from a test harness.
-- Back to the entry: [ONBOARDING.md](ONBOARDING.md).
+- Back to the entry: [README.md](README.md).

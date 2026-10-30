@@ -7,7 +7,7 @@ app plays them. The tool depends on Python and ffmpeg. The app side depends on n
 
 ## The table
 
-`dev/audio/sounds.json` is the one source:
+`scripts/audio/sounds.json` is the one source:
 
 | Key | Holds |
 |---|---|
@@ -20,13 +20,13 @@ app plays them. The tool depends on Python and ffmpeg. The app side depends on n
 
 ## The tool
 
-`dev/audio/sfx.py` needs ffmpeg, sox, and Python's numpy, scipy and Pillow.
+`scripts/audio/sfx.py` needs ffmpeg, sox, and Python's numpy, scipy and Pillow.
 
 ```sh
-python3 dev/audio/sfx.py render      # the sounds into app/audio/sfx, the cue table into app/audio/cues.json
-python3 dev/audio/sfx.py qa          # measures every sound against its role, exits 1 on any miss
-python3 dev/audio/sfx.py map         # writes build/sound-map/index.html: every screen, its gestures, their sounds
-python3 dev/audio/test_sfx.py        # proves each qa check catches the defect it is for
+python3 scripts/audio/sfx.py render      # the sounds into app/audio/sfx, the cue table into app/audio/cues.json
+python3 scripts/audio/sfx.py qa          # measures every sound against its role, exits 1 on any miss
+python3 scripts/audio/sfx.py map         # writes build/sound-map/index.html: every screen, its gestures, their sounds
+python3 scripts/audio/test_sfx.py        # proves each qa check catches the defect it is for
 ```
 
 A threshold is never relaxed to let a sound pass: change the recipe.
@@ -46,11 +46,11 @@ A threshold is never relaxed to let a sound pass: change the recipe.
 
 ## Adding a sound to a gesture
 
-1. In `dev/audio/sounds.json`, add the gesture to its screen in `screens`, and its cue to `cues` with a sound, new
+1. In `scripts/audio/sounds.json`, add the gesture to its screen in `screens`, and its cue to `cues` with a sound, new
    or existing.
 2. For a new cue, add its name to the `Cue` enum of `app/audio/sound_effects.gd`. The enum name in lower case is
    its key in `cues`.
-3. Run `python3 dev/audio/sfx.py render`, then `qa`.
+3. Run `python3 scripts/audio/sfx.py render`, then `qa`.
 4. Call `Sounds.play` where the gesture happens.
 5. `app/test/audio/gestures_test.gd` checks what the screens' gestures play. Add the gesture there.
 
@@ -58,4 +58,4 @@ A threshold is never relaxed to let a sound pass: change the recipe.
 
 - [architecture/godot.md](architecture/godot.md): the screens that play the cues.
 - [debug-bridge.md](debug-bridge.md): `sound` and `sounds` play sounds on a running build without a rebuild.
-- [testing.md](testing.md#gdscript). Back to the entry: [ONBOARDING.md](ONBOARDING.md).
+- [testing.md](testing.md#gdscript). Back to the entry: [README.md](README.md).

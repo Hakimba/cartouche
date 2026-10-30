@@ -2,7 +2,7 @@
 extends SceneTree
 ## Renders the console of a folder under app/carousel/consoles, or the medium of one under
 ## app/carousel/media, as the carousel lights it, from six points of view, into one contact sheet (run
-## by dev/render_console.sh): front, three quarters, side, back, top, and three quarters with every
+## by scripts/render_console.sh): front, three quarters, side, back, top, and three quarters with every
 ## part of a console fully moved, or a medium from below; to set a model beside photos of the real
 ## one. A medium shows the label image given after the PNG's path, if any, as it shows a game's scan.
 

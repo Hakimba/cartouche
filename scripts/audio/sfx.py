@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The app's sound effects, made in code from pure tones, to the files Godot plays.
 
-    dev/audio/sfx.py render        make every sound (sounds.json `sounds`) into app/audio/sfx, the sound each of
+    scripts/audio/sfx.py render        make every sound (sounds.json `sounds`) into app/audio/sfx, the sound each of
                                    the app's cues plays (`cues`) into app/audio/cues.json, the candidates to try
                                    on the sound board into app/audio/candidates, and the board's data (families,
                                    verdicts, the screens and their gestures) into app/audio/test/board.json
-    dev/audio/sfx.py qa            measure every sound against its role, draw its spectrogram and waveform
-    dev/audio/sfx.py map           write build/sound-map/index.html: every screen, its gestures and the sound each
+    scripts/audio/sfx.py qa            measure every sound against its role, draw its spectrogram and waveform
+    scripts/audio/sfx.py map           write build/sound-map/index.html: every screen, its gestures and the sound each
                                    plays, to listen to in a browser
 
 Needs ffmpeg (or FFMPEG=path), sox, and Python's numpy, scipy and Pillow. QA pictures and the report land in
@@ -408,7 +408,7 @@ def qa() -> None:
     sheets(config)
     (QA / "report.json").write_text(json.dumps(results, indent=1))
     (QA / "REPORT.md").write_text(
-        "# Sound QA\n\nMade by `dev/audio/sfx.py qa`. Every sound: 48 kHz mono, WAV (16 bits) under "
+        "# Sound QA\n\nMade by `scripts/audio/sfx.py qa`. Every sound: 48 kHz mono, WAV (16 bits) under "
         f"{WAV_UNDER_S * 1000:.0f} ms, else OGG; true peak (4× oversampled) at most -1 dBFS; no lead silence (it "
         f"reaches {ONSET_DB:.0f} dB under its peak within 1 ms); one event (an event starts where at least "
         f"{ONSET_SHARE * 100:.0f} % of the bands from 300 Hz to 16 kHz rise {ONSET_RISE_DB:.0f} dB within 2 ms, down to "

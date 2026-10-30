@@ -17,4 +17,4 @@ repository. Fan-made images are left out.
 - `gb.tsv`: from the dump of the date on its first line (`Nintendo Game Boy`, `Cart - Front`).
 - `gbc.tsv`: from the dump of the date on its first line (`Nintendo Game Boy Color`, `Cart - Front`).
 
-`dev/launchbox_art.py` regenerates a file from the dump; a platform's file is named after its id.
+`scripts/launchbox_art.py` regenerates a file from the dump; a platform's file is named after its id.

@@ -70,7 +70,7 @@ Package `launch`.
 | `Curtain.kt` | The black window over every app while the emulator starts, lowered after its time or when Cartouche is back (INV-07). It needs the "display over other apps" permission. |
 
 A launch goes `checkLaunch` (the core's `Catalog.launch`, then `Launcher.checkGame`), then `launchGame` (the curtain,
-then `Launcher.start`). [../ONBOARDING.md](../ONBOARDING.md#how-a-press-travels) draws the round trip.
+then `Launcher.start`). [../README.md](../README.md#how-a-press-travels) draws the round trip.
 
 ## Art
 
@@ -110,4 +110,4 @@ A setting crosses every layer. Follow `soundLevel` (the sound level) through the
 - Down: [core.md](core.md), the rules this package calls.
 - Up: [godot.md](godot.md), whose adapter is the only caller.
 - Tests, Robolectric and the fakes: [../testing.md](../testing.md#kotlin).
-- The words: [../GLOSSARY.md](../GLOSSARY.md). Back to the entry: [../ONBOARDING.md](../ONBOARDING.md).
+- The words: [../GLOSSARY.md](../GLOSSARY.md). Back to the entry: [../README.md](../README.md).

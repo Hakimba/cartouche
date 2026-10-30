@@ -141,14 +141,14 @@ once still and names the nodes still writing; the bench's `idle` scenarios repor
 
 | File | Responsibility |
 |---|---|
-| `app/dev/diagnostics.gd` | `Diagnostics`: debug traces, the memory the engine holds (`memory`, traced at each lifecycle change and at each new peak of graphics memory), and the debug arguments (`argument`, `flag`). See [../ONBOARDING.md](../ONBOARDING.md#diagnostics-and-debug-arguments). |
-| `app/dev/carousel_bench.gd` | `CarouselBench`: drives the carousel like a user for `dev/bench.sh`, one scenario per run. |
+| `app/dev/diagnostics.gd` | `Diagnostics`: debug traces, the memory the engine holds (`memory`, traced at each lifecycle change and at each new peak of graphics memory), and the debug arguments (`argument`, `flag`). See [../README.md](../README.md#diagnostics-and-debug-arguments). |
+| `app/dev/carousel_bench.gd` | `CarouselBench`: drives the carousel like a user for `scripts/bench.sh`, one scenario per run. |
 | `app/dev/frame_shots.gd` | `FrameShots`: pictures at set frames, to prove a change keeps every pixel ([../testing.md](../testing.md#pictures-and-benchmarks)). |
 | `app/dev/dev_sounds.gd` | `DevSounds`: sounds dropped by hand into the user folder, to try a launch's sounds. |
 | `app/dev/device_check/` | The device check: one tab per device capability (storage, launch, library, pad, performance). |
 | `app/dev/bridge/` | The debug bridge, left out of release builds. See [../debug-bridge.md](../debug-bridge.md). |
 | `app/addons/cartouche_android/` | Adds the plugin's AARs and dependencies to Android exports. Versions are declared once, in `kotlin/gradle/libs.versions.toml`. |
-| `app/addons/cartouche_dev/` | Leaves `app/dev/bridge/` out of release exports. `dev/check_release.sh` checks a real release pack. |
+| `app/addons/cartouche_dev/` | Leaves `app/dev/bridge/` out of release exports. `scripts/check_release.sh` checks a real release pack. |
 
 ## Neighbours
 
@@ -156,4 +156,4 @@ once still and names the nodes still writing; the bench's `idle` scenarios repor
 - Beside: [studio.md](studio.md), the look; [../sounds.md](../sounds.md), the sounds.
 - Folders: [../adding-a-console.md](../adding-a-console.md), [../adding-a-medium.md](../adding-a-medium.md).
 - Tests: [../testing.md](../testing.md#gdscript). The words: [../GLOSSARY.md](../GLOSSARY.md).
-- Back to the entry: [../ONBOARDING.md](../ONBOARDING.md).
+- Back to the entry: [../README.md](../README.md).

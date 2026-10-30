@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends SceneTree
 ## Exports a console or a medium for a three.js viewer, where a console's launch steps are tuned
-## (run by dev/export_console.sh): its model as `<folder>.glb`, every moving part a named node turning
+## (run by scripts/export_console.sh): its model as `<folder>.glb`, every moving part a named node turning
 ## or sliding about its own origin, our shaders drawn as plain PBR materials there; and
 ## `<folder>.model.json`, what the viewer moves and checks. For a console: how it is presented, its
 ## seat and way in, its moving parts (each with its role, its values at rest and fully moved, its
 ## unit, every node it moves and every material parameter it sets, at rest and fully moved, and the
 ## seat once it is fully moved), and its fingerprint ([method ConsoleModel.fingerprint]): steps tuned
-## on it carry it, and dev/launch_steps.py refuses them once the model has changed. For a medium: its
+## on it carry it, and scripts/launch_steps.py refuses them once the model has changed. For a medium: its
 ## kind, where its title and platform's name are drawn on its label, and its dimensions' hash.
 
 ## Our shaders' colour, by the first of these parameters they have.

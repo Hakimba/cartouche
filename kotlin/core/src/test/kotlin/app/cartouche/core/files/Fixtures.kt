@@ -13,7 +13,7 @@ import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/** The serial the fixture discs boot, as `dev/file_fixtures.py` writes it. */
+/** The serial the fixture discs boot, as `scripts/file_fixtures.py` writes it. */
 const val FIXTURE_SERIAL = "SLES_524.95"
 
 /** The CHD images of the fixture disc the readers decode, by codec and track type. */
@@ -29,7 +29,7 @@ val READABLE_CHDS =
         "dvd-zlib.chd",
     )
 
-/** A disc image of `src/test/resources/files`, made by `dev/file_fixtures.py`. */
+/** A disc image of `src/test/resources/files`, made by `scripts/file_fixtures.py`. */
 fun image(name: String): ByteArray =
     checkNotNull(InMemoryBytes::class.java.getResourceAsStream("/files/$name")) { "No fixture $name" }.use { it.readBytes() }
 
@@ -53,7 +53,7 @@ internal fun ChdImage.sectorOf(n: Int): Option<ByteArray> = readable { sector(n)
 internal fun chdOf(bytes: ByteArray): Option<ChdImage> = readable { chdImage(InMemoryBytes(bytes)) }
 
 /**
- * The sectors `dvd-runs.chd` holds, as `dev/file_fixtures.py` writes them: the disc padded with zeros to 32 sectors,
+ * The sectors `dvd-runs.chd` holds, as `scripts/file_fixtures.py` writes them: the disc padded with zeros to 32 sectors,
  * 40 sectors each filled with its number from 1, then 4 sectors of hashes.
  */
 val runsDisc: ByteArray by lazy {

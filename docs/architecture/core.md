@@ -46,9 +46,9 @@ console model ([../adding-a-console.md](../adding-a-console.md)):
 
 1. A definition in `app/data/platforms/cartouche/`, unless the Daijishō set has one.
 2. A profile in `app/data/platforms/profiles.json`.
-3. A reference list `app/data/titles/<platform>.tsv`, made with `dev/dat_titles.py` from a libretro-database DAT.
-   A cartridge platform also gets its prints, `app/data/prints/<platform>.tsv` (`dev/dat_titles.py --prints`).
-4. For art, an extract `app/data/art/<platform>.tsv` made with `dev/launchbox_art.py`, and a texture table in
+3. A reference list `app/data/titles/<platform>.tsv`, made with `scripts/dat_titles.py` from a libretro-database DAT.
+   A cartridge platform also gets its prints, `app/data/prints/<platform>.tsv` (`scripts/dat_titles.py --prints`).
+4. For art, an extract `app/data/art/<platform>.tsv` made with `scripts/launchbox_art.py`, and a texture table in
    `app/data/screenscraper/` (its README says how the project builds one). A platform without `art` in its profile
    gets no art.
 
@@ -83,7 +83,7 @@ Package `files`. What a game file's bytes say about which game it is.
 | `Cartridges.kt` | Counts a ROM's CRC32 as No-Intro does (headers left out, a zip entry as the archive records it), and reads a Game Boy cartridge's shell. |
 
 The disc images these tests decode live in `kotlin/core/src/test/resources/files`, made by
-`dev/file_fixtures.py`.
+`scripts/file_fixtures.py`.
 
 ## Shelves and search
 
@@ -134,4 +134,4 @@ Packages `settings` and `storage`.
 - The words: [../GLOSSARY.md](../GLOSSARY.md).
 - The tests and their helpers: [../testing.md](../testing.md#kotlin).
 - The guarantees: [../INVARIANTS.md](../INVARIANTS.md).
-- Back to the entry: [../ONBOARDING.md](../ONBOARDING.md).
+- Back to the entry: [../README.md](../README.md).

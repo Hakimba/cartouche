@@ -119,7 +119,7 @@ internal fun listedDocument(id: String, size: Long): ListedFile =
 
 internal fun documentUri(id: String): ContentUri = uri(DocumentsContract.buildDocumentUriUsingTree(Uri.parse(TREE.value), id).toString())
 
-/** Disc image [name] of the core's file readers' tests, made by `dev/file_fixtures.py`; its SYSTEM.CNF boots [DISC_SERIAL]. */
+/** Disc image [name] of the core's file readers' tests, made by `scripts/file_fixtures.py`; its SYSTEM.CNF boots [DISC_SERIAL]. */
 internal fun discImage(name: String): ByteArray =
     checkNotNull(FakeDocuments::class.java.getResourceAsStream("/files/$name")) { "No disc image $name" }.use { it.readBytes() }
 

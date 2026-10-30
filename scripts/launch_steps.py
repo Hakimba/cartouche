@@ -3,17 +3,17 @@
 """Derives a console's launch steps (its folder's launch.json, described in docs/adding-a-console.md)
 from a set of steps tuned outside the app and exported as JSON: a `choiceStep` index, its `steps`,
 each step's console under the key `--console-key` names and its moving parts under `parts`, and
-`model_hash`, the `hash` of the console's model.json (dev/export_console.sh) they were tuned on.
+`model_hash`, the `hash` of the console's model.json (scripts/export_console.sh) they were tuned on.
 
 Refuses steps tuned on another model than the folder's: their hash is compared with the one the
-console's export gives now (Godot runs, as for dev/export_console.sh). Keeps what the app plays: the
+console's export gives now (Godot runs, as for scripts/export_console.sh). Keeps what the app plays: the
 step the game is chosen at, and each step's timing and state, with the model's hash. Drops names,
 notes, the camera (the carousel's stays) and the art bar's own presence (it follows the pill).
 `--order` lists the exported steps in the order to play them. `--blur-width` is the width, in
 pixels, of the screen the blur was tuned on: the app's blur is in pixels of its own 1280 wide
 screen. A `lid` group, as steps tuned before parts had names, moves the PS2 slim's `lid_degrees`.
 
-Usage: dev/launch_steps.py steps.json --console ps2_slim --console-key ps2 [--order 1,0,2,...]
+Usage: scripts/launch_steps.py steps.json --console ps2_slim --console-key ps2 [--order 1,0,2,...]
     [--blur-width 868]
 writes app/carousel/consoles/<console>/launch.json.
 """

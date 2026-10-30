@@ -14,7 +14,7 @@ It emulates nothing itself.
 ## The map
 
 ```text
-ONBOARDING.md                  you are here: the entry, the commands, the "I want to…" index
+README.md                      you are here: the entry, the commands, the "I want to…" index
 ├── GLOSSARY.md                every domain word, as the code spells it
 ├── INVARIANTS.md              the guarantees no change may break, and their tests
 ├── architecture/core.md       kotlin/core: the domain rules, pure Kotlin
@@ -84,7 +84,7 @@ of the same names.
 | `app/test/` | GDScript tests (GdUnit4) |
 | `kotlin/core/` | the pure domain, its tests and the shared test fixtures (`kotlin/core/src/testFixtures/`) |
 | `kotlin/android/` | the Godot Android plugin and its Robolectric tests |
-| `dev/` | build, test, bench and data scripts |
+| `scripts/` | build, test, bench and data scripts |
 | `docs/` | this map |
 
 ## Build, run and test
@@ -96,29 +96,29 @@ gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), Python 3, and 
 ```sh
 export JAVA_HOME=/path/to/jdk-17 ANDROID_HOME=/path/to/android-sdk
 export GODOT=/path/to/godot          # if godot is not on PATH
-dev/build.sh                         # everything below, then the debug APK in build/
-dev/build.sh --install               # the same, then installs and starts it on the device adb sees
+scripts/build.sh                     # everything below, then the debug APK in build/
+scripts/build.sh --install           # the same, then installs and starts it on the device adb sees
 ```
 
-`dev/build.sh` runs, in order: `dev/check_docs.py`, `gdlint` on every app script, the Kotlin lint, tests,
-Android lint and build, every GDScript test, `dev/check_release.sh`, a short headless run of the project that
+`scripts/build.sh` runs, in order: `scripts/check_docs.py`, `gdlint` on every app script, the Kotlin lint, tests,
+Android lint and build, every GDScript test, `scripts/check_release.sh`, a short headless run of the project that
 fails on any script error, then the APK export.
 
 Run one part while you work:
 
 ```sh
-cd kotlin && ./gradlew :core:test --tests '*ScanTest'          # one core test class
+cd kotlin && ./gradlew :core:test --tests '*ScanTest'              # one core test class
 cd kotlin && ./gradlew :android:testDebugUnitTest --tests '*LauncherTest'
-GODOT=$GODOT dev/test_godot.sh res://test/carousel/search       # one GDScript folder or file
-GODOT=$GODOT dev/test_godot.sh                                  # every GDScript test
-python3 dev/check_docs.py                                       # every path and name the docs cite
+GODOT=$GODOT scripts/test_godot.sh res://test/carousel/search       # one GDScript folder or file
+GODOT=$GODOT scripts/test_godot.sh                                  # every GDScript test
+python3 scripts/check_docs.py                                       # every path and name the docs cite
 ```
 
 To run the app on your computer, open `app/` in the Godot editor and press Play, or run
 `$GODOT --path app`. The carousel shows the desktop demo library. Launching a game fails at the end, since no
 emulator exists there, but every screen and animation plays.
 
-On a device, `dev/logs.sh` follows a debug build's traces, and `dev/bench.sh` measures the installed build at
+On a device, `scripts/logs.sh` follows a debug build's traces, and `scripts/bench.sh` measures the installed build at
 several library sizes.
 
 ### Diagnostics and debug arguments
@@ -196,10 +196,10 @@ Find your task, open the page, then the files in the order given.
 |---|---|---|
 | a console | [adding-a-console.md](adding-a-console.md) | `app/carousel/consoles/ps2_slim/`, `console_model.gd`, `ConsoleVariant.kt` |
 | a disc or cartridge | [adding-a-medium.md](adding-a-medium.md) | `app/carousel/media/ps2_dvd/`, `medium_manifest.gd` |
-| a platform (data only) | [architecture/core.md](architecture/core.md#adding-a-platform) | `app/data/platforms/profiles.json`, `dev/dat_titles.py` |
+| a platform (data only) | [architecture/core.md](architecture/core.md#adding-a-platform) | `app/data/platforms/profiles.json`, `scripts/dat_titles.py` |
 | a screen in front of the carousel | [architecture/godot.md](architecture/godot.md#adding-a-screen) | `screen_flow.gd`, `hint_row.gd`, `app/test/screens/fixtures.gd` |
 | a setting | [architecture/android.md](architecture/android.md#adding-a-setting) | `Settings.kt`, `CartouchePlugin.kt`, `settings_menu.gd` |
-| a sound, or a sound to a gesture | [sounds.md](sounds.md) | `dev/audio/sounds.json`, `sound_effects.gd` |
+| a sound, or a sound to a gesture | [sounds.md](sounds.md) | `scripts/audio/sounds.json`, `sound_effects.gd` |
 | a test | [testing.md](testing.md) | the closest existing test |
 | a debug trace | [Diagnostics and debug arguments](#diagnostics-and-debug-arguments) | `diagnostics.gd`, `Wire.kt` |
 
@@ -210,8 +210,8 @@ Find your task, open the page, then the files in the order given.
 | drive a running build from a script | [debug-bridge.md](debug-bridge.md) | `app/dev/bridge/commands.gd` |
 | run without a device | [architecture/godot.md](architecture/godot.md#the-adapter) | `desktop_plugin.gd`, `app/dev/demo/desktop.json` |
 | prove a change keeps every pixel | [testing.md](testing.md#pictures-and-benchmarks) | `frame_shots.gd` |
-| measure on a device | [testing.md](testing.md#pictures-and-benchmarks) | `dev/bench.sh`, `carousel_bench.gd` |
-| look at a model beside photos | [adding-a-console.md](adding-a-console.md#tools) | `dev/render_console.sh`, `dev/export_console.sh` |
+| measure on a device | [testing.md](testing.md#pictures-and-benchmarks) | `scripts/bench.sh`, `carousel_bench.gd` |
+| look at a model beside photos | [adding-a-console.md](adding-a-console.md#tools) | `scripts/render_console.sh`, `scripts/export_console.sh` |
 
 ## Five words to know first
 

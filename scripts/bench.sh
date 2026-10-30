@@ -15,7 +15,7 @@
 # scans downloaded again from nothing while the carousel scrolls (time for 40 games and for all,
 # frame times meanwhile), then the user's art is put back as it was; the starts that follow read it
 # from the device (the selected game's label shown, the slowest label read). Every scenario starts
-# on the PS2's games, whichever console the app showed last. Run it after `dev/build.sh --install`,
+# on the PS2's games, whichever console the app showed last. Run it after `scripts/build.sh --install`,
 # with the device online.
 #
 # Prints one line per measurement, and keeps each scenario's slow frames in build/bench/SCENARIO-SIZE.log; with
@@ -23,7 +23,7 @@
 # record: {"date", "commit", "build", "device", "android", "scenario", "games", "metric",
 # "value", "unit", "run", "label"}, the label naming the run (--label, empty by default).
 #
-# Usage: dev/bench.sh [--record FILE] [--label TEXT] [--starts N] [SIZE...]   (sizes: real or a number;
+# Usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [SIZE...]   (sizes: real or a number;
 #        default: real 150 1000 5000)
 set -euo pipefail
 # Decimal points, whatever the machine's language.
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
     --label) label="$2"; shift 2 ;;
     --starts) starts="$2"; shift 2 ;;
     real | [0-9]*) sizes+=("$1"); shift ;;
-    *) echo "usage: dev/bench.sh [--record FILE] [--label TEXT] [--starts N] [real|N...]" >&2; exit 2 ;;
+    *) echo "usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [real|N...]" >&2; exit 2 ;;
   esac
 done
 [ ${#sizes[@]} -gt 0 ] || sizes=(real 150 1000 5000)

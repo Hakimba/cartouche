@@ -5,7 +5,7 @@ a `path` that is not in the repository, or a `ClassName`, `member` or `method_na
 and when docs/INVARIANTS.md and the tests disagree: an id with no test named after it, or a row whose Tests column
 does not list exactly the files holding a test named after its id.
 
-    dev/check_docs.py        prints each stale citation as file:line and exits 1 when there is one
+    scripts/check_docs.py        prints each stale citation as file:line and exits 1 when there is one
 """
 import fnmatch
 import re

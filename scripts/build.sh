@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 case "${1:-}" in
   "" | --install) ;;
-  *) echo "usage: dev/build.sh [--install]" >&2; exit 2 ;;
+  *) echo "usage: scripts/build.sh [--install]" >&2; exit 2 ;;
 esac
 
 GODOT="${GODOT:-godot}"
@@ -25,7 +25,7 @@ java_version=$("${JAVA_HOME:?JAVA_HOME is not set}/bin/java" -version 2>&1 | hea
 # Homebrew); without either, the runs are not bounded.
 bounded=$(command -v timeout || command -v gtimeout || true)
 mkdir -p build
-python3 dev/check_docs.py || fail "the docs cite a path, name or heading the code no longer has"
+python3 scripts/check_docs.py || fail "the docs cite a path, name or heading the code no longer has"
 # GDScript style, as gdlintrc sets it (member order, names, line length); the generated tokens are checked by
 # their generator instead.
 command -v gdlint > /dev/null || fail "gdlint not found: pip install --user \"gdtoolkit==4.*\""
@@ -39,8 +39,8 @@ status=0
   :android:assemble) || status=$?
 [ "$status" -ne 124 ] || fail "the Kotlin build and tests did not finish within 1800 s"
 [ "$status" -eq 0 ] || exit "$status"
-GODOT="$GODOT" dev/test_godot.sh
-GODOT="$GODOT" bash dev/check_release.sh
+GODOT="$GODOT" scripts/test_godot.sh
+GODOT="$GODOT" bash scripts/check_release.sh
 # The export packs scripts that fail to compile: run the project briefly to catch them first.
 ${bounded:+"$bounded" -k 10 120} "$GODOT" --headless --path app --quit-after 30 > build/run.log 2>&1 || status=$?
 [ "$status" -ne 124 ] || fail "the project did not stop within 120 s (full log: build/run.log)"

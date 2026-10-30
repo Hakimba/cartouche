@@ -11,28 +11,57 @@ of experience should be completely free and open source.
 So I built my own. First for me, and now for anyone who wants to use it, contribute to it, or fork
 it and make it theirs; I tried to keep the codebase easy to get into.
 
-## Status
+## Consoles
 
-Early development. The PlayStation 2 came first, then the NES, Super Nintendo, Nintendo 64, Game Boy,
-Game Boy Color, Game Boy Advance, GameCube, Wii, PlayStation, Xbox and Xbox 360.
+NES, Super Nintendo, Nintendo 64, GameCube, Wii, Game Boy, Game Boy Color, Game Boy Advance (original or SP),
+PlayStation, PlayStation 2 (slim or fat), Xbox and Xbox 360. Each one is a 3D model of the real console, and its
+games come on their real medium: discs, cartridges, mini-discs.
 
-- **Library:** your ROM folders scanned, games identified against the Redump lists.
-- **Consoles:** your consoles in 3D, each modelled after the real one, its lid, tray or slot moving;
-  go into one to see its games.
-- **Carousel:** games as 3D discs and cartridges, one shelf per console, 60 fps with thousands of
-  games.
-- **Launching:** the disc or cartridge goes into the console, each its own way, then the game starts
-  in its emulator, which stays hidden until the game shows.
-- **Labels:** each game's real disc or cartridge label, downloaded in the background from
-  LaunchBox and ScreenScraper (see [How a label is found](#how-a-label-is-found)).
-- **Setting up:** everything with the controller: first launch, adding, editing and removing
-  consoles, button style, and in Graphics how smooth the edges are drawn (4× unless you choose 2× or
-  none, for less work on the graphics card).
-- **Properties:** a game's label image (by region, or a picture of your own) and its name, and
-  the consoles' order on a ring; by controller or by touch.
-- **Frugal:** left alone, once its disc labels are downloaded, the screen stops moving and is drawn
-  only when something changes, until the next press; little memory, and quick starts even with
-  thousands of games.
+## Key features
+
+- **Immersion first:** a carousel of 3D consoles, then each console's games on their real discs and cartridges,
+  and a launch animation made for each console (and for each model of it).
+- **Smart labels:** each game is recognised from its own file (a disc's serial, a cartridge's checksum), then its
+  real label is downloaded from ScreenScraper and LaunchBox, in your region first. Another region or a picture of
+  your own is one menu away.
+- **Your library, your way:** filter by name or by region, put your consoles in the order you like on a wheel,
+  rename a game or a console.
+- **Controller first:** everything works with the pad, from the first launch to adding a console; touch works too.
+- **Uses your emulators:** Cartouche emulates nothing. It finds the emulators you already installed and starts each
+  game in the right one.
+- **Light:** at rest it draws nothing, and it stays smooth with thousands of games.
+
+## Install
+
+Download the APK from this repository's Releases page and install it on your handheld. You need Android 11 or
+later on an arm64 device with Vulkan, and the emulators of the consoles you want to play.
+
+## You want to contribute, or to know how it works?
+
+Ideas, feedback and pull requests are welcome: open an issue to talk about a bigger change first.
+
+- [docs/README.md](docs/README.md): start here. The three layers of the code, the commands, and for each task
+  (add a console, a screen, a setting, a sound…) the page and the files to open.
+- [docs/GLOSSARY.md](docs/GLOSSARY.md): every word of the domain, as the code spells it.
+- [docs/INVARIANTS.md](docs/INVARIANTS.md): the guarantees every change must keep, each enforced by tests.
+- [docs/adding-a-console.md](docs/adding-a-console.md) and [docs/adding-a-medium.md](docs/adding-a-medium.md): a
+  new console or a new disc or cartridge, step by step.
+- [docs/testing.md](docs/testing.md): the kinds of tests and how to run each.
+
+## Building
+
+Requirements: Godot 4.7.2 with its export templates, JDK 17, the Android SDK (platform 36, build
+tools 36.1.0, NDK 29.0.14206865 and CMake 3.22.1, which Gradle installs when missing), Python 3,
+gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), and `adb` for installing on a device.
+
+```sh
+export JAVA_HOME=/path/to/jdk-17 ANDROID_HOME=/path/to/android-sdk
+export GODOT=/path/to/godot     # if `godot` is not on PATH
+scripts/build.sh                # docs check, lint, Kotlin and GDScript tests, Kotlin build, debug APK in build/
+scripts/build.sh --install      # same, then installs and starts it on the connected device
+scripts/logs.sh                 # follows the debug build's traces on the device
+scripts/bench.sh                # measures the installed debug build at several library sizes
+```
 
 ## Stack
 
@@ -47,25 +76,6 @@ Game Boy Color, Game Boy Advance, GameCube, Wii, PlayStation, Xbox and Xbox 360.
 - **Tests:** [Kotest](https://kotest.io) 5.9.1 (property-based), [Robolectric](https://robolectric.org)
   4.16.1 on Android 11, 13 and 14, [GdUnit4](https://github.com/MikeSchulze/gdUnit4) 6.2.1 for
   GDScript, ktlint.
-
-## Building
-
-Requirements: Godot 4.7.2 with its export templates, JDK 17, the Android SDK (platform 36, build
-tools 36.1.0, NDK 29.0.14206865 and CMake 3.22.1, which Gradle installs when missing), Python 3, gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), and `adb` for
-installing on a device.
-
-```sh
-export JAVA_HOME=/path/to/jdk-17 ANDROID_HOME=/path/to/android-sdk
-export GODOT=/path/to/godot   # if `godot` is not on PATH
-dev/build.sh            # docs check, lint, Kotlin and GDScript tests, Kotlin build, debug APK in build/
-dev/build.sh --install  # same, then installs and starts it on the connected device
-dev/logs.sh             # follows the debug build's traces on the device
-dev/bench.sh            # measures the installed debug build at several library sizes
-```
-
-New to the code? Start at [docs/ONBOARDING.md](docs/ONBOARDING.md): the three layers, the commands, and for
-each task (add a console, a screen, a setting, a sound…) the page and the files to open. Guarantees every change
-must keep, each enforced by tests: [docs/INVARIANTS.md](docs/INVARIANTS.md).
 
 ## How a label is found
 
@@ -88,7 +98,7 @@ must keep, each enforced by tests: [docs/INVARIANTS.md](docs/INVARIANTS.md).
 
 ScreenScraper is used with Cartouche's developer key, which builds take from `kotlin/local.properties`
 (`screenscraper.devid`, `screenscraper.devpassword`), never from the repository; see
-[Credentials](docs/ONBOARDING.md#credentials).
+[Credentials](docs/README.md#credentials).
 
 ## Open-source work used
 
@@ -111,7 +121,7 @@ Cartouche builds on these projects, and thanks their authors.
 | [Kotest](https://kotest.io) | Property-based tests | Apache 2.0 |
 | [JUnit 4](https://junit.org/junit4/) | Test runner | EPL 1.0 |
 | [Robolectric](https://robolectric.org) | Android tests on the JVM | MIT |
-| [GdUnit4](https://github.com/MikeSchulze/gdUnit4) | GDScript tests (downloaded by `dev/test_godot.sh`, not shipped) | MIT |
+| [GdUnit4](https://github.com/MikeSchulze/gdUnit4) | GDScript tests (downloaded by `scripts/test_godot.sh`, not shipped) | MIT |
 | [ktlint](https://pinterest.github.io/ktlint/) | Kotlin style | MIT |
 | [Gradle](https://gradle.org) | Build, and the wrapper in `kotlin/` | Apache 2.0 |
 

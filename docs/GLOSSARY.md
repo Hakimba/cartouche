@@ -2,7 +2,7 @@
 
 **You are here.** The domain words, in alphabetical order. The code, the tests and the docs use them with these
 meanings, so a word here is also the word to search for. Each entry names the type or file that holds it and the
-page that explains it. Start from [ONBOARDING.md](ONBOARDING.md) if you have not.
+page that explains it. Start from [README.md](README.md) if you have not.
 
 - **Absent**: a game no art source has, remembered per sources' version so it is not asked again (`Absences`).
   See [architecture/core.md](architecture/core.md#art).
@@ -124,6 +124,6 @@ page that explains it. Start from [ONBOARDING.md](ONBOARDING.md) if you have not
 
 ## Neighbours
 
-[ONBOARDING.md](ONBOARDING.md) · [architecture/core.md](architecture/core.md) ·
+[README.md](README.md) · [architecture/core.md](architecture/core.md) ·
 [architecture/android.md](architecture/android.md) · [architecture/godot.md](architecture/godot.md) ·
 [INVARIANTS.md](INVARIANTS.md)

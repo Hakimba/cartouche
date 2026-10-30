@@ -275,7 +275,9 @@ func _frame(settled: bool) -> void:
 	if _view.size != fitted:
 		_view.size = fitted
 	size = Vector2(fitted) / scale_by
-	global_position = wanted.get_center() - size / 2.0
+	# Controls are drawn on whole pixels: the view stands on one and its camera carries the rest, so a
+	# medium moving by less than a pixel a frame (a float, a sway) moves smoothly instead of by steps.
+	global_position = ((wanted.get_center() - size / 2.0) * scale_by).round() / scale_by
 	var shown := camera.get_viewport().get_visible_rect().size
 	var height := 2.0 * camera.near * tan(deg_to_rad(camera.fov) / 2.0)
 	var centre := global_position + size / 2.0

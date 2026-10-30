@@ -16,7 +16,7 @@ import arrow.core.singleOrNone
 import arrow.core.toOption
 
 /**
- * One platform's extract of the LaunchBox Games Database (`app/data/art`, written by `dev/launchbox_art.py`): each
+ * One platform's extract of the LaunchBox Games Database (`app/data/art`, written by `scripts/launchbox_art.py`): each
  * game's names and scans, by region, all of the type of image its platform's profile names (`ArtKind`: a disc's face,
  * a cartridge's front).
  */

@@ -1,4 +1,4 @@
-Disc images the file readers' tests decode, made by `dev/file_fixtures.py` (genisoimage, chdman).
+Disc images the file readers' tests decode, made by `scripts/file_fixtures.py` (genisoimage, chdman).
 
 - `disc.iso`: a 29-sector ISO 9660 volume whose SYSTEM.CNF boots `SLES_524.95`.
 - `disc.bin`: the same volume as raw 2352-byte mode 1 sectors.

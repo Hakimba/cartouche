@@ -9,8 +9,8 @@ the file relative to https://images.launchbox-app.com/. Fan-made images are left
 start with `Fanart`). The first line, `# <date>`, is the dump's date: games found in no source are
 looked up again once it changes. The platform's profile says which type its extract holds (`art`).
 
-Usage: dev/launchbox_art.py Metadata.zip "Sony Playstation 2" > app/data/art/ps2.tsv
-       dev/launchbox_art.py Metadata.zip "Nintendo Game Boy Advance" --type "Cart - Front" > app/data/art/gba.tsv
+Usage: scripts/launchbox_art.py Metadata.zip "Sony Playstation 2" > app/data/art/ps2.tsv
+       scripts/launchbox_art.py Metadata.zip "Nintendo Game Boy Advance" --type "Cart - Front" > app/data/art/gba.tsv
 The dump comes from https://gamesdb.launchbox-app.com/Metadata.zip (about 100 MB, updated daily).
 """
 import argparse

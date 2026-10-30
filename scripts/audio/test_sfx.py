@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Each QA check of sfx.py against a sound made to have its defect, and a clean sound passing them all.
 
-    python3 dev/audio/test_sfx.py
+    python3 scripts/audio/test_sfx.py
 
 The signals are made here, to test the checks only: none of them is ever a sound of the app.
 """

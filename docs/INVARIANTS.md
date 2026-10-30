@@ -4,7 +4,7 @@ The guarantees every change must keep. An invariant exists only where breaking i
 user's data, launch the wrong game, leave the app stuck or crashed, or break a security promise; everything else
 is an ordinary test, or a check by hand on a device. Every test enforcing an invariant starts its name with its id,
 or ids (Kotlin `` `INV-20 …` `` or `` `INV-03 INV-09 …` ``, GDScript `test_inv_20_…`), so a search for `INV-20` or
-`test_inv_20…` finds them all, and a core property draws ten times the cases. `dev/check_docs.py` fails when a
+`test_inv_20…` finds them all, and a core property draws ten times the cases. `scripts/check_docs.py` fails when a
 row's Tests column does not list exactly the files holding a test named after its id.
 Weakening one is a decision to discuss first, never a side effect of a change.
 

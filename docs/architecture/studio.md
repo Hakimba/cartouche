@@ -81,7 +81,7 @@ The first two say they are generated: they are written by a tuning tool through 
 
 ## Tests
 
-`dev/test_godot.sh res://test/studio` runs this folder's tests. `fonts_test.gd` compares the drawn text with a
+`scripts/test_godot.sh res://test/studio` runs this folder's tests. `fonts_test.gd` compares the drawn text with a
 reference and needs a window, so the headless run skips it. Run it alone:
 
 ```sh
@@ -92,4 +92,4 @@ $GODOT --path app -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://test/stu
 
 - [godot.md](godot.md): the screens and the carousel that draw with these pieces.
 - [../debug-bridge.md](../debug-bridge.md): trying other timings and poses on a running app.
-- [../testing.md](../testing.md#gdscript). Back to the entry: [../ONBOARDING.md](../ONBOARDING.md).
+- [../testing.md](../testing.md#gdscript). Back to the entry: [../README.md](../README.md).

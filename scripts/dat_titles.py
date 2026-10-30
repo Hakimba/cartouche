@@ -12,9 +12,9 @@ Prints: one line per cartridge ROM, `name<TAB>CRC32`, sorted by name. The DATs l
 it is shared in: plain (`.unh`, `.z64`), as the app reads a ROM file, and with an iNES header (`.nes`) or
 byte-swapped (`.v64`), as a zip archive records its entry; every form is kept, one line each.
 
-Usage: dev/dat_titles.py "Sony - PlayStation 2.dat" > app/data/titles/ps2.tsv
-       dev/dat_titles.py "Nintendo - Game Boy Advance.dat" > app/data/titles/gba.tsv
-       dev/dat_titles.py --prints "Nintendo - Game Boy Advance.dat" > app/data/prints/gba.tsv
+Usage: scripts/dat_titles.py "Sony - PlayStation 2.dat" > app/data/titles/ps2.tsv
+       scripts/dat_titles.py "Nintendo - Game Boy Advance.dat" > app/data/titles/gba.tsv
+       scripts/dat_titles.py --prints "Nintendo - Game Boy Advance.dat" > app/data/prints/gba.tsv
 The DATs come from https://github.com/libretro/libretro-database (metadat/redump, metadat/no-intro).
 """
 import re
