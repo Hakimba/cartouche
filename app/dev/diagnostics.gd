@@ -31,12 +31,19 @@ const _PIPELINE_MONITORS: Dictionary[String, Performance.Monitor] = {
 
 ## Whether traces are written; check it before building an expensive detail.
 var enabled := OS.is_debug_build()
+## How long the last frame took by the clock, in debug builds. A frame's delta is not: the engine keeps it
+## near its physics steps (at most about 150 ms) and pays a longer stall back over the next frames.
+var frame_ms := 0.0
 ## Pipelines compiled so far, by monitor name.
 var _pipelines: Dictionary[String, int] = {}
 ## Whether each joypad axis (keyed by device * 100 + axis) is past half-way.
 var _axes_past_half: Dictionary[int, bool] = {}
 ## The rate the last frame ended under (see [method _rate]); 0 for none.
 var _rate_cap := 0
+var _frame_started_us := 0
+## The most the engine placed on the graphics card so far, in bytes: past a few hundred MB, a peak costs a whole
+## new block of the driver's memory, kept afterwards.
+var _video_peak := 0.0
 
 
 ## A frame's budget under a rate cap of [param fps] frames a second, 0 for none.
@@ -60,6 +67,13 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var now_us := Time.get_ticks_usec()
+	frame_ms = (now_us - _frame_started_us) / 1000.0 if _frame_started_us else delta * 1000.0
+	_frame_started_us = now_us
+	var video := Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED)
+	if video > _video_peak + 4e6:
+		_video_peak = video
+		trace("memory", "peak at frame %d: %s" % [Engine.get_process_frames(), memory()])
 	var compiled := PackedStringArray()
 	for monitor in _PIPELINE_MONITORS:
 		var count := int(Performance.get_monitor(_PIPELINE_MONITORS[monitor]))
@@ -71,13 +85,13 @@ func _process(delta: float) -> void:
 	# of the rate it ran under, as it was before a change of rate or after it.
 	var budget_ms := maxf(_budget_ms(_rate_cap), _budget_ms(_rate()))
 	_rate_cap = _rate()
-	if delta * 1000.0 > budget_ms:
+	if frame_ms > budget_ms:
 		# Where the time went in the previous frame: scripts and engine on the main thread, drawing
 		# on the CPU and the GPU.
 		var viewport := get_viewport().get_viewport_rid()
 		var pipelines := ", pipelines compiled: " + ", ".join(compiled) if compiled else ""
 		trace("frame", "slow frame: %.1f ms (process %.1f ms, draw %.1f ms, gpu %.1f ms)%s" % [
-			delta * 1000.0, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			frame_ms, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
 			RenderingServer.viewport_get_measured_render_time_cpu(viewport),
 			RenderingServer.viewport_get_measured_render_time_gpu(viewport), pipelines])
 
@@ -85,6 +99,22 @@ func _process(delta: float) -> void:
 func _notification(what: int) -> void:
 	if what in _NOTIFICATIONS:
 		trace("app", _NOTIFICATIONS[what])
+		trace("memory", memory())
+
+
+## What the engine holds, in MB: its own allocations and what it placed on the graphics card. The driver's own
+## memory (the pipelines compiled, for one) shows only in the system's count: `dumpsys meminfo`, and on Adreno
+## `/sys/class/kgsl/kgsl/proc/<pid>/kernel`.
+func memory() -> String:
+	var pipelines := PackedStringArray()
+	for kind in _PIPELINE_MONITORS:
+		pipelines.append("%s %d" % [kind, Performance.get_monitor(_PIPELINE_MONITORS[kind])])
+	return "static_mb=%.1f video_mb=%.1f texture_mb=%.1f buffer_mb=%.1f objects=%d resources=%d nodes=%d pipelines: %s" % [
+		OS.get_static_memory_usage() / 1e6, Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1e6,
+		Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1e6,
+		Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED) / 1e6,
+		Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT),
+		Performance.get_monitor(Performance.OBJECT_NODE_COUNT), ", ".join(pipelines)]
 
 
 ## Writes one `area: detail` line to the log, in debug builds only; long details are cut.

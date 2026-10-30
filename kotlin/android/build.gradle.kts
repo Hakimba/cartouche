@@ -33,6 +33,7 @@ android {
         // Android 11 is the first version with "All files access", which ROM scanning relies on;
         // every supported handheld runs 11 or newer.
         minSdk = 30
+        ndk { abiFilters += "arm64-v8a" }
         manifestPlaceholders["godotPluginName"] = godotPluginName
         buildConfigField("String", "GODOT_PLUGIN_NAME", "\"$godotPluginName\"")
         buildConfigField("String", "SCREENSCRAPER_DEVID", "\"${screenScraper("devid")}\"")
@@ -53,6 +54,10 @@ android {
     }
 
     buildFeatures { buildConfig = true }
+
+    // The NDK the Godot build template names (app/android/build/config.gradle), for the native heap's library.
+    ndkVersion = "29.0.14206865"
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
 
     // Robolectric runs the Android-bound code (intents, URI grants) in JVM tests.
     testOptions.unitTests.isIncludeAndroidResources = true

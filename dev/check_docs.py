@@ -19,7 +19,7 @@ GENERATED = ("build/", "app/addons/gdUnit4", "kotlin/local.properties", "user://
 RUNTIME_FILES = {"snapshot.json", "start.pck", "start_next.pck", "console-variants.json"}
 EXTENSIONS = ("gd tscn tres kt kts json tsv py sh gdshader gdshaderinc md svg glb png cfg godot toml properties xml "
               "txt wav ogg html pck").split()
-SOURCES = ("*.gd", "*.kt", "*.kts", "*.tscn", "*.tres", "*.json", "*.py", "*.sh", "*.cfg", "*.godot", "*.gdshader",
+SOURCES = ("*.gd", "*.kt", "*.c", "*.kts", "*.tscn", "*.tres", "*.json", "*.py", "*.sh", "*.cfg", "*.godot", "*.gdshader",
            "*.gdshaderinc", "*.toml", "*.properties", "*.xml", "*.import")
 
 tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()

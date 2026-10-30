@@ -100,6 +100,10 @@ var _search_lift := 0.0
 var _lift: Tween
 var _title_position := 0
 var _games_hint_fade: Tween
+## The room's light last given: the environment keeps it in single precision, never equal to the double it was given.
+var _room_energy := NAN
+## Whether the row stepped to a console whose shelf is not shown behind it yet (see [method _show_waiting_shelf]).
+var _shelf_waiting := false
 
 @onready var _room: WorldEnvironment = $Environment
 @onready var _row: ShelfRow = %Row
@@ -243,9 +247,12 @@ func _ready() -> void:
 	else:
 		_come_in()
 	_shown = true
-	# Once the carousel is on screen: reading sounds must not delay it.
+	# Once the carousel is on screen: reading sounds and the other shelves' media must not delay it.
 	get_tree().process_frame.connect(_game_launch.prepare.bind(_appearance.insertions.values()),
 		CONNECT_ONE_SHOT)
+	get_tree().process_frame.connect(func() -> void:
+		for shelf in _shelves:
+			_appearance.load_models_of(_platforms[shelf.platform_id], shelf.games), CONNECT_ONE_SHOT)
 	if Diagnostics.enabled:
 		add_child(StartTrace.new(self, _row, _art, answer.library.games.size(), _shelves.size(),
 			[started, read_ms, awaited_ms, answered_ms, library_shown_ms, screens_ms]))
@@ -266,7 +273,8 @@ func _process(delta: float) -> void:
 	# Wherever a medium is drawn in this world (the games, their properties, an insertion), it is lit
 	# by its own room; the consoles by the scene's.
 	var room := _row.room_energy if _screen in _GAME_SCREENS and _row.visible else _CONSOLE_ROOM
-	if _room.environment.ambient_light_energy != room:
+	if room != _room_energy:
+		_room_energy = room
 		_room.environment.ambient_light_energy = room
 	var gone := _screen in _GAME_SCREENS and not _game_launch.is_inserting()
 	# While a launch is checked, and as the black fades after the game, they stay away.
@@ -283,6 +291,8 @@ func _process(delta: float) -> void:
 	_consoles.inspect(stick if _screen in _CONSOLE_SCREENS and _shown else Vector2.ZERO)
 	if not _game_launch.is_busy():
 		_row.inspect(stick if _screen in _GAME_SCREENS else Vector2.ZERO)
+	if _shelf_waiting and _screen == Screen.CONSOLES and not _consoles.is_settling():
+		_show_waiting_shelf()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -428,6 +438,7 @@ func _long_press() -> void:
 ## where the selection left the user.
 func _show_library(library: AndroidServices.Library, shown := "") -> void:
 	var started := Time.get_ticks_usec()
+	_shelf_waiting = false
 	_console_variants = library.console_variants
 	_appearance.use_variants(_console_variants)
 	_shelves = library.shelves
@@ -440,14 +451,15 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 		_rail.show_consoles([] as Array[String], 0)
 		_show_rail()
 		return
-	# Only the media of the library's games: the others are never loaded.
+	# Only the media of the library's games: the others are never loaded. At start, only the shown shelf's: the
+	# others' load once the carousel shows.
 	_shelf_models.clear()
 	var models: Array[PackedScene] = []
 	var items: Array[ConsoleRow.Item] = []
 	var folders: Array[String] = []
 	for shelf in _shelves:
-		_shelf_models[shelf.platform_id] = _appearance.models_of(_platforms[shelf.platform_id], shelf.games)
-		models.append_array(_shelf_models[shelf.platform_id].values())
+		if _shown or shelf == _shelves[_shelf]:
+			models.append_array(_models_of(shelf).values())
 		_positions[shelf.platform_id] = shelf.selected
 		items.append(_console_item(shelf))
 		folders.append(items.back().folder)
@@ -465,30 +477,58 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 			game.title, game.platform_id, (Time.get_ticks_usec() - started) / 1000.0])
 
 
+## The models of [param shelf]'s media, by medium (see [method Appearance.models_of]), loaded the first time.
+func _models_of(shelf: AndroidServices.Shelf) -> Dictionary[String, PackedScene]:
+	if shelf.platform_id not in _shelf_models:
+		_shelf_models[shelf.platform_id] = _appearance.models_of(_platforms[shelf.platform_id], shelf.games)
+	return _shelf_models[shelf.platform_id]
+
+
 ## The console of [param shelf]'s platform, resting as the launch animation of its selected game starts.
 func _console_item(shelf: AndroidServices.Shelf) -> ConsoleRow.Item:
 	return _appearance.console_item(_platforms[shelf.platform_id], shelf.games[shelf.selected].medium, _demo)
 
 
-## The platform selected on the consoles screen: its shelf behind, ready for the games screen, and
-## the launch animation of each of its media made now rather than on A, its selected game's in use.
+## The platform selected on the consoles screen: its console standing as the launch animation of its
+## selected game starts, and its shelf behind.
 func _show_platform() -> void:
+	_use_platform()
+	_show_shelf()
+
+
+## The selected console stands as the launch animation of its shelf's selected game has it, and that
+## game's art is looked for first once the row stops.
+func _use_platform() -> void:
+	var shelf := _shelves[_shelf]
+	var selected := shelf.games[posmod(_positions[shelf.platform_id], shelf.games.size())]
+	_art_focus.start()
+	_sequence.use(_appearance.animation_of(_platforms[shelf.platform_id], selected.medium))
+
+
+## The selected platform's shelf behind the consoles screen, ready for the games screen, and the launch
+## animation of each of its media made now rather than on A.
+func _show_shelf() -> void:
 	var started := Time.get_ticks_usec()
 	var shelf := _shelves[_shelf]
 	var platform := _platforms[shelf.platform_id]
-	var models: Dictionary[String, PackedScene] = _shelf_models[shelf.platform_id]
+	var models := _models_of(shelf)
 	for medium in models:
 		_appearance.animation_of(platform, medium)
 	var console := _appearance.console_of(shelf.platform_id)
 	_games_logo.show_logo(LogoView.Slot.GAMES_TOP, ConsoleManifest.folder_of(console))
 	_title_position = _positions[shelf.platform_id]
 	_row.show_shelf(shelf.games, _positions[shelf.platform_id], models, _appearance.look(platform, _demo))
-	_art_focus.start()
 	_search.use_shelf(shelf.platform_id, shelf.games)
-	_sequence.use(_appearance.animation_of(platform, _row.selected_game().medium))
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "shelf %s prepared in %.1f ms, %d label viewports alive" % [shelf.platform_id,
 			(Time.get_ticks_usec() - started) / 1000.0, ShelfRow.LabelledModel.alive])
+
+
+## The shelf of the console stepped to, once the row stands still on it or as soon as something needs it,
+## rather than at every step: the consoles passed on the way never make theirs.
+func _show_waiting_shelf() -> void:
+	if _shelf_waiting:
+		_remember()
 
 
 func _enter() -> void:
@@ -531,6 +571,7 @@ func _show_title() -> void:
 
 
 func _go(screen_to: Screen) -> void:
+	_show_waiting_shelf()
 	_games_logo.visible = screen_to in _GAME_SCREENS
 	var games := screen_to == Screen.GAMES and _screen != Screen.PROPERTIES
 	var from := _screen
@@ -567,6 +608,10 @@ func _launch() -> void:
 
 ## Stores the selected game and its platform, for the next start.
 func _remember() -> void:
+	# The selection saved is the game of the shelf stepped to.
+	if _shelf_waiting:
+		_shelf_waiting = false
+		_show_shelf()
 	if _shelves.is_empty() or not _row.has_games():
 		return
 	_positions[_shelves[_shelf].platform_id] = _search.shown_position()
@@ -625,9 +670,9 @@ func _on_search_opened(open: bool) -> void:
 func _on_consoles_selection_changed(index: int) -> void:
 	_rail.go_to(_consoles.target())
 	_shelf = index
-	_show_platform()
+	_use_platform()
+	_shelf_waiting = true
 	Diagnostics.trace("carousel", "platform %s" % _shelves[_shelf].platform_id)
-	_remember()
 
 
 func _on_clock_timeout() -> void:
@@ -876,6 +921,7 @@ func _on_screens_covering() -> void:
 
 
 func _cover(keeping_ball := false) -> void:
+	_show_waiting_shelf()
 	_shown = false
 	_hold_select.stop()
 	_message_timer.stop()
@@ -949,6 +995,7 @@ func _on_message_timer_timeout() -> void:
 
 
 func _on_art_focus_timeout() -> void:
+	_show_waiting_shelf()
 	if _row.has_games():
 		android.art_focus(_row.games_around(CarouselLayout.REACH))
 

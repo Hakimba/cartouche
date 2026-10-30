@@ -68,3 +68,16 @@ func test_a_view_moving_on_a_side_keeps_its_size_and_one_off_the_screen_is_not_d
 	view.place(Transform3D(Basis.IDENTITY, Vector3(9.0, 0.0, 0.0)), 1.0)
 	assert_int(view.view().render_target_update_mode).override_failure_message("off the screen, not drawn") \
 		.is_equal(SubViewport.UPDATE_DISABLED)
+
+
+func test_a_hidden_view_frees_its_pictures_and_shown_again_draws_itself_at_the_size_it_had() -> void:
+	var view := _view(_camera())
+	view.place(Transform3D(Basis.IDENTITY, Vector3(0.9, 0.0, 0.0)), 1.0)
+	var size := view.view().size
+	view.hide()
+	view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
+	# The engine keeps a view at least a few pixels wide.
+	assert_int(view.view().size.x * view.view().size.y).override_failure_message("hidden, no pictures kept").is_less(16)
+	view.show()
+	assert_vector(Vector2(view.view().size)).is_equal(Vector2(size))
+	assert_int(view.view().render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)

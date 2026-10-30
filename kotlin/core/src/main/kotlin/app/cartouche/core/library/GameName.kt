@@ -125,6 +125,10 @@ public data class GameName(
          * [text] without its accents and other marks, its letters decomposed (`é` is `e`, `ﬁ` is `fi`), its case and
          * punctuation kept.
          */
-        internal fun unaccented(text: String): String = MARKS.replace(Normalizer.normalize(text, Normalizer.Form.NFKD), "")
+        internal fun unaccented(text: String): String =
+            // ASCII has no mark and is its own decomposition: most of a reference list never reaches the normalizer.
+            if (text.all { it.code < ASCII }) text else MARKS.replace(Normalizer.normalize(text, Normalizer.Form.NFKD), "")
+
+        private const val ASCII = 0x80
     }
 }

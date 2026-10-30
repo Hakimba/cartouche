@@ -62,6 +62,6 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 
 | Id | Invariant | Why | Tests |
 |---|---|---|---|
-| INV-23 | Everything the plugin sends to Godot is a value its JNI bridge converts: text, booleans, numbers, Dictionaries, lists of Dictionaries as `Object[]` and lists of texts as `String[]`. | Any other array, and a String inside an `Object[]`, reaches GDScript as an opaque object. | `WireTest` |
+| INV-23 | Everything the plugin sends to Godot is a value its JNI bridge converts: text, booleans, numbers, Dictionaries, lists of Dictionaries as `Object[]` and lists of texts as `String[]`. | Any other array, and a String inside an `Object[]`, reaches GDScript as an opaque object. | `WireTest`, `WireJsonTest` |
 | INV-24 | A release build contains no debug bridge and starts none, and the bridge never writes the user's library, settings or labels. | The remote control is a development tool, never a door into the user's data. | `bridge_security_test.gd` |
 

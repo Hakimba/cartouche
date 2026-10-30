@@ -5,7 +5,7 @@ extends RefCounted
 ## kind of media falls back to, the steps of the platforms shown by their medium, label colours and
 ## bands, the pose, and each media's insertion; and the media and the consoles found in their folders
 ## ([MediumManifest], [ConsoleManifest]). Read once; a medium's model is loaded the first time it is
-## asked for, a console's scene the first time its console or its launch animation is. What is loaded
+## asked for (or ahead, in the background), a console's scene the first time its console or its launch animation is. What is loaded
 ## or made stays: a library edit seldom drops a medium, and scenes and animations weigh little next to
 ## the labels' viewports, which [ShelfRow] frees.
 
@@ -19,6 +19,8 @@ var _media_animation: Animation
 var _media: Dictionary[String, MediumManifest] = {}
 var _kind_media: Dictionary[String, String] = {}
 var _models: Dictionary[String, PackedScene] = {}
+## The media whose models load in the background ([method load_models_of]).
+var _loading: Dictionary[String, bool] = {}
 var _consoles: Dictionary[String, ConsoleManifest] = {}
 var _scenes: Dictionary[String, PackedScene] = {}
 var _animations: Dictionary[String, Animation] = {}
@@ -139,6 +141,16 @@ func models_of(platform: AndroidServices.Platform, games: Array[AndroidServices.
 	return models
 
 
+## Loads the models of [param games]' media on [param platform] not loaded yet in the background: [method model_of]
+## then takes them, waiting for the end of their load if it has to.
+func load_models_of(platform: AndroidServices.Platform, games: Array[AndroidServices.Game]) -> void:
+	for game in games:
+		var shown := _shown(game.medium, platform.media)
+		if shown not in _models and shown not in _loading:
+			ResourceLoader.load_threaded_request(_media[shown].scene)
+			_loading[shown] = true
+
+
 ## Applies the library's model choices; omitted choices restore the base models.
 func use_variants(variants: Dictionary[String, String]) -> void:
 	var bases := defaults(ConsoleManifest.found())
@@ -198,7 +210,8 @@ func model_of(medium: String, media: String) -> PackedScene:
 	var shown := _shown(medium, media)
 	if shown not in _models:
 		var started := Time.get_ticks_usec()
-		_models[shown] = load(_media[shown].scene)
+		var path := _media[shown].scene
+		_models[shown] = ResourceLoader.load_threaded_get(path) if _loading.erase(shown) else load(path)
 		Diagnostics.trace("appearance", "%s model loaded in %.1f ms" % [shown, (Time.get_ticks_usec() - started) / 1000.0])
 	return _models[shown]
 

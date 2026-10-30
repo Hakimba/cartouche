@@ -55,12 +55,15 @@ public sealed interface Identification {
 public class TitleIndex private constructor(
     private val titles: List<KnownTitle>,
     private val byText: Map<String, KnownTitle>,
-    private val byPrint: Map<UInt, List<KnownTitle>>,
+    prints: String,
 ) {
     private val byTitle = titles.groupBy { it.filing.key }
-    private val byMainTitle = titles.groupBy { it.filing.mainKey }
-    private val bySerial = indexed { known -> known.serials.map(::serialKey) }
-    private val byDiscId = indexed { known -> known.serials.map { discIdOf(it) }.filterOption() }
+
+    // What only a file's content, a subtitle-less name or a cartridge needs is indexed when first asked.
+    private val byMainTitle by lazy { titles.groupBy { it.filing.mainKey } }
+    private val bySerial by lazy { indexed { known -> known.serials.map(::serialKey) } }
+    private val byDiscId by lazy { indexed { known -> known.serials.map { discIdOf(it) }.filterOption() } }
+    private val byPrint by lazy { prints.lines().map { parsePrint(it, byText) }.filterOption().groupBy({ it.first }, { it.second }) }
 
     public val size: Int get() = titles.size
 
@@ -143,9 +146,7 @@ public class TitleIndex private constructor(
          */
         public fun parse(titles: String, prints: String = ""): TitleIndex {
             val known = titles.lines().map(::parseLine).filterOption()
-            val byText = known.associateBy(KnownTitle::text)
-            val byPrint = prints.lines().map { parsePrint(it, byText) }.filterOption().groupBy({ it.first }, { it.second })
-            return TitleIndex(known, byText, byPrint)
+            return TitleIndex(known, known.associateBy(KnownTitle::text), prints)
         }
 
         private fun parseLine(line: String): Option<KnownTitle> = option {

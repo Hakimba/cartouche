@@ -232,6 +232,27 @@ func test_a_console_chosen_as_the_row_still_moves_goes_in_from_the_middle() -> v
 	assert_float(shown[1]).is_equal(0.0)
 
 
+func test_a_pressed_at_once_after_steps_opens_the_games_of_the_console_stepped_to() -> void:
+	var carousel := await Fixtures.shown_carousel(self)
+	var count := carousel._consoles._items.size()
+	var remembered: Array[String] = []
+	for shelf in carousel._shelves:
+		remembered.append(shelf.games[shelf.selected].id)
+	var random := Fixtures.cases(58)
+	for attempt in 12:
+		for step in random.randi_range(1, count - 1):
+			Fixtures.press(carousel, &"carousel_right")
+		# Pressed in the same frame as the last step, or while the row still moves.
+		Fixtures.step_frames(carousel, random.randi_range(0, 8))
+		var index := carousel._consoles.selected_index()
+		Fixtures.press(carousel, &"ui_accept")
+		_until(carousel, Carousel.Screen.GAMES)
+		assert_str(carousel._row.selected_game().id).is_equal(remembered[index])
+		assert_str(carousel._title.text).is_equal(carousel._row.selected_game().title)
+		Fixtures.press(carousel, &"screen_back")
+		_until(carousel, Carousel.Screen.CONSOLES)
+
+
 ## The console at [param index] selected on the consoles screen, the row still.
 func _select(carousel: Carousel, index: int) -> void:
 	while carousel._consoles.selected_index() != index:

@@ -18,7 +18,8 @@
 # on the PS2's games, whichever console the app showed last. Run it after `dev/build.sh --install`,
 # with the device online.
 #
-# Prints one line per measurement; with --record FILE, also appends each one to FILE as a JSON
+# Prints one line per measurement, and keeps each scenario's slow frames in build/bench/SCENARIO-SIZE.log; with
+# --record FILE, also appends each one to FILE as a JSON
 # record: {"date", "commit", "build", "device", "android", "scenario", "games", "metric",
 # "value", "unit", "run", "label"}, the label naming the run (--label, empty by default).
 #
@@ -76,15 +77,16 @@ wait_for() {
 
 # sampled SCENARIO SIZE: from the scenario's start to its `bench:` line, the app's processor time
 # a second and, each second, how busy the GPU is and its clock (Adreno's kgsl files; left out
-# where the GPU does not tell).
+# where the GPU does not tell). A scenario without its line within 120 s fails the run.
 gpu=/sys/class/kgsl/kgsl-3d0
 sampled() {
   wait_for "bench: $1 started" 60
-  local pid ticks started busy=0 clock=0 samples=0 reading
+  local pid ticks started busy=0 clock=0 samples=0 reading deadline=$((SECONDS + 120))
   pid=$("$adb" shell pidof app.cartouche | tr -d '\r')
   ticks=$("$adb" shell cat "/proc/$pid/stat" | awk '{ print $14 + $15 }')
   started=$(date +%s.%N)
   until "$adb" logcat -d | grep -qE "bench: $1:"; do
+    [ "$SECONDS" -lt "$deadline" ] || { echo "error: no \"bench: $1:\" within 120 s" >&2; exit 1; }
     reading=$("$adb" shell "cat $gpu/gpu_busy_percentage $gpu/clock_mhz 2> /dev/null" | tr -d '\r %' | paste -sd ' ')
     if [ -n "$reading" ]; then
       busy=$(echo "$busy ${reading% *}" | awk '{ print $1 + $2 }')
@@ -106,7 +108,7 @@ emit_bench() {
   line=$("$adb" logcat -d | grep -oE "bench: $1: .*" | head -1)
   for key in "${@:3}"; do
     emit "$1" "$2" "$key" "$(echo "$line" | grep -oE "$key=[0-9.]+" | cut -d= -f2)" \
-      "$(case "$key" in fps) echo fps ;; *_ms) echo ms ;; *) echo count ;; esac)" 1
+      "$(case "$key" in fps) echo fps ;; *_ms) echo ms ;; *_per_s) echo per_s ;; *) echo count ;; esac)" 1
   done
 }
 
@@ -136,6 +138,7 @@ set_art_aside() {
   trap put_art_back EXIT
 }
 
+mkdir -p build/bench
 for size in "${sizes[@]}"; do
   demo=$([ "$size" = real ] || echo "--demo-games=$size")
   # The same console's games each time, whichever the app showed last.
@@ -176,11 +179,15 @@ for size in "${sizes[@]}"; do
   for scenario in scroll enter step turn properties order swipe idle idle_consoles; do
     start "${args}--bench=$scenario"
     sampled "$scenario" "$size"
-    # At rest the app draws 30 times a second, when anything changes: its frame times say nothing.
+    # At rest the app draws only when something changes, its loop running 30 times a second: its frame times say
+    # nothing, the frames it draws (about none) say whether something keeps changing.
     case "$scenario" in
-      idle*) emit_bench "$scenario" "$size" steps draw_calls process_ms draw_cpu_ms ;;
+      idle*) emit_bench "$scenario" "$size" steps draw_calls process_ms draw_cpu_ms drawn_per_s ;;
       *) emit_bench "$scenario" "$size" fps worst_ms p95_ms slow_frames steps draw_calls process_ms draw_cpu_ms ;;
     esac
+    # Each slow frame (its processing, drawing, GPU time and the pipelines compiled) between the steps it fell among,
+    # to tell what a hitch was.
+    "$adb" logcat -d | grep -E "frame: slow frame|carousel: (step|jump|platform) " > "build/bench/$scenario-$size.log" || true
     if [ "$scenario" = scroll ]; then
       emit memory "$size" memory_pss "$("$adb" shell dumpsys meminfo app.cartouche | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
       # Leaving the app (here for the system settings) saves the selection.

@@ -51,7 +51,7 @@ Game Boy Color, Game Boy Advance, GameCube, Wii, PlayStation, Xbox and Xbox 360.
 ## Building
 
 Requirements: Godot 4.7.2 with its export templates, JDK 17, the Android SDK (platform 36, build
-tools 36.1.0), Python 3, gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), and `adb` for
+tools 36.1.0, NDK 29.0.14206865 and CMake 3.22.1, which Gradle installs when missing), Python 3, gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), and `adb` for
 installing on a device.
 
 ```sh

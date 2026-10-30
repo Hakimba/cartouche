@@ -83,6 +83,14 @@ var catalog := CatalogSummary.new({})
 
 var _plugin: Object = Engine.get_singleton(_SINGLETON) if Engine.has_singleton(_SINGLETON) else DesktopPlugin.new()
 var _last_request_id := 0
+## The system's font list, read on a worker while the main scene loads (nothing shapes text before the
+## tree starts): read on first need instead, by the first text with a letter its font lacks, such as a
+## Japanese title, it stalls that frame (about 200 ms on a handheld).
+var _system_fonts_read := WorkerThreadPool.add_task(OS.get_system_fonts)
+
+
+func _enter_tree() -> void:
+	WorkerThreadPool.wait_for_task_completion(_system_fonts_read)
 
 
 func _ready() -> void:
@@ -272,6 +280,11 @@ func art_focus(games: Array[AndroidServices.Game]) -> void:
 	for game in games:
 		ids.append(game.id)
 	_query(&"artFocus", [ids], null)
+
+
+## Hands the memory the app freed back to the system: as the screen comes to rest, and as the app leaves the screen.
+func release_memory() -> void:
+	_query(&"releaseMemory", [], null)
 
 
 ## Prepares in the background what looking at a folder needs (the reference lists' indexes), as a

@@ -8,12 +8,16 @@ import arrow.core.getOrElse
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.Codepoint
 import io.kotest.property.arbitrary.choice
+import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.filter
+import io.kotest.property.arbitrary.printableAscii
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import java.text.Normalizer
 
 class GameNameTest {
     @Test
@@ -54,6 +58,24 @@ class GameNameTest {
             val name = GameName.parse(text)
             name.displayTitle.shouldNotBeBlank()
             GameName.parse(name.title).title shouldBe name.title
+        }
+    }
+
+    @Test
+    fun `leaving accents out of a title gives what decomposing it and dropping its marks gave`() = runBlocking<Unit> {
+        val written = Arb.string(0..30, Codepoint.printableAscii())
+        val accented =
+            Arb.string(
+                0..30,
+                Arb.element(
+                    listOf("a", "é", "ﬁ", "日", "\u0301", "😀", "Z", " ", "(")
+                        .map {
+                            it.codePointAt(0)
+                        }.map(::Codepoint),
+                ),
+            )
+        checkAll(Arb.choice(written, accented)) { text ->
+            TitleKey.unaccented(text) shouldBe Regex("""\p{M}+""").replace(Normalizer.normalize(text, Normalizer.Form.NFKD), "")
         }
     }
 }

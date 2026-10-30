@@ -265,14 +265,17 @@ func test_only_the_library_s_media_are_loaded_the_shown_shelf_s_made_with_their_
 	var carousel := ScreenFixtures.carousel_for(self, ScreenFixtures.past_first_launch(self, {"snes": 2, "psx": 2}))
 	add_child(carousel)
 	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._shown)).is_true()
-	# Not the cartridge nor the disc their kinds fall back to.
-	assert_array(carousel._appearance._models.keys()).contains_exactly_in_any_order(["snes_pal_cart", "ps1_cd"])
+	# The shown shelf's at start, the other's as its shelf shows.
+	assert_array(carousel._appearance._models.keys()).contains_exactly(["snes_pal_cart"])
 	_assert_shown_shelf_made(carousel, [["snes_pal_cart"]])
 	# A game of the PlayStation's on a PS2 disc: both made as its shelf shows, the other shelf's kept.
 	var library: AndroidServices.Library = carousel._screens.library
 	library.shelves[1].games[1].medium = "ps2_dvd"
 	carousel._show_library(library, "psx")
 	_assert_shown_shelf_made(carousel, [["ps1_cd", "ps2_dvd"], ["snes_pal_cart"]])
+	# Not the cartridge nor the disc their kinds fall back to.
+	assert_array(carousel._appearance._models.keys()).contains_exactly_in_any_order(["snes_pal_cart", "ps1_cd",
+		"ps2_dvd"])
 	# Gone from the library, the other shelf's medium is freed.
 	library.shelves.remove_at(0)
 	carousel._show_library(library)

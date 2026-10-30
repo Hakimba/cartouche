@@ -65,9 +65,14 @@ func _logos_match(carousel: Carousel) -> void:
 		if tile.visible:
 			var slots := ConsoleRail.slot(i, rail.spring().position, carousel._shelves.size())
 			assert_float(absf((tile.position.x - 564.48) / 174.08)).is_equal_approx(absf(slots), 0.001)
-	var selected := carousel._consoles.selected().folder
-	assert_str(carousel._games_logo.texture.resource_path).ends_with("games-top/%s.png" % selected)
-	assert_str(rail.tiles()[carousel._consoles.selected_index()].console()).is_equal(selected)
+	assert_str(rail.tiles()[carousel._consoles.selected_index()].console()).is_equal(carousel._consoles.selected().folder)
+
+
+## The games screen's logo, made ready behind the consoles screen once the row stands still, is the selected console's.
+func _games_logo_matches(carousel: Carousel) -> void:
+	assert_bool(await Screens.until(self, func() -> bool: return not carousel._consoles.is_settling())).is_true()
+	await await_idle_frame()
+	assert_str(carousel._games_logo.texture.resource_path).ends_with("games-top/%s.png" % carousel._consoles.selected().folder)
 
 
 func test_reordering_and_random_fast_wraps_keep_every_tile_and_the_games_logo_on_their_console() -> void:
@@ -76,6 +81,7 @@ func test_reordering_and_random_fast_wraps_keep_every_tile_and_the_games_logo_on
 	ids.reverse()
 	carousel._on_consoles_ordered(ids)
 	_logos_match(carousel)
+	await _games_logo_matches(carousel)
 	var random := RandomNumberGenerator.new()
 	random.seed = 120113
 	for press in 60:
@@ -87,3 +93,4 @@ func test_reordering_and_random_fast_wraps_keep_every_tile_and_the_games_logo_on
 		carousel._rail._process(1.0 / 60.0)
 	assert_vector(carousel._rail.tile_at(carousel._consoles.selected_index())) \
 		.is_equal_approx(Vector2(564.48, 711.68), Vector2.ONE * 0.01)
+	await _games_logo_matches(carousel)

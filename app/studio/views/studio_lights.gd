@@ -20,6 +20,8 @@ static var _data: Dictionary = {}
 var _lights: Array[Light3D] = []
 var _rig: Rig
 var _environment: Environment
+## Where the lights were last placed: placed again unchanged, every light would be sent to the renderer.
+var _centre := Vector3(NAN, NAN, NAN)
 
 
 ## One light of a rig: a sun (its rays go along [member target]), a lamp at [member position], or a
@@ -162,6 +164,9 @@ func _init(parent: Node, rig: Rig, centre: Vector3, environment: Environment) ->
 
 ## The lights moved with their model's box centre, [param centre].
 func place(centre: Vector3) -> void:
+	if centre == _centre:
+		return
+	_centre = centre
 	for i in _lights.size():
 		var source := _rig.sources[i]
 		var light := _lights[i]

@@ -1,6 +1,7 @@
 build/
 .gradle/
 .kotlin/
+.cxx/
 local.properties
 app/.godot/
 app/android/

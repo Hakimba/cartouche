@@ -89,7 +89,8 @@ of the same names.
 
 ## Build, run and test
 
-You need Godot 4.7.2 with its export templates, JDK 17, the Android SDK (platform 36, build tools 36.1.0),
+You need Godot 4.7.2 with its export templates, JDK 17, the Android SDK (platform 36, build tools 36.1.0,
+NDK 29.0.14206865 and CMake 3.22.1, which Gradle installs when missing),
 gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), Python 3, and `adb` to install on a device.
 
 ```sh

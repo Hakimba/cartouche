@@ -36,6 +36,8 @@ var _canvas_size := Vector2.ZERO
 var _pixel_scale := 0.0
 var _at := Transform3D()
 var _softness := 0.0
+## The view's size while it is hidden, its pictures freed.
+var _hidden_size := Vector2i.ZERO
 
 
 ## The look of a medium of softness [param s]: its blur and shadow (px at 1280) and saturation.
@@ -133,6 +135,19 @@ func _ready() -> void:
 	set_process(_shown)
 	_environment.environment = StudioLights.environment_of(self)
 	texture = _view.get_texture()
+
+
+func _notification(what: int) -> void:
+	# Hidden, the view frees its pictures (tens of MB for the five of a row) and, shown, draws itself
+	# again at the size it had: a medium is drawn exactly as if it had kept them.
+	if what == NOTIFICATION_VISIBILITY_CHANGED and _framed and visible == (_hidden_size != Vector2i.ZERO):
+		if visible:
+			_view.size = _hidden_size
+			_hidden_size = Vector2i.ZERO
+			redraw()
+		else:
+			_hidden_size = _view.size
+			_view.size = Vector2i.ZERO
 
 
 func _process(_delta: float) -> void:

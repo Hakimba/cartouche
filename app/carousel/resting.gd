@@ -10,7 +10,7 @@ extends Node
 ## slow to a stop in [constant STOPPING_S], and from then on the screen is drawn only when something
 ## on it changes (the clock, the battery). The first press, touch or return to the app wakes
 ## everything at once, and acts as it always does. Animations no press started (a message) play
-## without waking it.
+## without waking it. Once still, and as the app leaves the screen, the memory it freed goes back to the system.
 
 ## Nodes moving by themselves, at their `pace`: 1 awake, down to 0, still.
 const PACED := &"paced"
@@ -35,6 +35,7 @@ var pace := 1.0:
 		get_tree().set_group(PACED, &"pace", pace)
 		if pace == 0.0:
 			Diagnostics.trace("rest", "still")
+			Android.release_memory()
 
 var _idle_s := 0.0
 
@@ -51,6 +52,8 @@ func _exit_tree() -> void:
 func _notification(what: int) -> void:
 	if what in [NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_APPLICATION_FOCUS_IN]:
 		wake()
+	elif what == NOTIFICATION_APPLICATION_PAUSED:
+		Android.release_memory()
 
 
 func _process(delta: float) -> void:

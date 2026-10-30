@@ -21,6 +21,7 @@ permissions, each with the reason in a comment.
 | `PendingPick.kt` | A system picker awaiting its activity result. Each pick is answered exactly once (INV-06). |
 | `Battery.kt` | `BatteryWatch` follows the battery broadcast from resume to pause and sends each change through `battery_changed`. |
 | `InstalledApps.kt` | Whether a package is installed, and the apps with a launcher entry. |
+| `NativeHeap.kt` | Hands the memory Godot and the graphics driver freed back to the system (`mallopt(M_PURGE)` in `kotlin/android/src/main/cpp/native_heap.c`, the plugin's only C). The C allocator otherwise keeps it for reuse: about 100 MB after the start. `releaseMemory` runs it off Godot's thread, when the screen comes to rest and when the app leaves the screen (`Resting`). |
 
 Inside `CartouchePlugin.kt`, each need has one helper. `onLibrary(requestId) { }` runs a call on the library
 thread and answers it. `save(note) { change }` changes the stored settings. `timed(area, describe) { }`, in

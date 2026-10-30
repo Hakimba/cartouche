@@ -70,6 +70,8 @@ var _frames_ms := PackedFloat32Array()
 var _process_ms := 0.0
 var _draw_ms := 0.0
 var _elapsed_s := 0.0
+## Frames drawn before the measure, to count those drawn during it: at rest, only what changes is drawn.
+var _drawn_before := 0
 var _next_action_s := 0.0
 var _steps := 0
 var _media: Array[MediaView] = []
@@ -113,8 +115,9 @@ func _ready() -> void:
 	elif _scenario == "launch":
 		press(&"ui_accept")
 		queue_free()
-	elif _scenario == "order":
-		press(&"ui_down")
+	elif _scenario == "order" and not await _open_ring():
+		queue_free()
+		return
 	elif _scenario == "settings":
 		press(&"open_settings")
 	elif _scenario == "plinth":
@@ -135,12 +138,13 @@ func _ready() -> void:
 	else:
 		_carousel._resting.stays_awake = true
 	set_process(true)
+	_drawn_before = Engine.get_frames_drawn()
 	Diagnostics.trace("bench", "%s started" % _scenario)
 
 
 func _process(delta: float) -> void:
 	_elapsed_s += delta
-	_frames_ms.append(delta * 1000.0)
+	_frames_ms.append(Diagnostics.frame_ms)
 	_process_ms += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 	_draw_ms += RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid())
 	if _scenario == "enter" and _elapsed_s >= _next_action_s:
@@ -153,7 +157,12 @@ func _process(delta: float) -> void:
 	elif _scenario == "properties" and _elapsed_s >= _next_action_s:
 		_next_action_s += _ENTER_EVERY_S
 		press(&"open_properties" if _carousel.screen() == Carousel.Screen.GAMES else &"screen_back")
-	elif _scenario == "order" and _elapsed_s >= _next_action_s:
+	elif _scenario == "order" and _carousel.screen() != Carousel.Screen.ORDER:
+		# Never a press elsewhere: an A on the games screen would launch a game.
+		Diagnostics.trace("bench", "order stopped: the ring closed after %d presses" % _steps)
+		queue_free()
+		return
+	elif _scenario == "order" and _elapsed_s >= _next_action_s and _ring_still():
 		_next_action_s += _STEP_EVERY_S
 		press(_ORDER_PRESSES[_steps % _ORDER_PRESSES.size()])
 		_steps += 1
@@ -179,6 +188,34 @@ func _process(delta: float) -> void:
 			act(_HELD[_scenario], false)
 		_report()
 		queue_free()
+
+
+## From the screen shown, back to the consoles screen, then the ring opened and still: whether it is (traced when not).
+func _open_ring() -> bool:
+	if _carousel.screen() == Carousel.Screen.GAMES:
+		press(&"screen_back")
+	if not await _until(func() -> bool: return _carousel.screen() == Carousel.Screen.CONSOLES):
+		Diagnostics.trace("bench", "order stopped: no consoles screen")
+		return false
+	press(&"ui_down")
+	if not await _until(_ring_still):
+		Diagnostics.trace("bench", "order stopped: no ring (a single console?)")
+		return false
+	return true
+
+
+## Whether the ring shows and takes presses: open, neither coming nor moving a console.
+func _ring_still() -> bool:
+	return _carousel.screen() == Carousel.Screen.ORDER and _carousel._order.is_open() and not _carousel._order._busy
+
+
+## Frames until [param condition] holds, ten seconds at most: whether it did.
+func _until(condition: Callable) -> bool:
+	var waited_s := 0.0
+	while not condition.call() and waited_s < 10.0:
+		await get_tree().process_frame
+		waited_s += get_process_delta_time()
+	return condition.call()
 
 
 ## The last console of the row placed on the ring of the others, as the form's Add does: the screens cover the
@@ -283,10 +320,8 @@ static func _fitted(model: Node3D) -> Node3D:
 
 func _report() -> void:
 	var frames := Diagnostics.frame_statistics(_frames_ms, _elapsed_s)
-	# Godot's own memory, apart from what the graphics driver holds.
-	var static_mb := Performance.get_monitor(Performance.MEMORY_STATIC) / 1e6
-	var video_mb := Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1e6
 	var draw_calls := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 	var count := maxi(_frames_ms.size(), 1)
-	Diagnostics.trace("bench", "%s: %s steps=%d static_mb=%.1f video_mb=%.1f draw_calls=%d process_ms=%.2f draw_cpu_ms=%.2f" % [
-		_scenario, frames, _steps, static_mb, video_mb, draw_calls, _process_ms / count, _draw_ms / count])
+	var drawn_per_s := (Engine.get_frames_drawn() - _drawn_before) / maxf(_elapsed_s, 0.001)
+	Diagnostics.trace("bench", "%s: %s steps=%d %s draw_calls=%d process_ms=%.2f draw_cpu_ms=%.2f drawn_per_s=%.1f" % [
+		_scenario, frames, _steps, Diagnostics.memory(), draw_calls, _process_ms / count, _draw_ms / count, drawn_per_s])

@@ -37,10 +37,11 @@ static func past_first_launch(suite: GdUnitTestSuite, consoles: Dictionary[Strin
 	return made
 
 
-## Once the properties of a console and the ring putting the consoles in order have stopped moving.
+## Once the consoles, the properties of a console and the ring putting the consoles in order have stopped moving: the
+## selected console's shelf is shown behind.
 static func settled_consoles(suite: GdUnitTestSuite, carousel: Carousel) -> void:
 	suite.assert_bool(await until(suite, func() -> bool:
-		return not carousel._console_properties._busy and not carousel._order._busy \
+		return not carousel._consoles.is_settling() and not carousel._console_properties._busy and not carousel._order._busy \
 			and not (carousel.get_node("%Screens/Settings") as SettingsMenu).is_processing())).is_true()
 	await suite.await_idle_frame()
 

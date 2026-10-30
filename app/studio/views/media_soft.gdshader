@@ -49,7 +49,8 @@ void fragment() {
 	vec4 medium;
 	GAUSSIAN(medium, UV, blur, MEDIUM_TAPS)
 	vec4 drawn = medium;
-	if (shadow_colour.a > 0.0) {
+	// The shadow shows only where the medium does not cover: under it, it would add exactly nothing.
+	if (shadow_colour.a > 0.0 && medium.a < 1.0) {
 		// The shadow is cast by the blurred medium: the two Gaussians add up.
 		vec4 casting;
 		GAUSSIAN(casting, UV - vec2(0.0, shadow_y) * TEXTURE_PIXEL_SIZE, length(vec2(blur, shadow_blur / 2.0)), SHADOW_TAPS)

@@ -555,11 +555,13 @@ class Place extends Node3D:
 		lit = StudioLights.rig_of(medium, &"games")
 		blank = StudioLights.rig_of(medium, &"games", true)
 
+	## Told at every frame the place is not drawn: only a view still drawn is sent to the renderer.
 	func hide_view() -> void:
 		if media_view:
 			media_view.hide()
 			media_view.set_process(false)
-			media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
+			if media_view.view().render_target_update_mode != SubViewport.UPDATE_DISABLED:
+				media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
 
 	func draw_at(at: Transform3D, softness: float, weight: float, mode: Draw, order: int) -> void:
 		var camera := (get_parent() as ShelfRow).camera
@@ -586,7 +588,9 @@ class Place extends Node3D:
 		var redraw := shown.dirty or not media_view.visible
 		media_view.show()
 		media_view.set_process(true)
-		media_view.z_index = order
+		# Set again, even unchanged, it would draw the whole screen again.
+		if media_view.z_index != order:
+			media_view.z_index = order
 		# A change below one percent relights nothing visible; the ends are still reached exactly.
 		if weight != _blank_weight and (absf(weight - _blank_weight) >= 0.01 or weight in [0.0, 1.0]):
 			media_view.crossfade(weight)

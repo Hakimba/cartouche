@@ -133,11 +133,6 @@ internal class ArtService(
         }
     }
 
-    fun absentLabels(games: List<Game>): List<String> = games.groupBy { it.platform }.flatMap { (platform, games) ->
-        val version = reference().artVersion(platform)
-        games.filter { store.stored(it.id).isNone() && store.isAbsent(it.id, version) }.map { it.id.value }
-    }
-
     /** Downloads the images not downloaded yet, each told through [VARIANT_SIGNAL]. */
     fun labelVariants(game: Game): Dictionary {
         val sources = sources(game.platform, preferredRegion())

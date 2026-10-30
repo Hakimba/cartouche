@@ -2,14 +2,11 @@
 package app.cartouche.android
 
 import app.cartouche.android.art.FoundArt
-import app.cartouche.core.library.Disc
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
-import app.cartouche.core.library.IgnoredCount
 import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlatformSetup
-import app.cartouche.core.library.SkippedFolder
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.MediumId
 import app.cartouche.core.platforms.PlatformId
@@ -21,7 +18,6 @@ import arrow.core.getOrNone
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -33,89 +29,139 @@ import kotlinx.serialization.json.put
  * {"shelves": [{"platform", "games": [index into games], "selected"}], "selected"}}`; a missing value is an absent key.
  * Each game carries its platform's medium from [catalog], absent when the platform is unknown.
  */
-internal fun Library.toWireJson(shelves: Option<Shelves>, catalog: Catalog): String = buildJsonObject {
+internal fun Library.toWireJson(shelves: Option<Shelves>, catalog: Catalog): String {
     val media = catalog.platforms.associate { it.id to it.profile.medium }
-    put("setups", setups.toJson(PlatformId::value) { it.toJson() })
-    put("games", games.toJson { game -> game.toJson(media.getOrNone(game.platform).map { it.of(game.regions) }) })
-    put("not_games", notGames.toJson(PlatformId::value) { files -> files.toJson { JsonPrimitive(it.name.value) } })
-    put("ignored_counts", ignoredCounts.toJson(PlatformId::value) { counts -> counts.toJson({ it.wire }) { it.toJson() } })
-    put("skipped_folders", skippedFolders.toJson(PlatformId::value) { folders -> folders.toJson { it.toJson() } })
-    put(
-        "console_variants",
-        buildJsonObject {
-            setups.keys.forEach { platform -> variantOf(platform).onSome { put(platform.value, it.wire) } }
-        },
-    )
-    shelves.onSome { put("shelves", it.toJson(games.withIndex().associate { (at, game) -> game.id to at })) }
-}.toString()
+    return StringBuilder(games.size * GAME_JSON_ESTIMATE)
+        .obj {
+            field("setups") { map(setups, PlatformId::value) { setup(it) } }
+            field("games") { array(games) { each -> obj { game(each, media.getOrNone(each.platform).map { it.of(each.regions) }) } } }
+            field("not_games") { map(notGames, PlatformId::value) { files -> array(files) { text(it.name.value) } } }
+            field("ignored_counts") {
+                map(ignoredCounts, PlatformId::value) { counts ->
+                    map(counts, { it.wire }) { count ->
+                        obj {
+                            field("count") { append(count.count) }
+                            field("examples") { array(count.examples) { text(it.value) } }
+                        }
+                    }
+                }
+            }
+            field("skipped_folders") {
+                map(skippedFolders, PlatformId::value) { folders ->
+                    array(folders) { folder ->
+                        obj {
+                            field("path") { text(folder.path.value) }
+                            field("reason") { text(folder.reason.wire) }
+                        }
+                    }
+                }
+            }
+            field("console_variants") {
+                obj { setups.keys.forEach { platform -> variantOf(platform).onSome { field(platform.value) { text(it.wire) } } } }
+            }
+            shelves.onSome { field("shelves") { shelves(it, games.withIndex().associate { (at, game) -> game.id to at }) } }
+        }.toString()
+}
+
+// A few hundred characters a game carries; sizing the buffer once avoids regrowing it a dozen times.
+private const val GAME_JSON_ESTIMATE = 250
+
+/** What `JsonObject.toString` writes, built in one buffer: the same text without a tree of elements to allocate. */
+private class Fields(val out: StringBuilder) {
+    private var first = true
+
+    inline fun field(key: String, value: StringBuilder.() -> Unit) {
+        if (!first) out.append(',')
+        first = false
+        out.text(key).append(':').value()
+    }
+
+    fun some(key: String, value: Option<String>) = value.onSome { field(key) { text(it) } }
+}
+
+private inline fun StringBuilder.obj(fields: Fields.() -> Unit): StringBuilder {
+    append('{')
+    Fields(this).fields()
+    return append('}')
+}
+
+private inline fun <T> StringBuilder.array(items: Iterable<T>, item: StringBuilder.(T) -> Unit) {
+    append('[')
+    var first = true
+    for (each in items) {
+        if (!first) append(',')
+        first = false
+        item(each)
+    }
+    append(']')
+}
+
+private inline fun <K, V> StringBuilder.map(entries: Map<K, V>, key: (K) -> String, value: StringBuilder.(V) -> Unit) = obj {
+    entries.forEach { (k, v) -> field(key(k)) { value(v) } }
+}
+
+/** Quoted as `JsonPrimitive` does; only what needs escaping goes through it. */
+private fun StringBuilder.text(value: String): StringBuilder {
+    if (value.all { it >= ' ' && it != '"' && it != '\\' }) append('"').append(value).append('"') else append(JsonPrimitive(value))
+    return this
+}
+
+private fun StringBuilder.setup(setup: PlatformSetup) = obj {
+    field("disc_grouping") { text(setup.discs.wire) }
+    field("folder_depth") { text(setup.depth.wire) }
+    setup.folder.onSome { field("folder_uri") { text(it.value) } }
+    setup.player.onSome { field("player_id") { text(it.value) } }
+}
+
+private fun Fields.game(game: Game, medium: Option<MediumId>) = with(game) {
+    field("id") { text(id.value) }
+    field("platform_id") { text(platform.value) }
+    field("title") { text(shownTitle) }
+    some("original_title", displayName.map { title })
+    field("regions") { array(regions) { text(it) } }
+    some("medium", medium.map { it.value })
+    field("languages") { array(languages) { text(it) } }
+    field("serials") { array(serials) { text(it) } }
+    field("discs") {
+        array(discs) { disc ->
+            obj {
+                field("name") { text(disc.file.name.value) }
+                disc.number.onSome { field("number") { append(it) } }
+            }
+        }
+    }
+    field("last_disc") { append(lastDisc) }
+    field("identified") { append(identified) }
+    some("version", version)
+    some("redump_name", redumpName)
+    when (val chosen = label) {
+        LabelChoice.Automatic -> Unit
+        is LabelChoice.Region -> {
+            field("label_region") { text(chosen.region.name) }
+            field("label_source") { text(chosen.source.wire) }
+        }
+        LabelChoice.Own -> field("label_own") { append(true) }
+    }
+}
+
+/** [indexes] places each game in the library's games. */
+private fun StringBuilder.shelves(shelves: Shelves, indexes: Map<GameId, Int>) = obj {
+    field("shelves") {
+        array(shelves.shelves) { shelf ->
+            obj {
+                field("platform") { text(shelf.platform.value) }
+                field("games") { array(shelf.games) { append(indexes.getValue(it.id)) } }
+                field("selected") { append(shelf.selected) }
+            }
+        }
+    }
+    field("selected") { append(shelves.selected) }
+}
 
 private fun <K, V> Map<K, V>.toJson(key: (K) -> String, value: (V) -> JsonElement): JsonObject =
     JsonObject(entries.associate { key(it.key) to value(it.value) })
 
 private fun <T> List<T>.toJson(item: (T) -> JsonElement): JsonArray = JsonArray(map(item))
-
-private fun JsonObjectBuilder.putSome(key: String, value: Option<String>) = value.onSome { put(key, it) }
-
-private fun PlatformSetup.toJson(): JsonObject = buildJsonObject {
-    put("disc_grouping", discs.wire)
-    put("folder_depth", depth.wire)
-    putSome("folder_uri", folder.map { it.value })
-    putSome("player_id", player.map { it.value })
-}
-
-private fun Game.toJson(medium: Option<MediumId>): JsonObject = buildJsonObject {
-    put("id", id.value)
-    put("platform_id", platform.value)
-    put("title", shownTitle)
-    putSome("original_title", displayName.map { title })
-    put("regions", regions.toJson(::JsonPrimitive))
-    putSome("medium", medium.map { it.value })
-    put("languages", languages.toJson(::JsonPrimitive))
-    put("serials", serials.toJson(::JsonPrimitive))
-    put("discs", discs.toJson { it.toJson() })
-    put("last_disc", lastDisc)
-    put("identified", identified)
-    putSome("version", version)
-    putSome("redump_name", redumpName)
-    when (val chosen = label) {
-        LabelChoice.Automatic -> Unit
-        is LabelChoice.Region -> {
-            put("label_region", chosen.region.name)
-            put("label_source", chosen.source.wire)
-        }
-        LabelChoice.Own -> put("label_own", true)
-    }
-}
-
-private fun Disc.toJson(): JsonObject = buildJsonObject {
-    put("name", file.name.value)
-    number.onSome { put("number", it) }
-}
-
-private fun IgnoredCount.toJson(): JsonObject = buildJsonObject {
-    put("count", count)
-    put("examples", examples.toJson { JsonPrimitive(it.value) })
-}
-
-/** [indexes] places each game in the library's games. */
-private fun Shelves.toJson(indexes: Map<GameId, Int>): JsonObject = buildJsonObject {
-    put(
-        "shelves",
-        shelves.toJson { shelf ->
-            buildJsonObject {
-                put("platform", shelf.platform.value)
-                put("games", shelf.games.toJson { JsonPrimitive(indexes.getValue(it.id)) })
-                put("selected", shelf.selected)
-            }
-        },
-    )
-    put("selected", selected)
-}
-
-private fun SkippedFolder.toJson(): JsonObject = buildJsonObject {
-    put("path", path.value)
-    put("reason", reason.wire)
-}
 
 /**
  * What the carousel shows of a shelf of [count] games, as JSON text: `{"count", "games": [position in the shelf],

@@ -232,6 +232,12 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     @UsedByGodot
     public fun artFocus(gameIds: Array<String>): Unit = art.focus(gameIds.map(::GameId))
 
+    /** Hands the memory the app freed back to the system, off Godot's thread: it takes tens of ms. */
+    @UsedByGodot
+    public fun releaseMemory() {
+        scope.launch { NativeHeap.release() }
+    }
+
     /** Indexes the reference lists in the background, so the first count of a folder does not wait. */
     @UsedByGodot
     public fun prepareTitles() {
@@ -428,8 +434,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
             val started = since()
             library.value.run {
                 val loaded = since()
-                val stored = library().games.flatMap { game -> art.store.stored(game.id).map { FoundArt(game.id, it) }.toList() }
-                val absent = art.absentLabels(library().games)
+                val (stored, absent) = art.store.labelsOf(library().games, reference::artVersion)
                 val found = since()
                 success("library" to wire(this), "art" to stored.artWireJson(), "absent" to absent.toTypedArray())
                     .putSome("load_problem", loadProblem)

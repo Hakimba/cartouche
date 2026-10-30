@@ -116,7 +116,9 @@ Under `app/carousel/properties/`. X on a game, or a long press, opens its proper
 
 Under `app/carousel/models/`: what console and medium models are built from. `ModelShape` holds a model's
 dimensions in millimetres and the rules they must keep. Each `ShapedMesh` is one part built from them, through
-`MeshBuilder` and the pieces of `ShapeGeometry`. `ModelFade` fades a model on the mobile renderer, which ignores
+`MeshBuilder` and the pieces of `ShapeGeometry`. An exported app finds every part already built: the export plugin
+`app/addons/cartouche_dev/shaped_mesh_export.gd` stores the arrays the code builds, so the code stays their only
+source and the app does not build them at start. `ModelFade` fades a model on the mobile renderer, which ignores
 per-instance transparency: a faded model draws with the `*_fading.gdshader` copies of its shaders. Every distinct
 material is a shader the GPU driver keeps, so models share `solid.gdshader`, `label.gdshader` and the few others
 here rather than standard materials.
@@ -127,13 +129,19 @@ here rather than standard materials.
 Godot's low processor mode draws only what changes. Later, whatever moves by itself (the nodes of the group
 `paced`) slows to a stop, and the screen is drawn only when something on it changes. The first press wakes
 everything and acts as usual (INV-20). Anything new that moves on its own joins the `paced` group, or keeps the app
-awake while it plays (`Resting.moving`).
+awake while it plays (`Resting.moving`). Once still, and as the app leaves the screen, `Resting` asks the plugin to
+hand the memory Godot freed back to the system (`Android.release_memory`, see [android.md](android.md)).
+
+"Draws only what changes" means: a frame is drawn when anything wrote to the renderer since the last one, even a
+value equal to the one it had (a z-index, a light's place, a viewport's update mode, a float the engine keeps in
+single precision). Code that runs at every frame writes only what changed. `at_rest_test.gd` checks each screen
+once still and names the nodes still writing; the bench's `idle` scenarios report `drawn_per_s`.
 
 ## Developer tools in the app
 
 | File | Responsibility |
 |---|---|
-| `app/dev/diagnostics.gd` | `Diagnostics`: debug traces, and the debug arguments (`argument`, `flag`). See [../ONBOARDING.md](../ONBOARDING.md#diagnostics-and-debug-arguments). |
+| `app/dev/diagnostics.gd` | `Diagnostics`: debug traces, the memory the engine holds (`memory`, traced at each lifecycle change and at each new peak of graphics memory), and the debug arguments (`argument`, `flag`). See [../ONBOARDING.md](../ONBOARDING.md#diagnostics-and-debug-arguments). |
 | `app/dev/carousel_bench.gd` | `CarouselBench`: drives the carousel like a user for `dev/bench.sh`, one scenario per run. |
 | `app/dev/frame_shots.gd` | `FrameShots`: pictures at set frames, to prove a change keeps every pixel ([../testing.md](../testing.md#pictures-and-benchmarks)). |
 | `app/dev/dev_sounds.gd` | `DevSounds`: sounds dropped by hand into the user folder, to try a launch's sounds. |

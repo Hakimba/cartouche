@@ -214,9 +214,30 @@ class ArtServiceTest {
         rig.art.lookForArt()
         rig.run()
         rig.signals.mapNotNull { (_, payload) -> (payload["absent"] as? Array<*>)?.toList() } shouldBe listOf(listOf(unknown.id.value))
-        rig.art.absentLabels(listOf(okage, unknown, stored)) shouldBe listOf(unknown.id.value)
+        rig.store.labelsOf(listOf(okage, unknown, stored)) { rig.reference.artVersion(it) }.second shouldBe listOf(unknown.id.value)
         rig.reference = Reference(catalog, artLists = mapOf(ps2 to okageExtract.replace("2026-10-18", "2026-10-19")))
-        rig.art.absentLabels(listOf(unknown)) shouldBe emptyList()
+        rig.store.labelsOf(listOf(unknown)) { rig.reference.artVersion(it) }.second shouldBe emptyList()
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun `the library's stored and absent art is what looking each game up twice gave, in the same order`() {
+        val games = (0 until 90).map { game("G$it", platform = if (it % 4 == 0) "gba" else "ps2") }
+        val rig = Rig(*games.toTypedArray(), extract = okageExtract)
+        rig.art.stop()
+        games.forEachIndexed { at, game ->
+            if (at % 3 == 0) rig.store.save(game.id, byteArrayOf(at.toByte())).shouldBeRight()
+            if (at % 5 == 0) rig.store.markAbsent(game.id, rig.reference.artVersion(game.platform)).shouldBeRight()
+        }
+        val (stored, absent) = rig.store.labelsOf(games) { rig.reference.artVersion(it) }
+        stored shouldBe games.flatMap { game -> rig.store.stored(game.id).map { FoundArt(game.id, it) }.toList() }
+        absent shouldBe
+            games.groupBy { it.platform }.flatMap { (platform, ofPlatform) ->
+                val version = rig.reference.artVersion(platform)
+                ofPlatform.filter { rig.store.stored(it.id).isNone() && rig.store.isAbsent(it.id, version) }.map { it.id.value }
+            }
+        stored.size shouldBe 30
+        (absent.isNotEmpty()) shouldBe true
         rig.scope.cancel()
     }
 }
