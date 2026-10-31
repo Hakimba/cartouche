@@ -221,6 +221,7 @@ class WireTest {
                 LaunchFailure.NotInstalled(PackageName.parse("com.armsx2").shouldBeSome()) to "not_installed",
                 LaunchFailure.NoPlayer(PlatformId("ps2")) to "no_player",
                 LaunchFailure.GameMissing(file) to "game_missing",
+                LaunchFailure.TooLate to "too_late",
                 LaunchFailure.ActivityNotFound("com.armsx2/.Main") to "activity_not_found",
                 LaunchFailure.PermissionDenied("denied") to "permission_denied",
             )

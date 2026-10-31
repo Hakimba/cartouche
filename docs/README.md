@@ -67,8 +67,8 @@ sequenceDiagram
     P-->>A: answered signal, request id and ok or an error code
     A-->>S: AndroidWire.Result
     S->>A: await launch_game(game, disc)
-    A->>P: launchGame(request id, game id and disc)
-    P->>P: Curtain over, Launcher.start
+    A->>P: launchGame(request id, game id, disc and within_ms)
+    P->>P: too late? refused, else Curtain over, Launcher.start
 ```
 
 Getters (`battery`, `browse`, `title_marks`) answer at once instead. Signals that are not answers
@@ -147,6 +147,7 @@ Debug builds read arguments after `--` on a desktop (`$GODOT --path app -- --she
 | `--bridge` | connects the debug bridge | `Diagnostics`, see [debug-bridge.md](debug-bridge.md) |
 | `--art-refused` | every art server refuses | `DebugOptions.kt` |
 | `--art-slow=MS` | waits MS milliseconds after each chunk of an image | `DebugOptions.kt` |
+| `--launch-slow=MS` | waits MS milliseconds before a game's file is checked to start, to see a slow storage | `DebugOptions.kt` |
 | `--screenscraper=quota` | ScreenScraper answers as `quota`, `wrong-key` or `wrong-account` says | `DebugOptions.kt` |
 
 ### Credentials

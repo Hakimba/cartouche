@@ -17,6 +17,9 @@ internal class DebugOptions(private val arguments: List<String>) {
     /** `--art-slow=MS`: a wait after each chunk read, to see a download's progress. */
     val artSlow: Duration = valueOf("--art-slow").flatMap { it.longOrNone() }.map { it.milliseconds }.getOrElse { Duration.ZERO }
 
+    /** `--launch-slow=MS`: a wait before a game's file is checked to start, to see a slow storage. */
+    val launchSlow: Duration = valueOf("--launch-slow").flatMap { it.longOrNone() }.map { it.milliseconds }.getOrElse { Duration.ZERO }
+
     /** `--screenscraper=quota`, `wrong-key` or `wrong-account`. */
     val screenScraper: Option<String> = valueOf("--screenscraper")
 

@@ -176,6 +176,11 @@ func test_art_focus_sends_the_ordered_ids_as_a_packed_string_array_to_the_plugin
 class FakePlugin extends Object:
 	var focus_calls: Array[PackedStringArray] = []
 	var loaded_supported := PackedStringArray()
+	var launch_requests: Array[Dictionary] = []
+
+	func launchGame(_id: int, request: Dictionary) -> Dictionary:
+		launch_requests.append(request)
+		return {"ok": true}
 
 	func artFocus(ids: PackedStringArray) -> void:
 		focus_calls.append(ids)
@@ -190,6 +195,20 @@ class FakePlugin extends Object:
 
 	func titleMarks(_platform_id: String, _position: int, _typed: String) -> String:
 		return "[[0, 3], [13, 4]]"
+
+
+func test_inv_21_a_start_is_asked_with_a_deadline_below_the_wait_of_the_carousel_that_gives_up_after_it() -> void:
+	var services: AndroidServices = auto_free(AndroidServices.new())
+	var plugin: FakePlugin = auto_free(FakePlugin.new())
+	services._plugin = plugin
+	var game := AndroidServices.Game.new({"id": "ps2/a", "platform_id": "ps2", "title": "A", "identified": false,
+		"discs": [{"name": "A"}], "last_disc": 0})
+	assert_bool((await services.launch_game(game, 0)).ok).is_true()
+	assert_int(plugin.launch_requests.size()).is_equal(1)
+	var within_ms: int = plugin.launch_requests[0].get("within_ms", -1)
+	assert_int(within_ms).is_greater(0)
+	assert_int(within_ms).is_less(int(GameLaunch.WAIT_TIMEOUT_S * 1000))
+	assert_str(plugin.launch_requests[0]["game_id"]).is_equal("ps2/a")
 
 
 func test_the_catalog_summary_reads_the_consoles_a_person_may_add_in_their_order() -> void:

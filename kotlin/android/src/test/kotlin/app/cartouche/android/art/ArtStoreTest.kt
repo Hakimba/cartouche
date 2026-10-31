@@ -186,15 +186,27 @@ class ArtStoreTest {
     }
 
     @Test
+    fun `INV-16 a look asks again the labels chosen before it read the library, never one chosen since`() {
+        val store = ArtStore(folder)
+        val other = GameId("ps2/content://p/document/Other (USA).iso")
+        store.save(game, image).shouldBeRight()
+        val since = store.choices()
+        store.save(other, image).shouldBeRight()
+        store.retry(setOf(game, other), since).shouldBeRight()
+        store.wants(game, older) shouldBe true
+        store.wants(other, older) shouldBe false
+    }
+
+    @Test
     fun `a label asked again stays so across a restart until a look settles it, and an unreadable memory asks nothing`() {
         val store = ArtStore(folder)
         store.save(game, image).shouldBeRight()
-        store.retry(setOf(game)).shouldBeRight()
+        store.retry(setOf(game), store.choices()).shouldBeRight()
         val again = ArtStore(folder)
         again.wants(game, older) shouldBe true
         again.saveIfAbsent(game, byteArrayOf(9), None, again.asked(game)).shouldBeRight()
         listOf(again, ArtStore(folder)).forEach { it.wants(game, older) shouldBe false }
-        store.retry(setOf(game)).shouldBeRight()
+        store.retry(setOf(game), store.choices()).shouldBeRight()
         File(folder, "again.json").writeText("{broken")
         ArtStore(folder).wants(game, older) shouldBe false
     }
@@ -204,10 +216,10 @@ class ArtStoreTest {
         val store = ArtStore(folder)
         val (found, kept, provisional) = listOf("found", "kept", "provisional").map { GameId("ps2/$it") }
         listOf(found, kept, provisional).forEach { store.save(it, image).shouldBeRight() }
-        store.retry(setOf(found)).shouldBeRight()
+        store.retry(setOf(found), store.choices()).shouldBeRight()
         val seen = listOf(found, kept, provisional).associateWith { store.asked(it) }
         seen.getValue(found).shouldBeSome()
-        store.retry(setOf(found, kept, provisional)).shouldBeRight()
+        store.retry(setOf(found, kept, provisional), store.choices()).shouldBeRight()
         store.saveIfAbsent(found, byteArrayOf(9), None, seen.getValue(found)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
         store.settle(kept, seen.getValue(kept)).shouldBeRight()
         store.keepProvisional(provisional, seen.getValue(provisional)).shouldBeRight()
@@ -241,15 +253,15 @@ class ArtStoreTest {
         store.saveIfAbsent(game, image, Some(Identity("https://lb/eu.png")), store.asked(game)).shouldBeRight()
         ArtStore(folder).provisional(game) shouldBe Some(Identity("https://lb/eu.png"))
         store.wants(game, older) shouldBe false
-        store.retry(setOf(game)).shouldBeRight()
+        store.retry(setOf(game), store.choices()).shouldBeRight()
         store.wants(game, older) shouldBe true
         store.keepProvisional(game, store.asked(game)).shouldBeRight()
         store.wants(game, older) shouldBe false
         store.provisional(game) shouldBe Some(Identity("https://lb/eu.png"))
-        store.retry(setOf(game)).shouldBeRight()
+        store.retry(setOf(game), store.choices()).shouldBeRight()
         store.saveIfAbsent(game, byteArrayOf(9), None, store.asked(game)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
         ArtStore(folder).provisional(game).shouldBeNone()
-        store.retry(setOf(game)).shouldBeRight()
+        store.retry(setOf(game), store.choices()).shouldBeRight()
         store.saveIfAbsent(game, image, Some(Identity("ss:58:1:t")), store.asked(game)).shouldBeRight()
         store.provisional(game) shouldBe Some(Identity("ss:58:1:t"))
         store.save(game, byteArrayOf(7)).shouldBeRight()
@@ -265,7 +277,7 @@ class ArtStoreTest {
             .readBytes() shouldBe
             byteArrayOf(7)
         store.provisional(game).shouldBeNone()
-        store.retry(setOf(game)).shouldBeRight()
+        store.retry(setOf(game), store.choices()).shouldBeRight()
         store.saveIfAbsent(game, image, Some(Identity("https://lb/eu.png")), store.asked(game)).shouldBeRight()
         store.keepOnly(emptySet()).shouldBeRight(1)
         ArtStore(folder).provisional(game).shouldBeNone()

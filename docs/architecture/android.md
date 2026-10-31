@@ -17,7 +17,7 @@ permissions, each with the reason in a comment.
 | `CartouchePlugin.kt` | The only class Godot sees (the `CartoucheAndroid` singleton). Its `@UsedByGodot` methods are the whole API. Getters answer at once. Operations take a request id and answer it once through the `answered` signal. |
 | `Threads.kt` | The coroutine scope and the dispatchers: one library thread that runs library work in arrival order, a low-priority planning thread, and the variant downloads. Tests pass their own through the internal constructor. |
 | `Reference.kt` | Everything `loadCatalog` loads (catalog, title lists, prints, data folders, curtain times, art extracts, texture tables) as one immutable value, with its indexes built on first use. |
-| `DebugOptions.kt` | The launch arguments of a debug build (`--art-refused`, `--art-slow`, `--screenscraper`), parsed once. |
+| `DebugOptions.kt` | The launch arguments of a debug build (`--art-refused`, `--art-slow`, `--launch-slow`, `--screenscraper`), parsed once. |
 | `PendingPick.kt` | A system picker awaiting its activity result. Each pick is answered exactly once (INV-06). |
 | `Battery.kt` | `BatteryWatch` follows the battery broadcast from resume to pause and sends each change through `battery_changed`. |
 | `InstalledApps.kt` | Whether a package is installed, and the apps with a launcher entry. |
@@ -66,11 +66,12 @@ Package `launch`.
 | File | Responsibility |
 |---|---|
 | `IntentMapper.kt` | Builds the intent from a resolved `LaunchSpec`, with read access to the game file only (INV-01). |
-| `Launcher.kt` | `checkGame` checks the emulator is installed and the file still there, and starts nothing (INV-05). `prepareGame` repeats the checks and stops a lingering emulator on older Android versions. `start` starts the activity on the main thread. |
+| `Launcher.kt` | `checkGame` checks the emulator is installed and the file still there, and starts nothing (INV-05). `prepareGame` repeats the checks and stops a lingering emulator on older Android versions, unless the start is already too late. `start` starts the activity on the main thread. |
+| `LateStart.kt` | `startInTime`: runs the start only before its `StartDeadline`, else answers `too_late` with nothing started (INV-21). |
 | `Curtain.kt` | The black window over every app while the emulator starts, lowered after its time or when Cartouche is back (INV-07). It needs the "display over other apps" permission. |
 
-A launch goes `checkLaunch` (the core's `Catalog.launch`, then `Launcher.checkGame`), then `launchGame` (the curtain,
-then `Launcher.start`). [../README.md](../README.md#how-a-press-travels) draws the round trip.
+A launch goes `checkLaunch` (the core's `Catalog.launch`, then `Launcher.checkGame`), then `launchGame` (refused as `too_late`
+once `within_ms` has passed since it was asked, else the curtain, then `Launcher.start`). [../README.md](../README.md#how-a-press-travels) draws the round trip.
 
 ## Art
 

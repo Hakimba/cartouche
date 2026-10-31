@@ -89,6 +89,8 @@ internal class ArtService(
                 .onRight { deleted -> if (deleted > 0) trace("art") { "$deleted images of games no longer in the library deleted" } }
                 .onLeft { trace("art") { "images of games no longer in the library not deleted: ${it.message}" } }
         }
+        // Read with the games, on this thread like the user's choices: one made after is never asked again.
+        val since = store.choices()
         val games = library().library().games
         val preferred = preferredRegion()
         val reference = reference()
@@ -101,7 +103,7 @@ internal class ArtService(
                     reference.sources(it, preferred)
                 }
             scraper.absent(plan.unfound)
-            scraper.lookFor(plan.requests, asked)
+            scraper.lookFor(plan.requests, asked, since)
         }
         if (!watchingNetwork.value) trace("art") { "the network is not watched: retries only follow their delay" }
     }

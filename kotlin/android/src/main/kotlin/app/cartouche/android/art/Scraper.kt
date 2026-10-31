@@ -110,8 +110,11 @@ internal class Scraper(
 
     private val over = MutableStateFlow(true)
 
-    /** Calls made in turn, on one thread, change the run in that order (the lock is fair): a later plan always replaces an earlier one. */
-    suspend fun lookFor(requests: List<ArtRequest>, again: Set<GameId> = emptySet()) {
+    /**
+     * Calls made in turn, on one thread, change the run in that order (the lock is fair): a later plan always replaces an earlier one.
+     * [since] is when the plan read the games' labels.
+     */
+    suspend fun lookFor(requests: List<ArtRequest>, again: Set<GameId> = emptySet(), since: Choices = store.choices()) {
         textures.newRun()
         val provisional = requests.filter { store.provisional(it.game).isSome() && !store.wants(it.game, it.version) }.map { it.game }
         val asked = again + if (textures.open) provisional else emptyList()
@@ -119,7 +122,7 @@ internal class Scraper(
         // one under way that is asked again is looked for again once its look ends.
         update(None) {
             if (run.isOver) began = TimeSource.Monotonic.markNow()
-            store.retry(asked).onLeft { trace("art") { "${asked.size} labels not asked again: ${it.message}" } }
+            store.retry(asked, since).onLeft { trace("art") { "${asked.size} labels not asked again: ${it.message}" } }
             val missing = requests.filter { store.wants(it.game, it.version) }
             trace("art") { "${missing.size} of ${requests.size} games to look for, ${asked.size} labels asked again among them" }
             run.with(missing).ahead(focused)

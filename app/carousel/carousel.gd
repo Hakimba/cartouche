@@ -689,7 +689,7 @@ func _on_game_launch_failed(code: StringName) -> void:
 			_show_message(tr("No {platform} emulator is installed.").format({"platform": platform}))
 		&"game_missing":
 			_show_message(tr("This game's file cannot be found: is its SD card or folder still there?"))
-		&"rehearsed":
+		&"rehearsed", &"too_late":
 			pass
 		_:
 			_show_message(tr("The game could not be launched."))

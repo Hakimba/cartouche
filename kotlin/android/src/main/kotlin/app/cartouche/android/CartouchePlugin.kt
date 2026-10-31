@@ -22,6 +22,7 @@ import app.cartouche.android.art.screenScraperFetch
 import app.cartouche.android.launch.Curtain
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.launch.Launcher
+import app.cartouche.android.launch.startInTime
 import app.cartouche.android.library.LaunchChoice
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.LibraryService
@@ -36,6 +37,7 @@ import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
 import app.cartouche.core.art.LabelFraming
 import app.cartouche.core.launch.GameFile
+import app.cartouche.core.launch.StartDeadline
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DemoLibrary
 import app.cartouche.core.library.DiscGrouping
@@ -82,6 +84,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.godotengine.godot.Dictionary
@@ -666,15 +669,24 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         success()
     }
 
-    /** Launches the game `{"game_id", "disc"?}` under the curtain when allowed. */
+    /**
+     * Launches the game `{"game_id", "disc"?, "within_ms"}` under the curtain when allowed. A start that could only begin
+     * `within_ms` or more after it was asked is refused (`too_late`): nothing stopped, no curtain, nothing recorded.
+     */
     @UsedByGodot
     public fun launchGame(requestId: Int, request: Dictionary): Unit = onActivity(requestId) { act ->
+        // Taken on Godot's thread, as the request is made: the wait for the library thread counts too.
+        val asked = TimeSource.Monotonic.markNow()
         onLibrary(requestId) {
+            val deadline = request.integer("within_ms").flatMap(StartDeadline::ofMillis).getOrElse { raise(invalid("No valid within_ms")) }
             val (choice, launch) = libraryLaunch(request)
-            trace("launch") { "${choice.file.name.value} in ${launch.spec.targetPackage.fold({ "the app Android picks" }) { it.value }}" }
-            val intent = launcher.prepareGame(launch, choice.file.uri).mapLeft { it.toWire() }.bind()
+            val emulator = launch.spec.targetPackage
+            trace("launch") { "${choice.file.name.value} in ${emulator.fold({ "the app Android picks" }) { it.value }}" }
+            delay(debug.launchSlow)
+            val inTime = { deadline.allows(asked.elapsedNow()) }
+            val intent = launcher.prepareGame(launch, choice.file.uri, inTime).mapLeft { it.toWire() }.bind()
             onMain {
-                curtain.over(reference.curtainTimes.timeFor(launch.spec.targetPackage)) { launcher.start(act, intent) }
+                deadline.startInTime(asked) { curtain.over(reference.curtainTimes.timeFor(emulator)) { launcher.start(act, intent) } }
             }.mapLeft { it.toWire() }.bind()
             // Answered at once so the black lasts no longer than the start; a disc not saved is no failed launch.
             scope.launch(threads.library) {
@@ -697,7 +709,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
             }
         game.fold({ answer(requestId) { invalid("launchFile needs a name and a content URI") } }) {
             withActivity(requestId) { act ->
-                start(act, launchOf(PlayerId(playerId), it).flatMap { launch -> launcher.prepareGame(launch, it.uri) })
+                start(act, launchOf(PlayerId(playerId), it).flatMap { launch -> launcher.prepareGame(launch, it.uri) { true } })
             }
         }
     }

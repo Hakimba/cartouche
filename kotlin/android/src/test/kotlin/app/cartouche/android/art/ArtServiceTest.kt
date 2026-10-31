@@ -23,6 +23,7 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.playerJson
 import app.cartouche.core.regions.PreferredRegion
+import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -87,7 +88,7 @@ class ArtServiceTest {
             LibraryStore(File(context.filesDir, "library.json")).save(Library(games = games.toList())).shouldBeRight()
         }
 
-        private val library =
+        val library =
             LibraryService(
                 LibraryStore(File(context.filesDir, "library.json")),
                 SelectionStore(File(context.filesDir, "selection.json")),
@@ -203,6 +204,49 @@ class ArtServiceTest {
         rig.run()
         ("jp.png" in fetch.asked.first()) shouldBe true
         rig.scope.cancel()
+    }
+
+    /**
+     * Okage's downloaded label, reordered by a region preferred, is planned to be looked up again, but the plan waits on the planning
+     * thread while the user [chooses] its image, [9, 9, 9]: the image stays theirs, whether a source has one ([found]) or none.
+     */
+    private fun chosenWhileThePlanWaits(found: Boolean, chooses: (Rig) -> Either<LabelFailure, StoredArt>) {
+        File(context.filesDir, "art").deleteRecursively()
+        val planning = Waiting()
+        val fetch = FakeFetch(emptyMap())
+        val rig = Rig(okage, extract = okageExtract, fetch = fetch, planning = planning.dispatcher)
+        if (found) fetch.images = variants(rig).associate { it.candidate.identity.value to scan(diameter = 40, margin = 4) }
+        rig.art.stop()
+        rig.store.saveIfAbsent(okage.id, byteArrayOf(1), None, None).shouldBeRight()
+        rig.preferred = Some(PreferredRegion.JAPAN)
+        rig.art.preferredRegionChanged(None, Some(PreferredRegion.JAPAN))
+        rig.run()
+        chooses(rig).shouldBeRight()
+        planning.drain()
+        rig.art.start()
+        rig.run()
+        rig.store.stored(okage.id).shouldBeSome().file.readBytes() shouldBe byteArrayOf(9, 9, 9)
+        rig.scope.cancel()
+    }
+
+    private fun variants(rig: Rig) = rig.reference.sources(ps2, None).variantsOf(okage) { true }
+
+    @Test
+    fun `INV-16 INV-18 a picture of the user's own kept while a look is planned is neither replaced nor deleted by that look`() {
+        listOf(true, false).forEach { found ->
+            chosenWhileThePlanWaits(found) { rig -> LabelChoices(rig.library, rig.store).keepOwn(okage, byteArrayOf(9, 9, 9)) }
+        }
+    }
+
+    @Test
+    fun `INV-16 INV-18 a region's image chosen while a look is planned is neither replaced nor deleted by that look`() {
+        listOf(true, false).forEach { found ->
+            chosenWhileThePlanWaits(found) { rig ->
+                val chosen = variants(rig).first()
+                rig.store.saveVariant(chosen.candidate, byteArrayOf(9, 9, 9)).shouldBeRight()
+                LabelChoices(rig.library, rig.store).choose(okage, chosen)
+            }
+        }
     }
 
     @Test

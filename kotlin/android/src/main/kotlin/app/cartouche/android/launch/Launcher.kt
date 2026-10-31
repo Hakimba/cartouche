@@ -40,6 +40,9 @@ internal sealed interface LaunchFailure {
     /** The game file is gone, or its storage cannot be read. */
     data class GameMissing(val file: ContentUri) : LaunchFailure
 
+    /** The start came after the caller stopped waiting. */
+    data object TooLate : LaunchFailure
+
     val message: String
         get() =
             when (this) {
@@ -49,6 +52,7 @@ internal sealed interface LaunchFailure {
                 is PermissionDenied -> "Permission denied: $reason"
                 is NoPlayer -> "No installed emulator for ${platform.value} opens this game"
                 is GameMissing -> "The game file ${file.value} is missing or cannot be read"
+                TooLate -> "The start came after the screen stopped waiting for it"
             }
 }
 
@@ -75,10 +79,14 @@ internal class Launcher(
         IntentMapper.toIntent(launch.spec).addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
     }
 
-    /** [checkGame], then stops a lingering instance of the emulator when its definition asks to. */
-    fun prepareGame(launch: Launch, game: ContentUri): Either<LaunchFailure, Intent> = checkGame(launch, game).onRight {
-        if (launch.runningInstance == RunningInstance.STOP) launch.spec.targetPackage.onSome(stopInstance)
-    }
+    /**
+     * [checkGame], then stops a lingering instance of the emulator when its definition asks to, while the start is still
+     * [wanted]: a start refused as too late must not have closed the game the user left running.
+     */
+    fun prepareGame(launch: Launch, game: ContentUri, wanted: () -> Boolean): Either<LaunchFailure, Intent> =
+        checkGame(launch, game).onRight {
+            if (launch.runningInstance == RunningInstance.STOP && wanted()) launch.spec.targetPackage.onSome(stopInstance)
+        }
 
     fun appIntent(packageName: PackageName): Either<LaunchFailure, Intent> = either {
         ensureNotNull(context.packageManager.getLaunchIntentForPackage(packageName.value)) { LaunchFailure.NotInstalled(packageName) }

@@ -33,6 +33,7 @@ Packages `platforms` and `launch`.
 | `LaunchTemplate.kt` | Parses a launch template (`am start` arguments, such as `-n com.example/.Main -a android.intent.action.VIEW -d {file.uri}`) once, then `resolve` fills `{file.uri}` and `{file.path}` from a `GameFile`. The file documents the grammar. |
 | `LaunchSpec.kt` | What a resolved template asks of Android: component, action, data, extras and flags. A template is third-party data, so it can grant nothing but read access to the one game file (INV-01, INV-02). |
 | `GameFile.kt` | The game file a launch hands over: its URI, path and name. |
+| `StartDeadline.kt` | How long after a start was asked it may still begin: past it the start is refused, as the carousel has stopped waiting for it (INV-21). |
 
 Definition files come in two sets, in the same format: `app/data/platforms/daijishou/` (third-party) and
 `app/data/platforms/cartouche/` (platforms the first set lacks). Each platform also needs a profile in

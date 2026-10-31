@@ -87,12 +87,12 @@ class LauncherTest {
     @Test
     fun `a game launches only in an installed emulator`() {
         given(Emulator.INSTALLED, GameFileState.PRESENT)
-        launcher.prepareGame(launch(Emulator.INSTALLED), game.uri).shouldBeRight().component.shouldNotBeNull().packageName shouldBe
+        launcher.prepareGame(launch(Emulator.INSTALLED), game.uri) { true }.shouldBeRight().component.shouldNotBeNull().packageName shouldBe
             "com.armsx2"
         given(Emulator.ABSENT, GameFileState.PRESENT)
-        launcher.prepareGame(launch(Emulator.ABSENT), game.uri).shouldBeLeft() shouldBe LaunchFailure.NotInstalled(armsx2)
+        launcher.prepareGame(launch(Emulator.ABSENT), game.uri) { true }.shouldBeLeft() shouldBe LaunchFailure.NotInstalled(armsx2)
         given(Emulator.DISABLED, GameFileState.PRESENT)
-        launcher.prepareGame(launch(Emulator.DISABLED), game.uri).shouldBeLeft() shouldBe LaunchFailure.NotInstalled(armsx2)
+        launcher.prepareGame(launch(Emulator.DISABLED), game.uri) { true }.shouldBeLeft() shouldBe LaunchFailure.NotInstalled(armsx2)
     }
 
     /** Runs [check] in every state: each emulator, game file and running instance policy. */
@@ -114,7 +114,7 @@ class LauncherTest {
         everyState { emulator, file, instance ->
             given(emulator, file)
             val checked = launcher.checkGame(launch(emulator, instance), game.uri)
-            val prepared = launcher.prepareGame(launch(emulator, instance), game.uri)
+            val prepared = launcher.prepareGame(launch(emulator, instance), game.uri) { true }
             prepared.map { it.toUri(0) } shouldBe checked.map { it.toUri(0) }
             if (prepared.isRight()) ready++
         }
@@ -129,16 +129,24 @@ class LauncherTest {
         ->
         given(emulator, file)
         stopped.clear()
-        val prepared = launcher.prepareGame(launch(emulator, instance), game.uri)
+        val prepared = launcher.prepareGame(launch(emulator, instance), game.uri) { true }
         val stops = prepared.isRight() && instance == RunningInstance.STOP && emulator != Emulator.IMPLICIT
         stopped shouldBe (if (stops) listOf(armsx2) else emptyList())
+    }
+
+    @Test
+    fun `INV-21 a launch past its deadline stops no lingering emulator`() = everyState { emulator, file, instance ->
+        given(emulator, file)
+        stopped.clear()
+        launcher.prepareGame(launch(emulator, instance), game.uri) { false }
+        stopped.shouldBeEmpty()
     }
 
     @Test
     fun `INV-04 a game whose file is gone or unreadable never launches, and is reported so when its emulator is there`() =
         everyState { emulator, file, instance ->
             given(emulator, file)
-            val prepared = launcher.prepareGame(launch(emulator, instance), game.uri)
+            val prepared = launcher.prepareGame(launch(emulator, instance), game.uri) { true }
             if (file != GameFileState.PRESENT) prepared.isLeft() shouldBe true
             if (emulator == Emulator.INSTALLED || emulator == Emulator.IMPLICIT) {
                 prepared.swap().getOrNone() shouldBe Some(LaunchFailure.GameMissing(game.uri)).filter { file != GameFileState.PRESENT }

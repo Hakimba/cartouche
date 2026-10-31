@@ -36,6 +36,10 @@ internal value class StoredArt(val file: File)
 @JvmInline
 internal value class Ask(val number: Long)
 
+/** How many labels the user had chosen at one moment ([ArtStore.choices]): a plan made from the library read then asks none chosen since. */
+@JvmInline
+internal value class Choices(val made: Long)
+
 /**
  * The label images found for games, one file each in [folder] named after a hash of the game's id, and what is remembered beside them so
  * that it is not asked at every start. Images are written atomically: a file there is always a whole image. Safe to use from several
@@ -67,6 +71,13 @@ internal class ArtStore(private val folder: File) {
 
     /** The latest [Ask]'s number; above every remembered one once [asking] ran. */
     private var asks = 0L
+
+    /**
+     * The labels chosen in this run ([save]), and the count each game's (by stem) was last chosen at: a plan reads the library's
+     * labels before it asks, and a choice made in between must win ([retry]).
+     */
+    private var chosen = 0L
+    private val chosenAt = HashMap<String, Long>()
 
     private val stored: ConcurrentHashMap<String, StoredArt> by lazy {
         ConcurrentHashMap(
@@ -102,7 +113,11 @@ internal class ArtStore(private val folder: File) {
 
     /** Stores [image] as [game]'s label, settled: the user chose it, no better one is to come. */
     @Synchronized
-    fun save(game: GameId, image: ByteArray): Either<StorageFailure, StoredArt> = saving(game, image, None, asked(game))
+    fun save(game: GameId, image: ByteArray): Either<StorageFailure, StoredArt> =
+        saving(game, image, None, asked(game)).onRight { chosenAt[stem(game)] = ++chosen }
+
+    @Synchronized
+    fun choices(): Choices = Choices(chosen)
 
     /** The mark goes with the image, under the one lock, so that it never lands on a label the user chose. */
     @Synchronized
@@ -184,11 +199,12 @@ internal class ArtStore(private val folder: File) {
     fun keepProvisional(game: GameId, seen: Option<Ask>): Either<StorageFailure, Unit> = answered(stem(game), seen)
 
     /**
-     * Looks [games]' labels up again, under a new [Ask]: each stored image stays until a better one replaces it (see
-     * [saveIfAbsent]); remembered across restarts.
+     * Looks [games]' labels up again, under a new [Ask], but those the user chose after [since], when their labels were read: each
+     * stored image stays until a better one replaces it (see [saveIfAbsent]); remembered across restarts.
      */
     @Synchronized
-    fun retry(games: Set<GameId>): Either<StorageFailure, Unit> = if (games.isEmpty()) Unit.right() else asking(games.map(::stem))
+    fun retry(games: Set<GameId>, since: Choices): Either<StorageFailure, Unit> =
+        games.map(::stem).filter { chosenAt.getOrDefault(it, 0) <= since.made }.let { if (it.isEmpty()) Unit.right() else asking(it) }
 
     /**
      * Deletes the images of the games of [stems], no longer looked up again; a file that cannot be deleted is listed

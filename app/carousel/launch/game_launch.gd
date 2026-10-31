@@ -31,7 +31,9 @@ enum Stage {
 }
 
 ## Waiting this long for an answer, or for Android to leave for the emulator, gives up: the carousel
-## shows again.
+## shows again. Longer than [constant AndroidServices.START_WITHIN_S], so that a start refused as
+## too late has been refused before this gives up; a start let through just before its deadline can
+## still come after it when a frame of the carousel lasts longer than the margin between the two.
 const WAIT_TIMEOUT_S := 5.0
 const SHOW_S := 0.2
 

@@ -37,6 +37,9 @@ const _ART := "res://data/art"
 const _PRINTS := "res://data/prints"
 ## ScreenScraper's texture table per platform, named after its id (`ps2.tsv`).
 const _SCREENSCRAPER := "res://data/screenscraper"
+## A start asked now that could only begin after this long is refused (`too_late`), as the carousel
+## stops waiting for it a little later (see [constant GameLaunch.WAIT_TIMEOUT_S]).
+const START_WITHIN_S := 4.5
 const Result := AndroidWire.Result
 const Document := AndroidWire.Document
 const Folder := AndroidWire.Folder
@@ -422,11 +425,12 @@ func check_launch(game: Game, disc: int) -> Result:
 ## Launches disc [param disc] (an index into [member Game.discs]) of [param game], hiding the
 ## emulator under a black curtain until its game shows when [method curtain_allowed]. Debug builds
 ## started with `--launch=rehearse` start nothing and fail with `rehearsed`: the insertion plays
-## whether an emulator is installed or not, then the carousel shows again.
+## whether an emulator is installed or not, then the carousel shows again. Fails with `too_late`
+## when the emulator could only start after [constant START_WITHIN_S]: it is not started.
 func launch_game(game: Game, disc: int) -> Result:
 	if _rehearsing():
 		return Result.new({"ok": false, "code": &"rehearsed"})
-	return Result.new(await _request(&"launchGame", [{"game_id": game.id, "disc": disc}]))
+	return Result.new(await _request(&"launchGame", [{"game_id": game.id, "disc": disc, "within_ms": int(START_WITHIN_S * 1000)}]))
 
 
 func _rehearsing() -> bool:

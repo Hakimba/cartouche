@@ -45,9 +45,9 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 
 | Id | Invariant | Why | Tests |
 |---|---|---|---|
-| INV-16 | A game gets only scans of its own game and platform, and a cartridge's label only from a scan of its front's shape; a picture of the user's own is never replaced by a download. | A wrong label shows on every screen, and the user's own picture is theirs. | `ArtIndexTest`, `ArtSourcesTest`, `LabelCutTest`, `CatalogTest`, `ArtImagesTest`, `ArtStoreTest`, `ScraperTest` |
+| INV-16 | A game gets only scans of its own game and platform, and a cartridge's label only from a scan of its front's shape; a picture of the user's own is never replaced by a download. | A wrong label shows on every screen, and the user's own picture is theirs. | `ArtIndexTest`, `ArtSourcesTest`, `LabelCutTest`, `CatalogTest`, `ArtImagesTest`, `ArtStoreTest`, `ScraperTest`, `ArtServiceTest` |
 | INV-17 | Scraping makes one request at a time within the sources' limits, never downloads an image twice, tries again after a failure with a growing delay, resumes where it stopped, and never asks a source which game a file is. | The sources' terms are kept, and a flaky network costs nothing. | `ScrapingTest`, `ScraperTest`, `ArtSourcesTest`, `AbsencesTest`, `HttpFetchTest`, `ArtStoreTest`, `ScreenScraperTest`, `ScreenScraperFetchTest`, `VariantDownloadsTest`, `TextureTableTest`, `ArtServiceTest` |
-| INV-18 | Only whole images are stored; a cut download leaves nothing; stored images (the user's own included) are found offline and never taken for orphans and deleted. | Art once there stays there. | `ArtStoreTest` |
+| INV-18 | Only whole images are stored; a cut download leaves nothing; stored images (the user's own included) are found offline and never taken for orphans and deleted. | Art once there stays there. | `ArtStoreTest`, `ArtServiceTest` |
 | INV-19 | Source credentials appear in a URL at request time only: in no stored file and no trace. | A member's password never leaks. | `ScreenScraperFetchTest`, `HttpFetchTest`, `ScraperTest`, `TextureTableTest` |
 
 ## Screens and input
@@ -55,7 +55,7 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 | Id | Invariant | Why | Tests |
 |---|---|---|---|
 | INV-20 | No dead screen: from 0, 1, 2 or 3 consoles and after any seeded walk of pad presses (A and B at any moment) or of finger gestures, exactly one control has the focus, something visible takes the next press, the app wakes from rest on the first press, and every screen settles whole. | A screen that takes no press leaves the user stuck. | `live_screen_test.gd`, `touch_test.gd`, `screen_flow_test.gd`, `settings_test.gd`, `add_console_test.gd`, `waking_test.gd`, `resting_test.gd`, `consoles_screen_test.gd`, `console_properties_test.gd`, `disc_properties_test.gd` |
-| INV-21 | After any outcome of a launch (refused, started then back, never answered) the carousel shows again as it was; input pressed meanwhile acts on nothing and starts no second launch. | Coming back from a game is never a surprise. | `game_launch_test.gd` |
+| INV-21 | After any outcome of a launch (refused, started then back, never answered) the carousel shows again as it was; input pressed meanwhile acts on nothing and starts no second launch, and a launch it gave up on starts nothing afterwards. | Coming back from a game is never a surprise. | `game_launch_test.gd`; `StartDeadlineTest`, `LateStartTest`; `android_services_test.gd`, `LauncherTest` |
 | INV-22 | A finger never launches a game; only A does. | A stray tap must not start a game. | `touch_test.gd`, `finger_test.gd` |
 
 ## Wire and release
