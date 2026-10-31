@@ -1,0 +1,441 @@
+# Brazilian Portuguese translation of Cartouche.
+# SPDX-License-Identifier: GPL-3.0-or-later
+msgid ""
+msgstr ""
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "No {platform} emulator is installed."
+msgstr "Nenhum emulador de {platform} está instalado."
+
+msgid "This game's file cannot be found: is its SD card or folder still there?"
+msgstr "O arquivo deste jogo não foi encontrado: o cartão SD ou a pasta ainda estão lá?"
+
+msgid "The game could not be launched."
+msgstr "Não foi possível abrir o jogo."
+
+msgid "Disc images · offline, resuming when the network is back"
+msgstr "Imagens das etiquetas · offline, continua quando a internet voltar"
+
+msgid "Disc images · server unavailable, trying again later"
+msgstr "Imagens das etiquetas · servidor indisponível, tentando de novo mais tarde"
+
+msgid "Disc images · no room left on the device"
+msgstr "Imagens das etiquetas · sem espaço no dispositivo"
+
+msgid "Disc images · {done} / {total}"
+msgstr "Imagens das etiquetas · {done} / {total}"
+
+msgid "Which button style?"
+msgstr "Qual estilo de botões?"
+
+msgid "This only changes how the buttons are drawn. The button that confirms is set in the device's settings."
+msgstr "Isso só muda a aparência dos botões. O botão de confirmar é definido nas configurações do dispositivo."
+
+msgid "For more immersion"
+msgstr "Para mais imersão"
+
+msgid "When you start a game, Cartouche puts up a black screen while the emulator starts. Android must allow it to “display over other apps”."
+msgstr "Quando você abre um jogo, o Cartouche mostra uma tela preta enquanto o emulador inicia. O Android precisa permitir isso em “Sobrepor a outros apps”."
+
+msgid "Open the setting"
+msgstr "Abrir a configuração"
+
+msgid "Later"
+msgstr "Mais tarde"
+
+msgid "No console yet"
+msgstr "Nenhum console ainda"
+
+msgid "Add a console"
+msgstr "Adicionar um console"
+
+msgid "Console"
+msgstr "Console"
+
+msgid "No console"
+msgstr "Nenhum console"
+
+msgid "Emulator"
+msgstr "Emulador"
+
+msgid "Games folder"
+msgstr "Pasta dos jogos"
+
+msgid "Choose…"
+msgstr "Escolher…"
+
+msgid "None installed"
+msgstr "Nenhum instalado"
+
+msgid "Install an emulator for this console, then come back."
+msgstr "Instale um emulador para este console e depois volte."
+
+msgid "Accepted files: {extensions}"
+msgstr "Arquivos aceitos: {extensions}"
+
+msgid "No compatible game in this folder"
+msgstr "Nenhum jogo compatível nesta pasta"
+
+msgid "Subfolders"
+msgstr "Subpastas"
+
+msgid "Group the discs of a game"
+msgstr "Agrupar os discos de um mesmo jogo"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Add"
+msgstr "Adicionar"
+
+msgid "The console could not be added."
+msgstr "Não foi possível adicionar o console."
+
+msgid "{console} added"
+msgstr "{console} adicionado"
+
+msgid "SD card"
+msgstr "Cartão SD"
+
+msgid "Internal storage"
+msgstr "Armazenamento interno"
+
+msgid "{count} compatible game found"
+msgid_plural "{count} compatible games found"
+msgstr[0] "{count} jogo compatível encontrado"
+msgstr[1] "{count} jogos compatíveis encontrados"
+
+msgid "Press a button"
+msgstr "Aperte um botão"
+
+msgid "Continue"
+msgstr "Continuar"
+
+msgid "Settings"
+msgstr "Configurações"
+
+msgid "Platforms"
+msgstr "Plataformas"
+
+msgid "Button style"
+msgstr "Estilo dos botões"
+
+msgid "Close"
+msgstr "Fechar"
+
+msgid "Back"
+msgstr "Voltar"
+
+msgid "Edit the platform"
+msgstr "Editar a plataforma"
+
+msgid "Remove"
+msgstr "Remover"
+
+msgid "Save"
+msgstr "Salvar"
+
+msgid "Remove {platform}?"
+msgstr "Remover {platform}?"
+
+msgid "Its {count} game, its image and the access to its folder will be removed from Cartouche."
+msgid_plural "Its {count} games, their images and the access to its folder will be removed from Cartouche."
+msgstr[0] "O {count} jogo, a imagem e o acesso à pasta deste console serão removidos do Cartouche."
+msgstr[1] "Os {count} jogos, as imagens e o acesso à pasta deste console serão removidos do Cartouche."
+
+msgid "Your game files stay on the SD card."
+msgstr "Seus arquivos de jogos continuam no cartão SD."
+
+msgid "Your game files stay in the internal storage."
+msgstr "Seus arquivos de jogos continuam no armazenamento interno."
+
+msgid "Your game files stay where they are."
+msgstr "Seus arquivos de jogos continuam onde estão."
+
+msgid "The console could not be removed."
+msgstr "Não foi possível remover o console."
+
+msgid "Its choices and the access to its folder will be removed from Cartouche."
+msgstr "As configurações dele e o acesso à pasta dele serão removidos do Cartouche."
+
+msgid "Add a platform"
+msgstr "Adicionar uma plataforma"
+
+msgid "Properties"
+msgstr "Propriedades"
+
+msgid "Label image"
+msgstr "Imagem da etiqueta"
+
+msgid "Change"
+msgstr "Trocar"
+
+msgid "Choose"
+msgstr "Escolher"
+
+msgid "Choose the label's image"
+msgstr "Escolha a imagem da etiqueta"
+
+msgid "My own image"
+msgstr "Minha própria imagem"
+
+msgid "This image could not be kept."
+msgstr "Não foi possível salvar esta imagem."
+
+msgid "No region"
+msgstr "Sem região"
+
+msgid "North America"
+msgstr "América do Norte"
+
+msgid "South America"
+msgstr "América do Sul"
+
+msgid "Latin America"
+msgstr "América Latina"
+
+msgid "Europe"
+msgstr "Europa"
+
+msgid "Japan"
+msgstr "Japão"
+
+msgid "World"
+msgstr "Mundo"
+
+msgid "Asia"
+msgstr "Ásia"
+
+msgid "Oceania"
+msgstr "Oceania"
+
+msgid "Australia"
+msgstr "Austrália"
+
+msgid "New Zealand"
+msgstr "Nova Zelândia"
+
+msgid "United Kingdom"
+msgstr "Reino Unido"
+
+msgid "Germany"
+msgstr "Alemanha"
+
+msgid "France"
+msgstr "França"
+
+msgid "Spain"
+msgstr "Espanha"
+
+msgid "Italy"
+msgstr "Itália"
+
+msgid "Netherlands"
+msgstr "Holanda"
+
+msgid "Russia"
+msgstr "Rússia"
+
+msgid "Scandinavia"
+msgstr "Escandinávia"
+
+msgid "Sweden"
+msgstr "Suécia"
+
+msgid "Finland"
+msgstr "Finlândia"
+
+msgid "Korea"
+msgstr "Coreia"
+
+msgid "China"
+msgstr "China"
+
+msgid "Brazil"
+msgstr "Brasil"
+
+msgid "Canada"
+msgstr "Canadá"
+
+msgid "No other image of this game is known"
+msgstr "Não há outras imagens deste jogo"
+
+msgid "Game name"
+msgstr "Nome do jogo"
+
+msgid "Adjust the image on the label"
+msgstr "Ajuste a imagem na etiqueta"
+
+msgid "Move"
+msgstr "Mover"
+
+msgid "Zoom out"
+msgstr "Diminuir zoom"
+
+msgid "Zoom in"
+msgstr "Aumentar zoom"
+
+msgid "Place"
+msgstr "Posicionar"
+
+msgid "Shift"
+msgstr "Shift"
+
+msgid "Space"
+msgstr "Espaço"
+
+msgid "Erase"
+msgstr "Apagar"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Type a key"
+msgstr "Digitar"
+
+msgid "This name could not be kept."
+msgstr "Não foi possível salvar este nome."
+
+msgid "Console name"
+msgstr "Nome do console"
+
+msgid "Arrange"
+msgstr "Organizar"
+
+msgid "Change place"
+msgstr "Mudar de lugar"
+
+msgid "Take"
+msgstr "Pegar"
+
+msgid "Done"
+msgstr "Pronto"
+
+msgid "Put down"
+msgstr "Soltar"
+
+msgctxt "ring"
+msgid "in its place"
+msgstr "no lugar dele"
+
+msgctxt "ring"
+msgid "between {before} and {after}"
+msgstr "entre {before} e {after}"
+
+msgctxt "ring"
+msgid "next to {name}"
+msgstr "ao lado de {name}"
+
+msgid "This order could not be kept."
+msgstr "Não foi possível salvar esta ordem."
+
+msgid "Graphics"
+msgstr "Gráficos"
+
+msgid "Preferred region of images"
+msgstr "Região preferida das imagens"
+
+msgid "None"
+msgstr "Nenhuma"
+
+msgid "Taiwan"
+msgstr "Taiwan"
+
+msgid "Which edge smoothing?"
+msgstr "Qual suavização das bordas?"
+
+msgid "This only changes how the edges of discs and consoles are drawn. Less smoothed, they ask less of the graphics card."
+msgstr "Isso só muda a aparência das bordas dos discos e dos consoles. Menos suavizadas, elas exigem menos da placa de vídeo."
+
+msgid "4× (default)"
+msgstr "4× (padrão)"
+
+msgid "The smoothest edges."
+msgstr "As bordas mais suaves."
+
+msgid "Slightly sharper edges; a little less work for the graphics card."
+msgstr "Bordas um pouco mais nítidas; a placa de vídeo trabalha menos."
+
+msgid "Off"
+msgstr "Desligada"
+
+msgid "Edges in small steps; much less work for the graphics card."
+msgstr "Bordas serrilhadas; bem menos trabalho para a placa de vídeo."
+
+msgid "Smoothing 4×"
+msgstr "Suavização 4×"
+
+msgid "Smoothing 2×"
+msgstr "Suavização 2×"
+
+msgid "No smoothing"
+msgstr "Sem suavização"
+
+msgid "Search"
+msgstr "Buscar"
+
+msgid "Clear the filter"
+msgstr "Limpar o filtro"
+
+msgid "Letter"
+msgstr "Letra"
+
+msgid "Region"
+msgstr "Região"
+
+msgid "Type the key"
+msgstr "Digitar"
+
+msgid "Other index"
+msgstr "Trocar de índice"
+
+msgid "Go back"
+msgstr "Voltar"
+
+msgid "Enter"
+msgstr "Entrar"
+
+msgid "By region"
+msgstr "Por região"
+
+msgid "“{typed}” — {found} of {total}"
+msgstr "“{typed}” — {found} de {total}"
+
+msgid "{count} game"
+msgid_plural "{count} games"
+msgstr[0] "{count} jogo"
+msgstr[1] "{count} jogos"
+
+msgid "Games float"
+msgstr "Jogos flutuam"
+
+msgid "The selected game gently rises and falls"
+msgstr "O jogo selecionado sobe e desce suavemente"
+
+msgid "Variant"
+msgstr "Variante"
+
+msgid "This variant could not be kept."
+msgstr "Não foi possível salvar esta variante."
+
+msgid "Used when a game's region is unknown."
+msgstr "Usada quando a região do jogo é desconhecida."
+
+msgid "Adding console…"
+msgstr "Adicionando console…"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "The language of the app. Until you pick one, it follows the device."
+msgstr "O idioma do app. Enquanto você não escolher um, ele segue o do dispositivo."
+
+msgid "Device language"
+msgstr "Idioma do dispositivo"
+
+msgid "Sounds"
+msgstr "Sons"

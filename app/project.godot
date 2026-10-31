@@ -135,7 +135,7 @@ pointing/android/enable_pan_and_scale_gestures=true
 
 [internationalization]
 
-locale/translations=PackedStringArray("res://locale/fr.po")
+locale/translations=PackedStringArray("res://locale/fr.po", "res://locale/de.po", "res://locale/es.po", "res://locale/it.po", "res://locale/pt.po", "res://locale/pt_BR.po", "res://locale/ja.po")
 
 [rendering]
 

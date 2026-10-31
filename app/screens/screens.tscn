@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" path="res://screens/confirm_removal.tscn" id="10"]
 [ext_resource type="PackedScene" path="res://screens/edge_smoothing_screen.tscn" id="11"]
 
-[ext_resource type="PackedScene" path="res://screens/preferred_region_screen.tscn" id="region"]
+[ext_resource type="PackedScene" path="res://screens/card_choice_screen.tscn" id="cards"]
 
 [node name="Screens" type="Control"]
 layout_mode = 3
@@ -38,10 +38,21 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 1
 
-[node name="PreferredRegion" parent="." instance=ExtResource("region")]
+[node name="PreferredRegion" parent="." instance=ExtResource("cards")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
+title = "Preferred region of images"
+note = "Used when a game's region is unknown."
+
+[node name="Language" parent="." instance=ExtResource("cards")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+title = "Language"
+note = "The language of the app. Until you pick one, it follows the device."
+columns = 2
+card_size = Vector2(537.6, 80)
 
 [node name="Permission" parent="." instance=ExtResource("4")]
 unique_name_in_owner = true

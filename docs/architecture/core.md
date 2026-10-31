@@ -124,7 +124,7 @@ Packages `settings` and `storage`.
 
 | File | Responsibility |
 |---|---|
-| `Settings.kt` | The app's choices apart from the library: button style, edge smoothing, preferred region, games floating, sound level, and whether the first launch is still to do. |
+| `Settings.kt` | The app's choices apart from the library: button style, edge smoothing, preferred region, games floating, sound level, language, and whether the first launch is still to do. |
 | `SettingsFormat.kt` | Their stored format. |
 | `DocumentPaths.kt` | Maps a document id (`1A2B-3C4D:ROMs/ps2`) to a path and to a place the user reads. |
 

@@ -48,6 +48,9 @@ var _float_save := 0
 ## The region labels' images prefer, as stored (empty for none), and those the plugin takes.
 var _preferred_region := ""
 var _preferred_regions: PackedStringArray
+## The language the app's text is written in (empty for the device's own), and those it can be.
+var _language := ""
+var _languages: PackedStringArray
 
 @onready var _welcome: Welcome = %Welcome
 @onready var _button_style: ButtonStyleScreen = %ButtonStyle
@@ -55,7 +58,8 @@ var _preferred_regions: PackedStringArray
 @onready var _permission: CurtainPermission = %Permission
 @onready var _no_console: NoConsole = %NoConsole
 @onready var _add_console: AddConsole = %AddConsole
-@onready var _region_screen: PreferredRegionScreen = %PreferredRegion
+@onready var _region_screen: CardChoiceScreen = %PreferredRegion
+@onready var _language_screen: CardChoiceScreen = %Language
 @onready var _pending: Label = %Saving
 @onready var _settings: SettingsMenu = %Settings
 @onready var _platforms: PlatformList = %Platforms
@@ -76,6 +80,10 @@ func run(settings: AndroidServices.SettingsAnswer) -> void:
 	Sounds.level = settings.sound_level
 	_preferred_region = settings.preferred_region
 	_preferred_regions = settings.preferred_regions
+	_language = settings.language
+	_languages = settings.languages
+	# Before the welcome: every text drawn from here on is in the language the user chose.
+	Locale.apply(_language)
 	if settings.first_launch and welcome_waits:
 		_welcome.show()
 		await _welcome.passed()
@@ -192,7 +200,7 @@ func _choose_edge_smoothing() -> void:
 func _choose_preferred_region(first_launch := false) -> void:
 	_show(_region_screen)
 	_region_screen.can_go_back = not first_launch
-	_region_screen.open(_preferred_region, _preferred_regions)
+	_region_screen.open(_preferred_region, _preferred_regions, SettingsMenu.region_name)
 	var region: String = await _region_screen.chosen
 	if region == _preferred_region and not first_launch:
 		return
@@ -235,7 +243,7 @@ func _settings_menu() -> void:
 	while true:
 		if focus != &"games_float":
 			_show(_settings)
-			_settings.open(_platforms_set_up().size(), focus, _preferred_region)
+			_settings.open(_platforms_set_up().size(), focus, _preferred_region, _language)
 		focus = await _settings.chosen
 		match focus:
 			&"close":
@@ -249,12 +257,32 @@ func _settings_menu() -> void:
 				await _choose_edge_smoothing()
 			&"region":
 				await _choose_preferred_region()
+			&"language":
+				await _choose_language()
 			&"games_float":
 				_choose_games_float()
 			&"platforms":
 				await _platform_menu()
 				if library.set_up_platforms().is_empty():
 					return
+
+
+## The language the app's text is written in, chosen from its own page: applied once saved.
+func _choose_language() -> void:
+	_show(_language_screen)
+	_language_screen.can_go_back = true
+	_language_screen.open(_language, _languages, Locale.name_of)
+	var language: String = await _language_screen.chosen
+	if language == _language:
+		return
+	_holding_presses = true
+	var saved := await android.save_language(language)
+	_holding_presses = false
+	if not saved.ok:
+		Diagnostics.trace("screens", "language not saved (%s): %s" % [saved.code, saved.detail])
+		return
+	_language = language
+	Locale.apply(_language)
 
 
 ## The sounds at [param steps] at once, heard so, and kept.

@@ -213,7 +213,7 @@ func test_the_region_cards_follow_the_focus_whole_in_view_to_the_last_and_back()
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
-	var cards: Array[Node] = (carousel.get_node("%Screens/PreferredRegion") as PreferredRegionScreen)._cards.get_children()
+	var cards: Array[Node] = (carousel.get_node("%Screens/PreferredRegion") as CardChoiceScreen)._cards.get_children()
 	for move: StringName in [&"ui_right", &"ui_left"]:
 		for step in cards.size() - 1:
 			await Fixtures.action(self, move)

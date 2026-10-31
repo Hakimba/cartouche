@@ -87,7 +87,7 @@ static func on_form(suite: GdUnitTestSuite, device: NewDevice, chosen := true) -
 
 static func choose_initial_region(suite: GdUnitTestSuite, carousel: Carousel, region := "") -> void:
 	suite.assert_bool(await on(suite, carousel, "PreferredRegion")).is_true()
-	var screen := carousel.get_node("%Screens/PreferredRegion") as PreferredRegionScreen
+	var screen := carousel.get_node("%Screens/PreferredRegion") as CardChoiceScreen
 	var index := screen._choices.find(region)
 	(screen._cards.get_child(index) as Control).grab_focus()
 	await joypad(suite, JOY_BUTTON_A)
@@ -335,6 +335,9 @@ class NewDevice extends AndroidServices:
 	var games_float := false
 	## The regions the plugin takes, as the settings send them.
 	var preferred_regions := PackedStringArray(["Europe", "North America", "Japan"])
+	## The language stored (empty: the device's) and those the plugin takes, as the settings send them.
+	var language := ""
+	var languages := PackedStringArray(Locale.NAMES.keys())
 	## Whether the library already has games (the desktop demo's, set up nowhere).
 	var has_games := false
 	## The platforms set up, by id, with how many games each has.
@@ -356,6 +359,7 @@ class NewDevice extends AndroidServices:
 	var saved_styles: Array[StringName] = []
 	var saved_smoothings: Array[StringName] = []
 	var saved_regions: Array[String] = []
+	var saved_languages: Array[String] = []
 	var saved_floats: Array[bool] = []
 	## The consoles placed, each as `[platform id, gap]`.
 	var placed: Array[Array] = []
@@ -404,11 +408,13 @@ class NewDevice extends AndroidServices:
 	func settings() -> AndroidServices.SettingsAnswer:
 		await _frames(1)
 		var answer := {"ok": true, "first_launch": first_launch, "games_float": games_float,
-			"preferred_regions": preferred_regions}
+			"preferred_regions": preferred_regions, "languages": languages}
 		if button_style:
 			answer["button_style"] = button_style
 		if preferred_region:
 			answer["preferred_region"] = preferred_region
+		if language:
+			answer["language"] = language
 		return AndroidServices.SettingsAnswer.new(answer)
 
 	func library() -> AndroidServices.LibraryAnswer:
@@ -458,6 +464,13 @@ class NewDevice extends AndroidServices:
 		var answer := _payload(&"save_preferred_region")
 		if answer["ok"]:
 			preferred_region = region
+		return AndroidServices.Result.new(answer)
+
+	func save_language(chosen: String) -> AndroidServices.Result:
+		saved_languages.append(chosen)
+		var answer := _payload(&"save_language")
+		if answer["ok"]:
+			language = chosen
 		return AndroidServices.Result.new(answer)
 
 	func installed_players(platform_id: String) -> Array[AndroidServices.Player]:

@@ -22,6 +22,11 @@ const _FILES: Array[String] = [
 
 ## Each face loaded once, by [enum StudioTokens.Face]: its raster font to draw and its MSDF twin to shape.
 static var _faces: Dictionary[StudioTokens.Face, Array] = {}
+## The system's Japanese face, as MSDF, read the first time a line has kana or kanji: the whole file is read
+## into memory, which a line without them never pays. None where the system has no font for them.
+static var _japanese: Array[Font] = []
+static var _japanese_looked := false
+static var _kana_or_kanji := RegEx.create_from_string("[\\x{3000}-\\x{9fff}\\x{ff00}-\\x{ffef}]")
 
 var text: String
 ## The line's width, the tracking after the last letter included; less once [method fit] cut it.
@@ -77,6 +82,8 @@ func _init(shown: String, face: StudioTokens.Face, px: float, tracking_em := 0.0
 	_tracking = tracking_em
 	_tabular = tabular
 	_px = px
+	if not _japanese_looked and _kana_or_kanji.search(shown):
+		_add_japanese()
 	var fonts := _face(face)
 	_display = fonts[0]
 	_measure = fonts[1]
@@ -198,10 +205,25 @@ static func _face(face: StudioTokens.Face) -> Array:
 		# A tiny MSDF raster: only the advances are read from it, and its first use is six times faster.
 		measure.msdf_size = 8
 		measure.msdf_pixel_range = 2
-		# A letter the face lacks comes from the system's fonts, as MSDF too, and is drawn from that font.
+		# A letter the face lacks comes from the system's fonts, as MSDF too, and is drawn from that font: its main
+		# face, then its Japanese one once a line needs it, as a system's main face has no kana nor kanji.
 		measure.allow_system_fallback = false
 		var fallback := SystemFont.new()
 		fallback.multichannel_signed_distance_field = true
-		measure.fallbacks = [fallback]
+		measure.fallbacks = [fallback] + _japanese
 		_faces[face] = [display, measure]
 	return _faces[face]
+
+
+## Adds the system's Japanese face after the other fallbacks of every face, once.
+static func _add_japanese() -> void:
+	_japanese_looked = true
+	var paths := OS.get_system_font_path_for_text("sans-serif", "日本語", "ja")
+	var font := FontFile.new()
+	if paths.is_empty() or font.load_dynamic_font(paths[0]) != OK or not font.has_char("日".unicode_at(0)):
+		return
+	font.multichannel_signed_distance_field = true
+	_japanese = [font]
+	for fonts: Array in _faces.values():
+		var measure: Font = fonts[1]
+		measure.fallbacks = measure.fallbacks + _japanese

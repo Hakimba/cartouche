@@ -39,7 +39,7 @@ msgid "For more immersion"
 msgstr "Pour davantage d’immersion"
 
 msgid "When you start a game, Cartouche puts up a black screen while the emulator starts. Android must allow it to “display over other apps”."
-msgstr "Quand tu lances un jeu, Cartouche pose un écran noir le temps que l’émulateur démarre. Android doit l’autoriser à « s’afficher par-dessus les autres applis »."
+msgstr "Quand tu lances un jeu, Cartouche pose un écran noir le temps que l’émulateur démarre. Android doit l’autoriser dans « Superposition sur d’autres applis »."
 
 msgid "Open the setting"
 msgstr "Ouvrir le réglage"
@@ -427,6 +427,15 @@ msgstr "Utilisée lorsque la région du jeu est inconnue."
 
 msgid "Adding console…"
 msgstr "Ajout de la console…"
+
+msgid "Language"
+msgstr "Langue"
+
+msgid "The language of the app. Until you pick one, it follows the device."
+msgstr "La langue de l’app. Tant que tu n’en choisis pas, elle suit celle de l’appareil."
+
+msgid "Device language"
+msgstr "Langue de l’appareil"
 
 msgid "Sounds"
 msgstr "Sons"

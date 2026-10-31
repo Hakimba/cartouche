@@ -9,6 +9,7 @@ const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 
 func after_test() -> void:
 	Controls.style = &"xbox"
+	Locale.apply("en")
 
 
 ## [param device]'s carousel, once it can be used.
@@ -368,15 +369,15 @@ func test_the_preferred_region_is_chosen_on_its_page_from_the_settings_saved_onc
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Region")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	var page: PreferredRegionScreen = carousel.get_node("%Screens/PreferredRegion")
+	var page: CardChoiceScreen = carousel.get_node("%Screens/PreferredRegion")
 	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
 	assert_array(_card_texts(page)).is_equal(PackedStringArray(["None", "Europe", "North America", "Japan"]))
 	await await_idle_frame()
 	assert_str((Fixtures.focus(self) as Button).text).is_equal("Japan")
 	# The region chosen now is the one ticked.
 	assert_int(page.find_children("*", "Control", true, false).filter(
-		func(node: Node) -> bool: return node is PreferredRegionScreen.Tick).size()).is_equal(1)
-	assert_object(Fixtures.focus(self).get_child(0)).is_instanceof(PreferredRegionScreen.Tick)
+		func(node: Node) -> bool: return node is CardChoiceScreen.Tick).size()).is_equal(1)
+	assert_object(Fixtures.focus(self).get_child(0)).is_instanceof(CardChoiceScreen.Tick)
 	# B gives the page up: nothing saved, the settings open again on the line.
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await _settings_ready(carousel)).is_true()
@@ -398,6 +399,99 @@ func test_the_preferred_region_is_chosen_on_its_page_from_the_settings_saved_onc
 	assert_array(device.saved_regions).is_equal([""])
 
 
+func test_the_language_line_scrolls_into_the_card_its_page_applies_a_choice_at_once_and_B_there_keeps_it() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	var carousel := await _shown(device)
+	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	# Six lines show; the seventh scrolls in, and the first out of sight, unseen and untouchable.
+	assert_float(menu._language.modulate.a).is_zero()
+	for step in 6:
+		await Fixtures.action(self, &"ui_down")
+	assert_str(_focused()).is_equal("Language")
+	assert_float(menu._language.modulate.a).is_equal(1.0)
+	assert_float(menu._platforms.modulate.a).is_zero()
+	assert_int(menu._platforms.mouse_filter).is_equal(Control.MOUSE_FILTER_IGNORE)
+	assert_str(_text(carousel, "Settings/%Language/%Value")).is_equal("Device language")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	var page: CardChoiceScreen = carousel.get_node("%Screens/Language")
+	assert_bool(await Fixtures.on(self, carousel, "Language")).is_true()
+	assert_array(_card_texts(page)).is_equal(PackedStringArray(["Device language"] + Locale.NAMES.values()))
+	await await_idle_frame()
+	assert_str((Fixtures.focus(self) as Button).text).is_equal("Device language")
+	# B gives the page up: nothing saved, the settings open again on the line.
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_str(_focused()).is_equal("Language")
+	assert_array(device.saved_languages).is_empty()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await await_idle_frame()
+	for step in 3:
+		await Fixtures.action(self, &"ui_right")
+	assert_str((Fixtures.focus(self) as Button).text).is_equal("Deutsch")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_languages.size() == 1)).is_true()
+	assert_array(device.saved_languages).is_equal(["de"])
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_str(TranslationServer.get_locale()).is_equal("de")
+	assert_str(_text(carousel, "Settings/%Language/%Value")).is_equal("Deutsch")
+	assert_str(_focused()).is_equal("Language")
+
+
+func test_with_no_console_the_card_shows_its_platforms_line_again_and_its_arrows_scroll_under_a_finger() -> void:
+	var carousel := Fixtures.fresh_carousel(self, Fixtures.past_first_launch(self, {}))
+	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
+	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	for step in 5:
+		await Fixtures.action(self, &"ui_down")
+	assert_str(_focused()).is_equal("Language")
+	assert_float(menu._platforms.modulate.a).is_zero()
+	for step in 5:
+		await Fixtures.action(self, &"ui_up")
+	assert_str(_focused()).is_equal("ButtonStyle")
+	# The platforms line cannot take the focus, yet shows with the line under it: no arrow leads nowhere.
+	assert_float(menu._platforms.modulate.a).is_equal(1.0)
+	assert_bool(menu._more(-1)).is_false()
+	# A finger on the arrow below scrolls a line, the focus kept on a line shown.
+	await _tap(menu, Vector2(menu._panel.size.x / 2.0, SettingsMenu._MORE_DOWN_Y))
+	assert_float(menu._language.modulate.a).is_equal(1.0)
+	assert_float(menu._platforms.modulate.a).is_zero()
+	assert_float((Fixtures.focus(self) as Control).modulate.a).is_equal(1.0)
+	await _tap(menu, Vector2(menu._panel.size.x / 2.0, SettingsMenu._MORE_UP_Y))
+	assert_float(menu._platforms.modulate.a).is_equal(1.0)
+
+
+## A finger down and up at [param at], in [param menu]'s card.
+func _tap(menu: SettingsMenu, at: Vector2) -> void:
+	await Fixtures.touch(self, [menu._panel.get_global_transform() * at])
+	await await_idle_frame()
+
+
+func test_a_language_the_plugin_does_not_save_is_not_applied() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	device.failing = [&"save_language"]
+	var carousel := await _shown(device)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	for step in 6:
+		await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.on(self, carousel, "Language")).is_true()
+	await await_idle_frame()
+	var shown_in := TranslationServer.get_locale()
+	for step in 2:
+		await Fixtures.action(self, &"ui_right")
+	assert_str((Fixtures.focus(self) as Button).text).is_equal("Français")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_languages.size() == 1)).is_true()
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_str(TranslationServer.get_locale()).is_equal(shown_in)
+	assert_str(_text(carousel, "Settings/%Language/%Value")).is_equal("Device language")
+
+
 func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_not_shown_chosen() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	device.preferred_regions = PackedStringArray(["Japan", "Korea"])
@@ -409,7 +503,7 @@ func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_n
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
-	assert_array(_card_texts(carousel.get_node("%Screens/PreferredRegion") as PreferredRegionScreen)).is_equal(PackedStringArray(["None",
+	assert_array(_card_texts(carousel.get_node("%Screens/PreferredRegion") as CardChoiceScreen)).is_equal(PackedStringArray(["None",
 		"Japan", "Korea"]))
 	await await_idle_frame()
 	await Fixtures.action(self, &"ui_right")
@@ -472,7 +566,7 @@ func test_inv_20_on_every_settings_screen_exactly_one_control_of_it_has_the_focu
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
 	await Fixtures.wander(self, carousel, "Settings", random)
-	for step in 4:
+	for step in 6:
 		await Fixtures.action(self, &"ui_up")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.wander(self, carousel, "Platforms", random)
@@ -623,7 +717,7 @@ func test_a_late_success_after_closing_does_not_change_the_hidden_switch_or_its_
 	assert_bool(device.games_float).is_true()
 
 
-func _card_texts(page: PreferredRegionScreen) -> PackedStringArray:
+func _card_texts(page: CardChoiceScreen) -> PackedStringArray:
 	var texts := PackedStringArray()
 	for card: Button in page._cards.get_children():
 		texts.append(card.text)

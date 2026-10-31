@@ -57,6 +57,7 @@ import app.cartouche.core.search.Mark
 import app.cartouche.core.search.View
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
+import app.cartouche.core.settings.Language
 import app.cartouche.core.settings.SoundLevel
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
@@ -171,9 +172,9 @@ class WireTest {
 
     @Test
     fun `the settings and a folder's place reach Godot with the keys the GDScript adapter reads`() {
-        AppSettings().toWire(true) - "preferred_regions" shouldBe
+        AppSettings().toWire(true) - "preferred_regions" - "languages" shouldBe
             dictionary("first_launch" to true, "edge_smoothing" to "4x", "games_float" to false, "sound_level" to 10)
-        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) - "preferred_regions" shouldBe
+        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) - "preferred_regions" - "languages" shouldBe
             dictionary(
                 "first_launch" to false,
                 "button_style" to "playstation",
@@ -186,6 +187,8 @@ class WireTest {
         AppSettings(edgeSmoothing = EdgeSmoothing.OFF).toWire(false)["edge_smoothing"] shouldBe "off"
         AppSettings(preferredRegion = Some(PreferredRegion.NORTH_AMERICA)).toWire(false)["preferred_region"] shouldBe "North America"
         (AppSettings().toWire(false)["preferred_regions"] as Array<*>).toList() shouldBe PreferredRegion.entries.map { it.region }
+        AppSettings(language = Some(Language.BRAZILIAN_PORTUGUESE)).toWire(false)["language"] shouldBe "pt_BR"
+        (AppSettings().toWire(false)["languages"] as Array<*>).toList() shouldBe listOf("en", "fr", "de", "es", "it", "pt", "pt_BR", "ja")
         val place = placed.toWire()["place"] as Dictionary
         place["volume"] shouldBe "card"
         (place["folders"] as Array<*>).toList() shouldBe listOf("ROMs", "ps2")

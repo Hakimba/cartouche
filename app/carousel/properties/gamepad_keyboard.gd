@@ -36,10 +36,11 @@ func build() -> void:
 				_letters.append(key)
 			keys.add_child(key)
 	var last := _row()
-	last.add_child(_key(tr("Shift"), func() -> void: capital = not capital, 1.5))
-	last.add_child(_key(tr("Space"), _type.bind(" "), 3.0))
-	last.add_child(_key(tr("Erase"), erased.emit, 1.5))
-	last.add_child(_key(tr("OK"), submitted.emit, 1.5))
+	for key: Button in [_key("Shift", func() -> void: capital = not capital, 1.5), _key("Space", _type.bind(" "), 3.0),
+			_key("Erase", erased.emit, 1.5), _key("OK", submitted.emit, 1.5)]:
+		# The words follow the language, also one chosen once the keys are made.
+		key.auto_translate_mode = AUTO_TRANSLATE_MODE_ALWAYS
+		last.add_child(key)
 	_show_case()
 
 

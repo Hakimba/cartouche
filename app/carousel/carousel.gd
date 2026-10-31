@@ -198,7 +198,8 @@ func _ready() -> void:
 	for properties: PropertiesScreen in [_properties, _console_properties]:
 		properties.android = android
 		properties.light = %Light
-	_properties.rename_failed.connect(_show_message.bind(tr("This name could not be kept.")))
+	_properties.rename_failed.connect(func() -> void:
+		_show_message(tr("This name could not be kept.")))
 	_properties.row = _row
 	_properties.art = _art
 	_properties.behind.assign([_pill, _games_hints, _search, _games_logo])
@@ -216,7 +217,8 @@ func _ready() -> void:
 	_order.android = android
 	_order.consoles = _consoles
 	_order.ordered.connect(_on_consoles_ordered)
-	_order.order_failed.connect(_show_message.bind(tr("This order could not be kept.")))
+	_order.order_failed.connect(func() -> void:
+		_show_message(tr("This order could not be kept.")))
 	_order.closing.connect(_on_order_closing)
 	_order.closed.connect(_on_order_closed)
 	_row.turntable = Diagnostics.argument("turntable").to_float()

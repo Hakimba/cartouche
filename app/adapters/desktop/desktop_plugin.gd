@@ -13,7 +13,8 @@ const DEMO := "res://dev/demo/desktop.json"
 const _VARIANTS := "user://console-variants.json"
 
 var _snapshot := {}
-var _settings := {"ok": true, "first_launch": false, "games_float": false, "sound_level": 10}
+var _settings := {"ok": true, "first_launch": false, "games_float": false, "sound_level": 10,
+	"language": "", "languages": Locale.NAMES.keys()}
 ## The library as the choices made since the app started left it; empty until one is made.
 var _current := {}
 var _story := {}
@@ -170,6 +171,10 @@ func saveGamesFloat(_id: int, floating: bool) -> Dictionary:
 
 func saveSoundLevel(_id: int, steps: int) -> Dictionary:
 	return _save("sound_level", steps)
+
+
+func saveLanguage(_id: int, language: String) -> Dictionary:
+	return _save("language", language)
 
 
 func savePreferredRegion(_id: int, region: String) -> Dictionary:

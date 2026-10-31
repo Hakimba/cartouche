@@ -55,10 +55,39 @@ public value class SoundLevel private constructor(public val steps: Int) {
     }
 }
 
+/** The language the app's text is written in, stored and sent as its locale code: the language, and the country where it differs. */
+@Serializable
+public enum class Language {
+    @SerialName("en")
+    ENGLISH,
+
+    @SerialName("fr")
+    FRENCH,
+
+    @SerialName("de")
+    GERMAN,
+
+    @SerialName("es")
+    SPANISH,
+
+    @SerialName("it")
+    ITALIAN,
+
+    @SerialName("pt")
+    PORTUGUESE,
+
+    @SerialName("pt_BR")
+    BRAZILIAN_PORTUGUESE,
+
+    @SerialName("ja")
+    JAPANESE,
+}
+
 /**
  * The app's own settings, apart from the library; [preferredRegion], none until the user chooses one, orders labels'
  * images; [gamesFloat] makes the selected game sway and bob (the consoles never do); [soundLevel] is how loud the
- * sounds play, full until the user turns them down.
+ * sounds play, full until the user turns them down; [language], none until the user chooses one, follows the
+ * device's.
  */
 @Serializable
 public data class Settings(
@@ -67,6 +96,7 @@ public data class Settings(
     public val preferredRegion: Option<PreferredRegion> = None,
     public val gamesFloat: Boolean = false,
     public val soundLevel: SoundLevel = SoundLevel.FULL,
+    public val language: Option<Language> = None,
 ) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An app updated from a

@@ -75,6 +75,11 @@ unique_name_in_owner = true
 layout_mode = 0
 label = "Sounds"
 
+[node name="Language" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 0
+label = "Language"
+
 [node name="Hints" parent="." instance=ExtResource("hint_row")]
 
 [node name="Hint" type="Control" parent="Hints"]
@@ -87,5 +92,6 @@ text = "Close"
 [connection signal="pressed" from="Panel/Items/ButtonStyle" to="." method="_on_button_style_pressed"]
 [connection signal="pressed" from="Panel/Items/Graphics" to="." method="_on_graphics_pressed"]
 [connection signal="pressed" from="Panel/Items/Region" to="." method="_on_region_pressed"]
+[connection signal="pressed" from="Panel/Items/Language" to="." method="_on_language_pressed"]
 
 [connection signal="pressed" from="Panel/Items/GamesFloat" to="." method="_on_games_float_pressed"]

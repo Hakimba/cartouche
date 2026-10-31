@@ -27,6 +27,7 @@ games come on their real medium: discs, cartridges, mini-discs.
 - **Your library, your way:** filter by name or by region, put your consoles in the order you like on a wheel,
   rename a game or a console.
 - **Controller first:** everything works with the pad, from the first launch to adding a console; touch works too.
+- **Speaks your language:** seven languages, following your device's until you pick one ([Languages](#languages)).
 - **Uses your emulators:** Cartouche emulates nothing. It finds the emulators you already installed and starts each
   game in the right one.
 - **Light:** at rest it draws nothing, and it stays smooth with thousands of games.
@@ -36,7 +37,34 @@ games come on their real medium: discs, cartridges, mini-discs.
 Download the APK from this repository's Releases page and install it on your handheld. You need Android 11 or
 later on an arm64 device with Vulkan, and the emulators of the consoles you want to play.
 
-## You want to contribute, or to know how it works?
+## Languages
+
+English, French, German, Spanish, Italian, Portuguese (Portugal and Brazil) and Japanese. Cartouche speaks your
+device's language when it has it, English otherwise; to choose another, open the settings and go down to
+**Language**.
+
+A translation reads wrong, or your language is missing? Open an issue, or change the text yourself: each language
+is one file, and [docs/translating.md](docs/translating.md) says how to fix one or add one.
+
+## How a label is found
+
+1. **Which game it is.** Cartouche reads the file itself (a cartridge's CRC32, a disc's serial) and looks it up in
+   the No-Intro and Redump lists; when the file says nothing, its name decides.
+2. **Which region.** The regions of the release found (France, Europe, USA, Japan…).
+3. **The images on offer.** LaunchBox's scans, found by the game's name. ScreenScraper's images, found in a table
+   shipped with the app (`app/data/screenscraper/`): for every release of the reference lists, its ScreenScraper
+   game and the images it has. The table is built once per version of the app, so the device never asks
+   ScreenScraper which game a file is; it only downloads images, one request each. PS2 discs also have
+   psxdatacenter's scans, by serial.
+4. **Which image first.** An image of the game's region (its country, or the zone containing it: France → Europe)
+   comes first: on a cartridge ScreenScraper's (the printed label itself), then LaunchBox's; on a disc LaunchBox's,
+   then ScreenScraper's, then psxdatacenter's. Then every other image, closest region first. The first image that
+   downloads is kept. A label you chose, or a picture of your own, is never replaced; a game's properties list every
+   image of every source, each named by its region and source.
+5. **When ScreenScraper cannot answer** (busy, closed, quota spent), the next image is taken at once and ScreenScraper
+   is tried again at a later scan.
+
+## Contributing
 
 Ideas, feedback and pull requests are welcome: open an issue to talk about a bigger change first.
 
@@ -63,6 +91,10 @@ scripts/logs.sh                 # follows the debug build's traces on the device
 scripts/bench.sh                # measures the installed debug build at several library sizes
 ```
 
+A build asks ScreenScraper for images with Cartouche's developer key, read from `kotlin/local.properties`
+(`screenscraper.devid`, `screenscraper.devpassword`), never from the repository; see
+[Credentials](docs/README.md#credentials).
+
 ## Stack
 
 - **Android only**, from Android 11 (API 30) to Android 16 (API 36), on arm64 devices with
@@ -77,30 +109,7 @@ scripts/bench.sh                # measures the installed debug build at several 
   4.16.1 on Android 11, 13 and 14, [GdUnit4](https://github.com/MikeSchulze/gdUnit4) 6.2.1 for
   GDScript, ktlint.
 
-## How a label is found
-
-1. **Which game it is.** Cartouche reads the file itself (a cartridge's CRC32, a disc's serial) and looks it up in
-   the No-Intro and Redump lists; when the file says nothing, its name decides.
-2. **Which region.** The regions of the release found (France, Europe, USA, Japan…).
-3. **The images on offer.** LaunchBox's scans, found by the game's name; ScreenScraper's textures, found in a table
-   shipped with the app (`app/data/screenscraper/`) that gives, for every release of the reference lists, its
-   ScreenScraper game and the images it has. The project builds that table once per release of the app, asking
-   ScreenScraper about each release by its reference hashes, so the device never asks which game a file is: it only
-   downloads images, one request each, and nothing for a game ScreenScraper lacks. PS2 discs also have
-   psxdatacenter, by serial.
-4. **Which image first.** An image of the game's region (its country, or the zone containing it: France → Europe)
-   comes first: on a cartridge ScreenScraper's (the printed label itself), then LaunchBox's; on a disc LaunchBox's,
-   then ScreenScraper's, then psxdatacenter's. Then every other image, closest region first. The first image that
-   downloads is kept. A label you chose, or a picture of your own, is never replaced; a game's properties list every
-   image of every source, each named by its region and source.
-5. **When ScreenScraper cannot answer** (busy, closed, quota spent), the next image is taken at once and ScreenScraper
-   is tried again at a later scan.
-
-ScreenScraper is used with Cartouche's developer key, which builds take from `kotlin/local.properties`
-(`screenscraper.devid`, `screenscraper.devpassword`), never from the repository; see
-[Credentials](docs/README.md#credentials).
-
-## Open-source work used
+## Credits
 
 Cartouche builds on these projects, and thanks their authors.
 
@@ -132,9 +141,7 @@ The consoles' 3D models are adapted from these downloads (CC-BY-4.0, licence tex
 - This work is based on "NES Console and Controller" (https://sketchfab.com/3d-models/nes-console-and-controller-ffd427134d5e44b4850628030aa66236) by Daz (https://sketchfab.com/Darren.Hogan) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Game Boy Color" (https://sketchfab.com/3d-models/game-boy-color-03c6fe28d45244d2acd55486e3cfee19) by Wikiti (https://sketchfab.com/wikiti) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Super Retro Game Console" (https://sketchfab.com/3d-models/super-retro-game-console-d672d0ac1d6a4d238314d6675f8f92b2) by ELIZION (https://sketchfab.com/ELIZION) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-
 - This work is based on "Sony PlayStation 2" (https://sketchfab.com/3d-models/sony-playstation-2-b53f858aa1584229a7f906239fc158a2) by Dolgov (https://sketchfab.com/Dolgov12) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-
 - This work is based on "Gameboy Advance SP" (https://sketchfab.com/3d-models/gameboy-advance-sp-18c9688eaa8f4903a940c105242df15f) by thegraphicsgeek (https://sketchfab.com/thegraphicsgeek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 ### 3D logos

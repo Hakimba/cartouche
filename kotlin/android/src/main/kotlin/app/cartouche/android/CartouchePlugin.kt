@@ -60,6 +60,7 @@ import app.cartouche.core.search.Order
 import app.cartouche.core.search.View
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
+import app.cartouche.core.settings.Language
 import app.cartouche.core.settings.SoundLevel
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
@@ -510,6 +511,17 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     public fun saveSoundLevel(requestId: Int, steps: Int): Unit = onLibrary(requestId) {
         val level = SoundLevel.of(steps).getOrElse { raise(invalid("sound_level is out of 0 to ${SoundLevel.MAX}")) }
         save("sound_level=$steps") { it.copy(soundLevel = level) }
+        success()
+    }
+
+    /** Stores the language the app's text is written in, [language] as `languages` names it; empty follows the device's. */
+    @UsedByGodot
+    public fun saveLanguage(requestId: Int, language: String): Unit = onLibrary(requestId) {
+        val chosen =
+            language.takeIf(String::isNotEmpty).toOption().map {
+                code("language", Some(it), Language.entries) { l -> l.wire }
+            }
+        save("language: ${language.ifEmpty { "device" }}") { it.copy(language = chosen) }
         success()
     }
 

@@ -516,6 +516,10 @@ class SettingsAnswer extends Result:
 	var preferred_region: String
 	## The regions labels' images can prefer, as the plugin names them, the only ones it saves.
 	var preferred_regions: PackedStringArray
+	## The language the app's text is written in, one of [member languages]; empty follows the device's.
+	var language: String
+	## The languages the app's text can be written in, as the plugin names them, the only ones it saves.
+	var languages: PackedStringArray
 
 	func _init(payload: Dictionary) -> void:
 		super(payload)
@@ -527,6 +531,8 @@ class SettingsAnswer extends Result:
 		sound_level = payload.get("sound_level", SoundEffects.LEVELS)
 		preferred_region = payload.get("preferred_region", "")
 		preferred_regions = payload.get("preferred_regions", PackedStringArray())
+		language = payload.get("language", "")
+		languages = payload.get("languages", PackedStringArray())
 
 
 class ScanAnswer extends LibraryAnswer:

@@ -31,6 +31,7 @@ class SettingsFormatTest {
             """{"version":2,"settings":{"buttonStyle":"sega"}}""",
             """{"version":2,"settings":{"edgeSmoothing":"8x"}}""",
             """{"version":2,"settings":{"preferredRegion":"Atlantis"}}""",
+            """{"version":2,"settings":{"language":"tlh"}}""",
         ).forEach { SettingsFormat.decode(it).shouldBeLeft() }
     }
 
@@ -46,6 +47,7 @@ class SettingsFormatTest {
         }
         SettingsFormat.encode(Settings(preferredRegion = Some(PreferredRegion.UNITED_KINGDOM))) shouldContain
             """"preferredRegion":"United Kingdom""""
+        SettingsFormat.encode(Settings(language = Some(Language.BRAZILIAN_PORTUGUESE))) shouldContain """"language":"pt_BR""""
     }
 
     @Test

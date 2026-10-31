@@ -25,6 +25,7 @@ import app.cartouche.core.platforms.Candidate
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.regions.PreferredRegion
+import app.cartouche.core.settings.Language
 import app.cartouche.core.settings.Settings
 import arrow.core.Either
 import arrow.core.None
@@ -203,9 +204,10 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
 internal fun BatteryState.toWire(): Dictionary = dictionary("plugged" to plugged).putSome("level_percent", levelPercent)
 
 /**
- * `{"first_launch", "button_style"?, "edge_smoothing", "games_float", "sound_level", "preferred_region"?, "preferred_regions"}`:
- * the style and the region are absent until one is chosen; the regions are those a preference can name, as
- * [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes.
+ * `{"first_launch", "button_style"?, "edge_smoothing", "games_float", "sound_level", "preferred_region"?, "preferred_regions",
+ * "language"?, "languages"}`: the style, the region and the language are absent until one is chosen; the regions are
+ * those a preference can name, as [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes; the
+ * languages are those the app's text is written in, the only ones `saveLanguage` takes.
  */
 internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
     "first_launch" to firstLaunch,
@@ -213,8 +215,10 @@ internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
     "games_float" to gamesFloat,
     "sound_level" to soundLevel.steps,
     "preferred_regions" to PreferredRegion.entries.map { it.region }.toTypedArray(),
+    "languages" to Language.entries.map { it.wire }.toTypedArray(),
 ).putSome("button_style", buttonStyle.map { it.wire })
     .putSome("preferred_region", preferredRegion.map { it.region })
+    .putSome("language", language.map { it.wire })
 
 /**
  * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`, and what it just

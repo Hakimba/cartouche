@@ -9,6 +9,9 @@ import app.cartouche.core.library.game
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.playerJson
+import app.cartouche.core.settings.Language
+import arrow.core.None
+import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -79,6 +82,21 @@ class CartouchePluginTest {
         h.plugin.saveSoundLevel(2, 11)
         h.scope.runCurrent()
         h.settings().soundLevel.steps shouldBe 4
+        h.done()
+    }
+
+    @Test
+    fun `INV-15 a language is stored once saved, an unknown one refused and the language kept, and none follows the device`() {
+        val h = Plugin()
+        h.plugin.saveLanguage(1, "pt_BR")
+        h.scope.runCurrent()
+        h.settings().language shouldBe Some(Language.BRAZILIAN_PORTUGUESE)
+        h.plugin.saveLanguage(2, "tlh")
+        h.scope.runCurrent()
+        h.settings().language shouldBe Some(Language.BRAZILIAN_PORTUGUESE)
+        h.plugin.saveLanguage(3, "")
+        h.scope.runCurrent()
+        h.settings().language shouldBe None
         h.done()
     }
 

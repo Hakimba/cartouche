@@ -308,6 +308,12 @@ func save_button_style(style: StringName) -> Result:
 	return Result.new(await _request(&"saveButtonStyle", [style]))
 
 
+## Stores the language the app's text is written in, [param language] one of
+## [member SettingsAnswer.languages] (empty follows the device's).
+func save_language(language: String) -> Result:
+	return Result.new(await _request(&"saveLanguage", [language]))
+
+
 ## Stores the edge smoothing the user chose, [param smoothing] as [SettingsAnswer] names it.
 func save_edge_smoothing(smoothing: StringName) -> Result:
 	return Result.new(await _request(&"saveEdgeSmoothing", [smoothing]))

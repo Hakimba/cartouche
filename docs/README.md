@@ -189,6 +189,7 @@ Find your task, open the page, then the files in the order given.
 | what the plugin sends to Godot | [architecture/android.md](architecture/android.md#the-wire) | `Wire.kt`, `WireJson.kt`, `android_wire.gd` |
 | a timing, colour or size of the design | [architecture/studio.md](architecture/studio.md#values) | `studio_tokens.gd` (generated, never edited by hand) |
 | a game's pose on the games screen | [architecture/studio.md](architecture/studio.md#the-games-screen) | `app/data/media_poses.json`, `games_layout.gd` |
+| a translation | [translating.md](translating.md) | `app/locale/` |
 
 ### Add something
 
@@ -199,6 +200,7 @@ Find your task, open the page, then the files in the order given.
 | a platform (data only) | [architecture/core.md](architecture/core.md#adding-a-platform) | `app/data/platforms/profiles.json`, `scripts/dat_titles.py` |
 | a screen in front of the carousel | [architecture/godot.md](architecture/godot.md#adding-a-screen) | `screen_flow.gd`, `hint_row.gd`, `app/test/screens/fixtures.gd` |
 | a setting | [architecture/android.md](architecture/android.md#adding-a-setting) | `Settings.kt`, `CartouchePlugin.kt`, `settings_menu.gd` |
+| a language | [translating.md](translating.md#add-a-language) | `app/locale/locale.gd`, `Settings.kt` |
 | a sound, or a sound to a gesture | [sounds.md](sounds.md) | `scripts/audio/sounds.json`, `sound_effects.gd` |
 | a test | [testing.md](testing.md) | the closest existing test |
 | a debug trace | [Diagnostics and debug arguments](#diagnostics-and-debug-arguments) | `diagnostics.gd`, `Wire.kt` |

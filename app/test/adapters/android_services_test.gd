@@ -86,14 +86,19 @@ func test_an_art_change_tells_the_progress_its_stall_and_the_scan_found() -> voi
 	assert_array(absent.absent).is_equal(PackedStringArray(["ps2/b", "ps2/c"]))
 
 
-func test_the_settings_answer_carries_the_regions_the_plugin_takes_and_the_one_preferred() -> void:
+func test_the_settings_answer_carries_the_regions_and_languages_the_plugin_takes_and_the_ones_chosen() -> void:
 	var answer := AndroidServices.SettingsAnswer.new({"ok": true, "first_launch": false,
-		"preferred_region": "Japan", "preferred_regions": PackedStringArray(["Europe", "Japan"])})
+		"preferred_region": "Japan", "preferred_regions": PackedStringArray(["Europe", "Japan"]), "language": "pt_BR",
+		"languages": PackedStringArray(["en", "pt_BR"])})
+	assert_str(answer.language).is_equal("pt_BR")
+	assert_array(answer.languages).is_equal(PackedStringArray(["en", "pt_BR"]))
 	assert_str(answer.preferred_region).is_equal("Japan")
 	assert_array(answer.preferred_regions).is_equal(PackedStringArray(["Europe", "Japan"]))
 	var bare := AndroidServices.SettingsAnswer.new({"ok": true, "first_launch": false})
 	assert_str(bare.preferred_region).is_empty()
 	assert_array(bare.preferred_regions).is_empty()
+	assert_str(bare.language).is_empty()
+	assert_array(bare.languages).is_empty()
 
 
 func test_a_label_download_tells_how_far_it_has_come_an_unknown_size_and_its_end() -> void:

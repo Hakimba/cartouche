@@ -1,0 +1,438 @@
+# Japanese translation of Cartouche.
+# SPDX-License-Identifier: GPL-3.0-or-later
+msgid ""
+msgstr ""
+"Language: ja\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "No {platform} emulator is installed."
+msgstr "{platform}のエミュレーターがインストールされていません。"
+
+msgid "This game's file cannot be found: is its SD card or folder still there?"
+msgstr "このゲームのファイルが見つかりません。SDカードかフォルダーはまだありますか？"
+
+msgid "The game could not be launched."
+msgstr "ゲームを起動できませんでした。"
+
+msgid "Disc images · offline, resuming when the network is back"
+msgstr "ラベル画像・オフライン。ネットワークが戻ったら再開します"
+
+msgid "Disc images · server unavailable, trying again later"
+msgstr "ラベル画像・サーバーに接続できません。後で再試行します"
+
+msgid "Disc images · no room left on the device"
+msgstr "ラベル画像・端末の空き容量がありません"
+
+msgid "Disc images · {done} / {total}"
+msgstr "ラベル画像・{done} / {total}"
+
+msgid "Which button style?"
+msgstr "ボタンのスタイルはどれにしますか？"
+
+msgid "This only changes how the buttons are drawn. The button that confirms is set in the device's settings."
+msgstr "ボタンの見た目が変わるだけです。決定ボタンは端末の設定で変更できます。"
+
+msgid "For more immersion"
+msgstr "さらに没入感を高めるために"
+
+msgid "When you start a game, Cartouche puts up a black screen while the emulator starts. Android must allow it to “display over other apps”."
+msgstr "ゲームの起動中は、エミュレーターの準備ができるまで黒い画面を表示します。Androidの「他のアプリの上に重ねて表示」で許可してください。"
+
+msgid "Open the setting"
+msgstr "設定を開く"
+
+msgid "Later"
+msgstr "後で"
+
+msgid "No console yet"
+msgstr "ゲーム機がまだありません"
+
+msgid "Add a console"
+msgstr "ゲーム機を追加"
+
+msgid "Console"
+msgstr "ゲーム機"
+
+msgid "No console"
+msgstr "ゲーム機なし"
+
+msgid "Emulator"
+msgstr "エミュレーター"
+
+msgid "Games folder"
+msgstr "ゲームのフォルダー"
+
+msgid "Choose…"
+msgstr "選択…"
+
+msgid "None installed"
+msgstr "未インストール"
+
+msgid "Install an emulator for this console, then come back."
+msgstr "このゲーム機のエミュレーターをインストールしてから戻ってください。"
+
+msgid "Accepted files: {extensions}"
+msgstr "対応ファイル：{extensions}"
+
+msgid "No compatible game in this folder"
+msgstr "このフォルダーに対応するゲームがありません"
+
+msgid "Subfolders"
+msgstr "サブフォルダー"
+
+msgid "Group the discs of a game"
+msgstr "同じゲームのディスクをまとめる"
+
+msgid "Cancel"
+msgstr "キャンセル"
+
+msgid "Add"
+msgstr "追加"
+
+msgid "The console could not be added."
+msgstr "ゲーム機を追加できませんでした。"
+
+msgid "{console} added"
+msgstr "{console}を追加しました"
+
+msgid "SD card"
+msgstr "SDカード"
+
+msgid "Internal storage"
+msgstr "内部ストレージ"
+
+msgid "{count} compatible game found"
+msgid_plural "{count} compatible games found"
+msgstr[0] "{count}件の対応ゲームが見つかりました"
+
+msgid "Press a button"
+msgstr "ボタンを押してください"
+
+msgid "Continue"
+msgstr "続ける"
+
+msgid "Settings"
+msgstr "設定"
+
+msgid "Platforms"
+msgstr "プラットフォーム"
+
+msgid "Button style"
+msgstr "ボタンのスタイル"
+
+msgid "Close"
+msgstr "閉じる"
+
+msgid "Back"
+msgstr "戻る"
+
+msgid "Edit the platform"
+msgstr "プラットフォームを編集"
+
+msgid "Remove"
+msgstr "削除"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Remove {platform}?"
+msgstr "{platform}を削除しますか？"
+
+msgid "Its {count} game, its image and the access to its folder will be removed from Cartouche."
+msgid_plural "Its {count} games, their images and the access to its folder will be removed from Cartouche."
+msgstr[0] "{count}件のゲームとその画像、フォルダーへのアクセスがCartoucheから削除されます。"
+
+msgid "Your game files stay on the SD card."
+msgstr "ゲームのファイルはSDカードに残ります。"
+
+msgid "Your game files stay in the internal storage."
+msgstr "ゲームのファイルは内部ストレージに残ります。"
+
+msgid "Your game files stay where they are."
+msgstr "ゲームのファイルはそのままの場所に残ります。"
+
+msgid "The console could not be removed."
+msgstr "ゲーム機を削除できませんでした。"
+
+msgid "Its choices and the access to its folder will be removed from Cartouche."
+msgstr "設定内容とフォルダーへのアクセスがCartoucheから削除されます。"
+
+msgid "Add a platform"
+msgstr "プラットフォームを追加"
+
+msgid "Properties"
+msgstr "プロパティ"
+
+msgid "Label image"
+msgstr "ラベルの画像"
+
+msgid "Change"
+msgstr "変更"
+
+msgid "Choose"
+msgstr "選択"
+
+msgid "Choose the label's image"
+msgstr "ラベルの画像を選択"
+
+msgid "My own image"
+msgstr "自分の画像"
+
+msgid "This image could not be kept."
+msgstr "この画像を保存できませんでした。"
+
+msgid "No region"
+msgstr "地域なし"
+
+msgid "North America"
+msgstr "北米"
+
+msgid "South America"
+msgstr "南米"
+
+msgid "Latin America"
+msgstr "中南米"
+
+msgid "Europe"
+msgstr "ヨーロッパ"
+
+msgid "Japan"
+msgstr "日本"
+
+msgid "World"
+msgstr "全世界"
+
+msgid "Asia"
+msgstr "アジア"
+
+msgid "Oceania"
+msgstr "オセアニア"
+
+msgid "Australia"
+msgstr "オーストラリア"
+
+msgid "New Zealand"
+msgstr "ニュージーランド"
+
+msgid "United Kingdom"
+msgstr "イギリス"
+
+msgid "Germany"
+msgstr "ドイツ"
+
+msgid "France"
+msgstr "フランス"
+
+msgid "Spain"
+msgstr "スペイン"
+
+msgid "Italy"
+msgstr "イタリア"
+
+msgid "Netherlands"
+msgstr "オランダ"
+
+msgid "Russia"
+msgstr "ロシア"
+
+msgid "Scandinavia"
+msgstr "スカンジナビア"
+
+msgid "Sweden"
+msgstr "スウェーデン"
+
+msgid "Finland"
+msgstr "フィンランド"
+
+msgid "Korea"
+msgstr "韓国"
+
+msgid "China"
+msgstr "中国"
+
+msgid "Brazil"
+msgstr "ブラジル"
+
+msgid "Canada"
+msgstr "カナダ"
+
+msgid "No other image of this game is known"
+msgstr "このゲームの他の画像は見つかりません"
+
+msgid "Game name"
+msgstr "ゲーム名"
+
+msgid "Adjust the image on the label"
+msgstr "ラベル上の画像を調整"
+
+msgid "Move"
+msgstr "移動"
+
+msgid "Zoom out"
+msgstr "縮小"
+
+msgid "Zoom in"
+msgstr "拡大"
+
+msgid "Place"
+msgstr "配置"
+
+msgid "Shift"
+msgstr "Shift"
+
+msgid "Space"
+msgstr "スペース"
+
+msgid "Erase"
+msgstr "消去"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Type a key"
+msgstr "入力"
+
+msgid "This name could not be kept."
+msgstr "この名前を保存できませんでした。"
+
+msgid "Console name"
+msgstr "ゲーム機の名前"
+
+msgid "Arrange"
+msgstr "並べ替え"
+
+msgid "Change place"
+msgstr "位置を変更"
+
+msgid "Take"
+msgstr "つかむ"
+
+msgid "Done"
+msgstr "完了"
+
+msgid "Put down"
+msgstr "置く"
+
+msgctxt "ring"
+msgid "in its place"
+msgstr "元の位置に"
+
+msgctxt "ring"
+msgid "between {before} and {after}"
+msgstr "{before}と{after}の間"
+
+msgctxt "ring"
+msgid "next to {name}"
+msgstr "{name}の隣"
+
+msgid "This order could not be kept."
+msgstr "この並び順を保存できませんでした。"
+
+msgid "Graphics"
+msgstr "グラフィック"
+
+msgid "Preferred region of images"
+msgstr "画像の優先地域"
+
+msgid "None"
+msgstr "なし"
+
+msgid "Taiwan"
+msgstr "台湾"
+
+msgid "Which edge smoothing?"
+msgstr "アンチエイリアスはどれにしますか？"
+
+msgid "This only changes how the edges of discs and consoles are drawn. Less smoothed, they ask less of the graphics card."
+msgstr "ディスクやゲーム機のふちの見た目が変わるだけです。弱くするほど、GPUへの負荷が軽くなります。"
+
+msgid "4× (default)"
+msgstr "4×（デフォルト）"
+
+msgid "The smoothest edges."
+msgstr "ふちが最もなめらかになります。"
+
+msgid "Slightly sharper edges; a little less work for the graphics card."
+msgstr "ふちが少しくっきりします。GPUの負荷が少し減ります。"
+
+msgid "Off"
+msgstr "オフ"
+
+msgid "Edges in small steps; much less work for the graphics card."
+msgstr "ふちが階段状になります。GPUの負荷が大きく減ります。"
+
+msgid "Smoothing 4×"
+msgstr "アンチエイリアス 4×"
+
+msgid "Smoothing 2×"
+msgstr "アンチエイリアス 2×"
+
+msgid "No smoothing"
+msgstr "アンチエイリアスなし"
+
+msgid "Search"
+msgstr "検索"
+
+msgid "Clear the filter"
+msgstr "フィルターを解除"
+
+msgid "Letter"
+msgstr "文字"
+
+msgid "Region"
+msgstr "地域"
+
+msgid "Type the key"
+msgstr "入力"
+
+msgid "Other index"
+msgstr "インデックス切り替え"
+
+msgid "Go back"
+msgstr "戻る"
+
+msgid "Enter"
+msgstr "開く"
+
+msgid "By region"
+msgstr "地域別"
+
+msgid "“{typed}” — {found} of {total}"
+msgstr "「{typed}」 {found} / {total}件"
+
+msgid "{count} game"
+msgid_plural "{count} games"
+msgstr[0] "{count}件のゲーム"
+
+msgid "Games float"
+msgstr "ゲームをふわふわ浮かせる"
+
+msgid "The selected game gently rises and falls"
+msgstr "選択中のゲームがゆっくり上下します"
+
+msgid "Variant"
+msgstr "バリエーション"
+
+msgid "This variant could not be kept."
+msgstr "このバリエーションを保存できませんでした。"
+
+msgid "Used when a game's region is unknown."
+msgstr "ゲームの地域が不明なときに使われます。"
+
+msgid "Adding console…"
+msgstr "ゲーム機を追加中…"
+
+msgid "Language"
+msgstr "言語"
+
+msgid "The language of the app. Until you pick one, it follows the device."
+msgstr "アプリの表示言語です。選ぶまでは端末の言語に従います。"
+
+msgid "Device language"
+msgstr "端末の言語"
+
+msgid "Sounds"
+msgstr "効果音"
