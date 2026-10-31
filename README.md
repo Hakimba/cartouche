@@ -4,6 +4,8 @@ A game launcher for Android handhelds that shows your games as physical discs an
 Cartouche does not emulate anything itself: it finds your games, recognises them, and starts them
 in the emulators you already have.
 
+<p align="center"><img src="docs/media/hero.webp" width="640" alt="The consoles ring turns to the PlayStation 2, its games come in on their discs, and Final Fantasy X goes into the console"></p>
+
 More and more frontends are heading in this direction, but none of them ever fully won me over.
 Two things kept bugging me: they don't push immersion as far as I'd like, and I believe this kind
 of experience should be completely free and open source.
@@ -13,38 +15,72 @@ it and make it theirs; I tried to keep the codebase easy to get into.
 
 ## Consoles
 
-NES, Super Nintendo, Nintendo 64, GameCube, Wii, Game Boy, Game Boy Color, Game Boy Advance (original or SP),
-PlayStation, PlayStation 2 (slim or fat), Xbox and Xbox 360. Each one is a 3D model of the real console, and its
-games come on their real medium: discs, cartridges, mini-discs.
+Twelve consoles, each a 3D model of the real one, with its games on their real medium.
+
+| Maker | Consoles |
+|---|---|
+| Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Game Boy · Game Boy Color · Game Boy Advance (original or SP) |
+| Sony | PlayStation · PlayStation 2 (slim or fat) |
+| Microsoft | Xbox · Xbox 360 |
+
+## Languages
+
+<table>
+<tr><td>English</td><td>Français</td><td>Deutsch</td><td>Español</td></tr>
+<tr><td>Italiano</td><td>Português (Portugal)</td><td>Português (Brasil)</td><td>日本語</td></tr>
+</table>
+
+Cartouche speaks your device's language when it has it, English otherwise; to choose another, open the settings and
+go down to **Language**.
+
+A translation reads wrong, or your language is missing? Open an issue, or change the text yourself: each language
+is one file, and [docs/translating.md](docs/translating.md) says how to fix one or add one.
 
 ## Key features
 
-- **Immersion first:** a carousel of 3D consoles, then each console's games on their real discs and cartridges,
-  and a launch animation made for each console (and for each model of it).
-- **Smart labels:** each game is recognised from its own file (a disc's serial, a cartridge's checksum), then its
-  real label is downloaded from ScreenScraper and LaunchBox, in your region first. Another region or a picture of
-  your own is one menu away.
-- **Your library, your way:** filter by name or by region, put your consoles in the order you like on a wheel,
-  rename a game or a console.
-- **Controller first:** everything works with the pad, from the first launch to adding a console; touch works too.
+<table>
+<tr>
+<td width="50%"><img src="docs/media/launches.webp" width="360" alt="Launches into a NES, a GameCube and a Game Boy Advance SP"><br><b>Immersion first:</b> a launch made for each console.</td>
+<td width="50%"><img src="docs/media/variant.webp" width="360" alt="The PlayStation 2 switched from its slim model to the fat one"><br><b>Each model of it:</b> a PlayStation 2 slim or fat, a Game Boy Advance original or SP.</td>
+</tr>
+<tr>
+<td><img src="docs/media/labels.webp" width="360" alt="Super Metroid's label chooser going through the regions' scans"><br><b>Smart labels:</b> each game recognised from its own file, its real label from ScreenScraper and LaunchBox, your region first; another region or your own picture one menu away.</td>
+<td><img src="docs/media/filter.webp" width="360" alt="Typing F then I on the search ribbon keeps the matching PlayStation 2 games"><br><b>Your library:</b> filter by name or by region, rename a game or a console.</td>
+</tr>
+<tr>
+<td><img src="docs/media/arrange.webp" width="360" alt="The consoles wheel: the PlayStation 2 taken and put down elsewhere"><br><b>Your order:</b> put your consoles where you like on a wheel.</td>
+<td><img src="docs/media/add.webp" width="360" alt="Adding the GameCube with the pad, then it lands on the ring"><br><b>Controller first:</b> everything with the pad, from the first launch to adding a console; touch works too.</td>
+</tr>
+</table>
+
 - **Speaks your language:** seven languages, following your device's until you pick one ([Languages](#languages)).
 - **Uses your emulators:** Cartouche emulates nothing. It finds the emulators you already installed and starts each
   game in the right one.
 - **Light:** at rest it draws nothing, and it stays smooth with thousands of games.
 
-## Install
+## Contributing
 
-Download the APK from this repository's Releases page and install it on your handheld. You need Android 11 or
-later on an arm64 device with Vulkan, and the emulators of the consoles you want to play.
+Ideas, feedback and pull requests are welcome: open an issue to talk about a bigger change first.
 
-## Languages
+### What I'd love help with
 
-English, French, German, Spanish, Italian, Portuguese (Portugal and Brazil) and Japanese. Cartouche speaks your
-device's language when it has it, English otherwise; to choose another, open the settings and go down to
-**Language**.
+- **Better 3D models** of the consoles and of their discs and cartridges: closer to the real thing, lighter to draw.
+- **A music theme** for the menus: the gestures have their sounds, the background still waits for its music.
+- **New consoles:** each one is a folder with its model, its medium and its launch animation
+  ([adding a console](docs/adding-a-console.md)).
+- **Translations:** a native reader for Japanese and Portuguese, or a new language
+  ([translating](docs/translating.md)).
+- **Integrations** such as RetroAchievements or RomM, and more ways to make Cartouche look like yours.
 
-A translation reads wrong, or your language is missing? Open an issue, or change the text yourself: each language
-is one file, and [docs/translating.md](docs/translating.md) says how to fix one or add one.
+### Where to start
+
+- [docs/README.md](docs/README.md): start here. The three layers of the code, the commands, and for each task
+  (add a console, a screen, a setting, a sound…) the page and the files to open.
+- [docs/GLOSSARY.md](docs/GLOSSARY.md): every word of the domain, as the code spells it.
+- [docs/INVARIANTS.md](docs/INVARIANTS.md): the guarantees every change must keep, each enforced by tests.
+- [docs/adding-a-console.md](docs/adding-a-console.md) and [docs/adding-a-medium.md](docs/adding-a-medium.md): a
+  new console or a new disc or cartridge, step by step.
+- [docs/testing.md](docs/testing.md): the kinds of tests and how to run each.
 
 ## How a label is found
 
@@ -64,17 +100,10 @@ is one file, and [docs/translating.md](docs/translating.md) says how to fix one 
 5. **When ScreenScraper cannot answer** (busy, closed, quota spent), the next image is taken at once and ScreenScraper
    is tried again at a later scan.
 
-## Contributing
+## Install
 
-Ideas, feedback and pull requests are welcome: open an issue to talk about a bigger change first.
-
-- [docs/README.md](docs/README.md): start here. The three layers of the code, the commands, and for each task
-  (add a console, a screen, a setting, a sound…) the page and the files to open.
-- [docs/GLOSSARY.md](docs/GLOSSARY.md): every word of the domain, as the code spells it.
-- [docs/INVARIANTS.md](docs/INVARIANTS.md): the guarantees every change must keep, each enforced by tests.
-- [docs/adding-a-console.md](docs/adding-a-console.md) and [docs/adding-a-medium.md](docs/adding-a-medium.md): a
-  new console or a new disc or cartridge, step by step.
-- [docs/testing.md](docs/testing.md): the kinds of tests and how to run each.
+Download the APK from this repository's Releases page and install it on your handheld. You need Android 11 or
+later on an arm64 device with Vulkan, and the emulators of the consoles you want to play.
 
 ## Building
 
