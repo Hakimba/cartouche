@@ -528,6 +528,22 @@ func test_Y_opens_the_settings_from_the_games_screen_too_and_B_goes_back_to_it()
 	assert_float(carousel._console_title.modulate.a if carousel._console_title.visible else 0.0).is_equal(0.0)
 
 
+func test_the_games_hints_stay_hidden_on_the_consoles_screen_while_the_settings_open_and_close() -> void:
+	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 3}))
+	var hints: Control = carousel.get_node("%GamesHints")
+	var seen: Array[float] = [0.0]
+	var watch := func() -> void: seen[0] = maxf(seen[0], hints.modulate.a if hints.visible else 0.0)
+	get_tree().process_frame.connect(watch)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null)).is_true()
+	await get_tree().process_frame
+	get_tree().process_frame.disconnect(watch)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
+	assert_float(seen[0]).is_equal(0.0)
+
+
 func test_a_direction_held_as_the_settings_open_on_the_games_screen_moves_nothing_once_they_close() -> void:
 	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 5}))
 	await Fixtures.joypad(self, JOY_BUTTON_A)

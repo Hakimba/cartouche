@@ -26,6 +26,8 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 	var pill_alpha := pill.modulate.a
 	var rail_alpha := console_rail.ground_alpha
 	var logo_alpha := games_logo.modulate.a
+	# The games screen's hints, laid where the consoles screen has its own: shown on the games screen only.
+	var hints_alpha := 1.0 if games else 0.0
 	var row_presence := Vector2(row.selected_presence, row.neighbours)
 	_sample = func(presence: float, rail: float, chrome: float) -> void:
 		var drawn := presence > 0.0 or chrome > 0.0
@@ -44,7 +46,7 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 		title.position.y = title_position.y + StudioTokens.TR_SETTINGS_DROP_PX * (1.0 - rail)
 		title.modulate.a = title_alpha * chrome
 		pill.modulate.a = pill_alpha * chrome
-		hints.modulate.a = chrome
+		hints.modulate.a = hints_alpha * chrome
 		search.modulate.a = chrome
 		console_rail.ground_alpha = rail_alpha * chrome
 		games_logo.modulate.a = logo_alpha * chrome
@@ -58,7 +60,7 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 			console_rail.ground_alpha = rail_alpha
 		games_logo.modulate.a = logo_alpha
 		pill.modulate.a = pill_alpha
-		hints.modulate.a = 1.0
+		hints.modulate.a = hints_alpha
 		search.modulate.a = 1.0
 		row.selected_presence = row_presence.x
 		row.neighbours = row_presence.y
