@@ -3,6 +3,12 @@
 Every release of Cartouche, newest first. Versions follow [Semantic Versioning](https://semver.org); the format
 follows [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Fixed
+- Closing the settings on the consoles screen no longer shows the games screen's **Search** hint over **Arrange**
+  ([#2](../../issues/2), thanks @kafka-esq).
+
 ## [0.2.0] - 2026-10-31
 
 ### Added
