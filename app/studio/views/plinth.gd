@@ -205,9 +205,13 @@ func _ready() -> void:
 	var top: TextureRect = $TopShadow
 	top.position = StudioTokens.PLINTH_TOP_SHADOW.position
 	top.size = StudioTokens.PLINTH_TOP_SHADOW.size
-	var shade := (top.texture as GradientTexture2D).gradient
-	shade.colors = PackedColorArray([StudioTokens.PLINTH_TOP_SHADE, Color(StudioTokens.PLINTH_TOP_SHADE, 0.0)])
 	item_rect_changed.connect(_place_logo)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED:
+		var shade := (($TopShadow as TextureRect).texture as GradientTexture2D).gradient
+		shade.colors = PackedColorArray([Backdrop.palette.plinth_top_shade, Color(Backdrop.palette.plinth_top_shade, 0.0)])
 
 
 ## Shows the logo of the console in [param folder] (under res://carousel/consoles) on the plate and its

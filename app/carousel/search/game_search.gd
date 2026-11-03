@@ -560,7 +560,7 @@ class RibbonKey extends PanelContainer:
 	func show_as(current: bool, lit: bool) -> void:
 		theme_type_variation = &"RibbonKeyOn" if current else &"RibbonKey"
 		_text.theme_type_variation = &"RibbonTextOn" if current else &"RibbonText"
-		_space.ink = Color.WHITE if current else StudioTokens.INK
+		_space.on_key = current
 		_space.queue_redraw()
 		modulate.a = 1.0 if lit or current else _DIMMED
 
@@ -576,7 +576,8 @@ class RibbonKey extends PanelContainer:
 
 ## A space, drawn as a bracket open upwards: fonts rarely have the sign for it.
 class SpaceMark extends Control:
-	var ink := StudioTokens.INK
+	## Whether it is drawn over the current key's fill, in the ink that reads on it.
+	var on_key := false
 
 	func _init() -> void:
 		mouse_filter = MOUSE_FILTER_IGNORE
@@ -585,4 +586,5 @@ class SpaceMark extends Control:
 		var middle := size / 2.0
 		var half := Vector2(9.0, 5.0)
 		draw_polyline([middle + Vector2(-half.x, -half.y), middle + Vector2(-half.x, half.y),
-			middle + Vector2(half.x, half.y), middle + Vector2(half.x, -half.y)], ink, 2.5, true)
+			middle + Vector2(half.x, half.y), middle + Vector2(half.x, -half.y)],
+			Backdrop.palette.ribbon_key_ink if on_key else Backdrop.palette.ink, 2.5, true)

@@ -58,6 +58,8 @@ func _init() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_FOCUS_ENTER or what == NOTIFICATION_FOCUS_EXIT or what == NOTIFICATION_TRANSLATION_CHANGED:
 		queue_redraw()
+	elif what == NOTIFICATION_THEME_CHANGED and is_node_ready():
+		_paint_chip()
 
 
 ## The value shown under the line's name; [param chosen] when it is a choice, not the "Choose…" it starts as.
@@ -76,31 +78,31 @@ func _draw() -> void:
 	var middle := size.y / 2.0
 	var chip := Vector2(_PAD_LEFT + _CHIP / 2.0, middle)
 	if not done:
-		draw_arc(chip, _CHIP / 2.0 - _CHIP_RING / 2.0, 0.0, TAU, 48, StudioTokens.LINE, _CHIP_RING, true)
+		draw_arc(chip, _CHIP / 2.0 - _CHIP_RING / 2.0, 0.0, TAU, 48, Backdrop.palette.line, _CHIP_RING, true)
 	var number := FormPaint.line("%02d" % step, StudioTokens.Face.PLEX_600, _CHIP_PX)
 	number.draw(self, Vector2(chip.x - number.width / 2.0, middle - FormPaint.PLEX_LINE * _CHIP_PX / 2.0
-		+ FormPaint.PLEX_ASCENT * _CHIP_PX - number.baseline), StudioTokens.MUTE.lerp(Color.WHITE, _lit))
+		+ FormPaint.PLEX_ASCENT * _CHIP_PX - number.baseline), Backdrop.palette.mute.lerp(Color.WHITE, _lit))
 	var left := _PAD_LEFT + _CHIP + _GAP
 	var kick := FormPaint.line(tr(label).to_upper(), StudioTokens.Face.PLEX_600, _KICK_PX, 0.14)
 	var value := FormPaint.line(text, _value_face(), _NAME_PX)
 	var kick_line := FormPaint.PLEX_LINE * _KICK_PX
 	var top := (size.y - kick_line - value.height) / 2.0
-	kick.draw(self, Vector2(left, top + FormPaint.PLEX_ASCENT * _KICK_PX - kick.baseline), StudioTokens.MUTE)
+	kick.draw(self, Vector2(left, top + FormPaint.PLEX_ASCENT * _KICK_PX - kick.baseline), Backdrop.palette.mute)
 	value.fit(room())
-	var ink := StudioTokens.INK if done else StudioTokens.MUTE
+	var ink := Backdrop.palette.ink if done else Backdrop.palette.mute
 	ink.a = 1.0 if has_focus() else _UNCHOSEN_ALPHA
 	value.draw(self, Vector2(left, top + kick_line), ink)
 	_draw_chevron(Vector2(size.x - _PAD_RIGHT - _CHEVRON, (size.y - _CHEVRON * 1.6) / 2.0))
-	draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), StudioTokens.LINE)
+	draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), Backdrop.palette.line)
 
 
 ## The chevron: a 10 × 16 round-capped stroke from (2, 2) to (8, 8) and back to (2, 14).
 func _draw_chevron(at: Vector2) -> void:
 	var k := _CHEVRON / 10.0
 	var points := PackedVector2Array([at + Vector2(2.0, 2.0) * k, at + Vector2(8.0, 8.0) * k, at + Vector2(2.0, 14.0) * k])
-	draw_polyline(points, StudioTokens.MUTE, _CHEVRON_STROKE, true)
+	draw_polyline(points, Backdrop.palette.mute, _CHEVRON_STROKE, true)
 	for point in points:
-		draw_circle(point, _CHEVRON_STROKE / 2.0, StudioTokens.MUTE)
+		draw_circle(point, _CHEVRON_STROKE / 2.0, Backdrop.palette.mute)
 
 
 func _value_face() -> StudioTokens.Face:
@@ -124,7 +126,8 @@ func _place_chip() -> void:
 
 ## The chip in the gel now, its colours changed where they stand.
 func _paint_chip() -> void:
-	_chip.shown.colors.assign([StudioMaterial.whitened(rim, 0.7), rim])
+	var gel := Backdrop.palette.gel(rim)
+	_chip.shown.colors.assign([StudioMaterial.whitened(gel, 0.7), gel])
 	_chip.repaint()
 	_place_chip()
 

@@ -154,6 +154,8 @@ static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: Stri
 ## faded) that takes presses, inside the screen in front when one shows, and no input guard of that screen is left set;
 ## or no screen is in front and the carousel, shown and processing, or its ring takes the presses.
 static func alive(carousel: Carousel) -> bool:
+	if not (carousel.get_node("Backdrop") as CanvasLayer).visible:
+		return false
 	var screen := shown_screen(carousel)
 	var focused := carousel.get_viewport().gui_get_focus_owner()
 	if focused != null and focused.is_visible_in_tree() and focused.can_process() and _seen(focused):
@@ -333,6 +335,10 @@ class NewDevice extends AndroidServices:
 	var preferred_region := ""
 	## Whether the selected game floats, as the settings send it.
 	var games_float := false
+	## The backdrop and whether its pixel veil moves, as the plugin reads them at start: a fresh install's by default.
+	var chosen_backdrop := &"light"
+	var pixel_veil := true
+	var veil_gel := false
 	## The regions the plugin takes, as the settings send them.
 	var preferred_regions := PackedStringArray(["Europe", "North America", "Japan"])
 	## The language stored (empty: the device's) and those the plugin takes, as the settings send them.
@@ -361,6 +367,8 @@ class NewDevice extends AndroidServices:
 	var saved_regions: Array[String] = []
 	var saved_languages: Array[String] = []
 	var saved_floats: Array[bool] = []
+	var saved_backdrops: Array[StringName] = []
+	var saved_veils: Array[bool] = []
 	## The consoles placed, each as `[platform id, gap]`.
 	var placed: Array[Array] = []
 	## The order the consoles are in, as placing answers it.
@@ -417,6 +425,10 @@ class NewDevice extends AndroidServices:
 			answer["language"] = language
 		return AndroidServices.SettingsAnswer.new(answer)
 
+	func backdrop() -> AndroidServices.BackdropAnswer:
+		return AndroidServices.BackdropAnswer.new({"backdrop": chosen_backdrop, "pixel_veil": pixel_veil,
+			"veil_gel": veil_gel})
+
 	func library() -> AndroidServices.LibraryAnswer:
 		await _frames(1)
 		if has_games:
@@ -441,6 +453,24 @@ class NewDevice extends AndroidServices:
 	func save_games_float(floating: bool) -> AndroidServices.Result:
 		saved_floats.append(floating)
 		games_float = floating
+		return AndroidServices.Result.new({"ok": true})
+
+	func save_backdrop(chosen: StringName) -> AndroidServices.Result:
+		saved_backdrops.append(chosen)
+		var answer := _payload(&"save_backdrop")
+		if answer["ok"]:
+			chosen_backdrop = chosen
+		return AndroidServices.Result.new(answer)
+
+	func save_pixel_veil(on: bool) -> AndroidServices.Result:
+		saved_veils.append(on)
+		var answer := _payload(&"save_pixel_veil")
+		if answer["ok"]:
+			pixel_veil = on
+		return AndroidServices.Result.new(answer)
+
+	func save_veil_gel(on: bool) -> AndroidServices.Result:
+		veil_gel = on
 		return AndroidServices.Result.new({"ok": true})
 
 	## Places as the plugin does, answering as it sends it: `not_in_library` for a console not set up or without games,

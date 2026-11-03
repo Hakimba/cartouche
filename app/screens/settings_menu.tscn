@@ -1,5 +1,6 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
+[ext_resource type="Script" path="res://studio/palette_rect.gd" id="palette_rect"]
 [ext_resource type="Script" path="res://screens/settings_menu.gd" id="1"]
 [ext_resource type="PackedScene" path="res://screens/settings_row.tscn" id="2"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
@@ -23,7 +24,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.235294, 0.172549, 0.117647, 0.16)
+script = ExtResource("palette_rect")
 
 [node name="Panel" type="Control" parent="."]
 layout_mode = 0
@@ -60,6 +61,21 @@ unique_name_in_owner = true
 layout_mode = 0
 label = "Graphics"
 
+[node name="Backdrop" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 0
+label = "Background"
+
+[node name="Veil" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 0
+label = "Animated background"
+
+[node name="VeilGel" parent="Panel/Items" instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 0
+label = "In the console's colour"
+
 [node name="GamesFloat" parent="Panel/Items" instance=ExtResource("2")]
 unique_name_in_owner = true
 layout_mode = 0
@@ -87,11 +103,3 @@ layout_mode = 2
 script = ExtResource("3")
 button = &"b"
 text = "Close"
-
-[connection signal="pressed" from="Panel/Items/Platforms" to="." method="_on_platforms_pressed"]
-[connection signal="pressed" from="Panel/Items/ButtonStyle" to="." method="_on_button_style_pressed"]
-[connection signal="pressed" from="Panel/Items/Graphics" to="." method="_on_graphics_pressed"]
-[connection signal="pressed" from="Panel/Items/Region" to="." method="_on_region_pressed"]
-[connection signal="pressed" from="Panel/Items/Language" to="." method="_on_language_pressed"]
-
-[connection signal="pressed" from="Panel/Items/GamesFloat" to="." method="_on_games_float_pressed"]

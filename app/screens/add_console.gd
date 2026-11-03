@@ -154,6 +154,8 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_RESUMED and is_visible_in_tree() and not _adding and not _leaving and not _choice.visible:
 		_read_players(_players[_player].id if _player >= 0 else "")
+	elif what == NOTIFICATION_THEME_CHANGED and is_node_ready():
+		_paint(Backdrop.palette.gel(_rim))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -598,7 +600,7 @@ func _nudge(side: int) -> void:
 
 
 func _gel() -> Color:
-	return ConsoleManifest.gel_of(_folders[platform_id] if _folders.has(platform_id) else "")
+	return Backdrop.palette.gel(ConsoleManifest.gel_of(_folders[platform_id] if _folders.has(platform_id) else ""))
 
 
 ## The gel of the console chosen on everything the form paints with it.
@@ -607,12 +609,13 @@ func _show_gel(animated: bool) -> void:
 	if not animated:
 		_paint(gel)
 		return
-	var from := _rim
+	var from := Backdrop.palette.gel(_rim)
 	Motion.animate(self, _motions, &"rim", StudioTokens.GEL_FADE_S, Motion.Easing.EASE, func(p: float) -> void: _paint(from.lerp(gel, p)))
 
 
 func _paint(gel: Color) -> void:
 	_rim = gel
+	_backdrop.gel = gel
 	_card.rim = gel
 	for field: Control in _fields:
 		field.set(&"rim", gel)
@@ -821,7 +824,7 @@ func _come_back(cursor: Rect2, rise: bool) -> void:
 func _draw_title() -> void:
 	if _title_line == null:
 		return
-	_title_line.draw(_title, Vector2.ZERO, StudioTokens.INK)
+	_title_line.draw(_title, Vector2.ZERO, Backdrop.palette.ink)
 
 
 ## The count of fields chosen, in the gel's colour, over the total.
@@ -845,7 +848,7 @@ func _draw_note() -> void:
 		_dot.clear()
 	_note_line.fit(_note.size.x - left)
 	_note_line.draw(_note, Vector2(left, middle - line / 2.0 + ascent - _note_line.baseline),
-		StudioTokens.INK if found else StudioTokens.MUTE)
+		Backdrop.palette.ink if found else Backdrop.palette.mute)
 
 
 ## The plate: the emulator's name under the logo, or "No console" while none is chosen.
@@ -858,4 +861,4 @@ func _draw_plate() -> void:
 	var line := FormPaint.PLEX_LINE * _KICK_PX
 	var box := _logo.size.y if _logo.visible else _LOGO_MIN
 	var row := top + (box - line) / 2.0 + _NO_TYPE_DROP if platform_id.is_empty() else top + box + _PLATE_GAP
-	kicker.draw(_plate, Vector2(centre - kicker.width / 2.0, row + FormPaint.PLEX_ASCENT * _KICK_PX - kicker.baseline), StudioTokens.MUTE)
+	kicker.draw(_plate, Vector2(centre - kicker.width / 2.0, row + FormPaint.PLEX_ASCENT * _KICK_PX - kicker.baseline), Backdrop.palette.mute)

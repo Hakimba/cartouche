@@ -14,7 +14,6 @@ const _RADIUS := 2.8 * FormPaint.CQW
 ## The Cancel button is a satin card: its corners are the card's, not the pill's.
 const _CARD_RADIUS := 1.1 * FormPaint.CQW
 const _NAME_PX := 2.1 * FormPaint.CQW
-const _OFF := Color(1.0, 0.988235, 0.968627, 0.5)
 ## The name goes from muted to white over this long when the pill starts to act.
 const _LIT_S := 0.3
 ## How much higher than centred the name is drawn, in px.
@@ -57,6 +56,9 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
 		queue_redraw()
+	elif what == NOTIFICATION_THEME_CHANGED and is_node_ready():
+		_body.shown = StudioMaterial.new(StudioTokens.Look.SATIN)
+		_dress()
 
 
 func _draw() -> void:
@@ -72,7 +74,7 @@ func _draw() -> void:
 		ButtonGlyph.draw_key(self, _key, lead_box, &"b")
 	else:
 		_key.place(Rect2(), 0.0)
-	var ink := StudioTokens.INK if not primary else StudioTokens.MUTE.lerp(Color.WHITE, _lit)
+	var ink := Backdrop.palette.ink if not primary else Backdrop.palette.mute.lerp(Color.WHITE, _lit)
 	label.draw(self, Vector2(left + lead.x + gap, (size.y - label.height) / 2.0 - _INK_RAISE), ink)
 
 
@@ -94,8 +96,8 @@ func _dress() -> void:
 		var glow := [Vector4(0.0, 10.24, 20.48, -6.4), Color.WHITE, false, false]
 		_body.shown = FormPaint.material(colors, _RADIUS, [[Vector4(0.0, 1.28, 0.0, 0.0), Color(1, 1, 1, 0.5), true, false], glow])
 	else:
-		var colors: Array[Color] = [_OFF, _OFF]
-		_body.shown = FormPaint.material(colors, _RADIUS, [[Vector4(0.0, 0.0, 0.0, 1.79), StudioTokens.LINE, true, false]])
+		var colors: Array[Color] = [Backdrop.palette.form_off, Backdrop.palette.form_off]
+		_body.shown = FormPaint.material(colors, _RADIUS, [[Vector4(0.0, 0.0, 0.0, 1.79), Backdrop.palette.line, true, false]])
 	_recolor()
 
 
@@ -103,8 +105,9 @@ func _dress() -> void:
 func _recolor() -> void:
 	if not _acting:
 		return
-	_body.shown.colors.assign([StudioMaterial.whitened(rim, 0.78), rim])
-	_body.shown.shadows[1].color = StudioMaterial.shaded(rim, 0.7)
+	var gel := Backdrop.palette.gel(rim)
+	_body.shown.colors.assign([StudioMaterial.whitened(gel, 0.78), gel])
+	_body.shown.shadows[1].color = StudioMaterial.shaded(gel, 0.7)
 	_body.repaint()
 
 

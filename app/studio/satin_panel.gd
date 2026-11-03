@@ -20,7 +20,8 @@ var _backing := Backing.new(self, StudioTokens.Look.SATIN)
 
 
 ## A Studio material on a box of its own, behind the canvas item it is made for: so that item's own drawing
-## (a mark, separators) stays above it.
+## (a mark, separators) stays above it. In the backdrop shown, drawn again when another shows; or, for a preview,
+## in the colours of a palette of its own.
 class Backing:
 	extends RefCounted
 
@@ -41,8 +42,12 @@ class Backing:
 	var _box := Rect2()
 	var _radius := -1.0
 	var _tuning := {}
+	var _palette: Palette
 
-	func _init(owner: CanvasItem, shown: StudioTokens.Look) -> void:
+	func _init(owner: CanvasItem, shown: StudioTokens.Look, palette: Palette = null) -> void:
+		_palette = palette
+		if not palette and owner is Control:
+			(owner as Control).theme_changed.connect(_paint)
 		owner.set_meta(&"studio_backing", weakref(self))
 		_material.shader = preload("res://studio/satin_panel.gdshader")
 		RenderingServer.canvas_item_set_parent(_item, owner.get_canvas_item())
@@ -51,7 +56,7 @@ class Backing:
 		look = shown
 
 	func _paint() -> void:
-		var shown := StudioMaterial.new(look)
+		var shown := StudioMaterial.new(look, _palette)
 		var parameters := Backing.recipe(shown, tint)
 		for parameter in parameters:
 			_material.set_shader_parameter(parameter, parameters[parameter])

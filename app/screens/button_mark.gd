@@ -15,10 +15,10 @@ static var _letters: Dictionary[String, Dictionary] = {}
 ## "○"…) [param size] pixels high on it; a capsule [param stretch] pixels longer on each side for a word
 ## (Start), its letters smaller.
 static func draw(canvas: CanvasItem, mark: String, at: Vector2, radius: float, size: float, stretch := 0.0) -> void:
-	canvas.draw_circle(at - Vector2(stretch, 0.0), radius, StudioTokens.INK, true, -1.0, true)
+	canvas.draw_circle(at - Vector2(stretch, 0.0), radius, Backdrop.palette.key_mark, true, -1.0, true)
 	if stretch > 0.0:
-		canvas.draw_circle(at + Vector2(stretch, 0.0), radius, StudioTokens.INK, true, -1.0, true)
-		canvas.draw_rect(Rect2(at - Vector2(stretch, radius), Vector2(stretch * 2.0, radius * 2.0)), StudioTokens.INK)
+		canvas.draw_circle(at + Vector2(stretch, 0.0), radius, Backdrop.palette.key_mark, true, -1.0, true)
+		canvas.draw_rect(Rect2(at - Vector2(stretch, radius), Vector2(stretch * 2.0, radius * 2.0)), Backdrop.palette.key_mark)
 		size *= 0.62
 	draw_mark(canvas, mark, at, size / StudioTokens.ROLE_PX[StudioTokens.Role.KEY], size)
 

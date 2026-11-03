@@ -16,7 +16,7 @@ func test_closing_settings_reads_the_new_float_choice_before_showing_the_games_a
 	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
 	assert_bool(await Screens.until(self, func() -> bool:
 		return menu.is_visible_in_tree() and menu.state == SettingsMenu.State.OPEN)).is_true()
-	for step in 3:
+	for step in 6:
 		await Screens.action(self, &"ui_down")
 	await Screens.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Screens.until(self, func() -> bool: return device.games_float)).is_true()

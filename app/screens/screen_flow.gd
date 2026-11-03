@@ -5,8 +5,8 @@ extends Control
 ## button is pressed, the button style and image region, then the curtain
 ## permission when Android does not allow it yet; while no console has games, "No console" and the
 ## form adding one and its arrival on the carousel. Later, the settings (Y): the platforms
-## set up, each to change or remove, the button style, the edges' smoothing and the region labels'
-## images prefer; and the form adding
+## set up, each to change or remove, the button style, the edges' smoothing, the backdrop and its veil, and the region
+## labels' images prefer; and the form adding
 ## one more console (the "+" above the consoles). One screen shows at a time, with the focus on it.
 ## Closes once the carousel can be used.
 
@@ -44,7 +44,8 @@ var arrived := false
 var _emptied := false
 var _holding_presses := false
 var _games_float := false
-var _float_save := 0
+## Counts the switches' saves: an answer that comes once the settings closed is let go.
+var _switch_save := 0
 ## The region labels' images prefer, as stored (empty for none), and those the plugin takes.
 var _preferred_region := ""
 var _preferred_regions: PackedStringArray
@@ -55,6 +56,7 @@ var _languages: PackedStringArray
 @onready var _welcome: Welcome = %Welcome
 @onready var _button_style: ButtonStyleScreen = %ButtonStyle
 @onready var _edge_smoothing: EdgeSmoothingScreen = %EdgeSmoothing
+@onready var _backdrop: BackdropScreen = %Backdrop
 @onready var _permission: CurtainPermission = %Permission
 @onready var _no_console: NoConsole = %NoConsole
 @onready var _add_console: AddConsole = %AddConsole
@@ -195,6 +197,26 @@ func _choose_edge_smoothing() -> void:
 		Diagnostics.trace("screens", "edge smoothing not saved (%s): %s" % [saved.code, saved.detail])
 
 
+## The backdrops' cards: each one chosen shows at once on every screen and is kept, the cards staying on screen, the
+## focus on it, to compare; one the plugin does not keep shows no more. B goes back.
+func _choose_backdrop() -> void:
+	_backdrop.gel = _settings.gel
+	_show(_backdrop)
+	_backdrop.focus()
+	var choice: StringName = await _backdrop.chosen
+	while not choice.is_empty():
+		var shown := Backdrop.choice
+		Diagnostics.trace("backdrop", Backdrop.show(choice, Backdrop.veil, Backdrop.veil_gel))
+		_holding_presses = true
+		var saved := await android.save_backdrop(choice)
+		_holding_presses = false
+		if not saved.ok:
+			Diagnostics.trace("screens", "backdrop not saved (%s): %s" % [saved.code, saved.detail])
+			Diagnostics.trace("backdrop", Backdrop.show(shown, Backdrop.veil, Backdrop.veil_gel))
+			_backdrop.focus()
+		choice = await _backdrop.chosen
+
+
 ## The region labels' images prefer, saved once another is chosen, and shown once saved: the plugin
 ## looks again for the labels it changes.
 func _choose_preferred_region(first_launch := false) -> void:
@@ -237,30 +259,45 @@ func _add_first_console() -> void:
 func _settings_menu() -> void:
 	# The form editing a platform counts its games as it opens: what that needs is prepared meanwhile.
 	android.prepare_titles()
-	_settings.games_float = _games_float
+	_settings.snap_switch(&"games_float", _games_float)
+	_settings.snap_switch(&"pixel_veil", Backdrop.veil)
+	_settings.snap_switch(&"veil_gel", Backdrop.veil_gel)
 	_settings.sound_level = Sounds.level
 	var focus := &"platforms"
 	while true:
-		if focus != &"games_float":
+		if focus not in SettingsMenu.SWITCHES:
 			_show(_settings)
 			_settings.open(_platforms_set_up().size(), focus, _preferred_region, _language)
 		focus = await _settings.chosen
 		match focus:
 			&"close":
-				_float_save += 1
-				_settings.animate_float(_games_float)
+				_switch_save += 1
+				_settings.slide_switch(&"games_float", _games_float)
+				_settings.slide_switch(&"pixel_veil", Backdrop.veil)
+				_settings.slide_switch(&"veil_gel", Backdrop.veil_gel)
 				_settings.saving = false
 				return
 			&"button_style":
 				await _choose_button_style(true)
 			&"graphics":
 				await _choose_edge_smoothing()
+			&"backdrop":
+				await _choose_backdrop()
+			&"pixel_veil":
+				_turn_switch(focus, android.save_pixel_veil, func(on: bool) -> void:
+					Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, on, Backdrop.veil_gel)),
+					func() -> bool: return Backdrop.veil)
+			&"veil_gel":
+				_turn_switch(focus, android.save_veil_gel, func(on: bool) -> void:
+					Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, Backdrop.veil, on)),
+					func() -> bool: return Backdrop.veil_gel)
 			&"region":
 				await _choose_preferred_region()
 			&"language":
 				await _choose_language()
 			&"games_float":
-				_choose_games_float()
+				_turn_switch(focus, android.save_games_float, func(on: bool) -> void: _games_float = on,
+					func() -> bool: return _games_float)
 			&"platforms":
 				await _platform_menu()
 				if library.set_up_platforms().is_empty():
@@ -294,22 +331,26 @@ func _change_sound_level(steps: int) -> void:
 		Diagnostics.trace("settings", "sound level not saved (%s): %s" % [saved.code, saved.detail])
 
 
-func _choose_games_float() -> void:
-	_float_save += 1
-	var request := _float_save
-	var target := not _games_float
+## Turns the settings' switch [param switch] over from what [param stored] says: slid there at once, saved
+## ([param save]), then taken ([param keep]) once saved; slid back to what is stored when not. An answer that comes
+## once the settings closed is let go.
+func _turn_switch(switch: StringName, save: Callable, keep: Callable, stored: Callable) -> void:
+	_switch_save += 1
+	var request := _switch_save
+	var target: bool = not stored.call()
 	Sounds.play(SoundEffects.Cue.TOGGLE if target else SoundEffects.Cue.UNTOGGLE)
 	_settings.saving = true
-	_settings.animate_float(target)
-	var saved := await android.save_games_float(target)
-	if request != _float_save:
+	_settings.slide_switch(switch, target)
+	var saved: AndroidServices.Result = await save.call(target)
+	if request != _switch_save:
 		return
 	if saved.ok:
-		_games_float = target
-		Diagnostics.trace("settings", "games_float=%s" % str(target))
+		keep.call(target)
+		Diagnostics.trace("settings", "%s=%s" % [switch, str(target)])
 	else:
-		Diagnostics.trace("settings", "games_float not saved (%s): %s" % [saved.code, saved.detail])
-	_settings.animate_float(_games_float)
+		Diagnostics.trace("settings", "%s not saved (%s): %s" % [switch, saved.code, saved.detail])
+	var kept: bool = stored.call()
+	_settings.slide_switch(switch, kept)
 	_settings.saving = false
 
 

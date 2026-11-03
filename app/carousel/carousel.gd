@@ -43,9 +43,6 @@ const _DEVICE_CHECK := "res://dev/device_check/device_check.tscn"
 const _MESSAGE_S := 4.0
 const _MOVING: Array[Screen] = [Screen.ENTERING, Screen.LEAVING]
 const _CONSOLE_SCREENS: Array[Screen] = [Screen.CONSOLES, Screen.CONSOLE_PROPERTIES]
-## The consoles' room light, the scene's own energy; a constant, as the scene's resource is shared and the
-## games change it while they are shown.
-const _CONSOLE_ROOM := 0.55
 const _GAME_SCREENS: Array[Screen] = [Screen.GAMES, Screen.PROPERTIES]
 const _ARRIVAL_S := 0.45
 const _TITLE_ARRIVES_S := 0.3
@@ -106,6 +103,7 @@ var _room_energy := NAN
 var _shelf_waiting := false
 
 @onready var _room: WorldEnvironment = $Environment
+@onready var _cyclorama: Cyclorama = %Cyclorama
 @onready var _row: ShelfRow = %Row
 @onready var _consoles: ConsoleRow = %Consoles
 @onready var _sequence: ConsoleSequence = %Sequence
@@ -139,6 +137,15 @@ var _shelf_waiting := false
 @onready var _touch := CarouselTouch.new(_consoles, _row, _rail, _add_ball)
 
 
+func _enter_tree() -> void:
+	DisplayServer.set_system_theme_change_callback(_follow_system_theme)
+
+
+func _exit_tree() -> void:
+	# The system holds the callback past this carousel: one gone must not be called.
+	DisplayServer.set_system_theme_change_callback(Callable())
+
+
 func _ready() -> void:
 	add_child(ControlTokens.new())
 	var started := Time.get_ticks_msec()
@@ -159,6 +166,10 @@ func _ready() -> void:
 	# The bar waits for the first launch's welcome to be passed.
 	_top_bar.hide()
 	_show_front(true)
+	# Read at once, before the first frame: it is drawn on the backdrop chosen, whatever the library's size.
+	var stored := android.backdrop()
+	Diagnostics.trace("backdrop", "%s; the system's theme dark=%s, followed=%s" % [Backdrop.show(stored.backdrop,
+		stored.pixel_veil, stored.veil_gel), Backdrop.system_dark.call(), DisplayServer.is_dark_mode_supported()])
 	# Asked first, its art looked for as soon as it is sent: the plugin reads the library while the
 	# scene sets itself up.
 	android.art_changed.connect(_on_art_changed)
@@ -168,6 +179,7 @@ func _ready() -> void:
 	var asked_library := AndroidServices.Asked.new(
 		android.use_demo_library.bind(demo_games, Diagnostics.argument("demo-shelf")) if _demo else android.library)
 	var asked_settings := AndroidServices.Asked.new(android.settings)
+	_rail.gel_changed.connect(func(gel: Color) -> void: _cyclorama.gel = gel)
 	for platform in android.catalog.platforms:
 		_platforms[platform.id] = platform
 	_appearance = Appearance.read(_APPEARANCE)
@@ -266,15 +278,22 @@ func _notification(what: int) -> void:
 		_remember()
 		# Up let go meanwhile never reaches the app.
 		_add_ball.close(false)
+	elif what == NOTIFICATION_APPLICATION_RESUMED:
+		# Where the system tells no change of its theme, it is read again on the way back.
+		_follow_system_theme()
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		Diagnostics.trace("touch", "back requested")
 		_press_back.call_deferred()
 
 
+func _follow_system_theme() -> void:
+	Diagnostics.trace("backdrop", "system dark=%s: %s" % [Backdrop.system_dark.call(), Backdrop.follow_system()])
+
+
 func _process(delta: float) -> void:
 	# Wherever a medium is drawn in this world (the games, their properties, an insertion), it is lit
-	# by its own room; the consoles by the scene's.
-	var room := _row.room_energy if _screen in _GAME_SCREENS and _row.visible else _CONSOLE_ROOM
+	# by its own room; the consoles by the backdrop's (the scene's resource is shared, and the games change it).
+	var room := _row.room_energy if _screen in _GAME_SCREENS and _row.visible else Backdrop.palette.room_light
 	if room != _room_energy:
 		_room_energy = room
 		_room.environment.ambient_light_energy = room
@@ -761,8 +780,8 @@ func _open_settings() -> void:
 		_console_title, _pill, _games_hints, _search, _sequence, _rail, _games_logo, [_arrival, _title_fade])
 	var emptied := await _screens.open_settings()
 	transition.restore(_screens.arrived)
-	_row.games_float = settings.games_float
-	Diagnostics.trace("settings", "games row games_float=%s" % str(settings.games_float))
+	_row.games_float = settings.switch_on(&"games_float")
+	Diagnostics.trace("settings", "games row games_float=%s" % str(settings.switch_on(&"games_float")))
 	if emptied and not _screens.arrived:
 		_come_in()
 	else:

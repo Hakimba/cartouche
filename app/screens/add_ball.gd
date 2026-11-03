@@ -66,7 +66,7 @@ func _draw() -> void:
 	var radius := button.y / 2.0
 	var straight := (button.x - button.y) / 2.0
 	_ball.place(white_box(), radius)
-	var ink := StudioTokens.INK
+	var ink := Backdrop.palette.ink
 	for side: float in [-1.0, 1.0]:
 		# The horizontal stroke parts into the top and bottom edges, as long as the straight sides.
 		var half := lerpf(_ARM, straight, t)
@@ -107,6 +107,6 @@ func _stroke(from: Vector2, to: Vector2, boxed := false) -> void:
 	var box := Rect2(from.min(to), (to - from).abs()).grow(_STROKE / 2.0)
 	if boxed:
 		box = Rect2(box.position.round(), box.end.round() - box.position.round())
-	SatinStyle.fill_rounded(bar, box, StudioTokens.PLUS_BAR_RADIUS, func(_at: Vector2) -> Color: return StudioTokens.INK,
+	SatinStyle.fill_rounded(bar, box, StudioTokens.PLUS_BAR_RADIUS, func(_at: Vector2) -> Color: return Backdrop.palette.ink,
 		0.0 if boxed else 1.0)
 	RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), bar.indices, bar.points, bar.colors)

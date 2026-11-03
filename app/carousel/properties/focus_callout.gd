@@ -44,16 +44,16 @@ func use_studio() -> void:
 
 
 func _draw() -> void:
-	draw_line(_from, _to, StudioTokens.INK, _WIDTH if _studio else 2.5, true)
+	draw_line(_from, _to, Backdrop.palette.ink, _WIDTH if _studio else 2.5, true)
 	if _studio:
-		draw_circle(_from, 10.24, Color.WHITE, true, -1.0, true)
-		draw_circle(_from, 7.04, StudioTokens.INK, true, -1.0, true)
+		draw_circle(_from, 10.24, Backdrop.palette.callout_ring, true, -1.0, true)
+		draw_circle(_from, 7.04, Backdrop.palette.ink, true, -1.0, true)
 		if _line:
-			_line.draw(self, _caption_box.position + Vector2(15.36, 5.76), StudioTokens.INK)
+			_line.draw(self, _caption_box.position + Vector2(15.36, 5.76), Backdrop.palette.ink)
 	else:
 		var back := (_from - _to).normalized() * 14.0
 		var side := back.orthogonal().normalized() * 7.0
-		draw_colored_polygon(PackedVector2Array([_to, _to + back + side, _to + back - side]), StudioTokens.INK)
+		draw_colored_polygon(PackedVector2Array([_to, _to + back + side, _to + back - side]), Backdrop.palette.ink)
 
 
 func point(caption: String, at: Vector2, target: Vector2) -> void:

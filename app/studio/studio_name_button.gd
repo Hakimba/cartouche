@@ -11,13 +11,17 @@ var _outline := Color.WHITE
 
 
 func _ready() -> void:
-	_ink = get_theme_color(&"font_color")
 	_outline_size = get_theme_constant(&"outline_size")
-	_outline = get_theme_color(&"font_outline_color")
 	# The engine's own glyphs stay unseen: the layout still measures with them.
 	for state: StringName in [&"font_color", &"font_focus_color", &"font_hover_color", &"font_pressed_color", &"font_disabled_color",
 			&"font_outline_color"]:
 		add_theme_color_override(state, Color.TRANSPARENT)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED:
+		_ink = StudioLabel.themed(&"font_color", theme_type_variation, &"Button")
+		_outline = StudioLabel.themed(&"font_outline_color", theme_type_variation, &"Button")
 
 
 func _draw() -> void:

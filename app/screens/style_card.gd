@@ -27,4 +27,4 @@ func _draw_sample() -> void:
 	var title := Controls.NAMES[value]
 	var width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, _TITLE_SIZE).x
 	draw_string(font, Vector2((size.x - width) / 2.0, size.y - 40.0), title, HORIZONTAL_ALIGNMENT_LEFT, -1,
-		_TITLE_SIZE, StudioTokens.INK)
+		_TITLE_SIZE, Backdrop.palette.ink)

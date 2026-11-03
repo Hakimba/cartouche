@@ -9,6 +9,7 @@ import app.cartouche.core.library.game
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.playerJson
+import app.cartouche.core.settings.Backdrop
 import app.cartouche.core.settings.Language
 import arrow.core.None
 import arrow.core.Some
@@ -82,6 +83,34 @@ class CartouchePluginTest {
         h.plugin.saveSoundLevel(2, 11)
         h.scope.runCurrent()
         h.settings().soundLevel.steps shouldBe 4
+        h.done()
+    }
+
+    @Test
+    fun `INV-15 a backdrop is stored once saved, an unknown one refused and the backdrop kept, the next start drawn on it`() {
+        val h = Plugin()
+        h.plugin.backdrop()["backdrop"] shouldBe "light"
+        h.plugin.saveBackdrop(1, "light_grey")
+        h.scope.runCurrent()
+        h.settings().backdrop shouldBe Backdrop.LIGHT_GREY
+        h.plugin.saveBackdrop(2, "sepia")
+        h.scope.runCurrent()
+        h.settings().backdrop shouldBe Backdrop.LIGHT_GREY
+        h.plugin.backdrop()["backdrop"] shouldBe "light_grey"
+        h.done()
+    }
+
+    @Test
+    fun `INV-15 the pixel veil is on until switched off, in the backdrop's colours until set to the console's, both stored`() {
+        val h = Plugin()
+        h.settings().pixelVeil shouldBe true
+        h.plugin.backdrop()["veil_gel"] shouldBe false
+        h.plugin.savePixelVeil(1, false)
+        h.plugin.saveVeilGel(2, true)
+        h.scope.runCurrent()
+        h.settings().pixelVeil shouldBe false
+        h.plugin.backdrop()["pixel_veil"] shouldBe false
+        h.plugin.backdrop()["veil_gel"] shouldBe true
         h.done()
     }
 

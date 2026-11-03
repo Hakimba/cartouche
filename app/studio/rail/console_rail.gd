@@ -6,7 +6,11 @@ extends Control
 ## the spring's target by one; the tiles follow it, each at its slot's distance from the centre (the ring
 ## wraps both ways; a ring short enough to show whole is a strip of its tiles side by side, so no tile ever
 ## crosses the rail), the frame pops and the gel crossfades. The rail fades out toward both edges and each tile
-## has its floor reflection. At rest nothing is drawn: the spring stops the rail's frames.
+## has its floor reflection. At rest nothing is drawn: the spring stops the rail's frames. The pool shows only on the
+## studio's wall ([member Palette.wall]).
+
+## The frame's gel changed, at each step of its crossfade.
+signal gel_changed(gel: Color)
 
 ## The tiles' step, the first tile's top-left corner and the farthest slot shown, in px and slots.
 const PITCH := 174.08
@@ -146,9 +150,16 @@ func _ready() -> void:
 	_pool.texture = _pool_texture()
 	_pool.mouse_filter = MOUSE_FILTER_IGNORE
 	_stage.add_child(_frame)
+	_pool.visible = Backdrop.palette.wall == &"studio"
 	set_process(false)
 	_apply_sink()
 	_apply_ground()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED and is_node_ready():
+		_pool.visible = Backdrop.palette.wall == &"studio"
+		_set_gel(_gel_to, false)
 
 
 func _process(delta: float) -> void:
@@ -299,9 +310,9 @@ func _set_gel(gel: Color, animated := true) -> void:
 	if _gel_fade:
 		_gel_fade.kill()
 	_gel_from = _gel
-	_gel_to = gel
-	if not animated or gel == _gel:
-		_tint(gel)
+	_gel_to = Backdrop.palette.gel(gel)
+	if not animated or _gel_to == _gel:
+		_tint(_gel_to)
 		return
 	_gel_weight = 0.0
 	_gel_fade = create_tween()
@@ -309,12 +320,14 @@ func _set_gel(gel: Color, animated := true) -> void:
 		.set_custom_interpolator(Motion.curve(Motion.Easing.EASE))
 
 
+## The frame and the pool in [param gel], as the backdrop shown draws it.
 func _tint(gel: Color) -> void:
-	_gel = gel
-	_frame.tint(gel)
+	_gel = Backdrop.palette.gel(gel)
+	gel_changed.emit(_gel)
+	_frame.tint(_gel)
 	var gradient := (_pool.texture as GradientTexture2D).gradient
-	gradient.set_color(0, Color(gel, _POOL_ALPHA))
-	gradient.set_color(1, Color(gel, 0.0))
+	gradient.set_color(0, Color(_gel, _POOL_ALPHA))
+	gradient.set_color(1, Color(_gel, 0.0))
 
 
 ## The pool: the gel's alpha at its centre fading to nothing at the edge of the ellipse that touches the

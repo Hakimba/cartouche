@@ -65,9 +65,6 @@ const _ARROW_SHADOW := Vector2(0.0, 3.2)
 ## to the farthest, each reaching 2 px further out than the one before; a Gaussian's edge laid in steps.
 const _GLOW_ALPHAS: Array[float] = [0.0856, 0.0668, 0.0472, 0.0302, 0.0173, 0.0089, 0.0041, 0.0025]
 const _GLOW_STEP_PX := 2.0
-const _ARROW_STROKE := Color("#fffdf9")
-const _ARROW_SHINE := Color(1.0, 1.0, 1.0, 0.22)
-const _ARROW_DROP := Color(60.0 / 255.0, 40.0 / 255.0, 20.0 / 255.0, 0.35)
 
 static var _sentence_slots := RegEx.create_from_string("\\{(before|after|name)\\}")
 
@@ -876,10 +873,10 @@ func _draw_arrow() -> void:
 	var shine := _arrow_shape([Vector2(0, 4), Vector2(7, 22), Vector2(0, 18)])
 	for k in range(_GLOW_ALPHAS.size(), 0, -1):
 		_stroke_arrow(head, _ARROW_EDGE_PX + k * _GLOW_STEP_PX, Color(_rim, _GLOW_ALPHAS[k - 1]), true)
-	_arrow.draw_colored_polygon(_shifted(head, _ARROW_SHADOW), _ARROW_DROP)
-	_stroke_arrow(head, _ARROW_EDGE_PX, _ARROW_STROKE, false)
-	_arrow.draw_colored_polygon(head, StudioTokens.INK)
-	_arrow.draw_colored_polygon(shine, _ARROW_SHINE)
+	_arrow.draw_colored_polygon(_shifted(head, _ARROW_SHADOW), Backdrop.palette.arrow_drop)
+	_stroke_arrow(head, _ARROW_EDGE_PX, Backdrop.palette.arrow_stroke, false)
+	_arrow.draw_colored_polygon(head, Backdrop.palette.ink)
+	_arrow.draw_colored_polygon(shine, Backdrop.palette.arrow_shine)
 
 
 ## The head's outline [param reach] px out, with round corners: edge by edge with a disc on each corner (a
@@ -928,4 +925,4 @@ class Word:
 		return Vector2(_line.width, _line.height)
 
 	func _draw() -> void:
-		_line.draw(self, Vector2(0.0, (size.y - _line.height) / 2.0), StudioTokens.MUTE)
+		_line.draw(self, Vector2(0.0, (size.y - _line.height) / 2.0), Backdrop.palette.mute)

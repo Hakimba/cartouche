@@ -49,7 +49,7 @@ func _get_minimum_size() -> Vector2:
 
 func _draw() -> void:
 	for line in separators():
-		draw_rect(line, StudioTokens.LINE)
+		draw_rect(line, Backdrop.palette.line)
 
 
 ## The thin lines between each two hints shown, in the row.

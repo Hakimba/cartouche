@@ -47,6 +47,7 @@ const Entry := AndroidWire.Entry
 const Candidate := AndroidWire.Candidate
 const App := AndroidWire.App
 const Battery := AndroidWire.Battery
+const BackdropAnswer := AndroidWire.BackdropAnswer
 const Platform := AndroidWire.Platform
 const Player := AndroidWire.Player
 const CatalogSummary := AndroidWire.CatalogSummary
@@ -106,6 +107,7 @@ func _ready() -> void:
 		_plugin.connect(&"battery_changed", func(payload: Dictionary) -> void: battery_changed.emit(Battery.new(payload)))
 	else:
 		(_plugin as DesktopPlugin).load_snapshot(Diagnostics.argument("snapshot"))
+		(_plugin as DesktopPlugin).start_with_backdrop(Diagnostics.argument("backdrop"), Diagnostics.argument("pixel-veil"))
 	if OS.has_feature("android"):
 		AndroidButtons.follow_android()
 	_load_catalog()
@@ -195,6 +197,12 @@ func has_all_files_access() -> bool:
 func curtain_allowed() -> bool:
 	var granted: bool = _query(&"curtainAllowed", [], false)
 	return granted
+
+
+## The backdrop stored, at once: the first frame is drawn on it.
+func backdrop() -> BackdropAnswer:
+	var stored: Dictionary = _query(&"backdrop", [], {})
+	return BackdropAnswer.new(stored)
 
 
 func battery() -> Battery:
@@ -325,6 +333,21 @@ func save_edge_smoothing(smoothing: StringName) -> Result:
 ## Stores whether the selected game sways and bobs ([param floating]); the consoles never do.
 func save_games_float(floating: bool) -> Result:
 	return Result.new(await _request(&"saveGamesFloat", [floating]))
+
+
+## Stores the backdrop the user chose, [param chosen] as [BackdropAnswer] names it.
+func save_backdrop(chosen: StringName) -> Result:
+	return Result.new(await _request(&"saveBackdrop", [chosen]))
+
+
+## Stores whether a veil of pixels animates over the backdrop ([param on]).
+func save_pixel_veil(on: bool) -> Result:
+	return Result.new(await _request(&"savePixelVeil", [on]))
+
+
+## Stores whether the veil takes the staged console's colour ([param on]) instead of the backdrop's.
+func save_veil_gel(on: bool) -> Result:
+	return Result.new(await _request(&"saveVeilGel", [on]))
 
 
 ## Stores how loud the sounds play, [param steps] from 0 (silenced) to [constant SoundEffects.LEVELS].

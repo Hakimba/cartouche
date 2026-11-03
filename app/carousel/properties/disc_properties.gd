@@ -724,7 +724,7 @@ class _NameText extends Control:
 		else:
 			_backing = null
 		if line:
-			line.draw(self, Vector2(30.72, 6.4), StudioTokens.INK)
+			line.draw(self, Vector2(30.72, 6.4), Backdrop.palette.ink)
 
 
 class Interval extends RefCounted:

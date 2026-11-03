@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.storage
 
+import app.cartouche.core.settings.Backdrop
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Settings
@@ -21,7 +22,7 @@ class SettingsStoreTest {
 
     @Test
     fun `saved settings load back, and no file means none set`() {
-        val settings = Settings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.OFF, gamesFloat = true)
+        val settings = Settings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.OFF, gamesFloat = true, backdrop = Backdrop.ANTHRACITE)
         SettingsStore(file).load().shouldBeRight(Settings())
         SettingsStore(file).save(settings).shouldBeRight()
         SettingsStore(file).load().shouldBeRight(settings)

@@ -144,6 +144,8 @@ Debug builds read arguments after `--` on a desktop (`$GODOT --path app -- --she
 | `--shots=DIR` | saves pictures at set frames (run with `--fixed-fps 60`) | `FrameShots` |
 | `--launch=rehearse` | every launch check passes and no emulator starts: the insertion plays, then the carousel returns | `AndroidServices` |
 | `--snapshot=DIR` | desktop only: shows a device's library, settings and labels copied into DIR | `DesktopPlugin` |
+| `--backdrop=dark` | desktop only: starts on that background (`light`, `dark`, `light_grey`, `anthracite`, `device`) | `DesktopPlugin` |
+| `--pixel-veil=off` | desktop only: starts with the background's pixel veil still | `DesktopPlugin` |
 | `--bridge` | connects the debug bridge | `Diagnostics`, see [debug-bridge.md](debug-bridge.md) |
 | `--art-refused` | every art server refuses | `DebugOptions.kt` |
 | `--art-slow=MS` | waits MS milliseconds after each chunk of an image | `DebugOptions.kt` |
@@ -176,6 +178,7 @@ Find your task, open the page, then the files in the order given.
 | the screens in front of it | [architecture/godot.md](architecture/godot.md#the-screens) | `screen_flow.gd`, `add_console.gd`, `settings_menu.gd` |
 | the shared look (materials, text, motion) | [architecture/studio.md](architecture/studio.md) | `studio_tokens.gd`, `satin_panel.gd`, `motion.gd` |
 | why the app draws nothing at rest | [architecture/godot.md](architecture/godot.md#resting) | `resting.gd` |
+| how the backgrounds change every screen | [architecture/studio.md](architecture/studio.md#backgrounds) | `backdrop.gd`, `palette.gd`, `cyclorama.gd` |
 
 ### Change something
 

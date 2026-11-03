@@ -32,6 +32,7 @@ class SettingsFormatTest {
             """{"version":2,"settings":{"edgeSmoothing":"8x"}}""",
             """{"version":2,"settings":{"preferredRegion":"Atlantis"}}""",
             """{"version":2,"settings":{"language":"tlh"}}""",
+            """{"version":2,"settings":{"backdrop":"sepia"}}""",
         ).forEach { SettingsFormat.decode(it).shouldBeLeft() }
     }
 

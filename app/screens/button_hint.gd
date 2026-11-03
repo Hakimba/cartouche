@@ -41,4 +41,4 @@ func _get_minimum_size() -> Vector2:
 func _draw() -> void:
 	var key := ButtonGlyph.key_size(button)
 	ButtonGlyph.draw_key(self, _key, Rect2(Vector2(0.0, (size.y - key.y) / 2.0), key), button)
-	_label.draw(self, Vector2(key.x + StudioTokens.HINT_GAP, (size.y - _label.height) / 2.0), StudioTokens.INK)
+	_label.draw(self, Vector2(key.x + StudioTokens.HINT_GAP, (size.y - _label.height) / 2.0), Backdrop.palette.ink)

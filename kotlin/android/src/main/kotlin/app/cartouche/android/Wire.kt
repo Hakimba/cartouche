@@ -223,6 +223,13 @@ internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
     .putSome("language", language.map { it.wire })
 
 /**
+ * `{"backdrop", "pixel_veil", "veil_gel"}`: the backdrop behind every screen, whether its pixel veil moves and whether
+ * in the console's colour.
+ */
+internal fun Settings.backdropToWire(): Dictionary =
+    dictionary("backdrop" to backdrop.wire, "pixel_veil" to pixelVeil, "veil_gel" to veilGel)
+
+/**
  * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`, and what it just
  * learnt of games' labels, if anything: the art found under `"found"` ([FoundArt.toWire]), or the ids of games no
  * source has art for under `"absent"`.

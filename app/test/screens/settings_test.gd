@@ -10,6 +10,7 @@ const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 func after_test() -> void:
 	Controls.style = &"xbox"
 	Locale.apply("en")
+	Backdrop.show(&"light", true, false)
 
 
 ## [param device]'s carousel, once it can be used.
@@ -365,7 +366,7 @@ func test_the_preferred_region_is_chosen_on_its_page_from_the_settings_saved_onc
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_text(carousel, "Settings/%Region/%Value")).is_equal("Japan")
-	for step in 4:
+	for step in 7:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Region")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -405,9 +406,9 @@ func test_the_language_line_scrolls_into_the_card_its_page_applies_a_choice_at_o
 	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	# Six lines show; the seventh scrolls in, and the first out of sight, unseen and untouchable.
+	# Six lines show; the tenth scrolls in, and the first out of sight, unseen and untouchable.
 	assert_float(menu._language.modulate.a).is_zero()
-	for step in 6:
+	for step in 9:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Language")
 	assert_float(menu._language.modulate.a).is_equal(1.0)
@@ -439,17 +440,81 @@ func test_the_language_line_scrolls_into_the_card_its_page_applies_a_choice_at_o
 	assert_str(_focused()).is_equal("Language")
 
 
+## [param device]'s settings, opened and the line called [param line] pressed.
+func _press_line(device: Fixtures.NewDevice, line: String) -> Carousel:
+	var carousel := await _shown(device)
+	await Fixtures.joypad(self, JOY_BUTTON_Y)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	while _focused() != line:
+		await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	return carousel
+
+
+## Dark chosen on the background's cards, which open on Light.
+func _choose_dark(device: Fixtures.NewDevice) -> Carousel:
+	var carousel := await _press_line(device, "Backdrop")
+	assert_bool(await Fixtures.on(self, carousel, "Backdrop")).is_true()
+	await await_idle_frame()
+	await Fixtures.action(self, &"ui_right")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await await_idle_frame()
+	assert_array(device.saved_backdrops).contains_exactly([&"dark"])
+	return carousel
+
+
+func test_a_background_chosen_on_its_cards_shows_at_once_the_cards_staying_and_B_keeps_it() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	var carousel := await _choose_dark(device)
+	assert_int(Backdrop.palette.scheme).is_equal(StudioTokens.Scheme.DARK)
+	assert_bool(Fixtures.shown_screen(carousel).name == "Backdrop").is_true()
+	assert_str(_focused()).is_equal("Dark")
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(await _settings_ready(carousel)).is_true()
+	assert_str(_text(carousel, "Settings/%Backdrop/%Value")).is_equal("Dark")
+
+
+func test_a_background_the_plugin_does_not_keep_shows_no_more() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	device.failing.append(&"save_backdrop")
+	await _choose_dark(device)
+	assert_int(Backdrop.palette.scheme).is_equal(StudioTokens.Scheme.LIGHT)
+	assert_str(Backdrop.choice).is_equal("light")
+	assert_str(_focused()).is_equal("Light")
+
+
+func test_the_veil_and_its_console_colour_switch_once_saved_and_a_veil_not_kept_slides_back() -> void:
+	var device := Fixtures.past_first_launch(self, {"ps2": 3})
+	assert_bool(Backdrop.veil).is_true()
+	var menu: SettingsMenu = (await _press_line(device, "Veil")).get_node("%Screens/Settings")
+	assert_bool(await Fixtures.until(self, func() -> bool: return not menu.saving)).is_true()
+	assert_array(device.saved_veils).contains_exactly([false])
+	assert_bool(Backdrop.veil).is_false()
+	assert_bool(menu.switch_on(&"pixel_veil")).is_false()
+	await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return not menu.saving)).is_true()
+	assert_bool(device.veil_gel).is_true()
+	assert_bool(Backdrop.veil_gel).is_true()
+	device.failing.append(&"save_pixel_veil")
+	await Fixtures.action(self, &"ui_up")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_bool(await Fixtures.until(self, func() -> bool: return not menu.saving)).is_true()
+	assert_bool(Backdrop.veil).is_false()
+	assert_bool(menu.switch_on(&"pixel_veil")).is_false()
+
+
 func test_with_no_console_the_card_shows_its_platforms_line_again_and_its_arrows_scroll_under_a_finger() -> void:
 	var carousel := Fixtures.fresh_carousel(self, Fixtures.past_first_launch(self, {}))
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	for step in 5:
+	for step in 8:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Language")
 	assert_float(menu._platforms.modulate.a).is_zero()
-	for step in 5:
+	for step in 8:
 		await Fixtures.action(self, &"ui_up")
 	assert_str(_focused()).is_equal("ButtonStyle")
 	# The platforms line cannot take the focus, yet shows with the line under it: no arrow leads nowhere.
@@ -457,7 +522,7 @@ func test_with_no_console_the_card_shows_its_platforms_line_again_and_its_arrows
 	assert_bool(menu._more(-1)).is_false()
 	# A finger on the arrow below scrolls a line, the focus kept on a line shown.
 	await _tap(menu, Vector2(menu._panel.size.x / 2.0, SettingsMenu._MORE_DOWN_Y))
-	assert_float(menu._language.modulate.a).is_equal(1.0)
+	assert_float(menu._floating.modulate.a).is_equal(1.0)
 	assert_float(menu._platforms.modulate.a).is_zero()
 	assert_float((Fixtures.focus(self) as Control).modulate.a).is_equal(1.0)
 	await _tap(menu, Vector2(menu._panel.size.x / 2.0, SettingsMenu._MORE_UP_Y))
@@ -476,7 +541,7 @@ func test_a_language_the_plugin_does_not_save_is_not_applied() -> void:
 	var carousel := await _shown(device)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	for step in 6:
+	for step in 9:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "Language")).is_true()
@@ -499,7 +564,7 @@ func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_n
 	var carousel := await _shown(device)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	for step in 4:
+	for step in 7:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
@@ -611,7 +676,7 @@ class FailedFloatDevice extends Fixtures.NewDevice:
 func _float_row(carousel: Carousel) -> SettingsMenu:
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	for step in 3:
+	for step in 6:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("GamesFloat")
 	return carousel.get_node("%Screens/Settings")
@@ -621,15 +686,15 @@ func test_floating_is_off_by_default_saved_on_A_and_keeps_one_focus() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	var carousel := await _shown(device)
 	var menu := await _float_row(carousel)
-	assert_bool(menu.games_float).is_false()
+	assert_bool(menu.switch_on(&"games_float")).is_false()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return device.saved_floats.size() == 1)).is_true()
 	assert_array(device.saved_floats).is_equal([true])
-	assert_bool(menu.games_float).is_true()
+	assert_bool(menu.switch_on(&"games_float")).is_true()
 	assert_str(_focused()).is_equal("GamesFloat")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_array(device.saved_floats).is_equal([true, false])
-	assert_bool(menu.games_float).is_false()
+	assert_bool(menu.switch_on(&"games_float")).is_false()
 	assert_str(_focused()).is_equal("GamesFloat")
 
 
@@ -642,7 +707,7 @@ func test_a_failed_float_save_restores_the_stored_switch_and_focus() -> void:
 	var menu := await _float_row(await _shown(device))
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_array(device.saved_floats).is_equal([false])
-	assert_bool(menu.games_float).is_true()
+	assert_bool(menu.switch_on(&"games_float")).is_true()
 	assert_bool(device.games_float).is_true()
 	assert_str(_focused()).is_equal("GamesFloat")
 
@@ -663,7 +728,7 @@ func test_while_a_float_save_is_pending_presses_do_not_start_another_save_or_lea
 	var carousel := await _shown(device)
 	var menu := await _float_row(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(menu.games_float).is_true()
+	assert_bool(menu.switch_on(&"games_float")).is_true()
 	for button: JoyButton in [JOY_BUTTON_A, JOY_BUTTON_B]:
 		await Fixtures.joypad(self, button)
 	await Fixtures.action(self, &"ui_down")
@@ -673,7 +738,7 @@ func test_while_a_float_save_is_pending_presses_do_not_start_another_save_or_lea
 	assert_str(_focused()).is_equal("GamesFloat")
 	device.released.emit()
 	assert_bool(await Fixtures.until(self, func() -> bool: return not menu.saving)).is_true()
-	assert_bool(menu.games_float).is_true()
+	assert_bool(menu.switch_on(&"games_float")).is_true()
 	assert_bool(device.games_float).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await _closed(carousel)).is_true()
@@ -704,10 +769,10 @@ func test_B_closes_after_two_seconds_even_when_the_save_never_answers() -> void:
 	menu._save_started_ms -= SettingsMenu.SAVE_ESCAPE_MS
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await _closed(carousel)).is_true()
-	assert_bool(menu.games_float).is_false()
+	assert_bool(menu.switch_on(&"games_float")).is_false()
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	assert_bool(menu.games_float).is_false()
+	assert_bool(menu.switch_on(&"games_float")).is_false()
 	assert_bool(menu.saving).is_false()
 
 
@@ -722,14 +787,14 @@ func test_a_late_success_after_closing_does_not_change_the_hidden_switch_or_its_
 	menu._save_started_ms -= SettingsMenu.SAVE_ESCAPE_MS
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await _closed(carousel)).is_true()
-	var knob := menu._knob_x
+	var knob := menu._switches[&"games_float"]._knob_x
 	device.released.emit()
 	assert_bool(carousel._screens._games_float).is_false()
-	assert_bool(menu.games_float).is_false()
-	assert_float(menu._knob_x).is_equal(knob)
+	assert_bool(menu.switch_on(&"games_float")).is_false()
+	assert_float(menu._switches[&"games_float"]._knob_x).is_equal(knob)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	assert_bool(menu.games_float).is_false()
+	assert_bool(menu.switch_on(&"games_float")).is_false()
 	assert_bool(device.games_float).is_true()
 
 

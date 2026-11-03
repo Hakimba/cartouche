@@ -87,4 +87,4 @@ class Tick extends Control:
 		offset_left = -44.0
 
 	func _draw() -> void:
-		draw_polyline([Vector2(0.0, 0.0), Vector2(7.0, 7.0), Vector2(20.0, -8.0)], StudioTokens.INK, 3.5, true)
+		draw_polyline([Vector2(0.0, 0.0), Vector2(7.0, 7.0), Vector2(20.0, -8.0)], Backdrop.palette.ink, 3.5, true)

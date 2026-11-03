@@ -541,7 +541,7 @@ static func _control_values(control: Control) -> Dictionary:
 	var backing: SatinPanel.Backing = reference.get_ref() if reference else null
 	if backing:
 		if not result.has("text_colour"):
-			result["text_colour"] = [StudioTokens.INK.r, StudioTokens.INK.g, StudioTokens.INK.b, StudioTokens.INK.a]
+			result["text_colour"] = [Backdrop.palette.ink.r, Backdrop.palette.ink.g, Backdrop.palette.ink.b, Backdrop.palette.ink.a]
 		var colours: Array = backing._material.get_shader_parameter(&"colors")
 		if not colours.is_empty():
 			var first: Vector4 = colours[0]

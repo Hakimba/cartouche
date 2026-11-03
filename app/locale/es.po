@@ -439,3 +439,39 @@ msgstr "Idioma del dispositivo"
 
 msgid "Sounds"
 msgstr "Sonidos"
+
+msgid "Background"
+msgstr "Fondo"
+
+msgid "Which background?"
+msgstr "¿Qué fondo?"
+
+msgid "The background behind every screen. “Like the device” follows the light or dark theme of the system."
+msgstr "El fondo detrás de cada pantalla. «Como el dispositivo» sigue el tema claro u oscuro del sistema."
+
+msgid "Light"
+msgstr "Claro"
+
+msgid "Dark"
+msgstr "Oscuro"
+
+msgid "Light grey"
+msgstr "Gris claro"
+
+msgid "Anthracite"
+msgstr "Antracita"
+
+msgid "Like the device"
+msgstr "Como el dispositivo"
+
+msgid "Animated background"
+msgstr "Fondo animado"
+
+msgid "In the console's colour"
+msgstr "Con el color de la consola"
+
+msgid "Instead of the background's colours"
+msgstr "En lugar de los colores del fondo"
+
+msgid "A veil of pixels drifts behind the screens"
+msgstr "Un velo de píxeles ondula tras las pantallas"

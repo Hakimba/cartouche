@@ -38,7 +38,7 @@ func _notification(what: int) -> void:
 func _draw() -> void:
 	# Room for the text: the pill less its round ends and what else it centres with the text.
 	_line.fit(size.x - 2.0 * StudioTokens.FROST_RADIUS - _beside_text())
-	_line.draw(self, Vector2(_text_left(), (size.y - _line.height) / 2.0), StudioTokens.INK)
+	_line.draw(self, Vector2(_text_left(), (size.y - _line.height) / 2.0), Backdrop.palette.ink)
 
 
 ## How wide what the pill centres after its text is: nothing.

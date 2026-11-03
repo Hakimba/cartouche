@@ -105,7 +105,7 @@ page that explains it. Start from [README.md](README.md) if you have not.
 - **Serial**: the id a disc boots (`SLES_524.95`), read from its `SYSTEM.CNF`, or a GameCube or Wii game code.
 - **Serial source**: a site naming disc scans after a game's serial (`SerialScans`).
 - **Settings**: the app's choices apart from the library: button style, edge smoothing, preferred region, games
-  floating, sound level (`Settings`).
+  floating, sound level, backdrop, pixel veil and whether it takes the console's colour (`Settings`).
 - **Setup**: what the user chose for a platform: folder, player, disc grouping, sub-folders (`PlatformSetup`).
 - **Shape**: the dimensions in millimetres a model is built from, and the rules they keep (`ModelShape`).
 - **Shelf**: one platform's games in title order (`Shelves`).

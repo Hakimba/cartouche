@@ -39,7 +39,7 @@ func _draw() -> void:
 	_panel.place(Rect2(Vector2.ZERO, size), RADIUS)
 	ButtonGlyph.draw_key(self, _key, Rect2(Vector2(LEFT, (size.y - KEY) / 2.0), Vector2.ONE * KEY), &"a")
 	var at := Vector2(LEFT + KEY + GAP + _text_x, VERTICAL)
-	var ink := Color(StudioTokens.INK, _text_alpha)
+	var ink := Color(Backdrop.palette.ink, _text_alpha)
 	_line.draw(self, at, ink)
 	for i in _marks.size():
 		var mark := _marks[i]

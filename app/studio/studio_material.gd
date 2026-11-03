@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name StudioMaterial
 extends RefCounted
-## One of the Studio materials, as [StudioTokens] gives it: its fill, its corner radius and its box
+## One of the Studio materials, as [StudioTokens] gives it in a backdrop's colours ([Palette]): its fill, its corner radius and its box
 ## shadows. [SatinPanel] draws it with a shader, [SatinStyle] as a StyleBox for Godot's own controls.
 
 ## The fill's stops (parts of the way), and their colours.
@@ -27,8 +27,11 @@ class Shadow:
 	var tinted: bool
 	## A tinted shadow's share of the gel, mixed with white in OKLab; 1, the gel alone.
 	var gel_share := 1.0
+	## The backdrop it is drawn in; none: the one shown.
+	var _palette: Palette
 
-	func _init(entry: Array) -> void:
+	func _init(entry: Array, palette: Palette = null) -> void:
+		_palette = palette
 		var shape: Vector4 = entry[0]
 		offset = Vector2(shape.x, shape.y)
 		blur = shape.z
@@ -39,13 +42,15 @@ class Shadow:
 		if entry.size() > 4:
 			gel_share = entry[4]
 
-	## Its colour, the gel's when it takes it.
+	## Its colour, the gel's when it takes it, as its backdrop draws that gel ([method Palette.gel]).
 	func shown(gel: Color) -> Color:
-		return Color(StudioMaterial.whitened(gel, gel_share), color.a) if tinted else color
+		var drawn_in := _palette if _palette else Backdrop.palette
+		return Color(StudioMaterial.whitened(drawn_in.gel(gel), gel_share), color.a) if tinted else color
 
 
-func _init(look: StudioTokens.Look) -> void:
-	var recipe: Array = StudioTokens.LOOKS[look]
+## [param look] in the colours of [param palette]; none: the backdrop shown.
+func _init(look: StudioTokens.Look, palette: Palette = null) -> void:
+	var recipe: Array = (palette if palette else Backdrop.palette).looks[look]
 	var shown_stops: Array = recipe[0]
 	var shown_colors: Array = recipe[1]
 	var shown_shadows: Array = recipe[4]
@@ -54,7 +59,7 @@ func _init(look: StudioTokens.Look) -> void:
 	centre = recipe[2]
 	radius = recipe[3]
 	for entry: Array in shown_shadows:
-		shadows.append(Shadow.new(entry))
+		shadows.append(Shadow.new(entry, palette))
 
 
 ## How far past the box its outer shadows reach.

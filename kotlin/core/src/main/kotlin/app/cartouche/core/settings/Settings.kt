@@ -42,6 +42,28 @@ public enum class EdgeSmoothing {
     OFF,
 }
 
+/**
+ * The backdrop behind every screen. [LIKE_DEVICE] draws [LIGHT] or [DARK] as the system's theme is, the others stay
+ * as chosen.
+ */
+@Serializable
+public enum class Backdrop {
+    @SerialName("light")
+    LIGHT,
+
+    @SerialName("dark")
+    DARK,
+
+    @SerialName("light_grey")
+    LIGHT_GREY,
+
+    @SerialName("anthracite")
+    ANTHRACITE,
+
+    @SerialName("device")
+    LIKE_DEVICE,
+}
+
 /** How loud the app's sounds play, in [steps] from none (silenced) to [MAX]. */
 @Serializable
 @JvmInline
@@ -87,7 +109,8 @@ public enum class Language {
  * The app's own settings, apart from the library; [preferredRegion], none until the user chooses one, orders labels'
  * images; [gamesFloat] makes the selected game sway and bob (the consoles never do); [soundLevel] is how loud the
  * sounds play, full until the user turns them down; [language], none until the user chooses one, follows the
- * device's.
+ * device's; [backdrop] is drawn behind every screen; [pixelVeil] animates a veil of pixels over it, in
+ * the staged console's colour when [veilGel], else in the backdrop's own.
  */
 @Serializable
 public data class Settings(
@@ -97,6 +120,9 @@ public data class Settings(
     public val gamesFloat: Boolean = false,
     public val soundLevel: SoundLevel = SoundLevel.FULL,
     public val language: Option<Language> = None,
+    public val backdrop: Backdrop = Backdrop.LIGHT,
+    public val pixelVeil: Boolean = true,
+    public val veilGel: Boolean = false,
 ) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An app updated from a

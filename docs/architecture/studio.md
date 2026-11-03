@@ -20,6 +20,39 @@ is generated from the design's tokens and never edited by hand: the file carries
 - `StudioTokens.CONTROL_EDITS` and `CONTROL_STYLES` hold saved per-control overrides, which `ControlTokens`
   (`control_tokens.gd`) applies when a matching control appears. With no record it does nothing.
 
+## Backgrounds
+
+The user chooses the background behind every screen in the settings: Light (the design as drawn), Dark, Light grey,
+Anthracite, or Like the device (Light or Dark as the system's theme is). Each one is a scheme of the tokens
+(`StudioTokens.Scheme`, `StudioTokens.SCHEMES`), generated like every other value: its colours, its materials, the
+project theme's items it changes, its wall and the properties' operating light. `Palette` (`palette.gd`) reads one
+scheme into typed fields.
+
+`Backdrop` (`backdrop.gd`) holds the one palette shown (`Backdrop.palette`), the choice, and whether the pixel veil
+moves. `Backdrop.show(choice, veil)` changes the project theme's items the scheme names, then emits the theme's
+change once: every control receives `NOTIFICATION_THEME_CHANGED`. That is the one way a drawing follows the
+background:
+
+- a control that reads `Backdrop.palette` in `_draw` needs nothing more: the notification redraws it;
+- a control that keeps something made from the palette (a `StudioMaterial`, a shader parameter, a texture) makes it
+  again in its `_notification(NOTIFICATION_THEME_CHANGED)`; `SatinPanel.Backing` follows its owner's
+  `theme_changed`, `SatinStyle` rebuilds once it draws in another palette;
+- a rectangle in a palette colour is a `PaletteRect` (`palette_rect.gd`), the colour named by its field.
+
+A gel is a console's colour or `StudioTokens.NEUTRAL`, the gel of no console, which each background draws in its own
+`neutral`: what paints a gel takes it through `Palette.gel`, so a gel held from before a change of background is
+drawn in the new one.
+
+The backdrop is known before the first frame: the plugin's `backdrop()` reads it from the stored settings at once,
+without waiting for the library that `settings` reads.
+
+Never type a colour of the look in a script: add it to the schemes in the tokens. A preview of another background
+(its card in the settings) draws with its own `Palette`: `Cyclorama.palette`, `SatinPanel.Backing.new(owner, look,
+palette)`.
+
+`LogoView` shows a console's `<console>.dark.png` on a scheme with `dark_logos`, where the slot has one: those
+pictures are made for a dark ground, each element at 3:1 at least against every dark backing.
+
 ## Pieces
 
 | Need | Use | File |
@@ -28,7 +61,7 @@ is generated from the design's tokens and never edited by hand: the file carries
 | A material behind pieces a control draws itself | `SatinPanel.Backing`, placed on a box | `satin_panel.gd` |
 | A material on Godot's own buttons, fields, cards | `SatinStyle`, the same material as a StyleBox (`SatinStyle.apply_to`) | `satin_style.gd` |
 | The focus card | the theme's focus StyleBox, its ring in the gel | `app/studio/focus.tres`, `app/carousel/carousel_theme.tres` |
-| The backdrop | `Cyclorama`: a baked picture of the wall and floor, the key light over it. Nothing moves, so nothing redraws. | `cyclorama.gd` |
+| The backdrop | `Cyclorama`: the background's wall (the baked studio and its key light, the same studio in another wall's colours with no light of its own, or black) and the pixel veil over it while it moves, the one thing redrawn at rest. | `cyclorama.gd`, `wall.gdshader`, `pixel_veil.gdshader` |
 | Button hints | `ButtonHint` children of the one `HintRow`, never a row of their own | `hint_row.gd`, `app/screens/button_hint.gd` |
 | A line of text at the design's exact width | `StudioText.of(role, text)`, then `fit(room)` and `draw(canvas, at, color)` | `studio_text.gd` |
 | A theme label or button in a tracked role | `StudioLabel`, `StudioNameButton`, through `TrackedText` | `studio_label.gd`, `studio_name_button.gd`, `tracked_text.gd` |

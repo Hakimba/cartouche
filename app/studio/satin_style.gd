@@ -6,7 +6,7 @@ extends StyleBox
 ## polygons: the fill as a gradient over the box's outline (exact for a fill from top to bottom), a hard inset
 ## highlight as the box less the box moved by its offset, and each outer shadow as rings outside the box whose
 ## colours follow its Gaussian falloff; no outer shadow is drawn under the box. Each box size
-## is built once.
+## is built once, and again in the colours of another backdrop once one is shown.
 
 ## Points on each quarter of a corner.
 const _ARC := 8
@@ -29,6 +29,8 @@ var gel := StudioTokens.NEUTRAL:
 		emit_changed()
 
 var _material := StudioMaterial.new(StudioTokens.Look.SATIN)
+## The backdrop [member _material] and [member _built] are in.
+var _palette := Backdrop.palette
 ## The triangles of each box size drawn so far.
 var _built: Dictionary[Vector2, Mesh2D] = {}
 
@@ -74,6 +76,7 @@ class Outline:
 
 
 func _draw(to_canvas_item: RID, rect: Rect2) -> void:
+	_follow_backdrop()
 	if rect.size not in _built:
 		if _built.size() >= _SIZES_KEPT:
 			_built.clear()
@@ -85,7 +88,17 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 
 
 func _get_draw_rect(rect: Rect2) -> Rect2:
+	_follow_backdrop()
 	return rect.grow(_material.reach())
+
+
+## The material made again in the backdrop shown, when another one shows since it was made: a control is drawn
+## again when the backdrop changes, its style then too.
+func _follow_backdrop() -> void:
+	if _palette != Backdrop.palette:
+		_palette = Backdrop.palette
+		_material = StudioMaterial.new(look)
+		_built.clear()
 
 
 ## The material on a box of [param size] at the origin, bottom layer first.

@@ -17,6 +17,14 @@ func _ready() -> void:
 	look(Vector2.ZERO, 0.0, 0.0)
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED:
+		var paint := material as ShaderMaterial
+		paint.set_shader_parameter(&"dark", Backdrop.palette.operating_dark)
+		paint.set_shader_parameter(&"warm_alpha", Backdrop.palette.operating_warm_alpha)
+		paint.set_shader_parameter(&"pool_color", _pool_color(_gel))
+
+
 ## A round pool of light at [param centre], reaching [param radius] pixels, the room around it
 ## [param darkness] dark, from 0 to 1.
 func look(centre: Vector2, radius: float, darkness: float) -> void:
@@ -51,9 +59,9 @@ func shaped(box: Rect2, gel: Color, opacity: float) -> void:
 	_material.set_shader_parameter(&"darkness", opacity)
 
 
+## The backdrop's pool round a staged game, mixed with [param gel] in OKLab.
 static func _pool_color(gel: Color) -> Color:
-	var alpha := 0.46 * 0.86 + 0.14
-	var dark := Color(46.0 / 255.0, 33.0 / 255.0, 22.0 / 255.0)
-	var lab := StudioMaterial.oklab(dark).lerp(StudioMaterial.oklab(gel), 0.14 / alpha)
-	var mixed := StudioMaterial.srgb(lab)
-	return Color(mixed, alpha)
+	var pool := Backdrop.palette.operating_pool
+	var lab := StudioMaterial.oklab(pool).lerp(StudioMaterial.oklab(Backdrop.palette.gel(gel)),
+		Backdrop.palette.operating_pool_gel_share)
+	return Color(StudioMaterial.srgb(lab), pool.a)

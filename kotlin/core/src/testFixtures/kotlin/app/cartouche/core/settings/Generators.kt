@@ -14,7 +14,7 @@ import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.map
 
-/** Settings with or without a button style chosen, a preferred region and a language, with any edge smoothing, games floating or not, and any sound level. */
+/** Settings with or without a button style chosen, a preferred region and a language, with any edge smoothing, games floating or not, any sound level, any backdrop and the pixel veil on or off. */
 val settings: Arb<Settings> =
     Arb.bind(
         Arb.choice(Arb.enum<ButtonStyle>().map { Some(it) }, Arb.constant(None)),
@@ -23,5 +23,7 @@ val settings: Arb<Settings> =
         Arb.boolean(),
         Arb.int(0..SoundLevel.MAX).map { steps -> SoundLevel.of(steps).getOrElse { SoundLevel.FULL } },
         Arb.choice(Arb.enum<Language>().map { Some(it) }, Arb.constant(None)),
+        Arb.enum<Backdrop>(),
+        Arb.boolean(),
         ::Settings,
     )

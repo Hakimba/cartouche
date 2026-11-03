@@ -60,6 +60,7 @@ import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.search.Finders
 import app.cartouche.core.search.Order
 import app.cartouche.core.search.View
+import app.cartouche.core.settings.Backdrop
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Language
@@ -153,7 +154,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
      */
     @Volatile private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
 
-    /** Only used on [libraryThread]. */
+    /** Used on [libraryThread], and by [backdrop] as the app starts, before any request is sent there. */
     private val settingsStore by lazy { SettingsStore(File(context.filesDir, "settings.json")) }
 
     /** Whether each package is installed, forgotten on resume since apps may be installed meanwhile. */
@@ -481,6 +482,13 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         success("report" to inLibrary { preview(platform, choices, loaded.titles(platform.id), loaded.dataFolders) }.toWire())
     }
 
+    /**
+     * The backdrop stored, `{"backdrop", "pixel_veil", "veil_gel"}`, at once: the app's first frame is drawn on it, without
+     * waiting for the library that [settings] reads. Asked once, as the app starts, before any request.
+     */
+    @UsedByGodot
+    public fun backdrop(): Dictionary = storedSettings().backdropToWire()
+
     @UsedByGodot
     public fun settings(requestId: Int): Unit = onLibrary(requestId) {
         val settings = storedSettings()
@@ -506,6 +514,28 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     @UsedByGodot
     public fun saveGamesFloat(requestId: Int, floating: Boolean): Unit = onLibrary(requestId) {
         save("games_float=$floating") { it.copy(gamesFloat = floating) }
+        success()
+    }
+
+    /** Stores the backdrop behind every screen, [backdrop] as `backdrop` names it. */
+    @UsedByGodot
+    public fun saveBackdrop(requestId: Int, backdrop: String): Unit = onLibrary(requestId) {
+        val chosen = code("backdrop", Some(backdrop), Backdrop.entries) { it.wire }
+        save("backdrop: $backdrop") { it.copy(backdrop = chosen) }
+        success()
+    }
+
+    /** Stores whether the pixel veil animates over the backdrop ([on]). */
+    @UsedByGodot
+    public fun savePixelVeil(requestId: Int, on: Boolean): Unit = onLibrary(requestId) {
+        save("pixel_veil=$on") { it.copy(pixelVeil = on) }
+        success()
+    }
+
+    /** Stores whether the pixel veil takes the staged console's colour ([on]) instead of the backdrop's. */
+    @UsedByGodot
+    public fun saveVeilGel(requestId: Int, on: Boolean): Unit = onLibrary(requestId) {
+        save("veil_gel=$on") { it.copy(veilGel = on) }
         success()
     }
 

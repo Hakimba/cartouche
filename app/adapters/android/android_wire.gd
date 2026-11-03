@@ -98,6 +98,21 @@ class Battery:
 		plugged = payload.get("plugged", false)
 
 
+## The backdrop stored, read as the app starts.
+class BackdropAnswer:
+	## `light`, `dark`, `light_grey`, `anthracite` or `device`: the backdrop behind every screen.
+	var backdrop: StringName
+	## Whether a veil of pixels animates over the backdrop.
+	var pixel_veil: bool
+	## Whether the veil takes the staged console's colour instead of the backdrop's.
+	var veil_gel: bool
+
+	func _init(payload: Dictionary) -> void:
+		backdrop = payload.get("backdrop", &"light")
+		pixel_veil = payload.get("pixel_veil", true)
+		veil_gel = payload.get("veil_gel", false)
+
+
 class Platform:
 	var id: String
 	var name: String

@@ -32,13 +32,13 @@ carousel, and returns once the carousel can be used. Each screen is a scene of i
 |---|---|
 | `screen_flow.gd` | Which screen shows when: the first launch, the empty library, the settings, adding one more console. Reads the settings at start and saves the user's changes through the adapter. |
 | `welcome.gd` | The title screen at each start, waiting for a button while the app loads. |
-| `button_style_screen.gd`, `edge_smoothing_screen.gd` | A choice among cards (`ChoiceScreen`, `ChoiceCard`), each card drawing its choice (`StyleCard`, `SmoothingCard`). |
+| `button_style_screen.gd`, `edge_smoothing_screen.gd`, `backdrop_screen.gd` | A choice among cards (`ChoiceScreen`, `ChoiceCard`), each card drawing its choice (`StyleCard`, `SmoothingCard`, `BackdropCard`). A background chosen shows at once, the cards staying. |
 | `card_choice_screen.gd` | A setting chosen among cards built from the values the plugin takes: the preferred region of images, the language. |
 | `curtain_permission.gd` | Asks for "display over other apps", which the launch curtain needs. |
 | `no_console.gd` | Nothing set up yet: one thing to do, add a console. |
 | `add_console.gd` | The form adding or editing a console: its type, its model, its folder, its emulator and options, with a count of the games found. Built from `StepField`, `FieldButton`, `FormToggle` and `FormPill`, drawn by `FormPaint`. |
 | `add_ball.gd` | The "+" above the consoles. Holding up turns it into the button adding one more console. |
-| `settings_menu.gd` | The settings card: the choices, games floating, the sound level and the language. Six lines show; the focus scrolls the others in, an arrow showing lines are hidden. |
+| `settings_menu.gd` | The settings card: the choices, the background and its animated veil, games floating, the sound level and the language. Six lines show; the focus scrolls the others in, an arrow showing lines are hidden. |
 | `settings_transition.gd` | The move between the screen under the settings and the settings card, on one reversible clock. |
 | `platform_list.gd`, `confirm_removal.gd` | The consoles set up, each opened in the form to edit or remove it, and the confirmation of a removal. |
 | `controls.gd` | The button style the user chose. `ButtonGlyph`, `ButtonMark`, `ButtonHint` and `GlyphButton` draw buttons in that style. |
@@ -136,7 +136,12 @@ hand the memory Godot freed back to the system (`Android.release_memory`, see [a
 "Draws only what changes" means: a frame is drawn when anything wrote to the renderer since the last one, even a
 value equal to the one it had (a z-index, a light's place, a viewport's update mode, a float the engine keeps in
 single precision). Code that runs at every frame writes only what changed. `at_rest_test.gd` checks each screen
-once still and names the nodes still writing; the bench's `idle` scenarios report `drawn_per_s`.
+once still and names the nodes still writing; the bench's `idle` scenarios report `drawn_per_s` and the GPU's
+`gpu_ms_per_s`. The one exception is the background's pixel veil, on by default: while it moves, the shown
+`Cyclorama` writes its time at every frame, so a resting screen is drawn again thirty times a second, whole (Godot
+redraws a viewport whole). Only the backdrop in front moves: the carousel's stops under a screen that draws its own
+(adding a console, the consoles set up, the model chooser), and none moves while hidden. With the veil off, rest
+draws nothing.
 
 ## Developer tools in the app
 

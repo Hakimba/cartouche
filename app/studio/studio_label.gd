@@ -9,11 +9,25 @@ var _outline := Color.WHITE
 
 
 func _ready() -> void:
-	_ink = get_theme_color(&"font_color")
-	_outline = get_theme_color(&"font_outline_color")
 	# The engine's own glyphs stay unseen: the layout still measures with them.
 	add_theme_color_override(&"font_color", Color.TRANSPARENT)
 	add_theme_color_override(&"font_outline_color", Color.TRANSPARENT)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED:
+		_ink = themed(&"font_color", theme_type_variation, &"Label")
+		_outline = themed(&"font_outline_color", theme_type_variation, &"Label")
+
+
+## The colour [param item] of the project theme's [param variation] (or of a type it varies, down to
+## [param base]): what a control of it shows, its own overrides aside.
+static func themed(item: StringName, variation: StringName, base: StringName) -> Color:
+	var project := ThemeDB.get_project_theme()
+	var type := variation
+	while type and not project.has_color(item, type):
+		type = project.get_type_variation_base(type)
+	return project.get_color(item, type if type else base)
 
 
 func _draw() -> void:

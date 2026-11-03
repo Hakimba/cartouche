@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://screens/screen_flow.gd" id="1"]
 [ext_resource type="PackedScene" path="res://screens/welcome.tscn" id="2"]
@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" path="res://screens/edge_smoothing_screen.tscn" id="11"]
 
 [ext_resource type="PackedScene" path="res://screens/card_choice_screen.tscn" id="cards"]
+[ext_resource type="PackedScene" path="res://screens/backdrop_screen.tscn" id="backdrop"]
 
 [node name="Screens" type="Control"]
 layout_mode = 3
@@ -34,6 +35,11 @@ visible = false
 layout_mode = 1
 
 [node name="EdgeSmoothing" parent="." instance=ExtResource("11")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="Backdrop" parent="." instance=ExtResource("backdrop")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1

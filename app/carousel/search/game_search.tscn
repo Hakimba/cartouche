@@ -1,5 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
+[ext_resource type="Script" path="res://studio/palette_rect.gd" id="palette_rect"]
 [ext_resource type="Script" path="res://carousel/search/game_search.gd" id="1"]
 [ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 [ext_resource type="Script" path="res://studio/studio_label.gd" id="studio_label"]
@@ -82,7 +83,8 @@ custom_minimum_size = Vector2(3, 28)
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
-color = Color(0.141176, 0.12549, 0.105882, 1)
+script = ExtResource("palette_rect")
+colour = &"caret"
 
 [node name="Count" type="Label" parent="Chip/Items"]
 unique_name_in_owner = true

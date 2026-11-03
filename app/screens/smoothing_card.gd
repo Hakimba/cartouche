@@ -15,8 +15,6 @@ const SAMPLES: Dictionary[StringName, Array] = {
 const _PIXEL := 7
 const _SLOPE_DEG := 8.0
 const _RADIUS := 240.0
-const _BACKGROUND := Color(0.933, 0.949, 0.965)
-const _DISC := Color(0.059, 0.059, 0.078)
 const _MARGIN := 15.0
 const _TITLE_SIZE := 28
 const _NOTE_SIZE := 18
@@ -27,10 +25,11 @@ const _NOTE_SIZE := 18
 var _close_up: ImageTexture
 
 
-func _ready() -> void:
-	super()
-	_close_up = ImageTexture.create_from_image(close_up(value, Vector2i(Vector2(custom_minimum_size.x - 2.0 * _MARGIN,
-		custom_minimum_size.y / 2.0))))
+func _notification(what: int) -> void:
+	# The close-up is drawn in the backdrop's colours: on a dark one, a light edge on a dark ground.
+	if what == NOTIFICATION_THEME_CHANGED:
+		_close_up = ImageTexture.create_from_image(close_up(value, Vector2i(Vector2(custom_minimum_size.x - 2.0 * _MARGIN,
+			custom_minimum_size.y / 2.0))))
 
 
 func _draw_sample() -> void:
@@ -38,9 +37,9 @@ func _draw_sample() -> void:
 	var font := get_theme_font(&"font", &"FieldValue")
 	var width := size.x - 2.0 * _MARGIN
 	var below := _MARGIN + _close_up.get_height()
-	draw_string(font, Vector2(_MARGIN, below + 48.0), tr(title), HORIZONTAL_ALIGNMENT_CENTER, width, _TITLE_SIZE, StudioTokens.INK)
+	draw_string(font, Vector2(_MARGIN, below + 48.0), tr(title), HORIZONTAL_ALIGNMENT_CENTER, width, _TITLE_SIZE, Backdrop.palette.ink)
 	draw_multiline_string(font, Vector2(_MARGIN, below + 84.0), tr(note), HORIZONTAL_ALIGNMENT_CENTER, width, _NOTE_SIZE, 3,
-		StudioTokens.INK.lerp(_BACKGROUND, 0.35))
+		Backdrop.palette.ink.lerp(Backdrop.palette.smoothing_ground, 0.35))
 
 
 ## A close-up of the bottom of a disc's dark band over the background, [param area] large, as
@@ -53,8 +52,8 @@ static func close_up(kind: StringName, area: Vector2i) -> Image:
 	# The disc's centre above the picture, so that the picture's middle lies on its rim.
 	var centre := Vector2(pixels) / 2.0 - Vector2(sin(slope), cos(slope)) * _RADIUS
 	var samples: Array = SAMPLES[kind]
-	var background := _BACKGROUND.srgb_to_linear()
-	var disc := _DISC.srgb_to_linear()
+	var background := Backdrop.palette.smoothing_ground.srgb_to_linear()
+	var disc := Backdrop.palette.smoothing_disc.srgb_to_linear()
 	for y in pixels.y:
 		for x in pixels.x:
 			var inside := 0

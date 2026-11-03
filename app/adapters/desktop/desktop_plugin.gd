@@ -15,6 +15,7 @@ const _VARIANTS := "user://console-variants.json"
 var _snapshot := {}
 var _settings := {"ok": true, "first_launch": false, "games_float": false, "sound_level": 10,
 	"language": "", "languages": Locale.NAMES.keys()}
+var _backdrop := {"backdrop": "light", "pixel_veil": true, "veil_gel": false}
 ## The library as the choices made since the app started left it; empty until one is made.
 var _current := {}
 var _story := {}
@@ -78,6 +79,19 @@ func load_snapshot(folder: String) -> void:
 	var locale: String = _snapshot.get("locale", "")
 	if locale:
 		TranslationServer.set_locale(locale)
+
+
+## Debug builds: starts on the backdrop named [param chosen] (a `backdrop` wire name, `--backdrop=dark`), the veil
+## still when [param veil] is `off` (`--pixel-veil=off`); the stored ones when empty. A name that is no backdrop's is
+## traced and left aside.
+func start_with_backdrop(chosen: String, veil: String) -> void:
+	if StringName(chosen) in Backdrop.NAMES:
+		_backdrop["backdrop"] = chosen
+	elif chosen:
+		Diagnostics.trace("backdrop", "--backdrop=%s refused, not one of %s" % [chosen,
+			", ".join(PackedStringArray(Backdrop.NAMES.keys()))])
+	if veil:
+		_backdrop["pixel_veil"] = veil != "off"
 
 
 func loadCatalog(..._data: Array) -> Dictionary:
@@ -167,6 +181,25 @@ func saveEdgeSmoothing(_id: int, smoothing: StringName) -> Dictionary:
 
 func saveGamesFloat(_id: int, floating: bool) -> Dictionary:
 	return _save("games_float", floating)
+
+
+func backdrop() -> Dictionary:
+	return _backdrop
+
+
+func saveBackdrop(_id: int, chosen: StringName) -> Dictionary:
+	_backdrop["backdrop"] = chosen
+	return {"ok": true}
+
+
+func savePixelVeil(_id: int, on: bool) -> Dictionary:
+	_backdrop["pixel_veil"] = on
+	return {"ok": true}
+
+
+func saveVeilGel(_id: int, on: bool) -> Dictionary:
+	_backdrop["veil_gel"] = on
+	return {"ok": true}
 
 
 func saveSoundLevel(_id: int, steps: int) -> Dictionary:

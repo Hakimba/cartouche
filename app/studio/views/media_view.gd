@@ -13,7 +13,6 @@ const DRAWN_WITHIN := 2.2
 ## The view's size goes by steps of this many pixels: a medium moving across the row does not resize it
 ## at each frame; it takes its own size again once it settles.
 const _STEP_PX := 32
-const _SHADOW_COLOUR := Color(70.0 / 255.0, 52.0 / 255.0, 34.0 / 255.0)
 
 ## The app's camera, whose view of the medium this one copies.
 var camera: Camera3D
@@ -148,6 +147,8 @@ func _notification(what: int) -> void:
 		else:
 			_hidden_size = _view.size
 			_view.size = Vector2i.ZERO
+	elif what == NOTIFICATION_THEME_CHANGED and _framed:
+		_shade()
 
 
 func _process(_delta: float) -> void:
@@ -220,8 +221,8 @@ func place(at: Transform3D, s: float) -> void:
 	shader.set_shader_parameter(&"blur", at_s.blur * scale_by)
 	shader.set_shader_parameter(&"shadow_y", at_s.shadow_y * scale_by)
 	shader.set_shader_parameter(&"shadow_blur", at_s.shadow_blur * scale_by)
-	shader.set_shader_parameter(&"shadow_colour", Color(_SHADOW_COLOUR, at_s.shadow_alpha))
 	shader.set_shader_parameter(&"saturation", at_s.saturation)
+	_shade()
 
 
 ## The view, for its size and how it is drawn.
@@ -242,6 +243,12 @@ func lights() -> Array[Light3D]:
 ## The environment of its own world, whose room light its lights set.
 func environment() -> Environment:
 	return _environment.environment
+
+
+## The shadow in the backdrop's warm colour, as dark as the medium's softness has it.
+func _shade() -> void:
+	(material as ShaderMaterial).set_shader_parameter(&"shadow_colour",
+		Color(Backdrop.palette.warm_shadow, look(_softness).shadow_alpha))
 
 
 func _hold(model: Node3D, lit: StudioLights.Rig, blank: StudioLights.Rig) -> void:

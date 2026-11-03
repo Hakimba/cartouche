@@ -69,6 +69,8 @@ var _frames_ms := PackedFloat32Array()
 ## preparation on the CPU, in milliseconds.
 var _process_ms := 0.0
 var _draw_ms := 0.0
+## The GPU's time over the frames drawn: at rest, what drawing again costs.
+var _gpu_ms := 0.0
 var _elapsed_s := 0.0
 ## Frames drawn before the measure, to count those drawn during it: at rest, only what changes is drawn.
 var _drawn_before := 0
@@ -139,6 +141,8 @@ func _ready() -> void:
 		_carousel._resting.stays_awake = true
 	set_process(true)
 	_drawn_before = Engine.get_frames_drawn()
+	RenderingServer.frame_post_draw.connect(func() -> void:
+		_gpu_ms += RenderingServer.viewport_get_measured_render_time_gpu(get_viewport().get_viewport_rid()))
 	Diagnostics.trace("bench", "%s started" % _scenario)
 
 
@@ -323,5 +327,6 @@ func _report() -> void:
 	var draw_calls := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 	var count := maxi(_frames_ms.size(), 1)
 	var drawn_per_s := (Engine.get_frames_drawn() - _drawn_before) / maxf(_elapsed_s, 0.001)
-	Diagnostics.trace("bench", "%s: %s steps=%d %s draw_calls=%d process_ms=%.2f draw_cpu_ms=%.2f drawn_per_s=%.1f" % [
-		_scenario, frames, _steps, Diagnostics.memory(), draw_calls, _process_ms / count, _draw_ms / count, drawn_per_s])
+	Diagnostics.trace("bench", "%s: %s steps=%d %s draw_calls=%d process_ms=%.2f draw_cpu_ms=%.2f drawn_per_s=%.1f gpu_ms_per_s=%.1f" % [
+		_scenario, frames, _steps, Diagnostics.memory(), draw_calls, _process_ms / count, _draw_ms / count, drawn_per_s,
+		_gpu_ms / maxf(_elapsed_s, 0.001)])

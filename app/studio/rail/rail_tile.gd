@@ -31,17 +31,20 @@ class Plain:
 
 	func _init() -> void:
 		mouse_filter = MOUSE_FILTER_IGNORE
-		var shown := StudioMaterial.new(StudioTokens.Look.SATIN)
-		shown.radius = RADIUS
-		shown.shadows = shown.shadows.filter(func(shadow: StudioMaterial.Shadow) -> bool: return shadow.inset)
 		_material.shader = preload("res://studio/satin_panel.gdshader")
-		var parameters := SatinPanel.Backing.recipe(shown)
-		for parameter in parameters:
-			_material.set_shader_parameter(parameter, parameters[parameter])
 		_material.set_shader_parameter(&"box_position", Vector2.ZERO)
 		_material.set_shader_parameter(&"box_size", SIZE)
 		material = _material
 		size = SIZE
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_THEME_CHANGED:
+			var shown := StudioMaterial.new(StudioTokens.Look.SATIN)
+			shown.radius = RADIUS
+			shown.shadows = shown.shadows.filter(func(shadow: StudioMaterial.Shadow) -> bool: return shadow.inset)
+			var parameters := SatinPanel.Backing.recipe(shown)
+			for parameter in parameters:
+				_material.set_shader_parameter(parameter, parameters[parameter])
 
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, SIZE), Color.WHITE)

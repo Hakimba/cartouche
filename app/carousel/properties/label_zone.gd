@@ -71,7 +71,7 @@ func place(label: Rect2, kind: Shape, tint: Color) -> void:
 	var morph := _target_box.has_area() and shape != kind
 	var same_target := _target_box == box and shape == kind
 	gel = tint
-	_material.set_shader_parameter(&"gel", gel)
+	_material.set_shader_parameter(&"gel", Backdrop.palette.gel(gel))
 	if same_target and _morph:
 		return
 	_target_box = box

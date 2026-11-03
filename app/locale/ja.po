@@ -436,3 +436,39 @@ msgstr "端末の言語"
 
 msgid "Sounds"
 msgstr "効果音"
+
+msgid "Background"
+msgstr "背景"
+
+msgid "Which background?"
+msgstr "どの背景にしますか？"
+
+msgid "The background behind every screen. “Like the device” follows the light or dark theme of the system."
+msgstr "すべての画面の後ろにある背景です。「端末に合わせる」はシステムのライト／ダークテーマに従います。"
+
+msgid "Light"
+msgstr "ライト"
+
+msgid "Dark"
+msgstr "ダーク"
+
+msgid "Light grey"
+msgstr "ライトグレー"
+
+msgid "Anthracite"
+msgstr "チャコール"
+
+msgid "Like the device"
+msgstr "端末に合わせる"
+
+msgid "Animated background"
+msgstr "動く背景"
+
+msgid "In the console's colour"
+msgstr "コンソールの色で"
+
+msgid "Instead of the background's colours"
+msgstr "背景の色の代わりに"
+
+msgid "A veil of pixels drifts behind the screens"
+msgstr "画面の後ろでピクセルのベールが揺れます"

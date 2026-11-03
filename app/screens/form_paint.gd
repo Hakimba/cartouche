@@ -110,6 +110,8 @@ class Card:
 	func _notification(what: int) -> void:
 		if what == NOTIFICATION_RESIZED:
 			_layer.place(Rect2(Vector2.ZERO, size), radius)
+		elif what == NOTIFICATION_THEME_CHANGED:
+			_layer.shown = FormPaint.card_material(not bare)
 
 
 ## The card's material: the focused card (the satin card and its shadow, with no gel ring or glow), or the ring
@@ -140,8 +142,8 @@ static func line(shown: String, face: StudioTokens.Face, px: float, tracking_em 
 ## A step count on [param canvas]: [param number] in the gel [param rim], then [param rest] muted.
 static func draw_count(canvas: CanvasItem, number: String, rest: String, rim: Color) -> void:
 	var shown := line(number, StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
-	shown.draw(canvas, _COUNT_SHIFT, rim)
-	line(rest, StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08).draw(canvas, _COUNT_SHIFT + Vector2(shown.width, 0.0), StudioTokens.MUTE)
+	shown.draw(canvas, _COUNT_SHIFT, Backdrop.palette.gel(rim))
+	line(rest, StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08).draw(canvas, _COUNT_SHIFT + Vector2(shown.width, 0.0), Backdrop.palette.mute)
 
 
 ## A material of [param colors] over [param stops] and [param shadows] (each as [StudioTokens] lists them), on a

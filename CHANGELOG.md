@@ -5,6 +5,14 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+### Added
+- A **Background** setting: Light, Dark (pure black, for OLED screens), Light grey, Anthracite, or Like the device,
+  which follows your system's light or dark theme. Each one is shown on its card, and the one you choose shows at once
+  on every screen. On the dark backgrounds the console logos take versions made for a dark ground.
+- An **Animated background** switch, on by default: a veil of pixels drifts behind the screens, in colours made for
+  each background, and keeps drifting while Cartouche rests. Turned off, a resting screen is drawn no more, as before.
+  A second switch, **In the console's colour**, off by default, gives the veil the colour of the console shown.
+
 ### Fixed
 - Closing the settings on the consoles screen no longer shows the games screen's **Search** hint over **Arrange**
   ([#2](../../issues/2), thanks @kafka-esq).

@@ -79,14 +79,14 @@ class Row:
 		var number := _number_on if on else _number
 		var room := size.x - _PAD_LEFT - _PAD_RIGHT - _GAP - number.width
 		var top := (size.y - _KICK_LINE - _NAME_LINE) / 2.0
-		_kick.draw(self, Vector2(_PAD_LEFT, top + _KICK_ASCENT - _kick.baseline - _KICK_RAISE), StudioTokens.MUTE)
+		_kick.draw(self, Vector2(_PAD_LEFT, top + _KICK_ASCENT - _kick.baseline - _KICK_RAISE), Backdrop.palette.mute)
 		var name_text := _name_on if on else _name
 		name_text.fit(room)
-		var ink := Color(StudioTokens.INK, 1.0 if on else 0.82)
+		var ink := Color(Backdrop.palette.ink, 1.0 if on else 0.82)
 		name_text.draw(self, Vector2(_PAD_LEFT, top + _KICK_LINE + _NAME_ASCENT - name_text.baseline), ink)
 		var number_top := (size.y - _NUMBER_LINE) / 2.0 + _NUMBER_ASCENT - number.baseline
-		number.draw(self, Vector2(size.x - _PAD_RIGHT - number.width, number_top), rim if on else StudioTokens.MUTE)
-		draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), StudioTokens.LINE)
+		number.draw(self, Vector2(size.x - _PAD_RIGHT - number.width, number_top), rim if on else Backdrop.palette.mute)
+		draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), Backdrop.palette.line)
 
 
 const _CQW := FormPaint.CQW
@@ -199,6 +199,12 @@ func _ready() -> void:
 	_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for line: Control in [_title_node, _count_node, _window, _plate_node]:
 		_rests[line] = line.position
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_THEME_CHANGED and is_node_ready():
+		_rim = Backdrop.palette.gel(_rim)
+		_place()
 
 
 func _input(event: InputEvent) -> void:
@@ -379,7 +385,7 @@ func _settle() -> void:
 
 func _gel_of(i: int) -> Color:
 	var folder := _entries[i].folder if _is_type else _plinth.console()
-	return ConsoleManifest.gel_of(folder)
+	return Backdrop.palette.gel(ConsoleManifest.gel_of(folder))
 
 
 func _place() -> void:
@@ -423,7 +429,7 @@ func _show_focus(moving: bool) -> void:
 		_cursor.position.y = _cursor_y)
 	if not _dragging:
 		_settle_scroll()
-	var from_rim := _rim
+	var from_rim := Backdrop.palette.gel(_rim)
 	Motion.animate(self, _motions, &"rim", StudioTokens.GEL_FADE_S, Motion.Easing.EASE, func(p: float) -> void:
 		_rim = from_rim.lerp(gel, p)
 		_cursor.gel = _rim
@@ -557,7 +563,7 @@ func _rebuild_plate() -> void:
 
 
 func _draw_title() -> void:
-	_title.draw(_title_node, Vector2.ZERO, StudioTokens.INK)
+	_title.draw(_title_node, Vector2.ZERO, Backdrop.palette.ink)
 
 
 func _draw_count() -> void:
@@ -574,15 +580,15 @@ func _draw_plate() -> void:
 	var y := plate.y + 1.4 * _CQW + (0.0 if kicked else _PLATE_DROP)
 	var name_box := _PLATE_NAME_PX * 1.1
 	var name_shift := (_plate_name.height - name_box) / 2.0
-	_plate_name.draw(_plate_ink, Vector2(centre - _plate_name.width / 2.0, y - name_shift), StudioTokens.INK)
+	_plate_name.draw(_plate_ink, Vector2(centre - _plate_name.width / 2.0, y - name_shift), Backdrop.palette.ink)
 	y += name_box + 0.3 * _CQW
 	var kick_box := _PLATE_KICK_PX * FormPaint.PLEX_LINE if kicked else 1.6 * _CQW
 	_plate_kick.draw(_plate_ink, Vector2(centre - _plate_kick.width / 2.0,
 			y + FormPaint.PLEX_ASCENT * _PLATE_KICK_PX - _plate_kick.baseline + _KICKED_DROP),
-		StudioTokens.MUTE)
+		Backdrop.palette.mute)
 	y += kick_box + 0.3 * _CQW
 	y += _KICKED_FILES_DROP if kicked else _FILES_DROP
-	var ink := StudioTokens.MUTE.lerp(_rim, _FILES_SHARE)
+	var ink := Backdrop.palette.mute.lerp(_rim, _FILES_SHARE)
 	for line in _files:
 		var shift := (line.height - _FILES_LINE) / 2.0
 		line.draw(_plate_ink, Vector2(centre - line.width / 2.0, y - shift), ink)

@@ -43,9 +43,11 @@ class SettingsTest {
     }
 
     @Test
-    fun `a fresh install is on its first launch, smooths the edges 4x and leaves the games still`() {
+    fun `a fresh install is on its first launch, smooths the edges 4x, leaves the games still, is Light with the veil on`() {
         Settings().isFirstLaunch(Library()) shouldBe true
         Settings().edgeSmoothing shouldBe EdgeSmoothing.FOUR_TIMES
         Settings().gamesFloat shouldBe false
+        Settings().backdrop shouldBe Backdrop.LIGHT
+        Settings().pixelVeil shouldBe true
     }
 }

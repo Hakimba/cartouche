@@ -55,6 +55,7 @@ import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.search.Group
 import app.cartouche.core.search.Mark
 import app.cartouche.core.search.View
+import app.cartouche.core.settings.Backdrop
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Language
@@ -154,6 +155,7 @@ class WireTest {
             LabelDownload.Running(Some(0.5)).toWire(GameId("ps2/b")),
             success("library" to library.toWireJson(None, ps2), "art" to listOf(found).artWireJson(), "absent" to arrayOf("ps2/b")),
             AppSettings(Some(ButtonStyle.NINTENDO), gamesFloat = true).toWire(false),
+            AppSettings(backdrop = Backdrop.ANTHRACITE).backdropToWire(),
             success("order" to arrayOf("ps2", "gba")),
             failure(ErrorCode.GAP_OUT_OF_RANGE, "x"),
             failure(ErrorCode.NOT_IN_LIBRARY, "x"),
@@ -342,6 +344,7 @@ class WireTest {
     fun `every enum reaches Godot as the word GDScript reads`() {
         ButtonStyle.entries.map { it.wire } shouldBe listOf("xbox", "nintendo", "playstation")
         EdgeSmoothing.entries.map { it.wire } shouldBe listOf("4x", "2x", "off")
+        Backdrop.entries.map { it.wire } shouldBe listOf("light", "dark", "light_grey", "anthracite", "device")
         DiscGrouping.entries.map { it.wire } shouldBe listOf("grouped", "separate")
         FolderDepth.entries.map { it.wire } shouldBe listOf("top_level", "subfolders")
         SkipReason.entries.map { it.wire } shouldBe listOf("hidden", "emulator_data", "too_deep", "unreadable")
