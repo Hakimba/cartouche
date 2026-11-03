@@ -418,7 +418,8 @@ func _step_node(node: Node) -> void:
 		return
 	if node.is_processing() and node.has_method(&"_process"):
 		node.call(&"_process", 1.0 / 60.0)
-	if node is AnimationPlayer:
+	# Only a playing one: the launch's, only ever sought, would otherwise apply its later moments.
+	if node is AnimationPlayer and (node as AnimationPlayer).is_playing():
 		(node as AnimationPlayer).advance(1.0 / 60.0)
 	for child in node.get_children():
 		_step_node(child)

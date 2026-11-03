@@ -300,6 +300,9 @@ func _walk(titles: Array) -> void:
 		else:
 			Fixtures.press(carousel, button)
 		Fixtures.step_frame(carousel)
+		# Up out of the ribbon tosses the game: the walk goes on once it lands.
+		while carousel._toss.is_busy():
+			Fixtures.step_frame(carousel)
 		# The pill names the game in the middle, one of the shelf's.
 		assert_str((carousel._title as Label).text).is_equal(_shown(carousel))
 		assert_bool(carousel._row.selected_game() in carousel._shelves[carousel._shelf].games).is_true()

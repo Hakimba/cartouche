@@ -6,7 +6,8 @@ extends Control
 ## screen: the platform's shelf of games, the selected game in the middle. There, left and right
 ## move along the shelf (held, faster and faster), A launches the selected game into its console
 ## ([GameLaunch]), B goes back out to the consoles, X opens the selected game's properties
-## ([DiscProperties]); down opens the ribbon that searches the shelf ([GameSearch]). The right stick
+## ([DiscProperties]); down opens the ribbon that searches the shelf ([GameSearch]), up tosses the
+## selected game to land as another one of the shelf drawn at random ([GameToss]). The right stick
 ## turns the selected console on the consoles screen, the selected game on the games screen and in
 ## its properties, nothing in between. Where the user was is remembered across restarts. The games'
 ## disc scans arrive as the plugin finds them ([GameArt]), a bar at the bottom right, beside the
@@ -85,6 +86,9 @@ var _console_variants: Dictionary[String, String] = {}
 var _demo := false
 var _shown := false
 var _direction := HeldDirection.new()
+var _up := HeldDirection.new({&"ui_up": 1})
+## Whether the games row rested on the games screen last frame (see [method ShelfRow.read_pick]).
+var _row_resting := false
 var _downloading := false
 var _arrival: Tween
 var _title_fade: Tween
@@ -134,7 +138,9 @@ var _shelf_waiting := false
 @onready var _search: GameSearch = %Search
 @onready var _title_marks: TitleMarks = %TitleMarks
 @onready var _clear_hint: Control = %ClearFilter
+@onready var _random_hint: Control = %RandomHint
 @onready var _touch := CarouselTouch.new(_consoles, _row, _rail, _add_ball)
+@onready var _toss := GameToss.new()
 
 
 func _enter_tree() -> void:
@@ -153,13 +159,17 @@ func _ready() -> void:
 	_screens.covering.connect(_on_screens_covering)
 	_screens.form_leaving.connect(_on_screens_form_leaving)
 	_game_launch.android = android
+	_toss.row = _row
+	_toss.pill = _pill
+	_toss.logo = _games_logo
+	add_child(_toss)
 	_share_clock()
 	_clock.position = StudioTokens.CLOCK.position
 	_clock.size = StudioTokens.CLOCK.size
 	_resting.smooth_motion = func() -> bool:
 		return _screen == Screen.GAMES and _row.is_visible_in_tree() and _row.games_float and _row.pace > 0.0
 	_resting.moving = func() -> bool:
-		return _downloading or _game_launch.is_busy() or _screen in _MOVING or _screens.is_playing() \
+		return _downloading or _game_launch.is_busy() or _toss.is_busy() or _screen in _MOVING or _screens.is_playing() \
 			or _order.is_open() or (_console_arrival and _console_arrival.is_playing())
 	if Diagnostics.argument("welcome") == "skip":
 		_screens.welcome_waits = false
@@ -198,6 +208,7 @@ func _ready() -> void:
 	_touch.entered.connect(_enter)
 	_touch.long_pressed.connect(_long_press)
 	_touch.lifted.connect(_let_go)
+	_touch.tossed.connect(_toss_selected)
 	_row.camera = _camera
 	resized.connect(func() -> void:
 		if _shown and _row.has_games():
@@ -274,9 +285,13 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED:
+		_toss.finish()
 		_let_go()
 		_remember()
-		# Up let go meanwhile never reaches the app.
+		# A button let go meanwhile never reaches the app: the row stops, the ball closes, the first press back is one.
+		_row.release(_direction.direction)
+		_direction.let_go()
+		_up.let_go()
 		_add_ball.close(false)
 	elif what == NOTIFICATION_APPLICATION_RESUMED:
 		# Where the system tells no change of its theme, it is read again on the way back.
@@ -310,17 +325,26 @@ func _process(delta: float) -> void:
 	_touch.hold(now, _touchable)
 	var stick := Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down")
 	_consoles.inspect(stick if _screen in _CONSOLE_SCREENS and _shown else Vector2.ZERO)
-	if not _game_launch.is_busy():
+	if not (_game_launch.is_busy() or _toss.is_busy()):
 		_row.inspect(stick if _screen in _GAME_SCREENS else Vector2.ZERO)
+	# Read as the row rests, not as it passes games nor at each letter of a search.
+	var resting := _screen == Screen.GAMES and _shown and not (_row.is_settling() or _search.is_open() or _toss.is_busy())
+	if resting and not _row_resting:
+		_row.read_pick()
+	_row_resting = resting
 	if _shelf_waiting and _screen == Screen.CONSOLES and not _consoles.is_settling():
 		_show_waiting_shelf()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var moved := _direction.update(event)
-	if _settle_waiting:
+	# Held up, a stick sends presses all along: only its first one is a press.
+	if not _up.update(event) and event.is_action_pressed(&"ui_up"):
+		return
+	if _settle_waiting or _toss.is_busy():
 		if event.is_pressed() and not event.is_echo():
-			Diagnostics.trace("carousel", "press during settle ignored: %s" % event.as_text())
+			Diagnostics.trace("carousel", "press during %s ignored: %s" % ["the toss" if _toss.is_busy() else "settle",
+				event.as_text()])
 		return
 	if _needs_settle(event):
 		_after_settle(event, moved)
@@ -370,6 +394,8 @@ func _handle_input(event: InputEvent, moved: bool) -> void:
 			_row.release(_direction.direction)
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_accept"):
 		_launch()
+	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_up"):
+		_toss_selected()
 	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_down"):
 		_row.freeze()
 		Sounds.play(SoundEffects.Cue.OPEN)
@@ -416,11 +442,18 @@ func _share_clock() -> void:
 	_properties.clock = clock
 
 
-## Whether a finger acts on the carousel now: not before it shows, nor during a launch, the
-## animation into or out of a console, or the ring (which reads its own).
+## Whether a finger acts on the carousel now: not before it shows, nor during a launch or a toss, a press waiting for
+## the row to stop, the animation into or out of a console, or the ring (which reads its own).
 func _touchable() -> bool:
-	return _shown and _row.has_games() and not _game_launch.is_busy() and _screen not in _MOVING \
-		and _screen != Screen.ORDER and not _search.is_open()
+	return _shown and _row.has_games() and not (_game_launch.is_busy() or _toss.is_busy() or _settle_waiting) \
+		and _screen not in _MOVING and _screen != Screen.ORDER and not _search.is_open()
+
+
+## The toss takes the title's pill: its fade in, under way as the carousel comes in, ends at once.
+func _toss_selected() -> void:
+	_toss.toss()
+	if _toss.is_busy() and _arrival and _arrival.is_running():
+		_arrival.custom_step(INF)
 
 
 ## Where the console or the game in the middle rests on the screen (not where it is passing
@@ -589,9 +622,11 @@ func _show_title() -> void:
 	_pill.move_top(top)
 	Diagnostics.trace("carousel", "pill top=%.2f medium=%s" % [top, _row.selected_game().medium])
 	_clear_hint.visible = _search.is_filtered()
+	_random_hint.visible = _row.has_pick()
 
 
 func _go(screen_to: Screen) -> void:
+	_toss.finish()
 	_show_waiting_shelf()
 	_games_logo.visible = screen_to in _GAME_SCREENS
 	var games := screen_to == Screen.GAMES and _screen != Screen.PROPERTIES
@@ -942,6 +977,7 @@ func _on_screens_covering() -> void:
 
 
 func _cover(keeping_ball := false) -> void:
+	_toss.finish()
 	_show_waiting_shelf()
 	_shown = false
 	_hold_select.stop()
@@ -1063,5 +1099,5 @@ func _after_settle(event: InputEvent, moved: bool) -> void:
 	while _start_moving() and Time.get_ticks_msec() - started < StudioTokens.TR_SETTLE_S * 1000.0:
 		await get_tree().process_frame
 	_settle_waiting = false
-	if _screen == before_screen:
+	if _screen == before_screen and not _toss.is_busy():
 		_handle_input(event, moved)

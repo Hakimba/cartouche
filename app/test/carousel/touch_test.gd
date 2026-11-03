@@ -113,6 +113,25 @@ func test_a_drag_on_the_disc_turns_it_and_a_long_press_opens_its_properties() ->
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.PROPERTIES)
 
 
+func test_a_flick_up_from_the_disc_tosses_it_a_slow_sideways_or_downward_one_does_not_a_swipe_beside_steps() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var centre := carousel._selected_point()
+	await Fixtures.finger(self, centre, true)
+	await Fixtures.finger_to(self, centre - Vector2(0.0, 200.0))
+	Fixtures.clock.ms += Finger.FLICK_MS
+	await Fixtures.finger(self, centre - Vector2(0.0, 200.0), false)
+	await Fixtures.touch(self, [centre, centre + Vector2(200.0, -150.0)])
+	await Fixtures.touch(self, [centre, centre + Vector2(0.0, 200.0)])
+	assert_bool(carousel._toss.is_busy()).is_false()
+	await Fixtures.touch(self, [centre + BESIDE, centre + BESIDE - Vector2(200.0, 0.0)])
+	assert_int(carousel._row.selected_index()).is_equal(1)
+	var pick := carousel._row.pick()
+	await Fixtures.touch(self, [centre, centre - Vector2(40.0, 200.0)])
+	assert_bool(carousel._toss.is_busy()).is_true()
+	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
+	assert_str(carousel._row.selected_game().id).is_equal(pick.id)
+
+
 func test_in_a_game_s_properties_a_tap_on_the_label_lists_its_images_and_one_on_an_image_keeps_it() -> void:
 	var setup := await _on_games()
 	var carousel: Carousel = setup[0]

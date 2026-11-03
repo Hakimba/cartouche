@@ -152,7 +152,7 @@ static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: Stri
 
 ## Whether a person can act on [param carousel] now (INV-20): the focus is on a control seen (no ancestor fully
 ## faded) that takes presses, inside the screen in front when one shows, and no input guard of that screen is left set;
-## or no screen is in front and the carousel, shown and processing, or its ring takes the presses.
+## or no screen is in front and the carousel, shown, no game in the air and processing, or its ring takes the presses.
 static func alive(carousel: Carousel) -> bool:
 	if not (carousel.get_node("Backdrop") as CanvasLayer).visible:
 		return false
@@ -160,8 +160,8 @@ static func alive(carousel: Carousel) -> bool:
 	var focused := carousel.get_viewport().gui_get_focus_owner()
 	if focused != null and focused.is_visible_in_tree() and focused.can_process() and _seen(focused):
 		return screen == null or (screen.is_ancestor_of(focused) and not _guarded(screen))
-	return screen == null and ((carousel._shown and carousel.is_visible_in_tree() and carousel.can_process())
-		or carousel._order.is_open())
+	return screen == null and ((carousel._shown and not carousel._toss.is_busy() and carousel.is_visible_in_tree()
+		and carousel.can_process()) or carousel._order.is_open())
 
 
 ## Whether an input guard of [param screen] is set.

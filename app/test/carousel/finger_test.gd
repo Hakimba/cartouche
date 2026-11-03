@@ -34,14 +34,16 @@ func test_a_short_press_that_barely_moves_is_a_tap_and_a_slow_one_is_nothing() -
 	assert_int(finger.read(_up(Vector2(100, 100)), 1000 + Finger.TAP_MS + 1)).is_equal(Finger.Gesture.NONE)
 
 
-func test_a_finger_moved_past_the_slop_drags_until_released_and_is_never_a_tap() -> void:
-	var finger := Finger.new()
-	finger.read(_down(Vector2(100, 100)), 0)
-	assert_int(finger.read(_move(Vector2(100 + Finger.SLOP, 100)), 20)).is_equal(Finger.Gesture.DRAG)
-	# Back where it came down, still a drag.
-	assert_int(finger.read(_move(Vector2(100, 100)), 40)).is_equal(Finger.Gesture.DRAG)
-	assert_int(finger.read(_up(Vector2(100, 100)), 60)).is_equal(Finger.Gesture.NONE)
-	assert_bool(finger.is_down).is_false()
+func test_a_finger_moved_past_the_slop_drags_until_released_is_a_flick_if_released_soon_and_never_a_tap() -> void:
+	for lifted_ms: int in [Finger.FLICK_MS - 1, Finger.FLICK_MS]:
+		var finger := Finger.new()
+		finger.read(_down(Vector2(100, 100)), 0)
+		assert_int(finger.read(_move(Vector2(100 + Finger.SLOP, 100)), 20)).is_equal(Finger.Gesture.DRAG)
+		# Back where it came down, still a drag.
+		assert_int(finger.read(_move(Vector2(100, 100)), 40)).is_equal(Finger.Gesture.DRAG)
+		assert_int(finger.read(_up(Vector2(100, 100)), lifted_ms)) \
+			.is_equal(Finger.Gesture.FLICK if lifted_ms < Finger.FLICK_MS else Finger.Gesture.NONE)
+		assert_bool(finger.is_down).is_false()
 
 
 func test_a_touch_the_system_takes_back_ends_as_nothing() -> void:

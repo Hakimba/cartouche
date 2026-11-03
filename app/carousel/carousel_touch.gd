@@ -5,7 +5,8 @@ extends RefCounted
 ## middle tile goes into it, one beside it moves one console that way, another tile moves that many, a long press on
 ## it opens its properties, and a swipe anywhere moves one console; on the games screen, a tap beside the game in the
 ## middle moves one game, a long press on it opens its properties, a swipe beside it moves one game, however long or
-## fast, a drag on it turns it, and nothing launches but A. A drag over the properties turns what they stage.
+## fast, a drag on it turns it, a flick up from it tosses it, and nothing launches but A. A drag over the properties
+## turns what they stage.
 
 ## A tap on the console in the middle, or on the middle tile: the carousel goes into it.
 signal entered
@@ -13,6 +14,8 @@ signal entered
 signal long_pressed
 ## The finger was lifted, or taken back by the system: what it turned comes back to the front.
 signal lifted
+## A flick up from the game in the middle.
+signal tossed
 
 ## How near the console or the game in the middle a finger comes down to be on it, and how far it swipes to move
 ## one, in pixels.
@@ -51,6 +54,8 @@ func read(event: InputEvent, now_ms: int, screen: Carousel.Screen, touchable: bo
 			_tap(screen, selected)
 		Finger.Gesture.DRAG:
 			_drag(screen)
+		Finger.Gesture.FLICK:
+			_flick(screen)
 
 
 ## A finger held still on the console or the game in the middle becomes a long press, at [param now_ms], while
@@ -101,6 +106,14 @@ func _drag(screen: Carousel.Screen) -> void:
 	var towards := 1 if swipe > 0.0 else -1
 	Diagnostics.trace("touch", "swiped %d" % towards)
 	_step_beside(screen, towards)
+
+
+## A flick from the game in the middle, far enough up and more up than sideways.
+func _flick(screen: Carousel.Screen) -> void:
+	var flick := _finger.at - _finger.start
+	if screen == Carousel.Screen.GAMES and _on_selected and -flick.y >= _SWIPE_PX and absf(flick.x) < -flick.y:
+		Diagnostics.trace("touch", "flicked up")
+		tossed.emit()
 
 
 func _step_beside(screen: Carousel.Screen, towards: int) -> void:

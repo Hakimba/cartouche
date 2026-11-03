@@ -12,6 +12,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
 - An **Animated background** switch, on by default: a veil of pixels drifts behind the screens, in colours made for
   each background, and keeps drifting while Cartouche rests. Turned off, a resting screen is drawn no more, as before.
   A second switch, **In the console's colour**, off by default, gives the veil the colour of the console shown.
+- **↑ Random** on the games screen, or a flick up from the game in the middle: the game is tossed like a coin and lands
+  as another game of the list shown (of the search's results, while one is on), drawn at random.
 
 ### Fixed
 - Closing the settings on the consoles screen no longer shows the games screen's **Search** hint over **Arrange**

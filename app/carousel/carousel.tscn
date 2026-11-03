@@ -325,6 +325,13 @@ script = ExtResource("20")
 button = &"↓"
 text = "Search"
 
+[node name="RandomHint" type="Control" parent="GamesHints"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("20")
+button = &"↑"
+text = "Random"
+
 [node name="Search" parent="." instance=ExtResource("30")]
 unique_name_in_owner = true
 layout_mode = 1

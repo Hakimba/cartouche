@@ -378,6 +378,9 @@ msgstr "Sans lissage"
 msgid "Search"
 msgstr "Chercher"
 
+msgid "Random"
+msgstr "Au hasard"
+
 msgid "Clear the filter"
 msgstr "Effacer le filtre"
 

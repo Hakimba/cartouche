@@ -2,16 +2,18 @@
 class_name Finger
 extends RefCounted
 ## The first finger on the screen, read as the person means it: put down, then a tap (lifted
-## soon, having barely moved), a long press (held still), or a drag (moved past the slop). A touch
-## the system takes back (its back gesture, a second finger's pinch) ends as nothing. Times come
-## from the caller, so that the reading is the same whatever the frame rate.
+## soon, having barely moved), a long press (held still), or a drag (moved past the slop), which is
+## a flick when lifted soon after it came down. A touch the system takes back (its back gesture, a second
+## finger's pinch) ends as nothing. Times come from the caller, so that the reading is the same
+## whatever the frame rate.
 
-enum Gesture { NONE, DOWN, TAP, DRAG }
+enum Gesture { NONE, DOWN, TAP, DRAG, FLICK }
 
-## How far a finger moves before it drags, in pixels of the 1280-wide screen; how long a tap lasts
-## (less than), and a long press at least, in milliseconds.
+## How far a finger moves before it drags, in pixels of the 1280-wide screen; how long a tap and a
+## flick last (less than), and a long press at least, in milliseconds.
 const SLOP := 24.0
 const TAP_MS := 250
+const FLICK_MS := 300
 const LONG_MS := 550
 
 ## Where the finger came down and where it is now.
@@ -41,9 +43,11 @@ func read(event: InputEvent, now_ms: int) -> Gesture:
 	elif touch and touch.index == 0 and is_down:
 		is_down = false
 		at = touch.position
+		var lasted := now_ms - _down_ms
+		if is_dragging and not touch.canceled and lasted < FLICK_MS:
+			return Gesture.FLICK
 		# Lifted far from where it came down, with no move seen between: not a tap either.
-		if not (touch.canceled or is_dragging or _long_pressed) and now_ms - _down_ms < TAP_MS \
-				and at.distance_to(start) < SLOP:
+		if not (touch.canceled or is_dragging or _long_pressed) and lasted < TAP_MS and at.distance_to(start) < SLOP:
 			return Gesture.TAP
 	elif drag and drag.index == 0 and is_down:
 		# The first drag counts from where the finger came down: nothing within the slop is lost.

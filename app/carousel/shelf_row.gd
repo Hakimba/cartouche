@@ -39,6 +39,13 @@ var selected_presence := 1.0
 var stage := 0.0
 ## Where the selected game stands once staged, in the row's space.
 var staged := Transform3D.IDENTITY
+## How the selected game is tossed ([GameToss]): lifted (world units), flipped about the horizontal axis (radians), and
+## squashed (above 0) or stretched (below 0) by that part of its height.
+var selected_lift := 0.0
+var selected_flip := 0.0
+var selected_squash := 0.0
+## Draws the pick.
+var random := RandomNumberGenerator.new()
 var _games: Array[AndroidServices.Game] = []
 var _models: Dictionary[String, PackedScene] = {}
 var _look := LabelLook.new()
@@ -72,6 +79,9 @@ var _previewing := false
 ## The games whose label downloads, by id: how much of it is read, from 0 to 1, or below 0 when its
 ## size is unknown (see [method downloading]).
 var _downloads: Dictionary[String, float] = {}
+## A game other than the selected one, drawn at random as the row shows its games and once it is selected, -1 with
+## fewer than two (see [method read_pick]).
+var _pick := -1
 
 
 func is_settling() -> bool:
@@ -119,9 +129,7 @@ func _process(delta: float) -> void:
 	if not _unlabelled.is_empty():
 		var place: Place = _unlabelled.pop_front()
 		if place.game >= 0:
-			var game := _games[place.game]
-			if not _show_image(place, game):
-				_draw_blank(place, game)
+			_label(place)
 	if not _downloads.is_empty():
 		_turn_rings(delta)
 
@@ -177,6 +185,7 @@ func show_games(games: Array[AndroidServices.Game], selected: int) -> void:
 			place.game = game
 			_placed[game] = place
 	_unlabelled = _unlabelled.filter(func(place: Place) -> bool: return place.game >= 0)
+	_draw_pick()
 	_arrange()
 
 
@@ -190,7 +199,36 @@ func jump(index: int, direction: int, slide: float) -> void:
 	_turn.release()
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "jump to %d" % selected_index())
-	selection_changed.emit(selected_game())
+	_selected()
+
+
+## Whether the row has a pick: two games or more.
+func has_pick() -> bool:
+	return _pick >= 0
+
+
+## The game [method select_pick] selects.
+func pick() -> AndroidServices.Game:
+	return _games[_pick]
+
+
+## Starts reading the labels the pick lands among, its own and its neighbours', unless kept or being read: asked as
+## the row comes to rest and as a toss starts, they are kept still when [method select_pick] shows them.
+func read_pick() -> void:
+	if has_pick():
+		for side: int in [0, -1, 1]:
+			label_images.request(_games[posmod(_pick + side, _games.size())])
+
+
+## Selects the pick in place, the row standing still: the game in the middle becomes it, among its own
+## neighbours, its label shown at once rather than in turn.
+func select_pick() -> void:
+	jump(_pick, 1, 0.0)
+	_arrange()
+	var place := _placed[selected_index()]
+	if _unlabelled.has(place):
+		_unlabelled.erase(place)
+		_label(place)
 
 
 ## The selected game, then the [param reach] games on each side of it, nearest first, each once.
@@ -315,8 +353,8 @@ func selected_label_proportion() -> float:
 func show_own_label() -> void:
 	_previewing = false
 	var place: Place = _placed.get(selected_index())
-	if place and not _show_image(place, selected_game()):
-		_draw_blank(place, selected_game())
+	if place:
+		_label(place)
 
 
 ## [param game_id]'s label downloads, [param fraction] of it read (below 0 when its size is
@@ -344,6 +382,13 @@ func refresh_label(game_id: String) -> void:
 			continue
 		if not _show_image(place, game) and label_images.is_absent(game):
 			_draw_blank(place, game)
+
+
+## Shows its game's image on [param place], or its blank until the image is read.
+func _label(place: Place) -> void:
+	var game := _games[place.game]
+	if not _show_image(place, game):
+		_draw_blank(place, game)
 
 
 ## Shows [param game]'s image on [param place] when it is read; otherwise asks for it and is false.
@@ -389,7 +434,18 @@ func step(direction: int) -> void:
 	_turn.release()
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "step %d to %d (held for %d steps)" % [direction, selected_index(), _held_steps])
+	_selected()
+
+
+func _selected() -> void:
+	if selected_index() == _pick:
+		_draw_pick()
 	selection_changed.emit(selected_game())
+
+
+func _draw_pick() -> void:
+	var count := _games.size()
+	_pick = posmod(selected_index() + random.randi_range(1, count - 1), count) if count > 1 else -1
 
 
 func _arrange() -> void:
@@ -439,6 +495,10 @@ func _arrange() -> void:
 			place.shown.spin(_launch_spin, _launch_blur)
 		elif stage > 0.0 and game == selected_index():
 			placed = placed.interpolate_with(Transform3D(staged.basis * turn, staged.origin), stage)
+		elif game == selected_index():
+			var squash := Vector3(1.0 + selected_squash / 2.0, 1.0 - selected_squash, 1.0 + selected_squash / 2.0)
+			placed = Transform3D(Basis.from_scale(squash) * Basis(Vector3.RIGHT, selected_flip) * placed.basis,
+				placed.origin + Vector3.UP * selected_lift)
 		if place.transform != placed:
 			place.transform = placed
 		var presence := selected_presence if game == selected_index() else neighbours

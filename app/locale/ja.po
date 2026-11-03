@@ -376,6 +376,9 @@ msgstr "アンチエイリアスなし"
 msgid "Search"
 msgstr "検索"
 
+msgid "Random"
+msgstr "ランダム"
+
 msgid "Clear the filter"
 msgstr "フィルターを解除"
 

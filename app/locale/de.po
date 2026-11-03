@@ -378,6 +378,9 @@ msgstr "Keine Glättung"
 msgid "Search"
 msgstr "Suchen"
 
+msgid "Random"
+msgstr "Zufällig"
+
 msgid "Clear the filter"
 msgstr "Filter löschen"
 

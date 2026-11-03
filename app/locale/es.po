@@ -378,6 +378,9 @@ msgstr "Sin suavizado"
 msgid "Search"
 msgstr "Buscar"
 
+msgid "Random"
+msgstr "Al azar"
+
 msgid "Clear the filter"
 msgstr "Borrar el filtro"
 

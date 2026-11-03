@@ -378,6 +378,9 @@ msgstr "Nessun antialiasing"
 msgid "Search"
 msgstr "Cerca"
 
+msgid "Random"
+msgstr "A caso"
+
 msgid "Clear the filter"
 msgstr "Cancella il filtro"
 

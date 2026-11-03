@@ -114,7 +114,8 @@ page that explains it. Start from [README.md](README.md) if you have not.
 - **Stall**: a run stopped until the network is back or a delay passes (offline, a server refusing, no room).
 - **Studio**: the app's look: every screen a small lit photo studio (`StudioTokens`). See
   [architecture/studio.md](architecture/studio.md).
-- **Tap, long press, drag, swipe**: what a finger does, read by `Finger`. A swipe moves exactly one game or console.
+- **Tap, long press, drag, swipe, flick**: what a finger does, read by `Finger`. A swipe moves exactly one game or console;
+  a flick up from the game in the middle tosses it.
 - **Template**: a player's launch, written as `am start` arguments (`LaunchTemplate`).
 - **Texture**: an image ScreenScraper has for a release, such as its printed label.
 - **Texture table**: `app/data/screenscraper/<platform>.tsv`: per release, its ScreenScraper game and textures

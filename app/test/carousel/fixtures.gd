@@ -179,11 +179,12 @@ static func stand(random: RandomNumberGenerator) -> Transform3D:
 
 
 ## The carousel of the demo library, shown on its consoles screen in [param suite], moved on by the
-## test itself (see [method step_frame]).
+## test itself (see [method step_frame]), its games row drawing the same picks at every run.
 static func shown_carousel(suite: GdUnitTestSuite) -> Carousel:
 	var carousel: Carousel = suite.auto_free(CAROUSEL.instantiate())
 	var row: ShelfRow = carousel.get_node("%Row")
 	row.label_images = suite.auto_free(FakeArt.new())
+	row.random = cases(0)
 	var screens: ScreenFlow = carousel.get_node("%Screens")
 	screens.welcome_waits = false
 	suite.add_child(carousel)
@@ -201,13 +202,15 @@ static func shown_carousel(suite: GdUnitTestSuite) -> Carousel:
 	return carousel
 
 
-## One frame of [param delta] seconds for [param carousel]: its console's animation and its launch,
-## the carousel, then its rows, in the order of their process priorities.
+## One frame of [param delta] seconds for [param carousel]: its console's animation, its launch and
+## its toss, the carousel, then its rows, in the order of their process priorities.
 static func step_frame(carousel: Carousel, delta := FRAME_S) -> void:
 	if carousel._sequence.is_processing():
 		carousel._sequence._process(delta)
 	if carousel._game_launch.is_processing():
 		carousel._game_launch._process(delta)
+	if carousel._toss.is_processing():
+		carousel._toss._process(delta)
 	carousel._process(delta)
 	carousel._row._process(delta)
 	carousel._consoles._process(delta)

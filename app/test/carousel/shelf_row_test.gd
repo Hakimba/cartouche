@@ -125,11 +125,61 @@ func test_a_blank_shows_no_title_nor_platform_until_a_try_found_no_image_then_bo
 	assert_str(titles.call()["test/1"][0]).is_empty()
 
 
-## A row showing [param count] test games from [param selected], moved only by the test, with no
-## label images whatever the developer's own folder holds.
+func test_the_pick_is_never_the_selected_game_and_every_other_one_can_be_drawn() -> void:
+	for count: int in [1, 2, 3, 7]:
+		var row := _row(count, 0)
+		assert_bool(row.has_pick()).is_equal(count > 1)
+		var drawn: Dictionary[Vector2i, bool] = {}
+		for draw in 100 * count if count > 1 else 0:
+			row.show_games(row._games, draw % count)
+			var pick := row._games.find(row.pick())
+			assert_int(pick).is_not_equal(row.selected_index())
+			drawn[Vector2i(row.selected_index(), pick)] = true
+		assert_int(drawn.size()).is_equal(count * (count - 1))
+
+
+func test_the_pick_selected_stands_in_the_middle_at_once_among_its_own_neighbours_its_label_drawn() -> void:
+	var random := Fixtures.cases(26)
+	for i in 40:
+		var count := random.randi_range(2, 12)
+		var row := _row(count, random.randi_range(0, count - 1))
+		_frames(row, random.randi_range(0, 2 * ShelfRow._PLACES), Fixtures.FRAME_S)
+		for toss in random.randi_range(1, 4):
+			var pick := row.pick()
+			row.select_pick()
+			assert_str(row.selected_game().id).is_equal(pick.id)
+			assert_str(row.pick().id).is_not_equal(pick.id)
+			assert_bool(row.is_settling()).is_false()
+			assert_bool(row._placed[row.selected_index()] in row._unlabelled).is_false()
+			_assert_places(row, count)
+			if is_failure():
+				return
+
+
+func test_stepping_or_jumping_onto_the_pick_draws_another() -> void:
+	var random := Fixtures.cases(27)
+	for i in 40:
+		var count := random.randi_range(2, 12)
+		var row := _row(count, random.randi_range(0, count - 1))
+		for move in 10:
+			var pick := row._games.find(row.pick())
+			if random.randf() < 0.5:
+				row.jump(pick, Fixtures.direction(random), random.randf_range(0.0, 2.0))
+			else:
+				var way := Fixtures.direction(random)
+				while row.selected_index() != pick:
+					row.step(way)
+			assert_int(row._games.find(row.pick())).is_not_equal(row.selected_index())
+			if is_failure():
+				return
+
+
+## A row showing [param count] test games from [param selected], moved only by the test, its picks the same at every
+## run, with no label images whatever the developer's own folder holds.
 func _row(count: int, selected: int, floating := false) -> ShelfRow:
 	var row: ShelfRow = auto_free(ShelfRow.new())
 	row.label_images = auto_free(Fixtures.FakeArt.new())
+	row.random = Fixtures.cases(count * 100 + selected)
 	if floating:
 		row.games_float = true
 	add_child(row)
