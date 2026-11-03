@@ -89,13 +89,10 @@ func _tap(screen: Carousel.Screen, selected: Vector2) -> void:
 		_step_beside(screen, 1 if _finger.at.x > selected.x else -1)
 
 
-## Over the properties, or on the game in the middle, a drag turns what they stage or that game; anywhere else (on
+## Over a game's properties, or on the game in the middle, a drag turns that game; anywhere else (on
 ## the consoles screen, even on the console, so that a swipe there is never mistaken for a turn), once swiped far
 ## enough, it moves one console or game, the way the finger goes, and no more until it is lifted.
 func _drag(screen: Carousel.Screen) -> void:
-	if screen == Carousel.Screen.CONSOLE_PROPERTIES:
-		_consoles.touch_turn(_finger.moved)
-		return
 	if screen == Carousel.Screen.PROPERTIES or (screen == Carousel.Screen.GAMES and _on_selected):
 		_row.touch_turn(_finger.moved)
 		return

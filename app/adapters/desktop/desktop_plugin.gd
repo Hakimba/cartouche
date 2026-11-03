@@ -141,25 +141,7 @@ func setUpPlatform(id: int, platform_id: String, setup: Dictionary) -> Dictionar
 	var story: String = form().get("library", "{}")
 	_current = JSON.parse_string(story)
 	var variant: String = setup.get("variant", "")
-	return setVariant(id, platform_id, variant) if variant else answer
-
-
-## Keeps the model beside the user's other files (in the snapshot when one is loaded).
-func setVariant(id: int, platform_id: String, variant: String) -> Dictionary:
-	var kept := _variants()
-	kept[platform_id] = variant
-	if not _snapshot.is_empty():
-		_snapshot["variants"] = kept
-		_current["console_variants"] = kept
-		return library(id)
-	var library_data := _current.duplicate(true) if not _current.is_empty() else demo("library")
-	var file := FileAccess.open(_VARIANTS, FileAccess.WRITE)
-	if file == null:
-		return {"ok": false, "code": "permission_denied"}
-	file.store_string(JSON.stringify(kept))
-	library_data["console_variants"] = kept
-	_current = library_data
-	return {"ok": true, "library": JSON.stringify(library_data)}
+	return _keep_variant(id, platform_id, variant) if variant else answer
 
 
 func previewPlatform(_id: int, _platform_id: String, _setup: Dictionary) -> Dictionary:
@@ -273,6 +255,24 @@ func form() -> Dictionary:
 func _save(key: String, value: Variant) -> Dictionary:
 	_settings[key] = value
 	return {"ok": true}
+
+
+## Keeps the model beside the user's other files (in the snapshot when one is loaded).
+func _keep_variant(id: int, platform_id: String, variant: String) -> Dictionary:
+	var kept := _variants()
+	kept[platform_id] = variant
+	if not _snapshot.is_empty():
+		_snapshot["variants"] = kept
+		_current["console_variants"] = kept
+		return library(id)
+	var library_data := _current.duplicate(true) if not _current.is_empty() else demo("library")
+	var file := FileAccess.open(_VARIANTS, FileAccess.WRITE)
+	if file == null:
+		return {"ok": false, "code": "permission_denied"}
+	file.store_string(JSON.stringify(kept))
+	library_data["console_variants"] = kept
+	_current = library_data
+	return {"ok": true, "library": JSON.stringify(library_data)}
 
 
 func _variants() -> Dictionary:

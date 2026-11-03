@@ -95,6 +95,9 @@ msgstr "Añadir"
 msgid "The console could not be added."
 msgstr "No se pudo añadir la consola."
 
+msgid "The console could not be saved."
+msgstr "No se pudo guardar la consola."
+
 msgid "{console} added"
 msgstr "{console} añadida"
 
@@ -130,8 +133,14 @@ msgstr "Cerrar"
 msgid "Back"
 msgstr "Atrás"
 
-msgid "Edit the platform"
-msgstr "Editar la plataforma"
+msgid "Edit"
+msgstr "Editar"
+
+msgid "Model"
+msgstr "Modelo"
+
+msgid "Keep"
+msgstr "Conservar"
 
 msgid "Remove"
 msgstr "Eliminar"
@@ -165,8 +174,6 @@ msgstr "Sus ajustes y el acceso a su carpeta se eliminarán de Cartouche."
 msgid "Add a platform"
 msgstr "Añadir una plataforma"
 
-msgid "Properties"
-msgstr "Propiedades"
 
 msgid "Label image"
 msgstr "Imagen de la etiqueta"
@@ -305,9 +312,6 @@ msgstr "Nombre de la consola"
 
 msgid "Arrange"
 msgstr "Ordenar"
-
-msgid "Change place"
-msgstr "Cambiar de sitio"
 
 msgid "Take"
 msgstr "Coger"

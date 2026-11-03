@@ -94,7 +94,7 @@ func test_down_opens_the_ring_on_the_selected_console_and_B_closes_it_on_the_one
 	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._console_title.modulate.a == 1.0)).is_true()
 	# And the consoles screen works as before.
 	await _press(carousel, JOY_BUTTON_X)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_EDIT)
 
 
 func test_inv_15_a_console_taken_and_moved_shows_the_order_at_once_and_A_keeps_it_after_a_restart_too() -> void:
@@ -218,43 +218,11 @@ func test_an_order_that_cannot_be_kept_is_told_and_the_ring_goes_back_to_the_ord
 	assert_str(carousel._order._wheel.selected()).is_equal("ps2")
 
 
-func test_change_place_in_a_console_s_properties_opens_the_ring_on_it_and_y_does_not() -> void:
-	var carousel: Carousel = (await _on_consoles())[0]
-	await _press(carousel, JOY_BUTTON_DPAD_RIGHT)
-	await _press(carousel, JOY_BUTTON_X)
-	await _press(carousel, JOY_BUTTON_Y)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-	assert_object(Fixtures.focus(self)).is_same(carousel._console_properties._change_place)
-	await _press(carousel, JOY_BUTTON_A)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.ORDER)
-	assert_str(carousel._order._wheel.selected()).is_equal("gc")
-	assert_int(carousel._console_properties._step).is_equal(ConsoleProperties.Step.CLOSED)
-	assert_bool(carousel._console_properties.visible).is_false()
-	assert_float(carousel._consoles.stage).is_equal(0.0)
-	assert_float(carousel._console_title.modulate.a).is_equal(0.0)
-	await _press(carousel, JOY_BUTTON_B)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
-	# The consoles screen whole again, though the properties had hidden its title.
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return carousel._console_title.visible and carousel._console_title.modulate.a == 1.0)).is_true()
-	await _press(carousel, JOY_BUTTON_X)
-	await _press(carousel, JOY_BUTTON_DPAD_DOWN)
-	assert_object(Fixtures.focus(self)).is_same(carousel._console_properties._change_place)
-	await _press(carousel, JOY_BUTTON_A)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.ORDER)
-
-
 func test_a_console_alone_has_no_order_to_be_put_in() -> void:
 	var carousel: Carousel = (await _on_consoles(Fixtures.past_first_launch(self, {"gc": 2})))[0]
 	assert_bool(carousel._arrange_hint.visible).is_false()
 	await _press(carousel, JOY_BUTTON_DPAD_DOWN)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
-	await _press(carousel, JOY_BUTTON_X)
-	assert_bool(carousel._console_properties._change_place.visible).is_false()
-	for button: JoyButton in [JOY_BUTTON_Y, JOY_BUTTON_DPAD_DOWN]:
-		await _press(carousel, button)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-	assert_object(Fixtures.focus(self)).is_same(carousel._console_properties._properties)
 
 
 func test_by_touch_a_drag_moves_the_cursor_a_tap_takes_a_console_and_another_puts_it_down() -> void:

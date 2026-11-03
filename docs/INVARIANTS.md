@@ -32,7 +32,7 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 | INV-10 | A file is never given a wrong game, serial or art: without a certain match it gets none. | A wrong identification is worse than none. | `ScanTest`, `TitleIndexTest`, `LibraryServiceTest` |
 | INV-11 | The stored library reads back identical, a library stored by an older version still loads, and an unreadable library file is set aside, never overwritten. | Restarting or updating the app never loses the library. | `LibraryFormatTest`, `LibraryStoreTest`, `LibraryServiceTest`, `LibraryTest` |
 | INV-12 | A rescan keeps what the user chose for games still there, drops games whose files are gone, and touches no other platform. | Rescanning is always safe. | `LibraryTest` |
-| INV-13 | Removing a platform removes everything of it (games, choices, art, folder access, counts) and nothing else. | A removal is complete and contained. | `RemovalTest`, `LibraryServiceTest`, `ArtStoreTest`, `AbsencesTest`, `FoldersTest`, `ScrapingTest`; `settings_test.gd` |
+| INV-13 | Removing a platform removes everything of it (games, choices, art, folder access, counts) and nothing else. | A removal is complete and contained. | `RemovalTest`, `LibraryServiceTest`, `ArtStoreTest`, `AbsencesTest`, `FoldersTest`, `ScrapingTest`; `console_edit_test.gd` |
 | INV-14 | Every definition and manifest shipped in `app/data` and in the console and medium folders loads without rejection. | Updating bundled data must not silently lose an emulator, a console or a medium. | `CatalogTest`; `console_folders_test.gd`, `media_folders_test.gd` |
 
 ## What the user chose is kept
@@ -54,7 +54,7 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 
 | Id | Invariant | Why | Tests |
 |---|---|---|---|
-| INV-20 | No dead screen: from 0, 1, 2 or 3 consoles and after any seeded walk of pad presses (A and B at any moment) or of finger gestures, exactly one control has the focus, something visible takes the next press, the app wakes from rest on the first press, and every screen settles whole. | A screen that takes no press leaves the user stuck. | `live_screen_test.gd`, `touch_test.gd`, `screen_flow_test.gd`, `settings_test.gd`, `add_console_test.gd`, `waking_test.gd`, `resting_test.gd`, `consoles_screen_test.gd`, `console_properties_test.gd`, `disc_properties_test.gd`, `game_toss_test.gd` |
+| INV-20 | No dead screen: from 0, 1, 2 or 3 consoles and after any seeded walk of pad presses (A and B at any moment) or of finger gestures, exactly one control has the focus, something visible takes the next press, the app wakes from rest on the first press, and every screen settles whole. | A screen that takes no press leaves the user stuck. | `live_screen_test.gd`, `touch_test.gd`, `screen_flow_test.gd`, `settings_test.gd`, `add_console_test.gd`, `waking_test.gd`, `resting_test.gd`, `consoles_screen_test.gd`, `console_edit_test.gd`, `disc_properties_test.gd`, `game_toss_test.gd` |
 | INV-21 | After any outcome of a launch (refused, started then back, never answered) the carousel shows again as it was; input pressed meanwhile acts on nothing and starts no second launch, and a launch it gave up on starts nothing afterwards. | Coming back from a game is never a surprise. | `game_launch_test.gd`; `StartDeadlineTest`, `LateStartTest`; `android_services_test.gd`, `LauncherTest` |
 | INV-22 | A finger never launches a game; only A does. | A stray tap must not start a game. | `touch_test.gd`, `finger_test.gd` |
 

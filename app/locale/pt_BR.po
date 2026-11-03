@@ -95,6 +95,9 @@ msgstr "Adicionar"
 msgid "The console could not be added."
 msgstr "Não foi possível adicionar o console."
 
+msgid "The console could not be saved."
+msgstr "Não foi possível salvar o console."
+
 msgid "{console} added"
 msgstr "{console} adicionado"
 
@@ -130,8 +133,14 @@ msgstr "Fechar"
 msgid "Back"
 msgstr "Voltar"
 
-msgid "Edit the platform"
-msgstr "Editar a plataforma"
+msgid "Edit"
+msgstr "Editar"
+
+msgid "Model"
+msgstr "Modelo"
+
+msgid "Keep"
+msgstr "Manter"
 
 msgid "Remove"
 msgstr "Remover"
@@ -165,8 +174,6 @@ msgstr "As configurações dele e o acesso à pasta dele serão removidos do Car
 msgid "Add a platform"
 msgstr "Adicionar uma plataforma"
 
-msgid "Properties"
-msgstr "Propriedades"
 
 msgid "Label image"
 msgstr "Imagem da etiqueta"
@@ -305,9 +312,6 @@ msgstr "Nome do console"
 
 msgid "Arrange"
 msgstr "Organizar"
-
-msgid "Change place"
-msgstr "Mudar de lugar"
 
 msgid "Take"
 msgstr "Pegar"

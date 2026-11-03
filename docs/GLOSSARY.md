@@ -32,6 +32,8 @@ page that explains it. Start from [README.md](README.md) if you have not.
 - **Display name**: a name the user typed for a game, shown instead of its title. Identification, art and shelf
   order keep the title (`DisplayName`).
 - **Edge smoothing**: the 3D's multisampling: 4×, 2× or none (`EdgeSmoothing`). A setting.
+- **Edit**: the form X opens on a console, the one adding a console, its type locked: its model (chosen among
+  swatches), folder, emulator and options, and Remove (`AddConsole`, `ModelSwatches`).
 - **Facts**: what a game file's bytes say about which game it is: a serial, a print, or nothing (`FileFacts`). See
   [architecture/core.md](architecture/core.md#file-facts).
 - **Fingerprint**: a hash of what launch steps are tuned on (a console's dimensions and moving parts), carried in
@@ -84,8 +86,8 @@ page that explains it. Start from [README.md](README.md) if you have not.
 - **Profile**: what Cartouche adds to a platform's definition: its media, the smallest game file, its art kind,
   its ScreenScraper system (`app/data/platforms/profiles.json`).
 - **Progress ring**: the ring filling on a blank label while its image downloads (`ProgressRing`).
-- **Properties**: the screen X opens on a game (its label and name, `DiscProperties`) or a console (its model and
-  place, `ConsoleProperties`).
+- **Properties**: the screen X (Edit) opens on a game: its label and name (`DiscProperties`). On a console, X opens
+  the Edit form.
 - **Proud**: how far a button or switch of a console stands out of it at rest (`ConsoleModel.PROUD_MM` at most).
 - **Provisional**: a label found while ScreenScraper was skipped, looked for again later (`ProvisionalArt`).
 - **Reference list**: a platform's Redump or No-Intro titles and serials, `app/data/titles/<platform>.tsv`.

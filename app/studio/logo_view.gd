@@ -5,10 +5,10 @@ extends TextureRect
 ## for it, so the app fits nothing. A backdrop with [member Palette.dark_logos] shows the picture made for a dark
 ## ground (`<console>.dark.png`) where the slot has one.
 
-enum Slot { RAIL_TILE, GAMES_TOP, PLINTH_PLATE, RING_MIDDLE, BETWEEN_MINI, FORM_PLATE }
+enum Slot { RAIL_TILE, GAMES_TOP, PLINTH_PLATE, RING_MIDDLE, BETWEEN_MINI }
 
 ## Each slot's folder under res://studio/logos.
-const FOLDERS: Array[String] = ["rail-tile", "games-top", "plinth-plate", "ring-middle", "between-mini", "form-plate"]
+const FOLDERS: Array[String] = ["rail-tile", "games-top", "plinth-plate", "ring-middle", "between-mini"]
 ## What shows for a console without a logo in the slot: nothing, no room taken.
 const _NONE := preload("res://studio/no_logo.tres")
 ## The logos read so far, by path (null for none): Godot drops a picture nobody shows, and a list moving

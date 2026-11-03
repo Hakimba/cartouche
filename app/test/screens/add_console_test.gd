@@ -336,7 +336,7 @@ func test_while_the_form_leaves_nothing_on_it_acts_and_it_closes_once() -> void:
 func test_remove_pressed_while_the_edit_form_leaves_asks_nothing() -> void:
 	var carousel := await Fixtures.on_form(self, _new_device(), false)
 	var form := _the_form(carousel)
-	form.edit("ps2", AndroidServices.PlatformSetup.new({}), null, PackedStringArray())
+	form.edit("ps2", AndroidServices.PlatformSetup.new({}), null)
 	var closed: Array[AddConsole.Outcome] = []
 	form.closed.connect(func(outcome: AddConsole.Outcome) -> void: closed.append(outcome))
 	await Fixtures.joypad(self, JOY_BUTTON_B)
@@ -396,30 +396,33 @@ func test_inv_20_a_seeded_walk_over_the_filled_form_keeps_one_focus_and_B_leaves
 		assert_object(focused).is_not_null()
 		assert_bool(focused.is_visible_in_tree()).is_true()
 		assert_bool((_chooser(carousel) if _chooser(carousel).visible else form).is_ancestor_of(focused)).is_true()
-		assert_bool(form.steps() >= 0 and form.steps() <= 3).is_true()
 		visited_add = visited_add or focused.name == "Add"
 	assert_bool(visited_add).is_true()
-	if _chooser(carousel).visible:
+	if _chooser(carousel).visible or (_form(carousel, "%Models") as ModelSwatches).is_open():
 		await Fixtures.joypad(self, JOY_BUTTON_B)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	assert_array(device.set_up).is_empty()
 
 
-func test_the_form_previews_variants_saves_the_choice_and_keeps_it_in_both_choosers() -> void:
+func test_the_model_chosen_in_the_swatches_shows_in_the_console_list_and_is_added_with_the_console() -> void:
 	var device := _new_device()
 	var carousel := await Fixtures.on_form(self, device)
 	var form := _the_form(carousel)
+	await Fixtures.action(self, &"ui_down")
+	assert_str(Fixtures.focus(self).name).is_equal("Model")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.action(self, &"ui_right")
-	assert_str(form.plinth().console()).is_equal("ps2_fat")
 	assert_str(form.setup().variant_id).is_equal("ps2_fat")
-	assert_dict(device.console_variants).is_empty()
-	await Fixtures.action(self, &"ui_up")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_str((_form(carousel, "%Model") as Button).text).is_equal("Fat")
+	for step in 3:
+		await Fixtures.action(self, &"ui_up")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return _chooser(carousel).visible)).is_true()
 	assert_str(_chooser(carousel)._plinth.console()).is_equal("ps2_fat")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	await Fixtures.action(self, &"ui_down")
+	(_form(carousel, "%Folder") as Control).grab_focus()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.focus(self).name == "Add")).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -428,11 +431,14 @@ func test_the_form_previews_variants_saves_the_choice_and_keeps_it_in_both_choos
 	assert_str(device.set_up[-1].variant_id).is_equal("ps2_fat")
 
 
-func test_a_form_given_up_does_not_keep_the_previewed_variant() -> void:
+func test_a_form_given_up_does_not_keep_the_model_chosen() -> void:
 	var device := _new_device()
 	var carousel := await Fixtures.on_form(self, device)
+	await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.action(self, &"ui_left")
-	assert_str(_the_form(carousel).plinth().console()).is_equal("ps2_fat")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_str(_the_form(carousel).setup().variant_id).is_equal("ps2_fat")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	assert_dict(device.console_variants).is_empty()

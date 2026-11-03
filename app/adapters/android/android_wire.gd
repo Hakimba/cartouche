@@ -434,9 +434,10 @@ class Library:
 	func setup_of(platform_id: String) -> PlatformSetup:
 		return _setups.get(platform_id, PlatformSetup.new())
 
-	## The platforms set up, games or not.
-	func set_up_platforms() -> PackedStringArray:
-		return PackedStringArray(_setups.keys())
+	## The platforms the consoles' ring shows, those with games. One set up whose games are all gone is not among them:
+	## the form adding a console sets it up again.
+	func on_ring() -> PackedStringArray:
+		return PackedStringArray(shelves.map(func(shelf: Shelf) -> String: return shelf.platform_id))
 
 	func games_of(platform_id: String) -> Array[Game]:
 		return games.filter(func(game: Game) -> bool: return game.platform_id == platform_id)

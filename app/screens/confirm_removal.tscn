@@ -93,6 +93,7 @@ focus_neighbor_right = NodePath(".")
 focus_neighbor_bottom = NodePath(".")
 text = "Remove"
 script = ExtResource("2")
+destructive = true
 
 [connection signal="pressed" from="Panel/Items/Buttons/Cancel" to="." method="_on_cancel_pressed"]
 [connection signal="pressed" from="Panel/Items/Buttons/Remove" to="." method="_on_remove_pressed"]

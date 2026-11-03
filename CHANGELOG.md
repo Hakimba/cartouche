@@ -15,6 +15,15 @@ follows [Keep a Changelog](https://keepachangelog.com).
 - **↑ Random** on the games screen, or a flick up from the game in the middle: the game is tossed like a coin and lands
   as another game of the list shown (of the search's results, while one is on), drawn at random.
 
+### Changed
+- **X Edit** on a console opens its form, the same as the one adding a console: change its folder, emulator and
+  options, pick its model among swatches while the console beside them changes as it will stand on the ring, or
+  remove it ([#3](../../issues/3), [#6](../../issues/6), thanks @kafka-esq and @kirillov1370). On a game the hint
+  reads **Edit** too.
+
+### Removed
+- **Platforms** in the settings: each console is edited or removed from the ring.
+
 ### Fixed
 - Closing the settings on the consoles screen no longer shows the games screen's **Search** hint over **Arrange**
   ([#2](../../issues/2), thanks @kafka-esq).

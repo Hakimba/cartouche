@@ -69,7 +69,6 @@ var _ink: Control
 
 @onready var _panel: Control = $Panel
 @onready var _items: Control = $Panel/Items
-@onready var _platforms: FieldButton = %Platforms
 @onready var _button_style: FieldButton = %ButtonStyle
 @onready var _graphics: FieldButton = %Graphics
 @onready var _backdrop: FieldButton = %Backdrop
@@ -80,7 +79,7 @@ var _ink: Control
 @onready var _sounds: FieldButton = %Sounds
 @onready var _language: FieldButton = %Language
 ## The rows whose press emits a choice, by it.
-@onready var _rows_of: Dictionary[StringName, FieldButton] = {&"platforms": _platforms, &"button_style": _button_style,
+@onready var _rows_of: Dictionary[StringName, FieldButton] = {&"button_style": _button_style,
 	&"graphics": _graphics, &"backdrop": _backdrop, &"pixel_veil": _veil, &"veil_gel": _veil_gel,
 	&"games_float": _floating, &"region": _region, &"language": _language}
 
@@ -88,7 +87,7 @@ var _ink: Control
 func _ready() -> void:
 	add_to_group(SoundEffects.MOVES)
 	_panel.pivot_offset = _panel.size / 2.0
-	_rows.assign([_platforms, _button_style, _graphics, _backdrop, _veil, _veil_gel, _floating, _region, _sounds, _language])
+	_rows.assign([_button_style, _graphics, _backdrop, _veil, _veil_gel, _floating, _region, _sounds, _language])
 	_sounds.focus_neighbor_left = _sounds.get_path_to(_sounds)
 	_sounds.focus_neighbor_right = _sounds.get_path_to(_sounds)
 	_card = SatinPanel.Backing.new(_panel, StudioTokens.Look.SATIN)
@@ -217,9 +216,6 @@ func _portion(start: float, duration: float, curve: Motion.Easing) -> float:
 
 func _focus_row(index: int) -> void:
 	_first = clampi(_first, index - _SHOWN + 1, index)
-	# A line that cannot take the focus shows with the one under it: nothing hides behind an arrow out of reach.
-	while _first == index and _first > 0 and _rows[_first - 1].focus_mode == FOCUS_NONE:
-		_first -= 1
 	_place_rows()
 	_cursor_tween = Motion.restart(self, _cursor_tween)
 	var start := _cursor_y
@@ -349,10 +345,9 @@ static func _rgba(color: Color) -> Vector4:
 	return Vector4(color.r, color.g, color.b, color.a)
 
 
-## Shows how many [param platforms] are set up, the button style, the edges' smoothing, the backdrop, the preferred
-## [param region] (empty for none) and the [param language] (empty for the device's), the focus on the line of
-## [param focus] (a choice). With no platform, its line cannot be opened.
-func open(platforms: int, focus: StringName, region: String, language: String) -> void:
+## Shows the button style, the edges' smoothing, the backdrop, the preferred [param region] (empty for none) and the
+## [param language] (empty for the device's), the focus on the line of [param focus] (a choice).
+func open(focus: StringName, region: String, language: String) -> void:
 	for switch: Switch in _switches.values():
 		switch.snap(switch.on, gel)
 	if state == State.CLOSED:
@@ -360,10 +355,6 @@ func open(platforms: int, focus: StringName, region: String, language: String) -
 		_closing = false
 		_time = DURATION_S
 		_sample()
-	_platforms.show_value(str(platforms))
-	_platforms.disabled = platforms == 0
-	_platforms.focus_mode = FOCUS_NONE if _platforms.disabled else FOCUS_ALL
-	_button_style.focus_neighbor_top = _button_style.get_path_to(_button_style if _platforms.disabled else _platforms)
 	_button_style.show_value(Controls.style_name())
 	_graphics.show_value(tr(EdgeSmoothingScreen.NAMES[EdgeSmoothingScreen.of(get_viewport())]))
 	_backdrop.show_value(tr(Backdrop.NAMES[Backdrop.choice]))
@@ -371,8 +362,8 @@ func open(platforms: int, focus: StringName, region: String, language: String) -
 	_language.show_value(Locale.name_of(language))
 	_first = 0
 	_place_rows()
-	var row: FieldButton = _rows_of.get(focus, _platforms)
-	(_button_style if row == _platforms and _platforms.disabled else row).grab_focus()
+	var row: FieldButton = _rows_of.get(focus, _button_style)
+	row.grab_focus()
 	# The line already focused takes no focus_entered: its place on the card is set here.
 	_focus_row(maxi(_rows.find(get_viewport().gui_get_focus_owner() as FieldButton), 0))
 	if state == State.OPENING:

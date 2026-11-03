@@ -37,11 +37,11 @@ static func past_first_launch(suite: GdUnitTestSuite, consoles: Dictionary[Strin
 	return made
 
 
-## Once the consoles, the properties of a console and the ring putting the consoles in order have stopped moving: the
+## Once the consoles and the ring putting the consoles in order have stopped moving: the
 ## selected console's shelf is shown behind.
 static func settled_consoles(suite: GdUnitTestSuite, carousel: Carousel) -> void:
 	suite.assert_bool(await until(suite, func() -> bool:
-		return not carousel._consoles.is_settling() and not carousel._console_properties._busy and not carousel._order._busy \
+		return not carousel._consoles.is_settling() and not carousel._order._busy \
 			and not (carousel.get_node("%Screens/Settings") as SettingsMenu).is_processing())).is_true()
 	await suite.await_idle_frame()
 
@@ -351,7 +351,6 @@ class NewDevice extends AndroidServices:
 	## Choices of [member consoles] other than the usual ones (sub-folders, discs grouped, ARMSX2), by id.
 	var setups: Dictionary[String, Dictionary] = {}
 	var console_variants: Dictionary[String, String] = {}
-	var variants_kept: Array[Array] = []
 	## The platforms whose folder access is gone.
 	var lost_folders: Array[String] = []
 	var players_everywhere := false
@@ -533,20 +532,6 @@ class NewDevice extends AndroidServices:
 			setups[platform_id] = setup.to_wire()
 			if not setup.variant_id.is_empty():
 				console_variants[platform_id] = setup.variant_id
-			answer["library"] = _library()
-		return AndroidServices.LibraryAnswer.new(answer)
-
-	func set_variant(platform_id: String, variant: String) -> AndroidServices.LibraryAnswer:
-		variants_kept.append([platform_id, variant])
-		var answer := await _later(&"set_variant")
-		if platform_id not in consoles:
-			answer = {"ok": false, "code": "not_in_library"}
-		var base: ConsoleManifest = Appearance.defaults(ConsoleManifest.found()).get(platform_id)
-		if base and not base.models().any(func(model: ConsoleManifest) -> bool:
-			return ConsoleManifest.folder_of(model) == variant):
-			answer = {"ok": false, "code": "unknown_variant"}
-		if answer["ok"]:
-			console_variants[platform_id] = variant
 			answer["library"] = _library()
 		return AndroidServices.LibraryAnswer.new(answer)
 

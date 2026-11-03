@@ -103,10 +103,10 @@ func test_a_game_s_properties_at_rest_draw_nothing() -> void:
 	await _assert_still_draws_nothing(carousel)
 
 
-func test_a_console_s_properties_at_rest_draw_nothing() -> void:
+func test_the_form_editing_a_console_at_rest_draws_nothing() -> void:
 	var carousel := await _carousel()
 	await Fixtures.action(self, &"open_properties")
-	await _on(carousel, Carousel.Screen.CONSOLE_PROPERTIES)
+	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	await _assert_still_draws_nothing(carousel)
 
 
@@ -130,16 +130,6 @@ func test_the_screen_without_a_console_at_rest_draws_nothing() -> void:
 	await _assert_still_draws_nothing(carousel)
 
 
-func test_the_platforms_at_rest_draw_nothing() -> void:
-	var carousel := await _carousel()
-	await Fixtures.action(self, &"open_settings")
-	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
-	assert_bool(await Fixtures.until(self, func() -> bool: return menu.state == SettingsMenu.State.OPEN)).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
-	await _assert_still_draws_nothing(carousel)
-
-
 func test_with_the_veil_moving_only_the_backdrop_is_drawn_again_at_rest() -> void:
 	var carousel := await _carousel({"ps2": 3, "gc": 2}, true)
 	var writers: Array[String] = ["Backdrop/Cyclorama"]
@@ -160,13 +150,10 @@ func test_with_the_veil_still_every_other_background_rests_drawing_nothing() -> 
 		remove_child(carousel)
 
 
-func test_with_the_veil_moving_the_platforms_redraw_only_their_own_backdrop_not_the_one_behind() -> void:
+func test_with_the_veil_moving_the_form_editing_a_console_redraws_only_its_own_backdrop_not_the_one_behind() -> void:
 	var carousel := await _carousel({"ps2": 3, "gc": 2}, true)
-	await Fixtures.action(self, &"open_settings")
-	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
-	assert_bool(await Fixtures.until(self, func() -> bool: return menu.state == SettingsMenu.State.OPEN)).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
-	var own: Array[String] = [str(carousel.get_path_to(carousel.get_node("%Screens/Platforms/Backdrop")))]
+	await Fixtures.action(self, &"open_properties")
+	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
+	var own: Array[String] = [str(carousel.get_path_to(carousel.get_node("%Screens/AddConsole/Backdrop")))]
 	assert_array(await _still_writers(carousel)).is_equal(own)
 

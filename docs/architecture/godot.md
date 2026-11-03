@@ -36,11 +36,13 @@ carousel, and returns once the carousel can be used. Each screen is a scene of i
 | `card_choice_screen.gd` | A setting chosen among cards built from the values the plugin takes: the preferred region of images, the language. |
 | `curtain_permission.gd` | Asks for "display over other apps", which the launch curtain needs. |
 | `no_console.gd` | Nothing set up yet: one thing to do, add a console. |
-| `add_console.gd` | The form adding or editing a console: its type, its model, its folder, its emulator and options, with a count of the games found. Built from `StepField`, `FieldButton`, `FormToggle` and `FormPill`, drawn by `FormPaint`. |
+| `add_console.gd` | The form adding a console, and editing one (X on the ring, titled Edit, its type locked, Remove at the far left): its type, its model, its folder, its emulator and options, with a count of the games found. Built from `StepField`, `FieldButton`, `FormToggle` and `FormPill`, drawn by `FormPaint`. |
+| `model_field.gd`, `model_swatches.gd` | The form's Model line, and the swatches it opens: one picture of each model of the console, rendered once per opening, the console beside them changing as the focus moves. |
+| `ring_view.gd` | The form's left zone: the console alone, standing as on the ring, seen by a copy of the carousel's camera. |
 | `add_ball.gd` | The "+" above the consoles. Holding up turns it into the button adding one more console. |
 | `settings_menu.gd` | The settings card: the choices, the background and its animated veil, games floating, the sound level and the language. Six lines show; the focus scrolls the others in, an arrow showing lines are hidden. |
 | `settings_transition.gd` | The move between the screen under the settings and the settings card, on one reversible clock. |
-| `platform_list.gd`, `confirm_removal.gd` | The consoles set up, each opened in the form to edit or remove it, and the confirmation of a removal. |
+| `confirm_removal.gd` | The confirmation of a console's removal. |
 | `controls.gd` | The button style the user chose. `ButtonGlyph`, `ButtonMark`, `ButtonHint` and `GlyphButton` draw buttons in that style. |
 
 ### Adding a screen
@@ -103,13 +105,12 @@ the check, the console's launch animation or the medium's insertion, the plugin'
 
 ### Properties
 
-Under `app/carousel/properties/`. X on a game, or a long press, opens its properties.
+Under `app/carousel/properties/`. X on a game (its hint reads Edit), or a long press, opens its properties.
 
 | File | Responsibility |
 |---|---|
-| `properties_screen.gd` | `PropertiesScreen`: what a game's and a console's properties share, the staging under the light and the moves between editors. |
+| `properties_screen.gd` | `PropertiesScreen`: a game's model staged under the light and the moves between its editors. |
 | `disc_properties.gd` | A game's properties: its label (the images on offer, a picture of the user's own and its framing) and its name. |
-| `console_properties.gd` | A console's properties: its model, and the way to the ordering ring. |
 | `name_editor.gd`, `gamepad_keyboard.gd` | A name typed with the stick or the d-pad. |
 | `label_zone.gd`, `label_card.gd`, `label_framing.gd`, `focus_callout.gd` | The label's outline, one image on offer, the framing of a picture, the caption of the focused zone. |
 | `operating_light.gd` | The light over the staged model. |

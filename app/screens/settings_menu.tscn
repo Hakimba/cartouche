@@ -46,11 +46,6 @@ mouse_filter = 2
 visible = false
 text = "Settings"
 
-[node name="Platforms" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Platforms"
-
 [node name="ButtonStyle" parent="Panel/Items" instance=ExtResource("2")]
 unique_name_in_owner = true
 layout_mode = 0

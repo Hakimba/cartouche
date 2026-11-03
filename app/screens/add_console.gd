@@ -2,24 +2,26 @@
 class_name AddConsole
 extends Control
 ## The form adding a console, field by field with the controller: its type (any platform of the
-## catalog not set up yet), its emulator (installed ones only; read again when the app comes back
+## catalog not on the ring yet), its emulator (installed ones only; read again when the app comes back
 ## to the front), both chosen from a list and neither chosen in advance, the folder of its games
-## (Android's folder picker). Once an emulator and a folder are chosen, the compatible games are
-## counted without saving anything and the focus goes to "Add", which stays greyed until there is
-## something to add.
+## (Android's folder picker), and its model, chosen in place among the console's ([ModelSwatches]) when it has more
+## than one. Once an emulator and a folder are chosen, the compatible games are counted without saving anything and
+## the focus goes to "Add", which stays greyed until there is something to add.
 ## B or "Cancel" gives up, except while the console is being added.
-## It is the Studio's numbered list beside a plinth: the console chosen turns on it, its logo and the emulator's name
-## on its plate. One card rests on the focused line and moves with the focus.
+## It is the Studio's numbered list beside the console chosen, standing as the consoles screen will show it
+## ([RingView]). One card rests on the focused line and moves with the focus.
 ##
-## The same form edits a console set up ([method edit]): filled with its choices, titled as an
-## edit, its buttons read "Remove" and "Save". Saving another type (one not set up yet) adds that
-## console and removes the one edited.
+## The same form edits a console of the ring ([method edit]): filled with its choices, titled "Edit", its type
+## locked, its buttons read "Remove", set apart at the left in red, and "Save". B gives up: nothing is saved and the
+## console shows the model it had again. A new model alone is saved without counting or scanning the games again.
 
 signal closed(outcome: Outcome)
 ## The form starts to go, given up: the screens behind it may start to come in.
 signal leaving
 ## Slow storage and scanning run behind the departing form.
 signal saving(pending: bool)
+## The console edited is shown as the model in [param folder] on the ring: for a look while choosing, or back.
+signal model_shown(folder: String)
 
 ## How the form closed.
 enum Outcome {
@@ -35,15 +37,6 @@ const _NOTE_PX := 1.45 * _CQW
 const _NOTE_FOUND_PX := 1.9 * _CQW
 const _DOT := 1.0 * _CQW
 const _DOT_GAP := 1.0 * _CQW
-const _KICK_PX := 1.4 * _CQW
-## The logo box on the plate: its top, the room an empty one keeps, and the gap under it.
-const _PLATE_PAD := 1.4 * _CQW
-const _LOGO_MIN := 4.6 * _CQW
-const _PLATE_GAP := 0.3 * _CQW
-## How far below the middle of the logo's box the plate puts "No console", in px.
-const _NO_TYPE_DROP := 6.0
-const _PLATE_S := 0.22
-const _PLATE_RISE := 0.6 * _CQW
 ## How far past a pill button its ring stands.
 const _PILL_RING := 0.7 * _CQW
 ## The corners of that ring, whatever the pill's height.
@@ -56,16 +49,13 @@ const _LINE_MOTIONS: Array[StringName] = [&"enter", &"lines", &"leave"]
 const _ENTER_S := 0.32
 const _LEAVE_FADE_S := 0.3
 const _COME_BACK_S := 0.23
-## The model rising again after a chooser: from this far down (px), in this time, as the plinth's own rise.
-const _MODEL_RISE := 1.6 * _CQW
+## The console coming back after a chooser, in this time, as a picture rises.
 const _MODEL_RISE_S := 0.3
-## The arrows on both sides of the model when the console has other models (← → change it): their gap to the
-## plinth's sides, their size against the chevron's own, and the nudge outward of the one pressed.
-const _ARROW_GAP := 1.0 * _CQW
-const _ARROW_SCALE := 1.5
-const _ARROW_NUDGE := 6.0
-const _ARROW_NUDGE_S := 0.15
-const _CHEVRON := preload("res://screens/chevron.svg")
+## Remove's place, alone at the left of the pills' row; where the model line goes while its chooser fills the column
+## under it, and how long the lines take to make way.
+const _REMOVE_X := 28.16
+const _HEADER_Y := 0.0
+const _MAKE_WAY_S := 0.2
 
 var android: AndroidServices = Android
 ## The platform the form adds; empty until one is chosen.
@@ -73,9 +63,15 @@ var platform_id := ""
 ## The library as the form last saved it (a console added or saved, or choices kept although
 ## their scan found nothing); null while nothing was saved.
 var library: AndroidServices.Library
+## The carousel's consoles and sun: the console chosen stands as theirs ([RingView]). Required before the form opens.
+var ring: ConsoleRow
+var sun: DirectionalLight3D
 ## The platform edited, as it was set up; empty while adding.
 var _edited_id := ""
-## The platforms the form cannot set up: those set up already, but for the one edited.
+## The choices of the platform edited as stored, and whether the user changed any of them but its model.
+var _stored: AndroidServices.PlatformSetup
+var _touched := false
+## The platforms the form cannot set up: those on the ring already.
 var _taken := PackedStringArray()
 var _players: Array[AndroidServices.Player] = []
 ## Index of the chosen player in [member _players]; -1 until one is chosen.
@@ -95,12 +91,11 @@ var _title_line: StudioText
 var _note_line: StudioText
 ## Platform id to the folder of its console under res://carousel/consoles.
 var _folders: Dictionary[String, String] = {}
+## The models of the console chosen, and the one the console had as the form opened.
 var _variants: Array[ConsoleManifest] = []
-var _variant := 0
-var _plinth: Plinth
-## The arrows left and right of the model.
-var _arrows: Array[TextureRect] = []
-var _logo: LogoView
+var _had_model := ""
+## Remove's place in add mode, Cancel's.
+var _cancel_x := 0.0
 var _card: FormPaint.Card
 var _dot: FormPaint.Layer
 var _leaving := false
@@ -113,18 +108,21 @@ var _fields: Array[Control] = []
 
 @onready var _backdrop: Cyclorama = $Backdrop
 @onready var _title: Label = %Title
-@onready var _count_node: Control = $Count
-@onready var _plate: Control = $Plate
 @onready var _list: Control = $List
 @onready var _type: StepField = %Type
 @onready var _emulator: StepField = %Emulator
 @onready var _folder_field: StepField = %Folder
+@onready var _model: ModelField = %Model
+@onready var _models: ModelSwatches = %Models
+@onready var _console: RingView = %Console
 @onready var _note: Label = %Note
 @onready var _subfolders: FormToggle = %Subfolders
 @onready var _discs: FormToggle = %Discs
 @onready var _cancel: FormPill = %Cancel
 @onready var _add: FormPill = %Add
 @onready var _choice: StudioChooser = %Choice
+@onready var _choose_hint: ButtonHint = %Choose
+@onready var _back_hint: ButtonHint = %Back
 
 
 func _ready() -> void:
@@ -133,10 +131,6 @@ func _ready() -> void:
 		text.add_theme_color_override(&"font_color", Color.TRANSPARENT)
 	_title.draw.connect(_draw_title)
 	_note.draw.connect(_draw_note)
-	_count_node.draw.connect(_draw_count)
-	_plate.draw.connect(_draw_plate)
-	_logo = LogoView.new()
-	_plate.add_child(_logo)
 	_card = FormPaint.Card.new()
 	_list.add_child(_card)
 	_list.move_child(_card, 0)
@@ -144,11 +138,12 @@ func _ready() -> void:
 	var defaults := Appearance.defaults(ConsoleManifest.found())
 	for platform in defaults:
 		_folders[platform] = ConsoleManifest.folder_of(defaults[platform])
-	_fields = [_type, _emulator, _folder_field, _subfolders, _discs, _cancel, _add]
+	_fields = [_type, _emulator, _folder_field, _model, _subfolders, _discs, _cancel, _add]
 	for field: Control in _fields:
 		field.focus_entered.connect(_aim.bind(field, true))
-	for line: Control in [_title, _count_node, _list, _plate]:
+	for line: Control in [_title, _list, _console, _model]:
 		_rests[line] = line.position
+	_cancel_x = _cancel.position.x
 
 
 func _notification(what: int) -> void:
@@ -161,26 +156,17 @@ func _notification(what: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or _choice.visible or _leaving:
 		return
-	if event.is_action_pressed(&"screen_back"):
-		get_viewport().set_input_as_handled()
+	if not event.is_action_pressed(&"screen_back"):
+		return
+	get_viewport().set_input_as_handled()
+	if _models.is_open():
+		Sounds.play(SoundEffects.Cue.BACK)
+		_models.cancel()
+	else:
 		_give_up()
 
 
-func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or _choice.visible or _leaving:
-		return
-	if not _adding and not event.is_echo() and _variants.size() > 1 \
-			and (event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"ui_right")) \
-			and get_viewport().gui_get_focus_owner() in [_type, _emulator, _folder_field]:
-		get_viewport().set_input_as_handled()
-		_variant = posmod(_variant + (1 if event.is_action_pressed(&"ui_right") else -1), _variants.size())
-		_folders[platform_id] = ConsoleManifest.folder_of(_variants[_variant])
-		_plinth.show_console(_folders[platform_id])
-		Sounds.play(SoundEffects.Cue.MOVE)
-		_nudge(1 if event.is_action_pressed(&"ui_right") else 0)
-
-
-## Shows the form as new, nothing chosen, the focus on the type; the platforms already set up,
+## Shows the form as new, nothing chosen, the focus on the type; the platforms already on the ring,
 ## [param taken], cannot be chosen.
 func open(taken := PackedStringArray()) -> void:
 	_fill("", AndroidServices.PlatformSetup.new({"folder_depth": "subfolders"}), null, taken)
@@ -190,11 +176,9 @@ func open(taken := PackedStringArray()) -> void:
 
 
 ## Shows the form filled with [param choices], those of [param edited_id], whose folder is
-## [param folder]; its type cannot become one of the other platforms set up, [param taken]. The
-## focus on the emulator.
-func edit(edited_id: String, choices: AndroidServices.PlatformSetup, folder: AndroidServices.Folder,
-		taken: PackedStringArray) -> void:
-	_fill(edited_id, choices, folder, taken)
+## [param folder], its type locked; the focus on the emulator.
+func edit(edited_id: String, choices: AndroidServices.PlatformSetup, folder: AndroidServices.Folder) -> void:
+	_fill(edited_id, choices, folder, PackedStringArray())
 	_emulator.grab_focus()
 	_aim(_emulator, false)
 	_enter()
@@ -242,42 +226,27 @@ func platform_name() -> String:
 	return platform_id
 
 
-## How many of the three fields (type, emulator, folder) are chosen.
-func steps() -> int:
-	return int(not platform_id.is_empty()) + int(_player >= 0) + int(_has_folder)
-
-
-## What the plate says under the logo: the emulator chosen, "No console" while there is no console chosen, nothing between.
-func plate_name() -> String:
-	if platform_id.is_empty():
-		return tr("No console")
-	return _players[_player].emulator_name if _player >= 0 else ""
-
-
-## The plinth the console chosen turns on.
-func plinth() -> Plinth:
-	return _plinth
-
-
-## The card resting on the focused control.
-func card() -> FormPaint.Card:
-	return _card
-
-
 func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: AndroidServices.Folder,
 		taken: PackedStringArray) -> void:
 	android.prepare_titles()
 	# An answer still on its way belongs to the form as it was.
 	_counts += 1
 	_edited_id = edited_id
+	_stored = choices
+	_touched = false
 	_taken = taken
 	library = null
 	platform_id = edited_id
-	_title.text = tr("Edit the platform") if edited_id else tr("Add a console")
+	var editing := is_editing()
+	_title.text = tr("Edit") if editing else tr("Add a console")
 	_title_line = FormPaint.line(_title.text, StudioTokens.Face.JAKARTA_800, FormPaint.TITLE_PX, -0.04)
-	_cancel.text = tr("Remove") if edited_id else tr("Cancel")
-	_cancel.keyed = edited_id.is_empty()
-	_add.text = tr("Save") if edited_id else tr("Add")
+	_type.disabled = editing
+	_type.focus_mode = FOCUS_NONE if editing else FOCUS_ALL
+	_emulator.focus_neighbor_top = _emulator.get_path_to(_emulator if editing else _type)
+	_cancel.text = tr("Remove") if editing else tr("Cancel")
+	_cancel.destructive = editing
+	_cancel.position.x = _REMOVE_X if editing else _cancel_x
+	_add.text = tr("Save") if editing else tr("Add")
 	_folder = folder
 	_has_folder = choices.has_folder
 	_games = -1
@@ -287,13 +256,17 @@ func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: An
 	_discs.snap()
 	_leaving = false
 	_form_back()
+	_console.ring = ring
+	_console.sun = sun
+	_models.ring = ring
+	_models.sun = sun
 	_use_variants(choices.variant_id)
-	_present_plinth()
+	_had_model = _folders.get(platform_id, "")
+	_show_console(true)
 	_show_type()
 	_show_folder()
 	_show_gel(false)
 	_read_players(choices.player_id)
-	_show_plate(false)
 
 
 ## The installed players, [param preferred_id] chosen if it is one of them, else none; then the
@@ -313,25 +286,15 @@ func _read_players(preferred_id := "") -> void:
 
 func _show_type() -> void:
 	_type.show_value(platform_name() if platform_id else tr("Choose…"), not platform_id.is_empty())
-	_showsteps()
 
 
 func _show_folder() -> void:
 	_folder_field.show_value(folder_place(_folder) if _has_folder else tr("Choose…"), _has_folder)
-	_showsteps()
 
 
 func _show_player() -> void:
 	_emulator.show_value(_players[_player].emulator_name if _player >= 0
 		else tr("None installed") if platform_id and _players.is_empty() else tr("Choose…"), _player >= 0)
-	_showsteps()
-	_plate.queue_redraw()
-
-
-## How many of the three fields are chosen, for the count and the trace.
-func _showsteps() -> void:
-	_count_node.queue_redraw()
-	Diagnostics.trace("console form", "step=%d" % steps())
 
 
 ## Once an emulator is chosen, the files it accepts until a folder is chosen, then how many games
@@ -348,7 +311,7 @@ func _show_count() -> void:
 	else:
 		_set_note(tr_n("{count} compatible game found", "{count} compatible games found", _games).format(
 			{"count": _games}) if _games > 0 else tr("No compatible game in this folder"), _games > 0)
-	_add.disabled = _games <= 0
+	_add.disabled = _games <= 0 and not _model_only()
 	# Greyed, "Add" cannot keep the focus: it goes back to the folder, never nowhere.
 	if _add.disabled and _add.has_focus():
 		_folder_field.grab_focus()
@@ -398,18 +361,15 @@ func _on_type_pressed() -> void:
 	var changed := index >= 0 and offered[index].id != platform_id
 	var from := _choice.cursor_rect()
 	_type.grab_focus()
-	_come_back(from, not changed)
-	if not changed:
-		return
-	platform_id = offered[index].id
-	_use_variants(_folders[platform_id])
-	Diagnostics.trace("console form", "platform %s" % platform_id)
-	_show_type()
-	_plinth.show_console(_folders[platform_id])
-	_show_arrows()
-	_show_gel(true)
-	_show_plate(true)
-	_read_players()
+	if changed:
+		platform_id = offered[index].id
+		_use_variants(_folders[platform_id])
+		Diagnostics.trace("console form", "platform %s" % platform_id)
+		_show_type()
+		_show_console(true)
+		_show_gel(true)
+		_read_players()
+	_come_back(from)
 
 
 func _on_emulator_pressed() -> void:
@@ -423,14 +383,14 @@ func _on_emulator_pressed() -> void:
 	var index := await _choice.choose_player(platform_id, _players, _player)
 	var from := _choice.cursor_rect()
 	_emulator.grab_focus()
-	_come_back(from, true)
+	_come_back(from)
 	if index < 0 or index == _player:
 		return
 	_player = index
+	_touched = true
 	_games = -1
 	Diagnostics.trace("console form", "emulator %s" % _players[_player].id)
 	_show_player()
-	_show_plate(true)
 	_show_count()
 	_count(false)
 
@@ -445,12 +405,14 @@ func _on_folder_pressed() -> void:
 		return
 	_folder = pick.folder
 	_has_folder = true
+	_touched = true
 	_show_folder()
 	await _count(true)
 
 
 func _on_option_toggled(on: bool) -> void:
 	Sounds.play(SoundEffects.Cue.TOGGLE if on else SoundEffects.Cue.UNTOGGLE)
+	_touched = true
 	var choices := setup()
 	Diagnostics.trace("console form", "%s, %s" % [choices.folder_depth, choices.disc_grouping])
 	_games = -1
@@ -475,6 +437,10 @@ func _give_up() -> void:
 	Diagnostics.trace("console form", "given up")
 	Sounds.play(SoundEffects.Cue.BACK)
 	_leaving = true
+	# Unless the save stored the new model before its scan failed.
+	if is_editing() and library == null and _folders[platform_id] != _had_model:
+		_folders[platform_id] = _had_model
+		model_shown.emit(_had_model)
 	leaving.emit()
 	await _leave().finished
 	closed.emit(Outcome.GIVEN_UP)
@@ -489,36 +455,39 @@ func _on_add_pressed() -> void:
 	_add.disabled = true
 	Sounds.play(SoundEffects.Cue.SELECT)
 	var started := Time.get_ticks_msec()
+	saving.emit(true)
 	if not is_editing():
-		saving.emit(true)
 		leave()
-	var stored := await android.set_up_platform(platform_id, setup())
+	var model_only := _model_only()
+	var choices := setup()
+	if model_only:
+		choices = AndroidServices.PlatformSetup.new(_stored.to_wire())
+		choices.variant_id = _folders[platform_id]
+	var stored := await android.set_up_platform(platform_id, choices)
 	if not stored.ok:
 		_not_added(stored)
 		return
 	library = stored.library
-	var scanned := await android.scan_platform(platform_id)
-	if not scanned.ok:
-		_not_added(scanned)
-		return
-	library = scanned.library
-	Diagnostics.trace("console form", "%s saved: %d games in %d ms" % [platform_id, scanned.report.games,
-		scanned.report.milliseconds])
-	# The folder changed since it was counted: nothing to show, the form stays.
-	if scanned.report.games == 0:
-		saving.emit(false)
-		resume()
-		_adding = false
-		_games = 0
-		_show_count()
-		return
-	# Another type is another console: the one edited goes once the new one is there.
-	if _edited_id and platform_id != _edited_id:
-		var removed := await android.remove_platform(_edited_id)
-		if removed.ok:
-			library = removed.library
-		else:
-			Diagnostics.trace("console form", "%s not removed (%s): %s" % [_edited_id, removed.code, removed.detail])
+	if not model_only:
+		var scanned := await android.scan_platform(platform_id)
+		if not scanned.ok:
+			_not_added(scanned)
+			return
+		library = scanned.library
+		Diagnostics.trace("console form", "%s saved: %d games in %d ms" % [platform_id, scanned.report.games,
+			scanned.report.milliseconds])
+		# The folder changed since it was counted: nothing to show, the form stays.
+		if scanned.report.games == 0:
+			saving.emit(false)
+			resume()
+			_adding = false
+			_games = 0
+			_show_count()
+			return
+	if is_editing():
+		_leaving = true
+		leaving.emit()
+		await _leave().finished
 	_adding = false
 	saving.emit(false)
 	Diagnostics.trace("console form", "added in %d ms after immediate departure" % (Time.get_ticks_msec() - started))
@@ -530,73 +499,104 @@ func _not_added(failed: AndroidServices.Result) -> void:
 	saving.emit(false)
 	resume()
 	_adding = false
-	_set_note(tr("The console could not be added."), false)
+	_set_note(tr("The console could not be saved.") if is_editing() else tr("The console could not be added."), false)
 	_add.disabled = false
 
 
-## A new plinth, the console of the platform chosen standing on it (none while nothing is chosen), so its picture
-## is presented again; the plate's own logo is the form's, set apart.
+## Whether, editing, only the model changed: it is saved as it is, the games neither counted nor scanned again.
+func _model_only() -> bool:
+	return is_editing() and not _touched and _folders[platform_id] != _had_model
+
+
+## The models of the platform chosen, the one in [param current] shown if it is one of them, else its base model.
 func _use_variants(current: String) -> void:
 	_variants.clear()
-	_variant = 0
-	if platform_id.is_empty():
+	if platform_id:
+		_variants = Appearance.defaults(ConsoleManifest.found())[platform_id].models()
+		var kept := _variants.find_custom(func(model: ConsoleManifest) -> bool:
+			return ConsoleManifest.folder_of(model) == current)
+		_folders[platform_id] = ConsoleManifest.folder_of(_variants[maxi(kept, 0)])
+	_show_model()
+
+
+## The model line: the console's model, choosable when it has more than one; the focus goes round it otherwise.
+func _show_model() -> void:
+	var at := _model_index()
+	_model.show_model(_variants[at].model_name if at >= 0 else "", _variants.size() > 1)
+	var choosable := _model.focus_mode != FOCUS_NONE
+	var below: Control = _model if choosable else _subfolders
+	var above: Control = _model if choosable else _folder_field
+	_folder_field.focus_neighbor_bottom = _folder_field.get_path_to(below)
+	_subfolders.focus_neighbor_top = _subfolders.get_path_to(above)
+
+
+## Where the model shown is among [member _variants]; -1 for none.
+func _model_index() -> int:
+	var folder: String = _folders.get(platform_id, "")
+	return _variants.find_custom(func(model: ConsoleManifest) -> bool: return ConsoleManifest.folder_of(model) == folder)
+
+
+## The console chosen at the left, as the consoles screen will show it; [param framed], filling the left.
+func _show_console(framed: bool) -> void:
+	_console.visible = not platform_id.is_empty()
+	if platform_id:
+		_console.show_console(platform_id, _folders[platform_id], framed)
+
+
+func _on_model_pressed() -> void:
+	if _leaving or _models.is_open():
 		return
-	var base := Appearance.defaults(ConsoleManifest.found())[platform_id]
-	_variants = base.models()
-	for i in _variants.size():
-		if ConsoleManifest.folder_of(_variants[i]) == current:
-			_variant = i
-	_folders[platform_id] = ConsoleManifest.folder_of(_variants[_variant])
+	Sounds.play(SoundEffects.Cue.OPEN)
+	_model.open = true
+	_model.models = _variants.size()
+	_model.focused = _model_index()
+	_models.rim = _rim
+	_models.open(platform_id, _variants, _model_index())
+	_make_way(true)
 
 
-func _present_plinth() -> void:
-	if not _plinth:
-		_plinth = Plinth.create()
-		_plinth.name = "Plinth"
-		_plinth.position = StudioTokens.PLINTH.position
-		_plinth.size = StudioTokens.PLINTH.size
-		add_child(_plinth)
-		move_child(_plinth, _backdrop.get_index() + 1)
-		_add_arrows()
-	(_plinth.get_node("Plate") as Control).hide()
-	if _folders.has(platform_id):
-		_plinth.show_console(_folders[platform_id])
-		_plinth.restart()
+## The lines make way while the models' chooser is open, and come back: they fade, the model line going up to head
+## the column (the focus card fading with it); the hints say what A and B do there.
+func _make_way(away: bool) -> void:
+	var way: Tween = _motions.get(&"way")
+	var motion := Motion.restart(self, way).set_parallel()
+	_motions[&"way"] = motion
+	var easing := Motion.curve(Motion.Easing.EASE)
+	for line: Control in [_type, _emulator, _folder_field, _note, _subfolders, _discs, _cancel, _add]:
+		motion.tween_property(line, ^"modulate:a", 0.0 if away else 1.0, _MAKE_WAY_S).set_custom_interpolator(easing)
+	motion.tween_property(_model, ^"position:y", _HEADER_Y if away else _rests[_model].y, _MAKE_WAY_S) \
+		.set_custom_interpolator(easing)
+	if away:
+		motion.tween_property(_card, ^"modulate:a", 0.0, _MAKE_WAY_S * 0.6)
+		_models.modulate.a = 0.0
+		motion.tween_property(_models, ^"modulate:a", 1.0, _MAKE_WAY_S).set_delay(_MAKE_WAY_S * 0.5)
 	else:
-		_plinth.clear()
-	_show_arrows()
+		# Back on the line once it is back in its place.
+		motion.tween_callback(_aim.bind(_model, false)).set_delay(_MAKE_WAY_S)
+		motion.tween_property(_card, ^"modulate:a", 1.0, _MAKE_WAY_S * 0.6).set_delay(_MAKE_WAY_S)
+	_choose_hint.text = "Keep" if away else "Choose"
+	_back_hint.text = "Back" if away else "Cancel"
 
 
-## The arrows on the plinth, beside the model's middle; the left one is the chevron turned round.
-func _add_arrows() -> void:
-	var shape := _CHEVRON.get_size() * _ARROW_SCALE
-	var y := StudioTokens.TURNTABLE.get_center().y - StudioTokens.PLINTH.position.y - shape.y / 2.0
-	for x: float in [-_ARROW_GAP - shape.x, StudioTokens.PLINTH.size.x + _ARROW_GAP]:
-		var arrow := TextureRect.new()
-		arrow.texture = _CHEVRON
-		arrow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		arrow.size = shape
-		arrow.position = Vector2(x, y)
-		arrow.flip_h = _arrows.is_empty()
-		arrow.mouse_filter = MOUSE_FILTER_IGNORE
-		_plinth.add_child(arrow)
-		_arrows.append(arrow)
+func _on_model_looked(index: int) -> void:
+	var folder := ConsoleManifest.folder_of(_variants[index])
+	if folder == _folders[platform_id]:
+		return
+	_folders[platform_id] = folder
+	_model.show_model(_variants[index].model_name, true)
+	_model.focused = index
+	_console.show_console(platform_id, folder, false)
+	if is_editing():
+		model_shown.emit(folder)
 
 
-## Shown while left and right change the model: the console has other models and the focus is on a field they act on.
-func _show_arrows() -> void:
-	var shown := _variants.size() > 1 and get_viewport().gui_get_focus_owner() in [_type, _emulator, _folder_field]
-	for arrow in _arrows:
-		arrow.visible = shown
-
-
-## The arrow on [param side] (0 left, 1 right) goes out a little and back.
-func _nudge(side: int) -> void:
-	var arrow := _arrows[side]
-	var rest := StudioTokens.PLINTH.size.x + _ARROW_GAP if side == 1 else -_ARROW_GAP - arrow.size.x
-	var out := _ARROW_NUDGE * (1.0 if side == 1 else -1.0)
-	Motion.animate(self, _motions, &"arrow", _ARROW_NUDGE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
-		arrow.position.x = rest + out * sin(PI * p))
+func _on_models_closed(index: int) -> void:
+	_on_model_looked(index)
+	_show_count()
+	_model.open = false
+	_make_way(false)
+	_model.grab_focus()
+	Diagnostics.trace("console form", "model %s" % _folders[platform_id])
 
 
 func _gel() -> Color:
@@ -621,7 +621,6 @@ func _paint(gel: Color) -> void:
 		field.set(&"rim", gel)
 	_dot.shown.colors.assign([gel, gel])
 	_dot.tint = gel
-	_count_node.queue_redraw()
 
 
 func _dot_material() -> StudioMaterial:
@@ -629,29 +628,14 @@ func _dot_material() -> StudioMaterial:
 	return FormPaint.material(colors, _DOT / 2.0, [[Vector4(0.0, 0.0, 0.8 * _CQW, 0.0), Color.WHITE, false, true]])
 
 
-## The logo of the console chosen and the emulator's name on the plate; with [param popping], fading in from a little
-## lower.
-func _show_plate(popping: bool) -> void:
-	var shown := _folders.has(platform_id) and _logo.show_logo(LogoView.Slot.FORM_PLATE, _folders[platform_id])
-	_logo.visible = shown
-	if shown:
-		var plate := StudioTokens.PLINTH.position + StudioTokens.PLINTH_PLATE.position
-		_logo.size = _logo.texture.get_size()
-		_logo.position = (Vector2(plate.x + StudioTokens.PLINTH_PLATE.size.x / 2.0 - _logo.size.x / 2.0, plate.y + _PLATE_PAD)).round()
-	_plate.queue_redraw()
-	if popping:
-		Motion.animate(self, _motions, &"plate", _PLATE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
-			_plate.modulate.a = clampf(p, 0.0, 1.0)
-			_plate.position.y = _rests[_plate].y + _PLATE_RISE * (1.0 - p))
-
-
 ## Where the card goes for the control that has the focus: its box, grown to a ring round a pill.
 func _aim(control: Control, animated: bool) -> void:
-	_show_arrows()
 	var pill := control is FormPill
 	var rect := Rect2(control.position, control.size).grow(_PILL_RING if pill else 0.0)
 	var radius := _PILL_RING_RADIUS if pill else StudioTokens.FOCUS_RADIUS
 	_card.bare = pill
+	# Round Remove, the ring is red.
+	_card.rim = FormPill.red() if pill and (control as FormPill).destructive else _rim
 	if not animated:
 		for key in _CARD_MOTIONS:
 			if key in _motions:
@@ -682,8 +666,6 @@ func _settle_lines() -> void:
 	for line: Control in _rests:
 		line.position = _rests[line]
 		line.modulate.a = 1.0
-	if _plinth:
-		_plinth.position = StudioTokens.PLINTH.position
 
 
 ## The motions of the lines stopped where they are: the next one starts from there, nothing jumps.
@@ -693,8 +675,8 @@ func _stop_lines() -> void:
 			_motions[key].kill()
 
 
-## The form half of the "+" ball to form transition: the screen fades in, the plinth comes up, the list in from
-## the right, the title and the count up from a little lower.
+## The form half of the "+" ball to form transition: the screen fades in, the console comes up, the list in from
+## the right, the title up from a little lower.
 func _enter() -> void:
 	_settle_lines()
 	modulate.a = 0.0
@@ -703,17 +685,14 @@ func _enter() -> void:
 	motion.tween_property(self, ^"modulate:a", 1.0, StudioTokens.TR_FORM_FADE_S).set_delay(StudioTokens.TR_FORM_AT_S) \
 		.set_custom_interpolator(Motion.curve(Motion.Easing.EASE_OUT))
 	var arrive := Motion.curve(Motion.Easing.ARRIVE)
-	_plinth.position.y += StudioTokens.TR_FORM_LIFT_PX
-	motion.tween_property(_plinth, ^"position:y", StudioTokens.PLINTH.position.y,
-		_ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
-	_plate.position.y += StudioTokens.TR_FORM_LIFT_PX
-	motion.tween_property(_plate, ^"position:y", _rests[_plate].y,
+	_console.position.y += StudioTokens.TR_FORM_LIFT_PX
+	motion.tween_property(_console, ^"position:y", _rests[_console].y,
 		_ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
 	_list.position.x += StudioTokens.TR_FORM_SLIDE_PX
 	motion.tween_property(_list, ^"position:x", _rests[_list].x, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
-	for line: Control in [_title, _count_node]:
-		line.position.y += StudioTokens.TR_FORM_CHOOSER_TITLE_PX
-		motion.tween_property(line, ^"position:y", _rests[line].y, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
+	_title.position.y += StudioTokens.TR_FORM_CHOOSER_TITLE_PX
+	motion.tween_property(_title, ^"position:y", _rests[_title].y, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S) \
+		.set_custom_interpolator(arrive)
 
 
 ## The form goes, taking no press and no focus, the console just added flying to its place on the ring; hidden once
@@ -729,7 +708,7 @@ func leave() -> Tween:
 	return motion
 
 
-## The form is back as it was filled, as it comes in (the plinth, the list, the title and the count), "Add" enabled and
+## The form is back as it was filled, as it comes in (the console, the list and the title), "Add" enabled and
 ## focused: the console was added and is not placed.
 func resume() -> void:
 	# Once: a second one would start the form's coming in again from nothing.
@@ -753,7 +732,7 @@ func _form_back() -> void:
 
 
 ## The form half of the form to "+" ball transition: the screen fades out as the list slides off to the right
-## and the plinth sinks. Returns the motion, finished when the form is gone.
+## and the console sinks. Returns the motion, finished when the form is gone.
 func _leave() -> Tween:
 	_stop_lines()
 	var motion := create_tween().set_parallel()
@@ -762,13 +741,13 @@ func _leave() -> Tween:
 	motion.tween_property(self, ^"modulate:a", 0.0, _LEAVE_FADE_S).set_custom_interpolator(ease_in)
 	motion.tween_property(_list, ^"position:x", _rests[_list].x + StudioTokens.TR_FORM_SLIDE_PX,
 		StudioTokens.TR_FORM_LEAVE_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_plinth, ^"position:y", StudioTokens.PLINTH.position.y + StudioTokens.TR_FORM_LIFT_PX,
+	motion.tween_property(_console, ^"position:y", _rests[_console].y + StudioTokens.TR_FORM_LIFT_PX,
 		StudioTokens.TR_FORM_LEAVE_S).set_custom_interpolator(ease_in)
 	return motion
 
 
-## The form half of the form to chooser transition: the lines leave to the left, the title and the count go up,
-## the model fades out, and the card glides to the chooser's cursor.
+## The form half of the form to chooser transition: the lines leave to the left, the title goes up, the console fades
+## out, and the card glides to the chooser's cursor.
 func _step_aside() -> void:
 	_stop_lines()
 	var motion := create_tween().set_parallel()
@@ -777,11 +756,10 @@ func _step_aside() -> void:
 	motion.tween_property(_list, ^"position:x", _rests[_list].x - StudioTokens.TR_CHOOSER_SHIFT_PX,
 		StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
 	motion.tween_property(_list, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
-	for line: Control in [_title, _count_node]:
-		motion.tween_property(line, ^"position:y", _rests[line].y - StudioTokens.TR_FORM_CHOOSER_TITLE_PX,
-			StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
-		motion.tween_property(line, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_plinth.get_node("Turntable"), ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_MODEL_S)
+	motion.tween_property(_title, ^"position:y", _rests[_title].y - StudioTokens.TR_FORM_CHOOSER_TITLE_PX,
+		StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
+	motion.tween_property(_title, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
+	motion.tween_property(_console, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_MODEL_S)
 	var from := Rect2(_card.position, _card.size)
 	var from_radius := _card.radius
 	Motion.animate(self, _motions, &"card_position", StudioTokens.TR_CHOOSER_CARD_S, StudioTokens.TR_CHOOSER_CARD_S_CURVE,
@@ -792,26 +770,18 @@ func _step_aside() -> void:
 		_card.radius = lerpf(from_radius, StudioTokens.FOCUS_RADIUS, p))
 
 
-## The way back of [method _step_aside], from wherever it was: the lines come back, the card glides from the
-## chooser's cursor to the field, and the model rises again when the console is the same ([param rise]; another
-## one rises by itself).
-func _come_back(cursor: Rect2, rise: bool) -> void:
+## The way back of [method _step_aside], from wherever it was: the lines and the console come back, and the card
+## glides from the chooser's cursor to the field.
+func _come_back(cursor: Rect2) -> void:
 	_stop_lines()
 	var motion := create_tween().set_parallel()
 	_motions[&"lines"] = motion
 	var arrive := Motion.curve(Motion.Easing.ARRIVE)
 	motion.tween_property(_list, ^"position:x", _rests[_list].x, _COME_BACK_S).set_custom_interpolator(arrive)
 	motion.tween_property(_list, ^"modulate:a", 1.0, _COME_BACK_S).set_custom_interpolator(arrive)
-	for line: Control in [_title, _count_node]:
-		motion.tween_property(line, ^"position:y", _rests[line].y, _COME_BACK_S).set_custom_interpolator(arrive)
-		motion.tween_property(line, ^"modulate:a", 1.0, _COME_BACK_S).set_custom_interpolator(arrive)
-	if rise:
-		var model := _plinth.get_node("Turntable") as Control
-		var rest := StudioTokens.TURNTABLE.position.y - StudioTokens.PLINTH.position.y
-		model.position.y = rest + _MODEL_RISE
-		var rising := Motion.curve(Motion.Easing.RISE)
-		motion.tween_property(model, ^"modulate:a", 1.0, _MODEL_RISE_S).set_custom_interpolator(rising)
-		motion.tween_property(model, ^"position:y", rest, _MODEL_RISE_S).set_custom_interpolator(rising)
+	motion.tween_property(_title, ^"position:y", _rests[_title].y, _COME_BACK_S).set_custom_interpolator(arrive)
+	motion.tween_property(_title, ^"modulate:a", 1.0, _COME_BACK_S).set_custom_interpolator(arrive)
+	motion.tween_property(_console, ^"modulate:a", 1.0, _MODEL_RISE_S).set_custom_interpolator(Motion.curve(Motion.Easing.RISE))
 	_card.position = cursor.position - _rests[_list]
 	_card.size = cursor.size
 	_card.radius = StudioTokens.FOCUS_RADIUS
@@ -825,11 +795,6 @@ func _draw_title() -> void:
 	if _title_line == null:
 		return
 	_title_line.draw(_title, Vector2.ZERO, Backdrop.palette.ink)
-
-
-## The count of fields chosen, in the gel's colour, over the total.
-func _draw_count() -> void:
-	FormPaint.draw_count(_count_node, "%02d" % steps(), " / 03", _rim)
 
 
 ## The note, centred in its box, a dot in the gel before it when games were found.
@@ -850,15 +815,3 @@ func _draw_note() -> void:
 	_note_line.draw(_note, Vector2(left, middle - line / 2.0 + ascent - _note_line.baseline),
 		Backdrop.palette.ink if found else Backdrop.palette.mute)
 
-
-## The plate: the emulator's name under the logo, or "No console" while none is chosen.
-func _draw_plate() -> void:
-	var plate := StudioTokens.PLINTH.position + StudioTokens.PLINTH_PLATE.position
-	var centre := plate.x + StudioTokens.PLINTH_PLATE.size.x / 2.0
-	var top := plate.y + _PLATE_PAD
-	var kicker := FormPaint.line(plate_name().to_upper(), StudioTokens.Face.PLEX_600, _KICK_PX, 0.14)
-	kicker.fit(StudioTokens.PLINTH_PLATE.size.x)
-	var line := FormPaint.PLEX_LINE * _KICK_PX
-	var box := _logo.size.y if _logo.visible else _LOGO_MIN
-	var row := top + (box - line) / 2.0 + _NO_TYPE_DROP if platform_id.is_empty() else top + box + _PLATE_GAP
-	kicker.draw(_plate, Vector2(centre - kicker.width / 2.0, row + FormPaint.PLEX_ASCENT * _KICK_PX - kicker.baseline), Backdrop.palette.mute)

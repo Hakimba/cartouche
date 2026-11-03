@@ -25,7 +25,6 @@ var _ring: SatinPanel.Backing
 
 func _ready() -> void:
 	add_to_group(SoundEffects.MOVES)
-	_remove.keyed = false
 	_card = SatinPanel.Backing.new(_panel, StudioTokens.Look.SATIN)
 	_panel.resized.connect(func() -> void: _card.place(Rect2(Vector2.ZERO, _panel.size), _CARD_RADIUS))
 	_ring = SatinPanel.Backing.new(_buttons, StudioTokens.Look.FOCUS)

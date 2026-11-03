@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://screens/screen_flow.gd" id="1"]
 [ext_resource type="PackedScene" path="res://screens/welcome.tscn" id="2"]
@@ -7,7 +7,6 @@
 [ext_resource type="PackedScene" path="res://screens/no_console.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://screens/add_console.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://screens/settings_menu.tscn" id="8"]
-[ext_resource type="PackedScene" path="res://screens/platform_list.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://screens/confirm_removal.tscn" id="10"]
 [ext_resource type="PackedScene" path="res://screens/edge_smoothing_screen.tscn" id="11"]
 
@@ -88,11 +87,6 @@ visible = false
 layout_mode = 1
 
 [node name="Settings" parent="." instance=ExtResource("8")]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-
-[node name="Platforms" parent="." instance=ExtResource("9")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1

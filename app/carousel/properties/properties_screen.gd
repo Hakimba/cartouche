@@ -2,9 +2,8 @@
 @abstract
 class_name PropertiesScreen
 extends Control
-## What the properties screens share (a game's, [DiscProperties]; a console's,
-## [ConsoleProperties]): their model staged under the light of an operating table
-## ([OperatingLight]), and each move from one of their screens to another played in three parts:
+## A game's properties ([DiscProperties]): its model staged under the light of an operating table
+## ([OperatingLight]), and each move from one of its screens to another played in three parts:
 ## what leaves goes, the 3D moves from one staging to the next, then what comes arrives ([Move]).
 ## No press counts while a staging moves or the plugin answers ([member _busy]).
 

@@ -98,7 +98,7 @@ func test_the_form_given_up_leaves_the_consoles_as_they_were() -> void:
 	assert_bool((carousel.get_node("%Consoles") as Node3D).visible).is_true()
 
 
-func test_the_first_form_does_not_offer_a_console_set_up_without_games() -> void:
+func test_the_form_offers_again_a_console_set_up_whose_games_are_all_gone() -> void:
 	var shown := await _shown_with_no_games()
 	var carousel: Carousel = shown[1]
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -106,7 +106,7 @@ func test_the_first_form_does_not_offer_a_console_set_up_without_games() -> void
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	var list: Control = carousel.get_node("%Screens/AddConsole/%Choice")
 	assert_bool(await Fixtures.until(self, func() -> bool: return list.visible)).is_true()
-	assert_array(Array((list as StudioChooser).ids())).not_contains(["ps2"])
+	assert_array(Array((list as StudioChooser).ids())).contains(["ps2"])
 
 
 ## Whether [param carousel]'s consoles show on every frame of the next [param seconds] of the game's time.

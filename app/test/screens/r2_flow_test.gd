@@ -55,17 +55,3 @@ func test_adding_responds_before_a_slow_scan_and_the_first_console_arrives_witho
 	assert_bool(carousel._order.is_open()).is_false()
 	assert_array(device.placed).is_empty()
 	assert_str(carousel._consoles.selected().folder).is_equal("ps2_slim")
-
-
-func test_a_single_grid_row_has_no_vertical_neighbour_and_horizontal_moves_stop_at_its_ends() -> void:
-	var device := Fixtures.past_first_launch(self, {"ps2": 1, "gc": 1, "gba": 1})
-	var screen: PlatformList = auto_free(preload("res://screens/platform_list.tscn").instantiate())
-	add_child(screen)
-	var platforms := device.catalog.platforms.filter(func(platform: AndroidServices.Platform) -> bool:
-		return platform.id in device.consoles)
-	screen.open(platforms, 0)
-	for action: StringName in [&"ui_up", &"ui_down", &"ui_left"]:
-		await Fixtures.action(self, action)
-		assert_object(Fixtures.focus(self)).is_same(screen._rows.get_child(0))
-	await Fixtures.action(self, &"ui_right")
-	assert_object(Fixtures.focus(self)).is_same(screen._rows.get_child(1))

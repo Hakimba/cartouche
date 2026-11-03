@@ -345,11 +345,6 @@ internal class LibraryService(
         save(library().withConsoleAt(platform, gap, platforms).mapLeft(LibraryFailure::Placement).bind()).bind()
     }
 
-    /** Stores a console's model without changing its games, folder or other choices. */
-    fun setVariant(platform: PlatformId, variant: String): Either<LibraryFailure, Library> = either {
-        save(library().withVariant(platform, variant).mapLeft(LibraryFailure::Variant).bind()).bind()
-    }
-
     private fun save(library: Library): Either<LibraryFailure, Library> = either {
         ensure(writable) { LibraryFailure.Storage(StorageFailure.Unavailable("the unreadable library file could not be set aside")) }
         val started = TimeSource.Monotonic.markNow()

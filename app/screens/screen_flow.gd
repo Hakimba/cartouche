@@ -4,13 +4,12 @@ extends Control
 ## The screens in front of the carousel, over its background: on a first launch, the welcome until a
 ## button is pressed, the button style and image region, then the curtain
 ## permission when Android does not allow it yet; while no console has games, "No console" and the
-## form adding one and its arrival on the carousel. Later, the settings (Y): the platforms
-## set up, each to change or remove, the button style, the edges' smoothing, the backdrop and its veil, and the region
-## labels' images prefer; and the form adding
-## one more console (the "+" above the consoles). One screen shows at a time, with the focus on it.
-## Closes once the carousel can be used.
+## form adding one and its arrival on the carousel. Later, the settings (Y): the button style, the edges' smoothing,
+## the backdrop and its veil, and the region labels' images prefer; the form adding one more console (the "+" above
+## the consoles); and the same form editing the console the ring shows (X), which it saves or removes. One screen
+## shows at a time, with the focus on it. Closes once the carousel can be used.
 
-## A console was saved or removed in the settings: [param library] is the library now.
+## A console was saved or removed: [param library] is the library now.
 signal library_edited(library: AndroidServices.Library)
 ## The welcome, which has no top bar, is over.
 signal welcome_closed
@@ -18,6 +17,10 @@ signal welcome_closed
 signal covering
 ## The form adding a console, given up, starts to go.
 signal form_leaving
+## The form editing the console of the ring, saved or given up, starts to go.
+signal edit_leaving
+## The console edited is shown as the model in [param folder] on the ring, for a look or back.
+signal model_shown(folder: String)
 
 ## Whether the first launch's welcome waits for a button; off to measure starts.
 @export var welcome_waits := true
@@ -64,12 +67,13 @@ var _languages: PackedStringArray
 @onready var _language_screen: CardChoiceScreen = %Language
 @onready var _pending: Label = %Saving
 @onready var _settings: SettingsMenu = %Settings
-@onready var _platforms: PlatformList = %Platforms
 @onready var _confirm: ConfirmRemoval = %Confirm
 
 
 func _ready() -> void:
 	_settings.sound_level_changed.connect(_change_sound_level)
+	_add_console.leaving.connect(func() -> void: (edit_leaving if _add_console.is_editing() else form_leaving).emit())
+	_add_console.model_shown.connect(model_shown.emit)
 	_add_console.saving.connect(func(pending: bool) -> void:
 		_pending.visible = pending
 		_holding_presses = pending)
@@ -121,9 +125,7 @@ func open_settings() -> bool:
 ## The form adding one more console, over the carousel, until it is added and placed, or given up; whether one was.
 func add_console() -> bool:
 	_show(_add_console)
-	_add_console.open(library.set_up_platforms())
-	if not _add_console.leaving.is_connected(form_leaving.emit):
-		_add_console.leaving.connect(form_leaving.emit)
+	_add_console.open(library.on_ring())
 	var added := false
 	while not added and await _form_closed() == AddConsole.Outcome.DONE:
 		library = _add_console.library
@@ -132,6 +134,21 @@ func add_console() -> bool:
 		_holding_presses = false
 	_close()
 	return added
+
+
+## The form editing the console of [param platform_id], the one the ring shows, until it is saved, given up or
+## removed; then, when no console has games any more, "No console" until one is added. Returns whether the carousel
+## must come in again (see [method open_settings]).
+func edit_console(platform_id: String) -> bool:
+	arrived = false
+	_emptied = false
+	for platform in android.catalog.platforms:
+		if platform.id == platform_id:
+			await _edit_platform(platform)
+	if not _has_games():
+		await _add_first_console()
+	_close()
+	return _emptied
 
 
 ## The form shows again, filled as it was, as the console flies back to it; it takes no press until the console is back.
@@ -247,7 +264,7 @@ func _add_first_console() -> void:
 				return
 			continue
 		_show(_add_console)
-		_add_console.open(library.set_up_platforms())
+		_add_console.open(library.on_ring())
 		if await _form_closed() == AddConsole.Outcome.DONE:
 			break
 	library = _add_console.library
@@ -255,19 +272,17 @@ func _add_first_console() -> void:
 	arrived = await place.call(library, platform_id)
 
 
-## "Settings" until B, or until no platform is set up any more.
+## "Settings" until B.
 func _settings_menu() -> void:
-	# The form editing a platform counts its games as it opens: what that needs is prepared meanwhile.
-	android.prepare_titles()
 	_settings.snap_switch(&"games_float", _games_float)
 	_settings.snap_switch(&"pixel_veil", Backdrop.veil)
 	_settings.snap_switch(&"veil_gel", Backdrop.veil_gel)
 	_settings.sound_level = Sounds.level
-	var focus := &"platforms"
+	var focus := &"button_style"
 	while true:
 		if focus not in SettingsMenu.SWITCHES:
 			_show(_settings)
-			_settings.open(_platforms_set_up().size(), focus, _preferred_region, _language)
+			_settings.open(focus, _preferred_region, _language)
 		focus = await _settings.chosen
 		match focus:
 			&"close":
@@ -298,10 +313,6 @@ func _settings_menu() -> void:
 			&"games_float":
 				_turn_switch(focus, android.save_games_float, func(on: bool) -> void: _games_float = on,
 					func() -> bool: return _games_float)
-			&"platforms":
-				await _platform_menu()
-				if library.set_up_platforms().is_empty():
-					return
 
 
 ## The language the app's text is written in, chosen from its own page: applied once saved.
@@ -354,36 +365,12 @@ func _turn_switch(switch: StringName, save: Callable, keep: Callable, stored: Ca
 	_settings.saving = false
 
 
-## "Platforms" until B, or until none is left.
-func _platform_menu() -> void:
-	var at := 0
-	while true:
-		var platforms := _platforms_set_up()
-		if platforms.is_empty():
-			return
-		_show(_platforms)
-		_platforms.open(platforms, at)
-		at = await _platforms.chosen
-		if at < 0:
-			return
-		await _edit_platform(platforms[at])
-
-
-## The platforms set up, in catalog order.
-func _platforms_set_up() -> Array[AndroidServices.Platform]:
-	var ids := library.set_up_platforms()
-	return android.catalog.platforms.filter(func(platform: AndroidServices.Platform) -> bool:
-		return platform.id in ids)
-
-
 ## The form editing [param platform], until it is saved, given up, or the console removed.
 func _edit_platform(platform: AndroidServices.Platform) -> void:
 	var setup := library.setup_of(platform.id)
 	var folder := await _folder_of(setup)
-	var others := PackedStringArray(Array(library.set_up_platforms()).filter(func(id: String) -> bool:
-		return id != platform.id))
 	_show(_add_console)
-	_add_console.edit(platform.id, setup, folder, others)
+	_add_console.edit(platform.id, setup, folder)
 	while await _form_closed() == AddConsole.Outcome.REMOVE:
 		_show(_confirm)
 		_confirm.open(platform.name, library.games_of(platform.id).size(), folder.volume if folder.has_place else &"")

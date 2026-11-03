@@ -465,14 +465,6 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         success("library" to wire(library.value))
     }
 
-    /** Stores [variant] as [platformId]'s model and answers with the library. */
-    @UsedByGodot
-    public fun setVariant(requestId: Int, platformId: String, variant: String): Unit = onLibrary(requestId) {
-        inLibrary { setVariant(PlatformId(platformId), variant) }
-        trace("console") { "variant=$variant of $platformId" }
-        success("library" to wire(library.value))
-    }
-
     /** Scans without reading game files or saving: its files are known by the last scan's facts ([LibraryService.preview]). */
     @UsedByGodot
     public fun previewPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = onLibrary(requestId) {

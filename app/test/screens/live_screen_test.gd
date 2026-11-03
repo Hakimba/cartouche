@@ -63,25 +63,21 @@ func test_after_a_console_added_the_form_opened_again_from_the_plus_shows_with_i
 	assert_str(Fixtures.focus(self).name).is_equal("Type")
 
 
-func test_after_a_console_added_A_on_a_platform_of_the_settings_shows_its_form_and_B_goes_back_to_the_platforms() -> void:
+func test_after_a_console_added_X_on_the_ring_shows_its_form_and_B_goes_back_to_the_ring() -> void:
 	var shown := await _shown({"ps2": 3})
 	var device: Fixtures.NewDevice = shown[0]
 	var carousel: Carousel = shown[1]
 	await _add(carousel, device, "gba")
-	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
-	assert_bool(await Fixtures.until(self, func() -> bool: return menu.state == SettingsMenu.State.OPEN)).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.joypad(self, JOY_BUTTON_X)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	var form: AddConsole = carousel.get_node("%Screens/AddConsole")
 	assert_bool(await Fixtures.until(self, func() -> bool: return form.modulate.a == 1.0 and Fixtures.alive(carousel))).is_true()
 	assert_str(Fixtures.focus(self).name).is_equal("Emulator")
 	assert_bool(form.is_editing()).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.on(self, carousel, "Platforms")).is_true()
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
+	assert_bool(await Fixtures.until(self, func() -> bool:
+		return Fixtures.shown_screen(carousel) == null and Fixtures.alive(carousel))).is_true()
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 
 ## From a library holding [param consoles], one console added through the form, then [param count] presses drawn by
@@ -118,7 +114,7 @@ func _walk(consoles: Dictionary[String, int], test_seed: int, count := 150) -> v
 
 
 func test_inv_20_a_walk_of_presses_from_no_console_never_leaves_a_dead_screen() -> void:
-	await _walk({}, 360411)
+	await _walk({}, 360441)
 
 
 func test_inv_20_a_walk_of_presses_from_one_console_never_leaves_a_dead_screen() -> void:
@@ -126,7 +122,7 @@ func test_inv_20_a_walk_of_presses_from_one_console_never_leaves_a_dead_screen()
 
 
 func test_inv_20_a_walk_of_presses_from_two_consoles_never_leaves_a_dead_screen() -> void:
-	await _walk({"ps2": 3, "gc": 2}, 360413)
+	await _walk({"ps2": 3, "gc": 2}, 360433)
 
 
 func test_inv_20_a_walk_of_presses_from_three_consoles_never_leaves_a_dead_screen() -> void:

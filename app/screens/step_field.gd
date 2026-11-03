@@ -2,8 +2,8 @@
 class_name StepField
 extends Button
 ## One numbered line of the add-console form: its step chip (filled with the gel once chosen), its name small
-## over what was chosen, a chevron at the right. The line draws its own text; the button's [member text] holds
-## what is shown, for the tests and the screen readers. A press asks for the choice.
+## over what was chosen, a chevron at the right unless it is locked ([member disabled]). The line draws its own text;
+## the button's [member text] holds what is shown, for the tests and the screen readers. A press asks for the choice.
 
 const _SIZE := Vector2(56.0 * FormPaint.CQW, 6.4 * FormPaint.CQW)
 const _PAD_LEFT := 2.2 * FormPaint.CQW
@@ -92,7 +92,8 @@ func _draw() -> void:
 	var ink := Backdrop.palette.ink if done else Backdrop.palette.mute
 	ink.a = 1.0 if has_focus() else _UNCHOSEN_ALPHA
 	value.draw(self, Vector2(left, top + kick_line), ink)
-	_draw_chevron(Vector2(size.x - _PAD_RIGHT - _CHEVRON, (size.y - _CHEVRON * 1.6) / 2.0))
+	if not disabled:
+		_draw_chevron(Vector2(size.x - _PAD_RIGHT - _CHEVRON, (size.y - _CHEVRON * 1.6) / 2.0))
 	draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), Backdrop.palette.line)
 
 

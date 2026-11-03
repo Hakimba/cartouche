@@ -231,7 +231,7 @@ func test_Ajouter_brings_the_ring_and_A_flies_the_console_into_the_chosen_gap_sa
 	assert_bool(carousel._rail.visible).is_true()
 	# And the consoles screen works as before.
 	await Fixtures.joypad(self, JOY_BUTTON_X)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_EDIT)
 
 
 func test_the_gap_chosen_at_either_end_is_the_one_the_order_is_saved_with() -> void:

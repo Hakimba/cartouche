@@ -24,8 +24,8 @@ extends Control
 ## console while none has games; Y on the consoles screen or the games screen opens the settings over
 ## it. On the consoles screen, holding up turns the "+" ball above the console into a button
 ## ([AddBall]), until up is let go: A then adds one more console, the consoles coming in again on it;
-## down (or "Change place" in a console's properties) opens the ring putting the consoles in order
-## ([ConsoleOrder]). The carousel waits for the screens in front to close.
+## down opens the ring putting the consoles in order ([ConsoleOrder]); X edits the selected console in the form
+## adding one ([method ScreenFlow.edit_console]). The carousel waits for the screens in front to close.
 ##
 ## In debug builds, holding Select opens the device check. See the diagnostics section of
 ## docs/README.md for the debug arguments. Without the Android plugin (the editor, a desktop
@@ -34,7 +34,7 @@ extends Control
 ## The screen changed; in between, the animation into or out of the console plays.
 signal screen_changed(screen: Screen)
 
-enum Screen { CONSOLES, ENTERING, GAMES, LEAVING, PROPERTIES, CONSOLE_PROPERTIES, ORDER }
+enum Screen { CONSOLES, ENTERING, GAMES, LEAVING, PROPERTIES, CONSOLE_EDIT, ORDER }
 ## The add-console form over the consoles: asked by the "+" (the screens not shown yet), coming in over the consoles
 ## still in view, covering them, or given up (leaving, the consoles back).
 enum Form { NONE, ASKED, COMING, COVERING, GIVEN_UP }
@@ -43,7 +43,7 @@ const _APPEARANCE := "res://data/carousel/appearance.json"
 const _DEVICE_CHECK := "res://dev/device_check/device_check.tscn"
 const _MESSAGE_S := 4.0
 const _MOVING: Array[Screen] = [Screen.ENTERING, Screen.LEAVING]
-const _CONSOLE_SCREENS: Array[Screen] = [Screen.CONSOLES, Screen.CONSOLE_PROPERTIES]
+const _CONSOLE_SCREENS: Array[Screen] = [Screen.CONSOLES, Screen.CONSOLE_EDIT]
 const _GAME_SCREENS: Array[Screen] = [Screen.GAMES, Screen.PROPERTIES]
 const _ARRIVAL_S := 0.45
 const _TITLE_ARRIVES_S := 0.3
@@ -95,6 +95,8 @@ var _title_fade: Tween
 var _settle_waiting := false
 var _form_entry: FormEntry
 var _form := Form.NONE
+## The platform edited until its form closes; none otherwise.
+var _edited_platform := ""
 ## The row's height, the ribbon closed, and how much it rises while it is open, in world units.
 var _row_y := 0.0
 var _search_lift := 0.0
@@ -122,7 +124,6 @@ var _shelf_waiting := false
 @onready var _art: GameArt = %Art
 @onready var _pill: GameTitlePill = %Pill
 @onready var _games_logo: LogoView = %GamesLogo
-@onready var _console_properties: ConsoleProperties = %ConsoleProperties
 @onready var _title: Label = %Title
 @onready var _message: Label = %Message
 @onready var _message_timer: Timer = %MessageTimer
@@ -158,6 +159,11 @@ func _ready() -> void:
 	_screens.android = android
 	_screens.covering.connect(_on_screens_covering)
 	_screens.form_leaving.connect(_on_screens_form_leaving)
+	_screens.edit_leaving.connect(_stop_editing)
+	_screens.model_shown.connect(_show_variant)
+	var form: AddConsole = _screens.get_node("%AddConsole")
+	form.ring = _consoles
+	form.sun = $Sun
 	_game_launch.android = android
 	_toss.row = _row
 	_toss.pill = _pill
@@ -218,9 +224,8 @@ func _ready() -> void:
 	_consoles.pose.turn = _appearance.pose.turn
 	_consoles.pose.sway_period_s = _appearance.pose.sway_period_s
 	_row.label_images = _art
-	for properties: PropertiesScreen in [_properties, _console_properties]:
-		properties.android = android
-		properties.light = %Light
+	_properties.android = android
+	_properties.light = %Light
 	_properties.rename_failed.connect(func() -> void:
 		_show_message(tr("This name could not be kept.")))
 	_properties.row = _row
@@ -230,13 +235,6 @@ func _ready() -> void:
 	_properties.choice_failed.connect(func() -> void:
 		_show_message(tr("This image could not be kept.")))
 	_properties.name_kept.connect(_show_title)
-	_console_properties.consoles = _consoles
-	# The add ball is the title's: it goes with it.
-	_console_properties.behind.assign([_console_title, _rail])
-	_console_properties.closed.connect(_on_console_properties_closed)
-	_console_properties.order_asked.connect(_open_order)
-	_console_properties.variant_shown.connect(_show_variant)
-	_console_properties.variant_kept.connect(_keep_variant)
 	_order.android = android
 	_order.consoles = _consoles
 	_order.ordered.connect(_on_consoles_ordered)
@@ -357,7 +355,7 @@ func _handle_input(event: InputEvent, moved: bool) -> void:
 	# into or out of the console plays.
 	# The properties take their own presses.
 	if event.is_echo() or not _shown or _game_launch.is_busy() or _screen in _MOVING \
-			or _screen in [Screen.PROPERTIES, Screen.CONSOLE_PROPERTIES, Screen.ORDER]:
+			or _screen in [Screen.PROPERTIES, Screen.CONSOLE_EDIT, Screen.ORDER]:
 		return
 	if event.is_action_pressed(&"app_back") and Diagnostics.enabled:
 		_hold_select.start()
@@ -379,7 +377,7 @@ func _handle_input(event: InputEvent, moved: bool) -> void:
 		else:
 			_add_ball.close()
 	elif _screen == Screen.CONSOLES and event.is_action_pressed(&"open_properties"):
-		_open_console_properties()
+		_edit_console()
 	elif _screen == Screen.CONSOLES and event.is_action_pressed(&"ui_down") and _shelves.size() > 1:
 		_open_order()
 	elif _screen == Screen.CONSOLES and event.is_action_pressed(&"ui_accept"):
@@ -482,7 +480,7 @@ func _let_go() -> void:
 func _long_press() -> void:
 	if _screen == Screen.CONSOLES:
 		Diagnostics.trace("touch", "long press on the console")
-		_open_console_properties()
+		_edit_console()
 	elif _screen == Screen.GAMES:
 		Diagnostics.trace("touch", "long press on the game")
 		_open_properties()
@@ -523,7 +521,6 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 	_show_rail()
 	# A console alone has no order to be put in.
 	_arrange_hint.visible = _shelves.size() > 1
-	_console_properties.orderable = _shelves.size() > 1
 	_show_platform()
 	if Diagnostics.enabled:
 		var game := _row.selected_game()
@@ -633,12 +630,12 @@ func _go(screen_to: Screen) -> void:
 	var from := _screen
 	_screen = screen_to
 	_show_rail()
-	if screen_to in [Screen.ENTERING, Screen.CONSOLE_PROPERTIES, Screen.ORDER]:
+	if screen_to in [Screen.ENTERING, Screen.CONSOLE_EDIT, Screen.ORDER]:
 		_rail.sink(StudioTokens.TR_RING_SINK_S if screen_to == Screen.ORDER else StudioTokens.TR_GAMES_RAIL_S)
 	elif screen_to == Screen.CONSOLES and from != Screen.LEAVING:
 		_rail.rise(StudioTokens.TR_GAMES_RAIL_BACK_S)
 	_let_go()
-	if screen_to in [Screen.ENTERING, Screen.CONSOLES, Screen.CONSOLE_PROPERTIES, Screen.ORDER]:
+	if screen_to in [Screen.ENTERING, Screen.CONSOLES, Screen.CONSOLE_EDIT, Screen.ORDER]:
 		_fade_title(1.0 if screen_to == Screen.CONSOLES else 0.0, 0.0,
 			_RING_LEAVE_S if screen_to == Screen.ORDER else StudioTokens.TR_GAMES_FADE_S)
 	# The games screen's hints come and go with it; its properties hide and show them themselves.
@@ -693,7 +690,7 @@ func _on_art_changed(change: AndroidServices.ArtChange) -> void:
 	for game_id in change.absent:
 		_art.mark_absent(game_id)
 		_row.refresh_label(game_id)
-	if not (_screens.visible or _properties.is_open() or _console_properties.is_open() or _order.is_open()):
+	if not (_screens.visible or _properties.is_open() or _order.is_open()):
 		_art_progress.follow(progress)
 
 
@@ -834,16 +831,6 @@ func _show_variant(folder: String) -> void:
 	_show_variants(shown)
 
 
-func _keep_variant(folder: String) -> void:
-	var answer := await android.set_variant(_shelves[_shelf].platform_id, folder)
-	if answer.ok:
-		_console_variants = answer.library.console_variants
-		_screens.library = answer.library
-	else:
-		Diagnostics.trace("console", "variant not kept (%s): %s" % [answer.code, answer.detail])
-		_show_variants(_console_variants)
-
-
 func _show_variants(variants: Dictionary[String, String]) -> void:
 	_appearance.use_variants(variants)
 	_consoles.replace_selected(_console_item(_shelves[_shelf]))
@@ -851,23 +838,33 @@ func _show_variants(variants: Dictionary[String, String]) -> void:
 	_sequence.use(_appearance.animation_of(_platforms[_shelves[_shelf].platform_id], _row.selected_game().medium))
 
 
-func _open_console_properties() -> void:
+## The selected console's edit, over the ring until it is saved, given up or removed; the consoles come in again if
+## the last one was removed and another added meanwhile.
+func _edit_console() -> void:
 	Sounds.play(SoundEffects.Cue.PROPERTIES)
-	_focus.gel = _selected_gel()
-	_leave_consoles(Screen.CONSOLE_PROPERTIES)
-	_console_properties.open()
+	_cover()
+	_leave_consoles(Screen.CONSOLE_EDIT)
+	_edited_platform = _shelves[_shelf].platform_id
+	var emptied := await _screens.edit_console(_edited_platform)
+	_edited_platform = ""
+	# Still behind it: the form did not fade over the ring (a console removed).
+	if _screen == Screen.CONSOLE_EDIT:
+		_stop_editing()
+	if emptied and not _screens.arrived:
+		_come_in()
+	_reopen_add_ball()
+	_shown = true
+
+
+## The form editing the selected console goes: the ring comes back behind it.
+func _stop_editing() -> void:
+	_show_front(false)
+	_go(Screen.CONSOLES)
 
 
 func _reopen_add_ball() -> void:
 	if Input.is_action_pressed(&"ui_up"):
 		_add_ball.open()
-
-
-func _on_console_properties_closed() -> void:
-	# Closed for the ring, the carousel is already there.
-	if _screen == Screen.CONSOLE_PROPERTIES:
-		_go(Screen.CONSOLES)
-		_reopen_add_ball()
 
 
 func _open_order() -> void:
@@ -908,7 +905,7 @@ func _on_consoles_ordered(order: Array[String]) -> void:
 
 
 ## The ring starts closing: the rail rises and the consoles screen's frame, pool and title come back as the console
-## pointed at glides to the middle (its title too when the ring came from a console's properties, which hid it).
+## pointed at glides to the middle.
 func _on_order_closing(duration: float) -> void:
 	var time_ratio := duration / _RING_CLOSE_S
 	_console_title.show()
@@ -1036,7 +1033,8 @@ func _place_console(library: AndroidServices.Library, platform_id: String) -> bo
 
 func _on_screens_library_edited(library: AndroidServices.Library) -> void:
 	_art.keep_only(library.games)
-	_show_library(library)
+	# Edited from the ring, the ring stays on the console edited, unless it was removed.
+	_show_library(library, _edited_platform)
 	# Shown again from the start, the carousel is back on the consoles screen.
 	if _screen == Screen.GAMES:
 		_go(Screen.CONSOLES)

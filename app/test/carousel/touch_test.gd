@@ -10,7 +10,7 @@ const HELD_S := 0.7
 const EUROPE := "user://touch-test-europe.png"
 ## The screens a finger reaches.
 const REACHABLE: Array[Carousel.Screen] = [Carousel.Screen.CONSOLES, Carousel.Screen.GAMES, Carousel.Screen.PROPERTIES,
-	Carousel.Screen.CONSOLE_PROPERTIES]
+	Carousel.Screen.CONSOLE_EDIT]
 
 
 func before() -> void:
@@ -39,7 +39,7 @@ func _on_consoles() -> Array:
 func _settled(carousel: Carousel) -> void:
 	assert_bool(await Fixtures.until(self, func() -> bool:
 		return (carousel.screen() not in [Carousel.Screen.ENTERING, Carousel.Screen.LEAVING]
-			and not carousel._properties._busy and not carousel._console_properties._busy))).is_true()
+			and not carousel._properties._busy))).is_true()
 	await await_idle_frame()
 
 
@@ -206,11 +206,8 @@ func test_the_system_s_back_is_B_on_the_games_the_ring_and_both_properties_scree
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
 	await _settled(carousel)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_PROPERTIES)
-	# A tap beside the console and its action does nothing.
-	await Fixtures.touch(self, [Vector2(120.0, 300.0)])
-	await _settled(carousel)
-	assert_int(carousel._console_properties._step).is_equal(ConsoleProperties.Step.PROPERTIES)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_EDIT)
+	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	await _back(carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 

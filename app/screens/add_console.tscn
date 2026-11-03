@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://screens/add_console.gd" id="1"]
 [ext_resource type="PackedScene" path="res://screens/step_field.tscn" id="2"]
@@ -8,6 +8,9 @@
 [ext_resource type="Script" path="res://screens/form_pill.gd" id="7"]
 [ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="8"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="9"]
+[ext_resource type="Script" path="res://screens/ring_view.gd" id="10"]
+[ext_resource type="Script" path="res://screens/model_field.gd" id="11"]
+[ext_resource type="Script" path="res://screens/model_swatches.gd" id="12"]
 
 [node name="AddConsole" type="Control"]
 layout_mode = 3
@@ -29,6 +32,16 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("5")
 
+[node name="Console" type="TextureRect" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 48.0
+offset_top = 236.0
+offset_right = 500.0
+offset_bottom = 764.0
+script = ExtResource("10")
+
 [node name="Title" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 0
@@ -38,20 +51,6 @@ offset_right = 764.0
 offset_bottom = 182.4
 mouse_filter = 2
 text = "Add a console"
-
-[node name="Count" type="Control" parent="."]
-layout_mode = 0
-offset_left = 66.56
-offset_top = 186.88
-offset_right = 266.56
-offset_bottom = 216.88
-mouse_filter = 2
-
-[node name="Plate" type="Control" parent="."]
-layout_mode = 0
-offset_right = 1280.0
-offset_bottom = 960.0
-mouse_filter = 2
 
 [node name="List" type="Control" parent="."]
 layout_mode = 0
@@ -82,7 +81,7 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_top = 179.2
 focus_neighbor_top = NodePath("../Emulator")
-focus_neighbor_bottom = NodePath("../Subfolders")
+focus_neighbor_bottom = NodePath("../Model")
 label = "Games folder"
 step = 3
 
@@ -95,11 +94,21 @@ offset_right = 691.2
 offset_bottom = 314.88
 mouse_filter = 2
 
-[node name="Subfolders" type="Button" parent="List"]
+[node name="Model" type="Button" parent="List"]
 unique_name_in_owner = true
 layout_mode = 0
 offset_top = 327.68
+focus_neighbor_left = NodePath(".")
 focus_neighbor_top = NodePath("../Folder")
+focus_neighbor_right = NodePath(".")
+focus_neighbor_bottom = NodePath("../Subfolders")
+script = ExtResource("11")
+
+[node name="Subfolders" type="Button" parent="List"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_top = 407.04
+focus_neighbor_top = NodePath("../Model")
 focus_neighbor_bottom = NodePath("../Discs")
 button_pressed = true
 text = "Subfolders"
@@ -108,7 +117,7 @@ script = ExtResource("6")
 [node name="Discs" type="Button" parent="List"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_top = 407.04
+offset_top = 486.4
 focus_neighbor_top = NodePath("../Subfolders")
 focus_neighbor_bottom = NodePath("../Cancel")
 button_pressed = true
@@ -119,7 +128,7 @@ script = ExtResource("6")
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 245.76
-offset_top = 506.88
+offset_top = 586.24
 focus_neighbor_left = NodePath(".")
 focus_neighbor_top = NodePath("../Discs")
 focus_neighbor_right = NodePath("../Add")
@@ -131,7 +140,7 @@ script = ExtResource("7")
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 473.6
-offset_top = 506.88
+offset_top = 586.24
 focus_neighbor_left = NodePath("../Cancel")
 focus_neighbor_top = NodePath("../Discs")
 focus_neighbor_right = NodePath(".")
@@ -141,13 +150,29 @@ text = "Add"
 script = ExtResource("7")
 primary = true
 
+[node name="Models" type="Control" parent="List"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_top = 89.6
+offset_right = 716.8
+offset_bottom = 593.6
+script = ExtResource("12")
+
 [node name="Hints" parent="." instance=ExtResource("8")]
 
 [node name="Choose" type="Control" parent="Hints"]
+unique_name_in_owner = true
 layout_mode = 2
 script = ExtResource("9")
 button = &"a"
 text = "Choose"
+
+[node name="Back" type="Control" parent="Hints"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("9")
+button = &"b"
+text = "Cancel"
 
 [node name="Choice" parent="." instance=ExtResource("4")]
 unique_name_in_owner = true
@@ -160,3 +185,6 @@ layout_mode = 1
 [connection signal="toggled" from="List/Discs" to="." method="_on_option_toggled"]
 [connection signal="pressed" from="List/Cancel" to="." method="_on_cancel_pressed"]
 [connection signal="pressed" from="List/Add" to="." method="_on_add_pressed"]
+[connection signal="pressed" from="List/Model" to="." method="_on_model_pressed"]
+[connection signal="looked" from="List/Models" to="." method="_on_model_looked"]
+[connection signal="closed" from="List/Models" to="." method="_on_models_closed"]

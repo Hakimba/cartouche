@@ -341,13 +341,3 @@ func _stood(consoles: ConsoleRow) -> Dictionary:
 			var fade: ModelFade = model.get(&"_fade")
 			looks[i] = [1.0 - fade.amount, model.position]
 	return looks
-
-
-func test_a_console_with_one_model_has_no_model_to_choose_in_its_properties() -> void:
-	var screens := preload("res://test/screens/fixtures.gd")
-	var carousel := screens.fresh_carousel(self, screens.past_first_launch(self, {"gc": 1}))
-	assert_bool(await screens.until(self, func() -> bool: return carousel._shown)).is_true()
-	await screens.action(self, &"open_properties")
-	var properties := carousel._console_properties
-	assert_bool(await screens.until(self, func() -> bool: return not properties._busy and properties.is_open())).is_true()
-	assert_bool(properties._model.visible).is_false()

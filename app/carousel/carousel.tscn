@@ -1,4 +1,4 @@
-[gd_scene load_steps=36 format=3 uid="uid://zf0ykprx4cdu"]
+[gd_scene load_steps=35 format=3 uid="uid://zf0ykprx4cdu"]
 
 [ext_resource type="Script" uid="uid://ctnvb4pt7gtiu" path="res://carousel/carousel.gd" id="1"]
 [ext_resource type="Script" uid="uid://5s4w465j4tbm" path="res://carousel/shelf_row.gd" id="2"]
@@ -19,7 +19,6 @@
 [ext_resource type="Script" path="res://carousel/properties/operating_light.gd" id="22"]
 [ext_resource type="Shader" path="res://carousel/properties/operating_light.gdshader" id="23"]
 [ext_resource type="PackedScene" path="res://carousel/properties/disc_properties.tscn" id="24"]
-[ext_resource type="PackedScene" path="res://carousel/properties/console_properties.tscn" id="25"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/console_order.tscn" id="26"]
 [ext_resource type="Script" path="res://studio/cyclorama.gd" id="27"]
 [ext_resource type="Script" path="res://studio/games/game_title_pill.gd" id="game_title"]
@@ -189,11 +188,11 @@ script = ExtResource("20")
 button = &"y"
 text = "Settings"
 
-[node name="Properties" type="Control" parent="ConsoleTitle/ConsoleHints"]
+[node name="Edit" type="Control" parent="ConsoleTitle/ConsoleHints"]
 layout_mode = 2
 script = ExtResource("20")
 button = &"x"
-text = "Properties"
+text = "Edit"
 
 [node name="Arrange" type="Control" parent="ConsoleTitle/ConsoleHints"]
 layout_mode = 2
@@ -305,11 +304,11 @@ script = ExtResource("20")
 button = &"y"
 text = "Settings"
 
-[node name="Properties" type="Control" parent="GamesHints"]
+[node name="Edit" type="Control" parent="GamesHints"]
 layout_mode = 2
 script = ExtResource("20")
 button = &"x"
-text = "Properties"
+text = "Edit"
 
 [node name="ClearFilter" type="Control" parent="GamesHints"]
 layout_mode = 2
@@ -337,10 +336,6 @@ unique_name_in_owner = true
 layout_mode = 1
 
 [node name="Properties" parent="." instance=ExtResource("24")]
-unique_name_in_owner = true
-layout_mode = 1
-
-[node name="ConsoleProperties" parent="." instance=ExtResource("25")]
 unique_name_in_owner = true
 layout_mode = 1
 

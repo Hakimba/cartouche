@@ -277,14 +277,6 @@ func set_up_platform(platform_id: String, setup: PlatformSetup) -> LibraryAnswer
 	return LibraryAnswer.new(await _request(&"setUpPlatform", [platform_id, setup.to_wire()]))
 
 
-## Keeps the selected model of a set-up console.
-func set_variant(platform_id: String, variant: String) -> LibraryAnswer:
-	var answer := LibraryAnswer.new(await _request(&"setVariant", [platform_id, variant]))
-	if answer.ok:
-		Diagnostics.trace("console", "variant=%s of %s" % [variant, platform_id])
-	return answer
-
-
 ## Looks for the art of [param games] (the game on screen and its neighbours) before the others'.
 func art_focus(games: Array[AndroidServices.Game]) -> void:
 	var ids := PackedStringArray()

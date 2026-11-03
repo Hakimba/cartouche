@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name FormPill
 extends Button
-## A pill button of the add-console form. The secondary one (Cancel, Remove) is satin, the controller's B on its
-## key before its name when it gives up. The primary one (Add, Save) takes the gel's colour once it can act, greyed
-## until then. The pill draws its own text; the button's holds the name
+## A pill button of the add-console form. The secondary one (Cancel) is satin, the controller's B on its key before
+## its name. A destructive one (Remove) is satin too, a bin before its name in red. The primary one (Add, Save) takes
+## the gel's colour once it can act, greyed until then. The pill draws its own text; the button's holds the name
 ## for the tests and the screen readers.
 
 const _HEIGHT := 5.6 * FormPaint.CQW
@@ -18,13 +18,18 @@ const _NAME_PX := 2.1 * FormPaint.CQW
 const _LIT_S := 0.3
 ## How much higher than centred the name is drawn, in px.
 const _INK_RAISE := 1.0
+## The red of a destructive pill's name and of the ring round it, on a light ground and on a dark one.
+const _DESTRUCTIVE := Color("#c2352b")
+const _DESTRUCTIVE_ON_DARK := Color("#ff7a6b")
+## The bin before a destructive pill's name.
+const _BIN := Vector2(1.5, 1.75) * FormPaint.CQW
 
 ## Whether it is the primary pill, the one that adds.
 @export var primary := false
-## Whether the secondary pill shows the B key: it does where B does what it says (Cancel), not on Remove.
-var keyed := true:
+## Whether it destroys something (Remove), which B does not do.
+@export var destructive := false:
 	set(value):
-		keyed = value
+		destructive = value
 		queue_redraw()
 
 ## The gel's colour now.
@@ -70,17 +75,39 @@ func _draw() -> void:
 	var left := (size.x - lead.x - gap - label.width) / 2.0
 	_body.place(Rect2(Vector2.ZERO, size), _RADIUS if primary else _CARD_RADIUS)
 	var lead_box := Rect2(Vector2(left, (size.y - lead.y) / 2.0 - _INK_RAISE), lead)
-	if not primary and keyed:
-		ButtonGlyph.draw_key(self, _key, lead_box, &"b")
-	else:
+	if destructive:
 		_key.place(Rect2(), 0.0)
-	var ink := Backdrop.palette.ink if not primary else Backdrop.palette.mute.lerp(Color.WHITE, _lit)
+		_draw_bin(lead_box, red())
+	elif not primary:
+		ButtonGlyph.draw_key(self, _key, lead_box, &"b")
+	var ink := red() if destructive else Backdrop.palette.mute.lerp(Color.WHITE, _lit) if primary \
+		else Backdrop.palette.ink
 	label.draw(self, Vector2(left + lead.x + gap, (size.y - label.height) / 2.0 - _INK_RAISE), ink)
 
 
-## The key's or the cap's box; none on a secondary pill without its key.
+## The red of a destructive pill on the backdrop now.
+static func red() -> Color:
+	return _DESTRUCTIVE_ON_DARK if Backdrop.palette.dark_logos else _DESTRUCTIVE
+
+
+## What stands before the name: the bin of a destructive pill, the B key of a secondary one, nothing on the primary.
 func _lead_size() -> Vector2:
-	return ButtonGlyph.key_size(&"b") if not primary and keyed else Vector2.ZERO
+	return _BIN if destructive else Vector2.ZERO if primary else ButtonGlyph.key_size(&"b")
+
+
+## A bin in [param box]: its lid and handle, and its body narrowing down, with two ribs.
+func _draw_bin(box: Rect2, ink: Color) -> void:
+	var w := box.size.x
+	var h := box.size.y
+	var o := box.position
+	var stroke := 0.16 * FormPaint.CQW
+	draw_line(o + Vector2(0.0, 0.2 * h), o + Vector2(w, 0.2 * h), ink, stroke, true)
+	draw_polyline(PackedVector2Array([o + Vector2(0.35 * w, 0.2 * h), o + Vector2(0.38 * w, 0.05 * h),
+		o + Vector2(0.62 * w, 0.05 * h), o + Vector2(0.65 * w, 0.2 * h)]), ink, stroke, true)
+	draw_polyline(PackedVector2Array([o + Vector2(0.1 * w, 0.2 * h), o + Vector2(0.18 * w, h), o + Vector2(0.82 * w, h),
+		o + Vector2(0.9 * w, 0.2 * h)]), ink, stroke, true)
+	for x: float in [0.4, 0.6]:
+		draw_line(o + Vector2(x * w, 0.38 * h), o + Vector2(x * w, 0.82 * h), ink, stroke, true)
 
 
 ## The materials of the state now: the primary pill acts when it is not greyed.

@@ -20,10 +20,6 @@ extends Node3D
 
 signal selection_changed(index: int)
 
-## How much of its pose a staged console keeps: enough to show its top and its front.
-const _STAGED_POSE := 0.35
-## Where the middle of the staged console's silhouette stands, in px of the 1280 × 960 reference frame, whatever its pose.
-const STAGE_CENTRE := Vector2(640.0, 440.0)
 ## How much the console pointed at grows, and how fast (a pop); the one peeled off, how much it grows,
 ## leans (radians, counter-clockwise on the screen) and rises (px).
 const _POINTED_GROWTH := 0.06
@@ -74,11 +70,6 @@ var pace := 1.0
 ## console grows out of its own centre with it, opaque all along (a fading model would draw with
 ## other shaders, compiled on the spot).
 var arrival := 1.0
-## How far the selected console has left the row for its properties, from 0 to 1: it stops swaying
-## and floating, keeps a little of its pose, takes [member staged_size] times its size and moves for the middle of
-## its silhouette to stand at [constant STAGE_CENTRE], while the others fade out.
-var stage := 0.0
-var staged_size := 1.0
 ## How far the console pointed at has gone from the hero's place to the ring, from 0 to 1, and how far the
 ## others have come from the rail's, 0 to 1.
 var wheel := 0.0
@@ -339,12 +330,6 @@ func face_front() -> void:
 	_scroll = _position
 
 
-## Turns the selected console with a finger dragged [param pixels] over it; it comes back to the
-## front once [method let_go] (see [StickTurn]).
-func touch_turn(pixels: Vector2) -> void:
-	_turn.touch(pixels)
-
-
 func let_go() -> void:
 	_turn.let_go()
 
@@ -373,24 +358,19 @@ func arrange() -> void:
 		if not item.model.visible:
 			continue
 		var offset := 0.0 if chosen or going else CarouselLayout.nearest(_position, i, _items.size()) - _scroll
-		var staged := stage if chosen else 0.0
-		var unstaged := 1.0 - staged
 		var rest := item.rest
 		var at_position := console_position if chosen else rest.console_position
 		var amount := pose_amount if chosen else rest.pose_amount
 		var centred := CarouselLayout.centred(offset) * amount
 		var place := CarouselLayout.place(offset)
-		pose.sway = (sway_degrees if chosen else rest.sway_degrees) * unstaged
-		var bob := CarouselLayout.float_height(_pose_s, bob_height if chosen else rest.bob_height, centred * unstaged)
+		pose.sway = sway_degrees if chosen else rest.sway_degrees
+		var bob := CarouselLayout.float_height(_pose_s, bob_height if chosen else rest.bob_height, centred)
 		var turned := _three_euler(console_rotation if chosen else rest.console_rotation)
 		var swapping := swap if chosen else leaver.look() if going else settled
-		var size := (console_scale if chosen else rest.console_scale) * maxf(arrival, 0.001) \
-			* lerpf(1.0, staged_size, staged) * swapping.size
-		var posed := place.basis * pose.at(_pose_s, centred * lerpf(1.0, _STAGED_POSE, staged)) * _turn.of(i)
+		var size := (console_scale if chosen else rest.console_scale) * maxf(arrival, 0.001) * swapping.size
+		var posed := place.basis * pose.at(_pose_s, centred) * _turn.of(i)
 		var stand := posed * turned.scaled(Vector3.ONE * size)
 		var lift := Vector3.UP * bob
-		if staged > 0.0 and item.modelled:
-			lift += _stage_shift(item, at_position + place.origin) * staged
 		var slid := Vector3.RIGHT * swapping.shift_px * _WORLD_PER_PX * (3.7 - at_position.z - global_position.z)
 		var in_row := Transform3D(stand, at_position + place.origin + lift + slid)
 		if chosen and _lights:
@@ -402,7 +382,7 @@ func arrange() -> void:
 		# Set again, even unchanged, it would be sent to every part of the console.
 		if item.model.transform != moved:
 			item.model.transform = moved
-		var presence := (1.0 if chosen else others_opacity * (1.0 - stage)) * swapping.opacity
+		var presence := (1.0 if chosen else others_opacity) * swapping.opacity
 		item.fade.call(1.0 - ringed.opacity if on_ring else CarouselLayout.faded(offset, presence * _screen_presence))
 
 
@@ -548,22 +528,6 @@ func _on_ring(index: int, stand: Stand) -> Transform3D:
 
 func ring_stand(index: int) -> Stand:
 	return _stand(index)
-
-
-## The selected console's silhouette on the stage, in px of the reference frame.
-func staged_box() -> Rect2:
-	var size := _hero_of(selected()).box.size * CarouselLayout.FRAME * staged_size
-	return Rect2(STAGE_CENTRE - size / 2.0, size)
-
-
-## How far the console of [param item], standing at [param origin], moves on the stage for the middle of its
-## silhouette to stand at [constant STAGE_CENTRE]: measured on its rest pose, grown as it grows there.
-func _stage_shift(item: Item, origin: Vector3) -> Vector3:
-	var hero := _hero_of(item)
-	var camera := get_viewport().get_camera_3d()
-	var depth := -(camera.global_transform.affine_inverse() * to_global(origin)).z
-	var wanted := STAGE_CENTRE - (hero.centre - hero.origin) * staged_size
-	return to_local(camera.project_position(to_view(wanted), depth)) - origin
 
 
 ## The silhouette box of console [param index] in its picture's frame, as fractions of it: the box of what it

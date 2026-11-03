@@ -95,6 +95,9 @@ msgstr "追加"
 msgid "The console could not be added."
 msgstr "ゲーム機を追加できませんでした。"
 
+msgid "The console could not be saved."
+msgstr "ゲーム機を保存できませんでした。"
+
 msgid "{console} added"
 msgstr "{console}を追加しました"
 
@@ -129,8 +132,14 @@ msgstr "閉じる"
 msgid "Back"
 msgstr "戻る"
 
-msgid "Edit the platform"
-msgstr "プラットフォームを編集"
+msgid "Edit"
+msgstr "編集"
+
+msgid "Model"
+msgstr "モデル"
+
+msgid "Keep"
+msgstr "決定"
 
 msgid "Remove"
 msgstr "削除"
@@ -163,8 +172,6 @@ msgstr "設定内容とフォルダーへのアクセスがCartoucheから削除
 msgid "Add a platform"
 msgstr "プラットフォームを追加"
 
-msgid "Properties"
-msgstr "プロパティ"
 
 msgid "Label image"
 msgstr "ラベルの画像"
@@ -303,9 +310,6 @@ msgstr "ゲーム機の名前"
 
 msgid "Arrange"
 msgstr "並べ替え"
-
-msgid "Change place"
-msgstr "位置を変更"
 
 msgid "Take"
 msgstr "つかむ"
