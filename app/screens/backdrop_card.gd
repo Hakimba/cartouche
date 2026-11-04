@@ -2,8 +2,7 @@
 class_name BackdropCard
 extends ChoiceCard
 ## One backdrop to choose ([member ChoiceCard.value], a key of [constant Backdrop.NAMES]): the backdrop drawn small as
-## every screen shows it, the veil over it while it moves (in the console's gel when
-## [member Backdrop.veil_gel]), and a satin panel holding a line in
+## every screen shows it, the veil over it while it moves, and a satin panel holding a line in
 ## the backdrop's ink; under it, its name. "Like the device" shows the backdrop the system's theme gives now.
 
 const _MARGIN := 14.0
@@ -14,12 +13,6 @@ const _PANEL_RADIUS := 34.0
 const _LINE := "Cartouche"
 const _LINE_PX := 17.0
 const _FRAME := Vector2(1280.0, 960.0)
-
-## The colour of the console the backdrop is lit for.
-var gel := StudioTokens.NEUTRAL:
-	set(value):
-		gel = value
-		_backdrop.gel = value
 
 var _palette: Palette
 ## The backdrop shown, drawn at full size then made small.

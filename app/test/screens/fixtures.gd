@@ -338,7 +338,6 @@ class NewDevice extends AndroidServices:
 	## The backdrop and whether its pixel veil moves, as the plugin reads them at start: a fresh install's by default.
 	var chosen_backdrop := &"light"
 	var pixel_veil := true
-	var veil_gel := false
 	## The regions the plugin takes, as the settings send them.
 	var preferred_regions := PackedStringArray(["Europe", "North America", "Japan"])
 	## The language stored (empty: the device's) and those the plugin takes, as the settings send them.
@@ -425,8 +424,7 @@ class NewDevice extends AndroidServices:
 		return AndroidServices.SettingsAnswer.new(answer)
 
 	func backdrop() -> AndroidServices.BackdropAnswer:
-		return AndroidServices.BackdropAnswer.new({"backdrop": chosen_backdrop, "pixel_veil": pixel_veil,
-			"veil_gel": veil_gel})
+		return AndroidServices.BackdropAnswer.new({"backdrop": chosen_backdrop, "pixel_veil": pixel_veil})
 
 	func library() -> AndroidServices.LibraryAnswer:
 		await _frames(1)
@@ -467,10 +465,6 @@ class NewDevice extends AndroidServices:
 		if answer["ok"]:
 			pixel_veil = on
 		return AndroidServices.Result.new(answer)
-
-	func save_veil_gel(on: bool) -> AndroidServices.Result:
-		veil_gel = on
-		return AndroidServices.Result.new({"ok": true})
 
 	## Places as the plugin does, answering as it sends it: `not_in_library` for a console not set up or without games,
 	## `gap_out_of_range`, else the whole order.

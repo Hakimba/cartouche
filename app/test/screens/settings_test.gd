@@ -10,7 +10,7 @@ const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 func after_test() -> void:
 	Controls.style = &"xbox"
 	Locale.apply("en")
-	Backdrop.show(&"light", true, false)
+	Backdrop.show(&"light", true)
 
 
 ## [param device]'s carousel, once it can be used.
@@ -76,7 +76,7 @@ func test_the_preferred_region_is_chosen_on_its_page_from_the_settings_saved_onc
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
 	assert_str(_text(carousel, "Settings/%Region/%Value")).is_equal("Japan")
-	for step in 6:
+	for step in 5:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Region")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -118,7 +118,7 @@ func test_the_language_line_scrolls_into_the_card_its_page_applies_a_choice_at_o
 	assert_bool(await _settings_ready(carousel)).is_true()
 	# Six lines show; the last scrolls in, and the first out of sight, unseen and untouchable.
 	assert_float(menu._language.modulate.a).is_zero()
-	for step in 8:
+	for step in 7:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Language")
 	assert_float(menu._language.modulate.a).is_equal(1.0)
@@ -193,7 +193,7 @@ func test_a_background_the_plugin_does_not_keep_shows_no_more() -> void:
 	assert_str(_focused()).is_equal("Light")
 
 
-func test_the_veil_and_its_console_colour_switch_once_saved_and_a_veil_not_kept_slides_back() -> void:
+func test_the_veil_switches_once_saved_and_a_veil_not_kept_slides_back() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	assert_bool(Backdrop.veil).is_true()
 	var menu: SettingsMenu = (await _press_line(device, "Veil")).get_node("%Screens/Settings")
@@ -201,13 +201,7 @@ func test_the_veil_and_its_console_colour_switch_once_saved_and_a_veil_not_kept_
 	assert_array(device.saved_veils).contains_exactly([false])
 	assert_bool(Backdrop.veil).is_false()
 	assert_bool(menu.switch_on(&"pixel_veil")).is_false()
-	await Fixtures.action(self, &"ui_down")
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return not menu.saving)).is_true()
-	assert_bool(device.veil_gel).is_true()
-	assert_bool(Backdrop.veil_gel).is_true()
 	device.failing.append(&"save_pixel_veil")
-	await Fixtures.action(self, &"ui_up")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return not menu.saving)).is_true()
 	assert_bool(Backdrop.veil).is_false()
@@ -242,7 +236,7 @@ func test_a_language_the_plugin_does_not_save_is_not_applied() -> void:
 	var carousel := await _shown(device)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	for step in 9:
+	for step in 8:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "Language")).is_true()
@@ -265,7 +259,7 @@ func test_the_regions_offered_are_those_the_plugin_takes_and_one_it_refuses_is_n
 	var carousel := await _shown(device)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	for step in 6:
+	for step in 5:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
@@ -348,7 +342,7 @@ func test_inv_20_on_every_settings_screen_exactly_one_control_of_it_has_the_focu
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
 	await Fixtures.wander(self, carousel, "Settings", random)
-	for step in 8:
+	for step in 7:
 		await Fixtures.action(self, &"ui_up")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.wander(self, carousel, "ButtonStyle", random)
@@ -363,7 +357,7 @@ class FailedFloatDevice extends Fixtures.NewDevice:
 func _float_row(carousel: Carousel) -> SettingsMenu:
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	assert_bool(await _settings_ready(carousel)).is_true()
-	for step in 5:
+	for step in 4:
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("GamesFloat")
 	return carousel.get_node("%Screens/Settings")

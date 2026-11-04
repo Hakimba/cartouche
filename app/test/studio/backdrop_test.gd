@@ -4,7 +4,7 @@ extends GdUnitTestSuite
 
 
 func after_test() -> void:
-	Backdrop.show(&"light", true, false)
+	Backdrop.show(&"light", true)
 
 
 func test_every_value_of_every_scheme_is_a_field_of_its_palette() -> void:
@@ -18,19 +18,19 @@ func test_every_value_of_every_scheme_is_a_field_of_its_palette() -> void:
 
 func test_a_backdrop_shown_tells_every_control_once_and_light_again_gives_the_theme_back_as_made() -> void:
 	var theme := ThemeDB.get_project_theme()
-	Backdrop.show(&"light", false, false)
+	Backdrop.show(&"light", false)
 	var made := theme.get_color(&"font_color", &"Label")
 	var told := Probe.new()
 	add_child(told)
 	await await_idle_frame()
 	var at_first := told.told
-	Backdrop.show(&"dark", false, false)
+	Backdrop.show(&"dark", false)
 	assert_int(told.told - at_first).is_equal(1)
 	assert_that(theme.get_color(&"font_color", &"Label")).is_equal(Palette.of(StudioTokens.Scheme.DARK).ink)
 	assert_that(RenderingServer.get_default_clear_color()).is_equal(Color.BLACK)
-	Backdrop.show(&"dark", false, false)
+	Backdrop.show(&"dark", false)
 	assert_int(told.told - at_first).is_equal(1)
-	Backdrop.show(&"light", false, false)
+	Backdrop.show(&"light", false)
 	assert_that(theme.get_color(&"font_color", &"Label")).is_equal(made)
 	told.free()
 

@@ -9,8 +9,6 @@ extends Control
 ## has its floor reflection. At rest nothing is drawn: the spring stops the rail's frames. The pool shows only on the
 ## studio's wall ([member Palette.wall]).
 
-## The frame's gel changed, at each step of its crossfade.
-signal gel_changed(gel: Color)
 
 ## The tiles' step, the first tile's top-left corner and the farthest slot shown, in px and slots.
 const PITCH := 174.08
@@ -323,7 +321,6 @@ func _set_gel(gel: Color, animated := true) -> void:
 ## The frame and the pool in [param gel], as the backdrop shown draws it.
 func _tint(gel: Color) -> void:
 	_gel = Backdrop.palette.gel(gel)
-	gel_changed.emit(_gel)
 	_frame.tint(_gel)
 	var gradient := (_pool.texture as GradientTexture2D).gradient
 	gradient.set_color(0, Color(_gel, _POOL_ALPHA))

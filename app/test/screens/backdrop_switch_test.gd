@@ -10,7 +10,7 @@ var _system_dark := Backdrop.system_dark
 
 func after_test() -> void:
 	Backdrop.system_dark = _system_dark
-	Backdrop.show(&"light", true, false)
+	Backdrop.show(&"light", true)
 
 
 func _shown(device: Fixtures.NewDevice) -> Carousel:

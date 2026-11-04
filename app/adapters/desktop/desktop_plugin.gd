@@ -15,7 +15,7 @@ const _VARIANTS := "user://console-variants.json"
 var _snapshot := {}
 var _settings := {"ok": true, "first_launch": false, "games_float": false, "sound_level": 10,
 	"language": "", "languages": Locale.NAMES.keys()}
-var _backdrop := {"backdrop": "light", "pixel_veil": true, "veil_gel": false}
+var _backdrop := {"backdrop": "light", "pixel_veil": true}
 ## The library as the choices made since the app started left it; empty until one is made.
 var _current := {}
 var _story := {}
@@ -176,11 +176,6 @@ func saveBackdrop(_id: int, chosen: StringName) -> Dictionary:
 
 func savePixelVeil(_id: int, on: bool) -> Dictionary:
 	_backdrop["pixel_veil"] = on
-	return {"ok": true}
-
-
-func saveVeilGel(_id: int, on: bool) -> Dictionary:
-	_backdrop["veil_gel"] = on
 	return {"ok": true}
 
 

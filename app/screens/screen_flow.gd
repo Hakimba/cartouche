@@ -217,19 +217,18 @@ func _choose_edge_smoothing() -> void:
 ## The backdrops' cards: each one chosen shows at once on every screen and is kept, the cards staying on screen, the
 ## focus on it, to compare; one the plugin does not keep shows no more. B goes back.
 func _choose_backdrop() -> void:
-	_backdrop.gel = _settings.gel
 	_show(_backdrop)
 	_backdrop.focus()
 	var choice: StringName = await _backdrop.chosen
 	while not choice.is_empty():
 		var shown := Backdrop.choice
-		Diagnostics.trace("backdrop", Backdrop.show(choice, Backdrop.veil, Backdrop.veil_gel))
+		Diagnostics.trace("backdrop", Backdrop.show(choice, Backdrop.veil))
 		_holding_presses = true
 		var saved := await android.save_backdrop(choice)
 		_holding_presses = false
 		if not saved.ok:
 			Diagnostics.trace("screens", "backdrop not saved (%s): %s" % [saved.code, saved.detail])
-			Diagnostics.trace("backdrop", Backdrop.show(shown, Backdrop.veil, Backdrop.veil_gel))
+			Diagnostics.trace("backdrop", Backdrop.show(shown, Backdrop.veil))
 			_backdrop.focus()
 		choice = await _backdrop.chosen
 
@@ -276,7 +275,6 @@ func _add_first_console() -> void:
 func _settings_menu() -> void:
 	_settings.snap_switch(&"games_float", _games_float)
 	_settings.snap_switch(&"pixel_veil", Backdrop.veil)
-	_settings.snap_switch(&"veil_gel", Backdrop.veil_gel)
 	_settings.sound_level = Sounds.level
 	var focus := &"button_style"
 	while true:
@@ -289,7 +287,6 @@ func _settings_menu() -> void:
 				_switch_save += 1
 				_settings.slide_switch(&"games_float", _games_float)
 				_settings.slide_switch(&"pixel_veil", Backdrop.veil)
-				_settings.slide_switch(&"veil_gel", Backdrop.veil_gel)
 				_settings.saving = false
 				return
 			&"button_style":
@@ -300,12 +297,8 @@ func _settings_menu() -> void:
 				await _choose_backdrop()
 			&"pixel_veil":
 				_turn_switch(focus, android.save_pixel_veil, func(on: bool) -> void:
-					Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, on, Backdrop.veil_gel)),
+					Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, on)),
 					func() -> bool: return Backdrop.veil)
-			&"veil_gel":
-				_turn_switch(focus, android.save_veil_gel, func(on: bool) -> void:
-					Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, Backdrop.veil, on)),
-					func() -> bool: return Backdrop.veil_gel)
 			&"region":
 				await _choose_preferred_region()
 			&"language":

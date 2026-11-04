@@ -109,7 +109,6 @@ var _room_energy := NAN
 var _shelf_waiting := false
 
 @onready var _room: WorldEnvironment = $Environment
-@onready var _cyclorama: Cyclorama = %Cyclorama
 @onready var _row: ShelfRow = %Row
 @onready var _consoles: ConsoleRow = %Consoles
 @onready var _sequence: ConsoleSequence = %Sequence
@@ -185,7 +184,7 @@ func _ready() -> void:
 	# Read at once, before the first frame: it is drawn on the backdrop chosen, whatever the library's size.
 	var stored := android.backdrop()
 	Diagnostics.trace("backdrop", "%s; the system's theme dark=%s, followed=%s" % [Backdrop.show(stored.backdrop,
-		stored.pixel_veil, stored.veil_gel), Backdrop.system_dark.call(), DisplayServer.is_dark_mode_supported()])
+		stored.pixel_veil), Backdrop.system_dark.call(), DisplayServer.is_dark_mode_supported()])
 	# Asked first, its art looked for as soon as it is sent: the plugin reads the library while the
 	# scene sets itself up.
 	android.art_changed.connect(_on_art_changed)
@@ -195,7 +194,6 @@ func _ready() -> void:
 	var asked_library := AndroidServices.Asked.new(
 		android.use_demo_library.bind(demo_games, Diagnostics.argument("demo-shelf")) if _demo else android.library)
 	var asked_settings := AndroidServices.Asked.new(android.settings)
-	_rail.gel_changed.connect(func(gel: Color) -> void: _cyclorama.gel = gel)
 	for platform in android.catalog.platforms:
 		_platforms[platform.id] = platform
 	_appearance = Appearance.read(_APPEARANCE)

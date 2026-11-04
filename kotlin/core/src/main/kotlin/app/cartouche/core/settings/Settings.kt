@@ -110,7 +110,7 @@ public enum class Language {
  * images; [gamesFloat] makes the selected game sway and bob (the consoles never do); [soundLevel] is how loud the
  * sounds play, full until the user turns them down; [language], none until the user chooses one, follows the
  * device's; [backdrop] is drawn behind every screen; [pixelVeil] animates a veil of pixels over it, in
- * the staged console's colour when [veilGel], else in the backdrop's own.
+ * the backdrop's own colours.
  */
 @Serializable
 public data class Settings(
@@ -122,7 +122,6 @@ public data class Settings(
     public val language: Option<Language> = None,
     public val backdrop: Backdrop = Backdrop.LIGHT,
     public val pixelVeil: Boolean = true,
-    public val veilGel: Boolean = false,
 ) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An app updated from a

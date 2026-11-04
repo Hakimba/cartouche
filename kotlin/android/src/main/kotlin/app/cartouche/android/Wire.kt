@@ -222,12 +222,8 @@ internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
     .putSome("preferred_region", preferredRegion.map { it.region })
     .putSome("language", language.map { it.wire })
 
-/**
- * `{"backdrop", "pixel_veil", "veil_gel"}`: the backdrop behind every screen, whether its pixel veil moves and whether
- * in the console's colour.
- */
-internal fun Settings.backdropToWire(): Dictionary =
-    dictionary("backdrop" to backdrop.wire, "pixel_veil" to pixelVeil, "veil_gel" to veilGel)
+/** `{"backdrop", "pixel_veil"}`: the backdrop behind every screen and whether its pixel veil moves. */
+internal fun Settings.backdropToWire(): Dictionary = dictionary("backdrop" to backdrop.wire, "pixel_veil" to pixelVeil)
 
 /**
  * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`, and what it just

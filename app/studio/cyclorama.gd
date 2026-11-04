@@ -5,9 +5,8 @@ extends Control
 ## studio (the paper wall curving into the floor and its vignette are one baked picture; over it, in one shader,
 ## the key light and the floor's pool of light, without the console's colour); that studio's shape in another
 ## wall's colours, with no light of its own; or black.
-## Over it, while [member Backdrop.veil], the pixel veil drifts in the backdrop's veil colours, or in the staged
-## console's gel while [member Backdrop.veil_gel], matched to the wall: the
-## one thing drawn again while the app rests. Otherwise nothing moves, so nothing is drawn again. Of the backdrops drawn
+## Over it, while [member Backdrop.veil], the pixel veil drifts in the backdrop's veil colours, matched to the wall:
+## the one thing drawn again while the app rests. Otherwise nothing moves, so nothing is drawn again. Of the backdrops drawn
 ## full size (not previews) and shown, only the one in front moves: a screen with its own backdrop hides the one behind
 ## it.
 
@@ -19,20 +18,12 @@ var palette: Palette:
 	set(value):
 		palette = value
 		_lay_out()
-## The staged console's colour, which the veil takes while [member Backdrop.veil_gel].
-var gel := StudioTokens.NEUTRAL:
-	set(value):
-		gel = value
-		if _drawn_gel:
-			_paint_veil()
-
 var _wall := ShaderMaterial.new()
 var _glows := ShaderMaterial.new()
 var _veil := ShaderMaterial.new()
-## What the layers draw now: the palette, whether the veil moves and whether in the gel.
+## What the layers draw now: the palette and whether the veil moves.
 var _drawn: Palette
 var _drawn_veil := false
-var _drawn_gel := false
 ## The veil's own time.
 var _time := 0.0
 
@@ -94,11 +85,10 @@ func _lay_out() -> void:
 	if not is_node_ready():
 		return
 	var shown := palette if palette else Backdrop.palette
-	if shown == _drawn and Backdrop.veil == _drawn_veil and Backdrop.veil_gel == _drawn_gel:
+	if shown == _drawn and Backdrop.veil == _drawn_veil:
 		return
 	_drawn = shown
 	_drawn_veil = Backdrop.veil
-	_drawn_gel = Backdrop.veil_gel
 	for layer in get_children():
 		layer.free()
 	match shown.wall:
@@ -176,23 +166,20 @@ func _lay_glows() -> void:
 	_add(ColorRect.new(), _glows)
 
 
-## The veil in the colours of the backdrop drawn, or in the gel, each painted for its wall.
+## The veil in the colours of the backdrop drawn, each painted for its wall.
 func _paint_veil() -> void:
 	if not _drawn_veil:
 		return
 	var lights: Array[Vector4] = []
 	var inks: Array[Vector4] = []
-	var colours := _drawn.veil_colours
-	if _drawn_gel:
-		colours = [_drawn.gel(gel)]
-	for colour in colours:
+	for colour in _drawn.veil_colours:
 		var paint := veil_paint(_drawn.veil_base, colour)
 		lights.append(_rgba(paint[0]))
 		inks.append(_rgba(paint[1]))
 	_veil.set_shader_parameter(&"lights", lights)
 	_veil.set_shader_parameter(&"inks", inks)
 	_veil.set_shader_parameter(&"count", lights.size())
-	_veil.set_shader_parameter(&"waves", not _drawn_gel and _drawn.veil_spread == &"waves")
+	_veil.set_shader_parameter(&"waves", _drawn.veil_spread == &"waves")
 
 
 static func _studio() -> TextureRect:

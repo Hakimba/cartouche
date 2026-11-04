@@ -106,7 +106,6 @@ var _rests: Dictionary[Control, Vector2] = {}
 var _motions: Dictionary[StringName, Tween] = {}
 var _fields: Array[Control] = []
 
-@onready var _backdrop: Cyclorama = $Backdrop
 @onready var _title: Label = %Title
 @onready var _list: Control = $List
 @onready var _type: StepField = %Type
@@ -615,7 +614,6 @@ func _show_gel(animated: bool) -> void:
 
 func _paint(gel: Color) -> void:
 	_rim = gel
-	_backdrop.gel = gel
 	_card.rim = gel
 	for field: Control in _fields:
 		field.set(&"rim", gel)

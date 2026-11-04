@@ -66,11 +66,6 @@ unique_name_in_owner = true
 layout_mode = 0
 label = "Animated background"
 
-[node name="VeilGel" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "In the console's colour"
-
 [node name="GamesFloat" parent="Panel/Items" instance=ExtResource("2")]
 unique_name_in_owner = true
 layout_mode = 0

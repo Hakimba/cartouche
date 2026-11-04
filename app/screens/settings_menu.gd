@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name SettingsMenu
 extends Control
-## The settings on the plain backdrop: the choices, the switches (the backdrop's pixel veil and its colour, the games
+## The settings on the plain backdrop: the choices, the switches (the backdrop's pixel veil, the games
 ## floating) and the sounds' level, which left and right turn down and up. The card shows [constant _SHOWN] lines; the
 ## focus scrolls the others in, and an arrow above or below says lines are hidden that way.
 
@@ -29,7 +29,7 @@ const _STEP_SIZE := Vector2(10.24, 23.04)
 const _STEP_GAP := 6.4
 ## The choices made with a switch on their row, each with the note under its row's name.
 const SWITCHES: Dictionary[StringName, String] = {&"pixel_veil": "A veil of pixels drifts behind the screens",
-	&"veil_gel": "Instead of the background's colours", &"games_float": "The selected game gently rises and falls"}
+	&"games_float": "The selected game gently rises and falls"}
 
 static var DURATION_S: float:
 	get: return maxf(StudioTokens.TR_SETTINGS_OPEN_S, StudioTokens.TR_SETTINGS_CARD_AT_S + StudioTokens.TR_SETTINGS_CARD_S)
@@ -73,21 +73,20 @@ var _ink: Control
 @onready var _graphics: FieldButton = %Graphics
 @onready var _backdrop: FieldButton = %Backdrop
 @onready var _veil: FieldButton = %Veil
-@onready var _veil_gel: FieldButton = %VeilGel
 @onready var _floating: FieldButton = %GamesFloat
 @onready var _region: FieldButton = %Region
 @onready var _sounds: FieldButton = %Sounds
 @onready var _language: FieldButton = %Language
 ## The rows whose press emits a choice, by it.
 @onready var _rows_of: Dictionary[StringName, FieldButton] = {&"button_style": _button_style,
-	&"graphics": _graphics, &"backdrop": _backdrop, &"pixel_veil": _veil, &"veil_gel": _veil_gel,
+	&"graphics": _graphics, &"backdrop": _backdrop, &"pixel_veil": _veil,
 	&"games_float": _floating, &"region": _region, &"language": _language}
 
 
 func _ready() -> void:
 	add_to_group(SoundEffects.MOVES)
 	_panel.pivot_offset = _panel.size / 2.0
-	_rows.assign([_button_style, _graphics, _backdrop, _veil, _veil_gel, _floating, _region, _sounds, _language])
+	_rows.assign([_button_style, _graphics, _backdrop, _veil, _floating, _region, _sounds, _language])
 	_sounds.focus_neighbor_left = _sounds.get_path_to(_sounds)
 	_sounds.focus_neighbor_right = _sounds.get_path_to(_sounds)
 	_card = SatinPanel.Backing.new(_panel, StudioTokens.Look.SATIN)

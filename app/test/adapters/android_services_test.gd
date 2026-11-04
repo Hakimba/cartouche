@@ -322,7 +322,6 @@ func test_desktop_settings_save_every_choice_with_the_same_success_and_read_them
 	assert_bool(services.backdrop().pixel_veil).is_true()
 	assert_bool((await services.save_backdrop(&"anthracite")).ok).is_true()
 	assert_bool((await services.save_pixel_veil(false)).ok).is_true()
-	assert_bool((await services.save_veil_gel(true)).ok).is_true()
 	assert_bool((await services.save_games_float(true)).ok).is_true()
 	assert_bool((await services.save_button_style(&"nintendo")).ok).is_true()
 	assert_bool((await services.save_edge_smoothing(&"2x")).ok).is_true()
@@ -334,7 +333,6 @@ func test_desktop_settings_save_every_choice_with_the_same_success_and_read_them
 	assert_str(stored.preferred_region).is_equal("Japan")
 	assert_str(services.backdrop().backdrop).is_equal("anthracite")
 	assert_bool(services.backdrop().pixel_veil).is_false()
-	assert_bool(services.backdrop().veil_gel).is_true()
 	assert_bool((await services.save_games_float(false)).ok).is_true()
 	assert_bool((await services.settings()).games_float).is_false()
 

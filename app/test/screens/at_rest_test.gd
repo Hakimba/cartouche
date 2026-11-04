@@ -14,7 +14,7 @@ const CLOCK_TURNS := 1
 
 func after_test() -> void:
 	OS.low_processor_usage_mode = false
-	Backdrop.show(&"light", true, false)
+	Backdrop.show(&"light", true)
 
 
 func _carousel(consoles: Dictionary[String, int] = {"ps2": 3, "gc": 2}, veil := false, backdrop := &"light") -> Carousel:

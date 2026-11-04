@@ -101,16 +101,13 @@ class CartouchePluginTest {
     }
 
     @Test
-    fun `INV-15 the pixel veil is on until switched off, in the backdrop's colours until set to the console's, both stored`() {
+    fun `INV-15 the pixel veil is on until switched off, and stored`() {
         val h = Plugin()
         h.settings().pixelVeil shouldBe true
-        h.plugin.backdrop()["veil_gel"] shouldBe false
         h.plugin.savePixelVeil(1, false)
-        h.plugin.saveVeilGel(2, true)
         h.scope.runCurrent()
         h.settings().pixelVeil shouldBe false
         h.plugin.backdrop()["pixel_veil"] shouldBe false
-        h.plugin.backdrop()["veil_gel"] shouldBe true
         h.done()
     }
 

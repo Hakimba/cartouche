@@ -17,8 +17,6 @@ static var choice := &"light"
 ## Whether the pixel veil moves behind the screens. A fresh install's backdrop is shown until the stored one is read,
 ## before the first frame.
 static var veil := true
-## Whether the veil takes the staged console's gel instead of the backdrop's own veil colours.
-static var veil_gel := false
 ## The values of the backdrop shown.
 static var palette := Palette.of(StudioTokens.Scheme.LIGHT)
 ## Whether the system's theme is dark, as `device` reads it; a test stands in for the system with its own.
@@ -27,19 +25,16 @@ static var system_dark := func() -> bool: return DisplayServer.is_dark_mode()
 static var _theme_as_made: Dictionary[String, Color] = {}
 
 
-## Shows [param chosen] (a key of [constant NAMES]) with the veil [param moving] or still, in the console's gel when
-## [param in_gel], on every screen at once; nothing is drawn again when all are as shown. Returns what shows, for the
+## Shows [param chosen] (a key of [constant NAMES]) with the veil [param moving] or still, on every screen at once; nothing is drawn again when all are as shown. Returns what shows, for the
 ## traces.
-static func show(chosen: StringName, moving: bool, in_gel: bool) -> String:
+static func show(chosen: StringName, moving: bool) -> String:
 	choice = chosen
 	var shown := Palette.of(scheme_of(chosen))
-	var said := "%s (%s), veil %s%s" % [StudioTokens.Scheme.find_key(shown.scheme), chosen,
-		"moving" if moving else "still", " in the gel" if in_gel else ""]
-	if shown == palette and moving == veil and in_gel == veil_gel:
+	var said := "%s (%s), veil %s" % [StudioTokens.Scheme.find_key(shown.scheme), chosen, "moving" if moving else "still"]
+	if shown == palette and moving == veil:
 		return said
 	palette = shown
 	veil = moving
-	veil_gel = in_gel
 	RenderingServer.set_default_clear_color(palette.clear)
 	var theme := ThemeDB.get_project_theme()
 	theme.set_block_signals(true)
@@ -63,7 +58,7 @@ static func scheme_of(chosen: StringName) -> StudioTokens.Scheme:
 
 ## Shows the device's theme again when it changed and the backdrop follows it.
 static func follow_system() -> String:
-	return show(choice, veil, veil_gel)
+	return show(choice, veil)
 
 
 ## [param item] as a property path of the theme: a colour's own, or a flat box's and then its property.

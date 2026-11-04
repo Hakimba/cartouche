@@ -337,10 +337,6 @@ func save_pixel_veil(on: bool) -> Result:
 	return Result.new(await _request(&"savePixelVeil", [on]))
 
 
-## Stores whether the veil takes the staged console's colour ([param on]) instead of the backdrop's.
-func save_veil_gel(on: bool) -> Result:
-	return Result.new(await _request(&"saveVeilGel", [on]))
-
 
 ## Stores how loud the sounds play, [param steps] from 0 (silenced) to [constant SoundEffects.LEVELS].
 func save_sound_level(steps: int) -> Result:

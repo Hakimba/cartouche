@@ -474,11 +474,5 @@ msgstr "Wie das Gerät"
 msgid "Animated background"
 msgstr "Animierter Hintergrund"
 
-msgid "In the console's colour"
-msgstr "In der Farbe der Konsole"
-
-msgid "Instead of the background's colours"
-msgstr "Statt der Farben des Hintergrunds"
-
 msgid "A veil of pixels drifts behind the screens"
 msgstr "Ein Pixelschleier wogt hinter den Bildschirmen"

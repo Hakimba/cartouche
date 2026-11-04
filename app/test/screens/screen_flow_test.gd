@@ -185,7 +185,7 @@ func test_the_floating_setting_survives_closing_and_a_new_carousel() -> void:
 	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
 	assert_bool(await Fixtures.until(self,
 		func() -> bool: return menu.is_visible_in_tree() and menu.state == SettingsMenu.State.OPEN)).is_true()
-	for step in 5:
+	for step in 4:
 		await Fixtures.action(self, &"ui_down")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(device.games_float).is_true()

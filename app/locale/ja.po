@@ -471,11 +471,5 @@ msgstr "端末に合わせる"
 msgid "Animated background"
 msgstr "動く背景"
 
-msgid "In the console's colour"
-msgstr "コンソールの色で"
-
-msgid "Instead of the background's colours"
-msgstr "背景の色の代わりに"
-
 msgid "A veil of pixels drifts behind the screens"
 msgstr "画面の後ろでピクセルのベールが揺れます"

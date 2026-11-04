@@ -475,7 +475,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     }
 
     /**
-     * The backdrop stored, `{"backdrop", "pixel_veil", "veil_gel"}`, at once: the app's first frame is drawn on it, without
+     * The backdrop stored, `{"backdrop", "pixel_veil"}`, at once: the app's first frame is drawn on it, without
      * waiting for the library that [settings] reads. Asked once, as the app starts, before any request.
      */
     @UsedByGodot
@@ -521,13 +521,6 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     @UsedByGodot
     public fun savePixelVeil(requestId: Int, on: Boolean): Unit = onLibrary(requestId) {
         save("pixel_veil=$on") { it.copy(pixelVeil = on) }
-        success()
-    }
-
-    /** Stores whether the pixel veil takes the staged console's colour ([on]) instead of the backdrop's. */
-    @UsedByGodot
-    public fun saveVeilGel(requestId: Int, on: Boolean): Unit = onLibrary(requestId) {
-        save("veil_gel=$on") { it.copy(veilGel = on) }
         success()
     }
 
