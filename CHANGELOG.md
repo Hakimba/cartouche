@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
 ### Added
 - A **Background** setting: Light, Dark (pure black, for OLED screens), Light grey, Anthracite, or Like the device,
   which follows your system's light or dark theme. Each one is shown on its card, and the one you choose shows at once
@@ -52,5 +54,6 @@ the emulators you already have. NES, Super Nintendo, Nintendo 64, GameCube, Wii,
 Game Boy Advance, PlayStation, PlayStation 2, Xbox and Xbox 360; labels from ScreenScraper and LaunchBox; filters,
 a wheel to order your consoles, renaming; controller and touch; English and French.
 
+[0.3.0]: ../../compare/v0.2.0...v0.3.0
 [0.2.0]: ../../compare/v0.1.0...v0.2.0
 [0.1.0]: ../../releases/tag/v0.1.0
