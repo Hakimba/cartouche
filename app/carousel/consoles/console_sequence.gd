@@ -38,6 +38,9 @@ var saturation := 1.0
 ## screen is, from 0 to 1 (see [GameLaunch]).
 var black := 0.0
 var fade := 0.0
+## How much the carousel's controls that the animation has no track of show, from 0 to 1: the games
+## screen's bottom row (`ui.tabs`), and with it the rest ([GameLaunch] fades them as a game goes in).
+var controls := 1.0
 ## How much of the consoles behind the games shows, from 0 (none) to 1 (as the animation has them):
 ## the carousel takes them away once on the games screen, back for a launch or to go out.
 var behind_amount := 1.0:
@@ -84,14 +87,13 @@ func use(animation: Animation, at := &"") -> void:
 		player.remove_animation_library(&"")
 	player.add_animation_library(&"", library)
 	player.assigned_animation = _ANIMATION
+	stand(at)
+
+
+## Still at the animation's moment [param at], at its start without one.
+func stand(at := &"") -> void:
 	set_process(false)
 	_seek(_moment(at))
-
-
-## The games screen, still.
-func show_games() -> void:
-	set_process(false)
-	_seek(_moment(&"games"))
 
 
 ## Into the console, from the consoles screen to the games screen; [signal finished] once there.
@@ -130,6 +132,12 @@ func launch_at(time: float, delta: float) -> void:
 	_spin += disc_turns_per_s * TAU * delta
 	_spin_blur = minf(TAU, disc_turns_per_s * TAU * delta)
 	_seek(_moment(&"launch") + time)
+
+
+## Whether the animation has a track of [param item]'s opacity.
+func fades(item: CanvasItem) -> bool:
+	var path := player.get_node(player.root_node).get_path_to(item)
+	return _animation.find_track(NodePath("%s:modulate:a" % path), Animation.TYPE_VALUE) != -1
 
 
 ## Where the black starts from: the selected console's seat, else the row.

@@ -6,6 +6,7 @@ import app.cartouche.android.DebugOptions
 import app.cartouche.android.Reference
 import app.cartouche.android.Threads
 import app.cartouche.android.library.LibraryService
+import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
@@ -92,6 +93,7 @@ class ArtServiceTest {
             LibraryService(
                 LibraryStore(File(context.filesDir, "library.json")),
                 SelectionStore(File(context.filesDir, "selection.json")),
+                ArrivalsStore(File(context.filesDir, "arrivals.json")),
                 Folders(context),
                 FactsStore(File(context.filesDir, "facts")),
             )

@@ -17,6 +17,7 @@ import app.cartouche.android.storage.EntryKind
 import app.cartouche.android.storage.Folder
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.core.art.Scraping
+import app.cartouche.core.library.Arrivals
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlacementError
@@ -259,6 +260,13 @@ internal fun LabelFailure.toWire(): Dictionary = when (this) {
     is LabelFailure.Library -> failure.toWire()
     is LabelFailure.Storage -> failure.toWire()
 }
+
+/** `{"unseen": [game id], "announced": {platform id: [game id]}}`: the games not seen yet, and those each console announces. */
+internal fun Arrivals.toWire(): Dictionary = dictionary(
+    "unseen" to unseen.map { it.value }.toTypedArray(),
+    "announced" to
+        Dictionary().apply { announced.forEach { (platform, games) -> put(platform.value, games.map { it.value }.toTypedArray()) } },
+)
 
 internal fun ScanReport.toWire(): Dictionary = dictionary(
     "files" to files,

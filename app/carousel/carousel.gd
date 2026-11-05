@@ -20,6 +20,11 @@ extends Control
 ## changes; not while labels download. On the games screen the consoles behind are not drawn: they
 ## fade out once there, back in for a launch or to go out.
 ##
+## As the app starts and each time it comes back to the screen, every console's folder is read again ([NewGames]): the
+## library a re-read changed shows once nothing is under way (a launch, a move, a screen in front, the ring, a toss,
+## the search ribbon), each shelf keeping the game in its middle; a badge over a console's rail tile tells how many
+## games it received until it is entered, and a glowing dot over each of them until it is left ([NewGameDots]).
+##
 ## In front of it, [ScreenFlow] shows the first launch's welcome and screens, and the screens adding a
 ## console while none has games; Y on the consoles screen or the games screen opens the settings over
 ## it. On the consoles screen, holding up turns the "+" ball above the console into a button
@@ -107,6 +112,8 @@ var _games_hint_fade: Tween
 var _room_energy := NAN
 ## Whether the row stepped to a console whose shelf is not shown behind it yet (see [method _show_waiting_shelf]).
 var _shelf_waiting := false
+## The game in the middle of the games screen as last seen there; none elsewhere.
+var _middle: AndroidServices.Game
 
 @onready var _room: WorldEnvironment = $Environment
 @onready var _row: ShelfRow = %Row
@@ -141,6 +148,8 @@ var _shelf_waiting := false
 @onready var _random_hint: Control = %RandomHint
 @onready var _touch := CarouselTouch.new(_consoles, _row, _rail, _add_ball)
 @onready var _toss := GameToss.new()
+@onready var _new_games := NewGames.new()
+@onready var _dots := NewGameDots.new()
 
 
 func _enter_tree() -> void:
@@ -168,6 +177,16 @@ func _ready() -> void:
 	_toss.pill = _pill
 	_toss.logo = _games_logo
 	add_child(_toss)
+	_new_games.android = android
+	_new_games.platforms = func() -> PackedStringArray:
+		return _screens.library.with_folders() if _screens.library else PackedStringArray()
+	_new_games.changed.connect(_show_badges)
+	add_child(_new_games)
+	_dots.row = _row
+	_dots.new_games = _new_games
+	# Over the games, under their title.
+	add_child(_dots)
+	move_child(_dots, _pill.get_index())
 	_share_clock()
 	_clock.position = StudioTokens.CLOCK.position
 	_clock.size = StudioTokens.CLOCK.size
@@ -268,6 +287,7 @@ func _ready() -> void:
 	else:
 		_come_in()
 	_shown = true
+	_new_games.read_again()
 	# Once the carousel is on screen: reading sounds and the other shelves' media must not delay it.
 	get_tree().process_frame.connect(_game_launch.prepare.bind(_appearance.insertions.values()),
 		CONNECT_ONE_SHOT)
@@ -292,6 +312,10 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_APPLICATION_RESUMED:
 		# Where the system tells no change of its theme, it is read again on the way back.
 		_follow_system_theme()
+		# Games may have been copied into the folders meanwhile, or deleted. The first comes before the carousel is set up,
+		# which reads them once shown.
+		if is_node_ready():
+			_new_games.read_again()
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		Diagnostics.trace("touch", "back requested")
 		_press_back.call_deferred()
@@ -330,6 +354,11 @@ func _process(delta: float) -> void:
 	_row_resting = resting
 	if _shelf_waiting and _screen == Screen.CONSOLES and not _consoles.is_settling():
 		_show_waiting_shelf()
+	if _new_games.has_library() and _is_free():
+		var library := _new_games.take_library()
+		if library:
+			_refresh_library(library)
+	_follow_middle()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -445,6 +474,68 @@ func _touchable() -> bool:
 		and _screen not in _MOVING and _screen != Screen.ORDER and not _search.is_open()
 
 
+## Whether a library read again can show now: the consoles screen or the games screen stands still, nothing in front of
+## it or under way.
+func _is_free() -> bool:
+	return _shown and _screen in [Screen.CONSOLES, Screen.GAMES] and not (_game_launch.is_busy() or _toss.is_busy()
+		or _settle_waiting or _search.is_open() or _screens.visible or _order.is_open() or _form != Form.NONE
+		or _row.is_settling() or _consoles.is_settling() or (_console_arrival and _console_arrival.is_playing()))
+
+
+## The game left in the middle of the games screen is not new any more.
+func _follow_middle() -> void:
+	var middle: AndroidServices.Game = _row.selected_game() if _screen in _GAME_SCREENS and _row.has_games() else null
+	if _middle and (not middle or middle.id != _middle.id):
+		_new_games.leave(_middle)
+	_middle = middle
+
+
+## Shows [param library] a re-read left: each shelf keeps the game in its middle when it is still there, else the game
+## now at its place, and the shelf on screen announces nothing, its new games being in view.
+func _refresh_library(library: AndroidServices.Library) -> void:
+	if library.shelves.is_empty():
+		Diagnostics.trace("refresh", "no game left in any console")
+		_show_emptied(library)
+		return
+	var shown := _shelves[_shelf].platform_id if not _shelves.is_empty() else ""
+	if _screen == Screen.GAMES:
+		_positions[shown] = _search.shown_position()
+	var middles: Dictionary[String, String] = {}
+	for shelf in _shelves:
+		middles[shelf.platform_id] = shelf.games[clampi(_positions[shelf.platform_id], 0, shelf.games.size() - 1)].id
+	_art.keep_only(library.games)
+	_screens.library = library
+	_show_library(library, shown, middles)
+	Diagnostics.trace("refresh", "library shown on %s, %s" % [Screen.keys()[_screen], _shelves[_shelf].platform_id])
+	if _screen != Screen.GAMES:
+		return
+	if _shelves[_shelf].platform_id == shown:
+		_show_title()
+		_new_games.enter(shown)
+	else:
+		_go(Screen.CONSOLES)
+
+
+## A re-read left no game in any console: "No console" until one is added, as once the last one is removed.
+func _show_emptied(library: AndroidServices.Library) -> void:
+	_cover()
+	_show_front(true)
+	await _screens.show_emptied(library)
+	if _screens.arrived:
+		_show_front(false)
+	else:
+		_come_in()
+	_shown = true
+
+
+## Each console's rail tile tells how many new games it has.
+func _show_badges() -> void:
+	var counts: Array[int] = []
+	for shelf in _shelves:
+		counts.append(_new_games.count(shelf))
+	_rail.announce(counts)
+
+
 ## The toss takes the title's pill: its fade in, under way as the carousel comes in, ends at once.
 func _toss_selected() -> void:
 	_toss.toss()
@@ -485,8 +576,9 @@ func _long_press() -> void:
 
 
 ## Shows [param library], on the console of [param shown] (a platform id) if it has one, else
-## where the selection left the user.
-func _show_library(library: AndroidServices.Library, shown := "") -> void:
+## where the selection left the user; each shelf of [param middles] (platform id: game id) on that game, or on the one
+## now at its place when it is gone.
+func _show_library(library: AndroidServices.Library, shown := "", middles: Dictionary[String, String] = {}) -> void:
 	var started := Time.get_ticks_usec()
 	_shelf_waiting = false
 	_console_variants = library.console_variants
@@ -510,12 +602,14 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 	for shelf in _shelves:
 		if _shown or shelf == _shelves[_shelf]:
 			models.append_array(_models_of(shelf).values())
-		_positions[shelf.platform_id] = shelf.selected
+		_positions[shelf.platform_id] = _kept_position(shelf, middles[shelf.platform_id]) \
+			if middles.has(shelf.platform_id) else shelf.selected
 		items.append(_console_item(shelf))
 		folders.append(items.back().folder)
 	_row.keep_models(models)
 	_consoles.show_consoles(items, _shelf)
 	_rail.show_consoles(folders, _shelf)
+	_show_badges()
 	_show_rail()
 	# A console alone has no order to be put in.
 	_arrange_hint.visible = _shelves.size() > 1
@@ -524,6 +618,12 @@ func _show_library(library: AndroidServices.Library, shown := "") -> void:
 		var game := _row.selected_game()
 		Diagnostics.trace("carousel", "restored %s on %s in %.1f ms" % [
 			game.title, game.platform_id, (Time.get_ticks_usec() - started) / 1000.0])
+
+
+## The index of [param middle] (a game id) in [param shelf], or the place it stood at when it is gone.
+func _kept_position(shelf: AndroidServices.Shelf, middle: String) -> int:
+	var index := shelf.games.find_custom(func(game: AndroidServices.Game) -> bool: return game.id == middle)
+	return index if index >= 0 else clampi(_positions[shelf.platform_id], 0, shelf.games.size() - 1)
 
 
 ## The models of [param shelf]'s media, by medium (see [method Appearance.models_of]), loaded the first time.
@@ -551,7 +651,19 @@ func _use_platform() -> void:
 	var shelf := _shelves[_shelf]
 	var selected := shelf.games[posmod(_positions[shelf.platform_id], shelf.games.size())]
 	_art_focus.start()
-	_sequence.use(_appearance.animation_of(_platforms[shelf.platform_id], selected.medium))
+	_stand(_appearance.animation_of(_platforms[shelf.platform_id], selected.medium))
+
+
+## The launch animation from now on, still where the screen shown has it ([method _pose]).
+func _stand(animation: Animation) -> void:
+	_sequence.use(animation, _pose())
+
+
+## The moment of the launch animation the screen shown stands at: the consoles in front at its start, behind the games
+## once there. Every still pose is read from the screen, so that no library, model or screen shown again can leave the
+## consoles of one screen under the controls of the other.
+func _pose() -> StringName:
+	return &"games" if _screen in _GAME_SCREENS else &""
 
 
 ## The selected platform's shelf behind the consoles screen, ready for the games screen, and the launch
@@ -582,6 +694,7 @@ func _show_waiting_shelf() -> void:
 
 func _enter() -> void:
 	Sounds.play(SoundEffects.Cue.SELECT)
+	_new_games.enter(_shelves[_shelf].platform_id)
 	# A press begun before A must not act once it is let go.
 	_hold_select.stop()
 	_go(Screen.ENTERING)
@@ -627,6 +740,10 @@ func _go(screen_to: Screen) -> void:
 	var games := screen_to == Screen.GAMES and _screen != Screen.PROPERTIES
 	var from := _screen
 	_screen = screen_to
+	# Arrived, by the animation into or out of the console or straight from another screen; with no console, nothing
+	# stands.
+	if screen_to in [Screen.CONSOLES, Screen.GAMES] and not _shelves.is_empty():
+		_sequence.stand(_pose())
 	_show_rail()
 	if screen_to in [Screen.ENTERING, Screen.CONSOLE_EDIT, Screen.ORDER]:
 		_rail.sink(StudioTokens.TR_RING_SINK_S if screen_to == Screen.ORDER else StudioTokens.TR_GAMES_RAIL_S)
@@ -650,10 +767,13 @@ func _launch() -> void:
 	var game := _row.selected_game()
 	# A press begun before A must not act once it is let go.
 	_hold_select.stop()
+	# Pressed as the hints come, they arrive at once: the launch fades them from there and gives them back whole.
+	if _games_hint_fade and _games_hint_fade.is_running():
+		_games_hint_fade.custom_step(StudioTokens.TR_GAMES_HINTS_S)
 	_remember()
 	var platform := _platforms[game.platform_id]
 	# The placeholder brings the game's own medium from its own length away.
-	_sequence.use(_appearance.animation_of(platform, game.medium), &"games")
+	_stand(_appearance.animation_of(platform, game.medium))
 	_game_launch.launch(game, game.last_disc, _appearance.insertions[platform.media])
 
 
@@ -833,7 +953,7 @@ func _show_variants(variants: Dictionary[String, String]) -> void:
 	_appearance.use_variants(variants)
 	_consoles.replace_selected(_console_item(_shelves[_shelf]))
 	# The selected console stands as its own model's launch animation has it.
-	_sequence.use(_appearance.animation_of(_platforms[_shelves[_shelf].platform_id], _row.selected_game().medium))
+	_stand(_appearance.animation_of(_platforms[_shelves[_shelf].platform_id], _row.selected_game().medium))
 
 
 ## The selected console's edit, over the ring until it is saved, given up or removed; the consoles come in again if

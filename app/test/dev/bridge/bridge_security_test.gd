@@ -98,6 +98,9 @@ func test_inv_24_reload_restart_and_snapshot_only_write_beneath_the_dev_director
 	for path: String in ["user://settings.json", "res://../settings.json", "res://data/../../settings.json", "/tmp/outside"]:
 		assert_bool((await _commands.run({"cmd": "reload", "files": [Fixtures.file(path, "broken")]}))["ok"]).is_false()
 	assert_dict(_user_files("user://")).is_equal(saved_files)
+	# A resume reads the folders again, which writes a device's library.
+	_commands.android = auto_free(OnDevice.new())
+	assert_bool((await _commands.run({"cmd": "lifecycle", "event": "resume"}))["ok"]).is_false()
 
 
 func _user_files(directory: String) -> Dictionary:
@@ -109,6 +112,11 @@ func _user_files(directory: String) -> Dictionary:
 		if directory == "user://" and file_name in ["dev", "logs"]: continue
 		files.merge(_user_files(directory.path_join(file_name)))
 	return files
+
+class OnDevice extends AndroidServices:
+	func is_available() -> bool:
+		return true
+
 
 class ValueProbe extends Node:
 	var value := 0.0

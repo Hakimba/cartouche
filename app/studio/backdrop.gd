@@ -25,8 +25,8 @@ static var system_dark := func() -> bool: return DisplayServer.is_dark_mode()
 static var _theme_as_made: Dictionary[String, Color] = {}
 
 
-## Shows [param chosen] (a key of [constant NAMES]) with the veil [param moving] or still, on every screen at once; nothing is drawn again when all are as shown. Returns what shows, for the
-## traces.
+## Shows [param chosen] (a key of [constant NAMES]) with the veil [param moving] or still, on every screen at once;
+## nothing is drawn again when all are as shown. Returns what shows, for the traces.
 static func show(chosen: StringName, moving: bool) -> String:
 	choice = chosen
 	var shown := Palette.of(scheme_of(chosen))

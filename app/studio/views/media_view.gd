@@ -268,7 +268,7 @@ func _light() -> void:
 ## This view over the part of the screen the medium covers and the reach of its look, drawn again; its
 ## size grows while it moves and, once [param settled], becomes its own again.
 func _frame(settled: bool) -> void:
-	var box := _on_screen()
+	var box := on_screen()
 	var margin := reach()
 	var wanted := Rect2(box.position - Vector2(margin.x, margin.y), box.size + Vector2(margin.x + margin.z, margin.y + margin.w))
 	var scale_by := StudioTokens.window_scale(get_window())
@@ -299,8 +299,13 @@ func _frame(settled: bool) -> void:
 		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
+## Where the middle of the medium's top stands on the screen (the app's canvas, px).
+func crown() -> Vector2:
+	return camera.unproject_position(_at * Vector3(_box.get_center().x, _box.end.y, _box.get_center().z))
+
+
 ## The part of the screen (the app's canvas, px) the medium covers where it stands.
-func _on_screen() -> Rect2:
+func on_screen() -> Rect2:
 	var seen := Rect2(camera.unproject_position(_at * _box.get_endpoint(0)), Vector2.ZERO)
 	for i in range(1, 8):
 		seen = seen.expand(camera.unproject_position(_at * _box.get_endpoint(i)))

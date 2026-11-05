@@ -2,6 +2,8 @@
 package app.cartouche.android.library
 
 import android.net.Uri
+import app.cartouche.android.storage.AUTHORITY
+import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.FakeDocuments
 import app.cartouche.android.storage.FileStamp
@@ -21,6 +23,7 @@ import app.cartouche.android.storage.rows
 import app.cartouche.android.storage.serving
 import app.cartouche.android.storage.setAside
 import app.cartouche.core.files.FileFacts
+import app.cartouche.core.library.Arrivals
 import app.cartouche.core.library.ConsoleVariant
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DiscGrouping
@@ -42,6 +45,7 @@ import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.playerJson
 import app.cartouche.core.search.Query
 import app.cartouche.core.shelves.Selection
+import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeLeft
@@ -70,6 +74,7 @@ class LibraryServiceTest {
     private val context = RuntimeEnvironment.getApplication()
     private val file = File(context.filesDir, "library.json")
     private val selectionFile = File(context.filesDir, "selection.json")
+    private val arrivalsFile = File(context.filesDir, "arrivals.json")
     private val platform =
         catalog(
             definition(playerJson("test.x", pattern = ".*\\\\.iso"), platform = "test"),
@@ -78,8 +83,16 @@ class LibraryServiceTest {
 
     private val factsFolder = File(context.filesDir, "facts")
 
-    private fun service(selection: File = selectionFile) =
-        LibraryService(LibraryStore(file), SelectionStore(selection), Folders(context), FactsStore(factsFolder))
+    /** Another folder the fake provider serves, holding the same files: their games are other games. */
+    private val other = uri("content://$AUTHORITY/tree/other")
+
+    private fun service(selection: File = selectionFile, arrivals: File = arrivalsFile) = LibraryService(
+        LibraryStore(file),
+        SelectionStore(selection),
+        ArrivalsStore(arrivals),
+        Folders(context),
+        FactsStore(factsFolder),
+    )
 
     private fun LibraryService.scan() = scan(platform, TitleIndex.EMPTY, DataFolders.NONE)
 
@@ -94,6 +107,13 @@ class LibraryServiceTest {
         installDocuments { rows(*titles.map { fileRow("root/$it.iso") }.toTypedArray()) }
         service.scan().shouldBeRight()
     }
+
+    private fun LibraryService.reread() = reread(platform, TitleIndex.EMPTY, DataFolders.NONE)
+
+    /** The folder now holds the games [titles]. */
+    private fun holding(vararg titles: String) = installDocuments { rows(*titles.map { fileRow("root/$it.iso") }.toTypedArray()) }
+
+    private fun LibraryService.titles(ids: Set<GameId>): Set<String> = ids.map { id -> library().game(id).shouldBeSome().title }.toSet()
 
     private fun LibraryService.select(title: String) = select(library().games.single { it.title == title }.id).shouldBeRight()
 
@@ -186,6 +206,120 @@ class LibraryServiceTest {
     }
 
     @Test
+    fun `INV-25 a re-read keeps the user's choices as a rescan does and marks only the games it brought, after a restart too`() {
+        val service = scanned("Okage", "Ico")
+        service.arrivals() shouldBe Arrivals()
+        val okage = service.library().games.single { it.title == "Okage" }.id
+        val japan = LabelChoice.Region(LabelRegion("Japan"))
+        service.chooseLabel(okage, japan).shouldBeRight()
+        holding("Okage", "Shadow", "Rez")
+        val reread = service.reread().shouldBeRight()
+        val library = reread.library.shouldBeSome()
+        library.games.map { it.title }.toSet() shouldBe setOf("Okage", "Shadow", "Rez")
+        library.game(okage).shouldBeSome().label shouldBe japan
+        service.titles(reread.arrivals.unseen) shouldBe setOf("Shadow", "Rez")
+        reread.arrivals.announced.keys shouldBe setOf(platform.id)
+        service.titles(reread.arrivals.announced.getValue(platform.id)) shouldBe setOf("Shadow", "Rez")
+        service().arrivals() shouldBe reread.arrivals
+        holding("Okage", "Shadow", "Rez", "Ico")
+        val restarted = service()
+        restarted.titles(restarted.reread().shouldBeRight().arrivals.unseen) shouldBe setOf("Shadow", "Rez", "Ico")
+        holding("Okage")
+        service().reread().shouldBeRight().arrivals shouldBe Arrivals()
+    }
+
+    @Test
+    fun `a rescan the user asks for marks no game, and a re-read finding what is there writes nothing`() {
+        val service = scanned("Okage")
+        holding("Okage", "Rez")
+        service.scan().shouldBeRight()
+        service.arrivals() shouldBe Arrivals()
+        file.setLastModified(0L)
+        val stored = file.readText()
+        service.reread().shouldBeRight().library.shouldBeNone()
+        file.readText() shouldBe stored
+        file.lastModified() shouldBe 0L
+    }
+
+    @Test
+    fun `INV-25 entering a console and leaving a game clear their own marks, after a restart too, an unreadable file meaning none`() {
+        val service = scanned("Okage")
+        holding("Okage", "Rez", "Ico")
+        service.reread().shouldBeRight()
+        val rez = service.library().games.single { it.title == "Rez" }.id
+        service.leave(rez).shouldBeRight()
+        service().titles(service().arrivals().unseen) shouldBe setOf("Ico")
+        service().titles(service().arrivals().announced.getValue(platform.id)) shouldBe setOf("Rez", "Ico")
+        service().enter(platform.id).shouldBeRight()
+        service().arrivals().announced shouldBe emptyMap()
+        arrivalsFile.writeText("not arrivals")
+        service().arrivals() shouldBe Arrivals()
+    }
+
+    @Test
+    fun `INV-25 a re-read between a form's setup and its scan marks nothing, after a restart too, and marks again once scanned`() {
+        scanned("Okage", "Ico")
+        service().setUp(platform.id, PlatformSetup(Some(other))).shouldBeRight()
+        holding("Okage", "Ico", "Rez")
+        val restarted = service()
+        restarted.reread().shouldBeRight().arrivals shouldBe Arrivals()
+        restarted.library().games.map { it.title }.toSet() shouldBe setOf("Okage", "Ico", "Rez")
+        restarted.scan().shouldBeRight()
+        holding("Okage", "Ico", "Rez", "Shadow")
+        restarted.titles(restarted.reread().shouldBeRight().arrivals.unseen) shouldBe setOf("Shadow")
+    }
+
+    @Test
+    fun `INV-13 a console removed, or scanned in another folder, leaves no mark that its games bring back`() {
+        val service = scanned("Okage")
+        holding("Okage", "Rez")
+        service.reread().shouldBeRight()
+        service.remove(platform.id).shouldBeRight()
+        service.setUp(platform.id, PlatformSetup(Some(TREE))).shouldBeRight()
+        service.scan().shouldBeRight()
+        service.arrivals() shouldBe Arrivals()
+        service().arrivals() shouldBe Arrivals()
+        holding("Okage", "Rez", "Ico")
+        service.reread().shouldBeRight()
+        service.setUp(platform.id, PlatformSetup(Some(other))).shouldBeRight()
+        service.scan().shouldBeRight()
+        service.setUp(platform.id, PlatformSetup(Some(TREE))).shouldBeRight()
+        service.scan().shouldBeRight()
+        service().arrivals() shouldBe Arrivals()
+    }
+
+    @Test
+    fun `a re-read whose folder only holds other files set aside keeps them without answering a library`() {
+        val service = scanned("Okage")
+        installDocuments { rows(fileRow("root/Okage.iso"), fileRow("root/Okage.sav")) }
+        service.reread().shouldBeRight().library.shouldBeNone()
+        service().library().ignoredCounts shouldBe service.library().ignoredCounts
+        service().library().ignoredCounts.getValue(platform.id).isNotEmpty() shouldBe true
+    }
+
+    @Test
+    fun `a re-read whose marks cannot be stored still answers the library it saved`() {
+        scanned("Okage")
+        holding("Okage", "Rez")
+        // In a folder that is a file: never written.
+        val reread = service(arrivals = File(file, "arrivals.json")).reread().shouldBeRight()
+        reread.library.shouldBeSome().games.map { it.title }.toSet() shouldBe setOf("Okage", "Rez")
+        service().library().games.map { it.title }.toSet() shouldBe setOf("Okage", "Rez")
+    }
+
+    @Test
+    fun `INV-09 a re-read whose folder cannot be listed changes nothing, marks included`() {
+        val service = scanned("Okage")
+        holding("Okage", "Rez")
+        val marked = service.reread().shouldBeRight().arrivals
+        val library = service.library()
+        installDocuments { throw IllegalStateException("storage removed") }
+        service.reread().shouldBeLeft().shouldBeInstanceOf<LibraryFailure.Storage>()
+        service().library() shouldBe library
+        service().arrivals() shouldBe marked
+    }
+
+    @Test
     fun `INV-09 a scan whose folder cannot be listed changes nothing, in memory or stored`() {
         val service = service()
         service.setUp(platform.id, PlatformSetup(Some(TREE))).shouldBeRight()
@@ -234,7 +368,7 @@ class LibraryServiceTest {
         service.remove(platform.id).shouldBeRight()
         File(factsFolder, "${platform.id.value}.tsv").exists() shouldBe false
         listOf(service, service()).forEach { again ->
-            again.library() shouldBe Library(setups = mapOf(other to PlatformSetup(Some(otherFolder))))
+            again.library() shouldBe Library(setups = mapOf(other to PlatformSetup(Some(otherFolder))), awaitingScan = setOf(other))
             again.selection() shouldBe Selection()
         }
         kept() shouldBe listOf(otherTree)

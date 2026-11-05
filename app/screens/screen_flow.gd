@@ -136,6 +136,14 @@ func add_console() -> bool:
 	return added
 
 
+## [param emptied], a library a re-read left without games, shown; then "No console" until one is added.
+func show_emptied(emptied: AndroidServices.Library) -> void:
+	arrived = false
+	_edited(emptied)
+	await _add_first_console()
+	_close()
+
+
 ## The form editing the console of [param platform_id], the one the ring shows, until it is saved, given up or
 ## removed; then, when no console has games any more, "No console" until one is added. Returns whether the carousel
 ## must come in again (see [method open_settings]).

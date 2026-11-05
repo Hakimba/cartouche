@@ -6,6 +6,7 @@ const LaunchView := preload("res://dev/bridge/launch_view.gd")
 const Views := preload("res://dev/bridge/views.gd")
 const BridgeSounds := preload("res://dev/bridge/sounds.gd")
 const RouteFixture := preload("res://dev/bridge/route_fixture.gd")
+const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
 const _PLINTH := preload("res://studio/views/plinth.gd")
 const CACHE_FILES := {
 	"res://data/studio_lights.json":
@@ -69,6 +70,7 @@ func run(message: Dictionary) -> Dictionary:
 		"tune": result = _tune(message)
 		"pause": _pause()
 		"resume": _resume()
+		"lifecycle": result = await _lifecycle(message)
 		"step": result = await _step(message)
 		"scrub": result = _scrub(message)
 		"pick":
@@ -141,7 +143,29 @@ func _state() -> Dictionary:
 			result["console"] = carousel._consoles.selected().folder
 		if carousel._row.has_games():
 			result["game"] = carousel._row.selected_game().id
+		result["parts"] = ScreenAgreement.shown(carousel)
+		result["disagreement"] = ScreenAgreement.disagreement(carousel)
+		result["badges"] = carousel._rail.tiles().map(func(tile: RailTile) -> int: return tile.badge().count())
+		result["new_games"] = {"reading": carousel._new_games._reading, "waiting": carousel._new_games.has_library()}
 	return result
+
+
+## The app put aside or brought back as Android does it, then a frame: whether the consoles' folders are being read
+## again. `arrive` (`gba:2`, as `--new-games`) has the next re-read of those consoles bring games. Desktop only: on a
+## device, the re-read it starts would write the user's library (INV-24).
+func _lifecycle(message: Dictionary) -> Dictionary:
+	var event: Variant = message.get("event")
+	var arrive: Variant = message.get("arrive", "")
+	if android.is_available():
+		return _error("lifecycle is the desktop's: on a device, leave the app and come back")
+	if event not in ["pause", "resume"] or arrive is not String:
+		return _error("invalid lifecycle")
+	(android._plugin as DesktopPlugin).start_with_arrivals(str(arrive))
+	get_tree().root.propagate_notification(
+		NOTIFICATION_APPLICATION_PAUSED if event == "pause" else NOTIFICATION_APPLICATION_RESUMED)
+	await get_tree().process_frame
+	var carousel := _scene() as Carousel
+	return {"reading": carousel != null and carousel._new_games._reading}
 
 
 ## The screen the carousel shows: its own, or the page of the screens flow over it.

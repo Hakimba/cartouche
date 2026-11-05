@@ -28,7 +28,7 @@ const TRACKS: Array[String] = [
 	"Row:position", "Row:scale", "Row:neighbours", "Row:pose_amount", "Row:selected_presence",
 	"Sequence:disc_away", "Sequence:disc_lift", "Sequence:disc_offset", "Sequence:disc_tilt",
 	"Sequence:disc_turns_per_s", "Sequence:blur", "Sequence:layer_opacity", "Sequence:saturation",
-	"Sequence:black", "Sequence:fade",
+	"Sequence:black", "Sequence:fade", "Sequence:controls",
 	"TopBar:modulate:a", "Pill:modulate:a",
 	"ArtProgress:modulate:a",
 ]
@@ -314,6 +314,8 @@ static func _value(track: String, step: Dictionary) -> Variant:
 			return _number(_group(step, "fx"), "black", 0.0)
 		"Sequence:fade":
 			return _number(_group(step, "fx"), "fade", 0.0)
+		"Sequence:controls":
+			return _number(shown, "tabs", 1.0)
 		"TopBar:modulate:a":
 			return _number(shown, "bar", 1.0)
 		"Pill:modulate:a":

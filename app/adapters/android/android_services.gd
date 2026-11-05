@@ -19,6 +19,8 @@ signal label_variant_downloaded(variant: LabelVariant)
 signal art_progress(download: LabelDownload)
 ## The battery's level, or whether the device is plugged in, changed.
 signal battery_changed(battery: Battery)
+## An answer told the games not seen yet, as the plugin now marks them.
+signal arrivals_told(arrivals: Arrivals)
 ## Every operation's answer; callers await the one carrying their request id.
 signal _answered(payload: Dictionary)
 
@@ -71,6 +73,8 @@ const ScanReport := AndroidWire.ScanReport
 const PreviewAnswer := AndroidWire.PreviewAnswer
 const SettingsAnswer := AndroidWire.SettingsAnswer
 const ScanAnswer := AndroidWire.ScanAnswer
+const Arrivals := AndroidWire.Arrivals
+const RefreshAnswer := AndroidWire.RefreshAnswer
 const RescrapeAnswer := AndroidWire.RescrapeAnswer
 const Art := AndroidWire.Art
 const ArtProgress := AndroidWire.ArtProgress
@@ -84,6 +88,8 @@ const ArtAnswer := AndroidWire.ArtAnswer
 
 ## The catalog, loaded when the app starts.
 var catalog := CatalogSummary.new({})
+## The library's revision, as the latest answer told it: one more at each write of the plugin.
+var library_revision := 0
 
 var _plugin: Object = Engine.get_singleton(_SINGLETON) if Engine.has_singleton(_SINGLETON) else DesktopPlugin.new()
 var _last_request_id := 0
@@ -108,6 +114,7 @@ func _ready() -> void:
 	else:
 		(_plugin as DesktopPlugin).load_snapshot(Diagnostics.argument("snapshot"))
 		(_plugin as DesktopPlugin).start_with_backdrop(Diagnostics.argument("backdrop"), Diagnostics.argument("pixel-veil"))
+		(_plugin as DesktopPlugin).start_with_arrivals(Diagnostics.argument("new-games"))
 	if OS.has_feature("android"):
 		AndroidButtons.follow_android()
 	_load_catalog()
@@ -337,7 +344,6 @@ func save_pixel_veil(on: bool) -> Result:
 	return Result.new(await _request(&"savePixelVeil", [on]))
 
 
-
 ## Stores how loud the sounds play, [param steps] from 0 (silenced) to [constant SoundEffects.LEVELS].
 func save_sound_level(steps: int) -> Result:
 	return Result.new(await _request(&"saveSoundLevel", [steps]))
@@ -353,6 +359,27 @@ func save_preferred_region(region: String) -> Result:
 ## Scans the folder of [param platform_id] and replaces its games.
 func scan_platform(platform_id: String) -> ScanAnswer:
 	return ScanAnswer.new(await _request(&"scanPlatform", [platform_id]))
+
+
+## Reads the folder of [param platform_id] again, the user not asking: its games change as a scan's, and those it
+## brings are marked as new.
+func refresh_platform(platform_id: String) -> RefreshAnswer:
+	return RefreshAnswer.new(await _request(&"refreshPlatform", [platform_id]))
+
+
+## The user entered [param platform_id]'s console: it announces no new game any more ([signal arrivals_told]).
+func enter_console(platform_id: String) -> Result:
+	return Result.new(await _request(&"enterConsole", [platform_id]))
+
+
+## The user left [param game] on its shelf: it is not new any more ([signal arrivals_told]).
+func leave_game(game: Game) -> Result:
+	return Result.new(await _request(&"leaveGame", [game.id]))
+
+
+## The library as the plugin now stores it.
+func current_library() -> LibraryAnswer:
+	return LibraryAnswer.new(await _request(&"currentLibrary"))
 
 
 ## Removes [param platform_id] from the library: its choices, games and art, and the access to its
@@ -491,7 +518,17 @@ func _request(method: StringName, args: Array = []) -> Dictionary:
 		var shown := payload.duplicate()
 		shown.erase("library")
 		Diagnostics.trace("plugin", "#%d answered in %d ms: %s" % [id, elapsed, shown])
+	_took(payload)
 	return payload
+
+
+## What any answer tells besides its own result, read as it comes, before the code awaiting it goes on: the library's
+## revision, and the games not seen yet when the request changed them.
+func _took(payload: Dictionary) -> void:
+	library_revision = payload.get("revision", library_revision)
+	if payload.has("arrivals"):
+		var arrivals: Dictionary = payload["arrivals"]
+		arrivals_told.emit(Arrivals.new(arrivals))
 
 
 func _answer_to(id: int) -> Dictionary:

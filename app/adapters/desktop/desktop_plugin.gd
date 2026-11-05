@@ -20,6 +20,10 @@ var _backdrop := {"backdrop": "light", "pixel_veil": true}
 var _current := {}
 var _story := {}
 var _story_read := false
+## Debug builds: how many games the next re-read of each console brings, by platform id (`--new-games=gba:2`).
+var _arriving: Dictionary[String, int] = {}
+## The games not seen yet, as the plugin sends them.
+var _arrivals := {"unseen": PackedStringArray(), "announced": {}}
 
 
 ## Part [param key] of the desktop demo, or none without the file. Exports ship it: on a device, the debug bridge's
@@ -92,6 +96,23 @@ func start_with_backdrop(chosen: String, veil: String) -> void:
 			", ".join(PackedStringArray(Backdrop.NAMES.keys()))])
 	if veil:
 		_backdrop["pixel_veil"] = veil != "off"
+
+
+## Debug builds: the consoles of [param asked] (`gba:2,ps2:3`) are set up with a folder, and their next re-read
+## brings that many made-up games, copies of their first one; asked at start (`--new-games`) or later.
+func start_with_arrivals(asked: String) -> void:
+	if not OS.is_debug_build() or asked.is_empty():
+		return
+	for part in asked.split(",", false):
+		var pieces := part.split(":")
+		if pieces.size() == 2 and pieces[1].is_valid_int():
+			_arriving[pieces[0]] = pieces[1].to_int()
+	if _current.is_empty():
+		_current = demo("library")
+	var setups: Dictionary = _current.get_or_add("setups", {})
+	for platform_id in _arriving:
+		setups[platform_id] = {"folder_uri": "content://demo/tree/" + platform_id, "disc_grouping": "grouped",
+			"folder_depth": "top_level"}
 
 
 func loadCatalog(..._data: Array) -> Dictionary:
@@ -193,6 +214,51 @@ func savePreferredRegion(_id: int, region: String) -> Dictionary:
 
 func scanPlatform(_id: int, _platform_id: String) -> Dictionary:
 	return _form_answer({"library": form().get("library", "{}"), "report": _report()})
+
+
+## The games [method start_with_arrivals] asked for, the first time the console is read again.
+func refreshPlatform(_id: int, platform_id: String) -> Dictionary:
+	var count: int = _arriving.get(platform_id, 0)
+	_arriving.erase(platform_id)
+	var answer := {"ok": true, "arrivals": _arrivals}
+	var found: Dictionary = _current.get("shelves", {"shelves": []})
+	var shelves: Array = found["shelves"]
+	var at := shelves.find_custom(func(shelf: Dictionary) -> bool: return shelf["platform"] == platform_id)
+	if count == 0 or at < 0:
+		return answer
+	var games: Array = _current["games"]
+	var shelf: Dictionary = shelves[at]
+	var indices: Array = shelf["games"]
+	var first: Dictionary = games[indices[0]]
+	var unseen: PackedStringArray = _arrivals["unseen"]
+	var announced: Dictionary = _arrivals["announced"]
+	var platform_new: PackedStringArray = announced.get(platform_id, PackedStringArray())
+	for i in count:
+		var game := first.duplicate(true)
+		# Numbered across the library: games asked again later never take an id already given.
+		game["id"] = "demo/new-%s-%d" % [platform_id, games.size()]
+		game["title"] = "%s %s" % [first["title"], ["II", "III", "IV", "V", "VI"][i % 5]]
+		indices.append(games.size())
+		games.append(game)
+		var id: String = game["id"]
+		unseen.append(id)
+		platform_new.append(id)
+	_arrivals["unseen"] = unseen
+	announced[platform_id] = platform_new
+	answer["library"] = JSON.stringify(_current)
+	return answer
+
+
+func enterConsole(_id: int, platform_id: String) -> Dictionary:
+	var announced: Dictionary = _arrivals["announced"]
+	announced.erase(platform_id)
+	return {"ok": true, "arrivals": _arrivals}
+
+
+func leaveGame(_id: int, game_id: String) -> Dictionary:
+	var unseen: PackedStringArray = _arrivals["unseen"]
+	_arrivals["unseen"] = PackedStringArray(Array(unseen).filter(func(id: String) -> bool: return id != game_id))
+	return {"ok": true, "arrivals": _arrivals}
 
 
 ## The library as it now stands, whatever the number of games asked for.

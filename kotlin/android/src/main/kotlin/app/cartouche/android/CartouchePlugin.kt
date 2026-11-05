@@ -26,6 +26,7 @@ import app.cartouche.android.launch.startInTime
 import app.cartouche.android.library.LaunchChoice
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.LibraryService
+import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
@@ -430,7 +431,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
             withActivity(requestId) { act -> start(act, launcher.appIntent(it)) }
         }
 
-    /** Answers with `{"library", "art", "absent"}`, then looks for the art of the others. */
+    /** Answers with `{"library", "art", "absent", "arrivals"}`, then looks for the art of the others. */
     @UsedByGodot
     public fun library(requestId: Int) {
         val asked = TimeSource.Monotonic.markNow()
@@ -441,8 +442,12 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
                 val loaded = since()
                 val (stored, absent) = art.store.labelsOf(library().games, reference::artVersion)
                 val found = since()
-                success("library" to wire(this), "art" to stored.artWireJson(), "absent" to absent.toTypedArray())
-                    .putSome("load_problem", loadProblem)
+                success(
+                    "library" to wire(this),
+                    "art" to stored.artWireJson(),
+                    "absent" to absent.toTypedArray(),
+                    "arrivals" to arrivals().toWire(),
+                ).putSome("load_problem", loadProblem)
                     .also {
                         trace("library") {
                             "answered ${since()} ms after asked: started at $started ms, library at $loaded ms, stored and absent art at $found ms"
@@ -555,25 +560,63 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         success()
     }
 
-    /** Scans [platformId]'s folder; answers with `{"library", "report"}`. */
+    /** Scans [platformId]'s folder; answers with `{"library", "report", "arrivals"}`. */
     @UsedByGodot
     public fun scanPlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
         val loaded = reference
         val platform = platform(PlatformId(platformId), loaded)
         val before = library.value.library().games
         val report = inLibrary { scan(platform, loaded.titles(platform.id), loaded.dataFolders) }.second
-        success("library" to wire(library.value), "report" to report.toWire()).also { art.recutAfterScan(before) }
+        success("library" to wire(library.value), "report" to report.toWire(), "arrivals" to library.value.arrivals().toWire())
+            .also { art.recutAfterScan(before) }
+    }
+
+    /**
+     * Re-reads [platformId]'s folder as the app comes to the screen, the user not asking ([LibraryService.reread]):
+     * one console a request, so that a launch asked meanwhile waits for one console's read at most. Answers with
+     * `{"arrivals"}`, and `"library"` when the re-read changed it.
+     */
+    @UsedByGodot
+    public fun refreshPlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
+        val loaded = reference
+        val platform = platform(PlatformId(platformId), loaded)
+        val before = library.value.library().games
+        val reread = inLibrary { reread(platform, loaded.titles(platform.id), loaded.dataFolders) }
+        success("arrivals" to reread.arrivals.toWire()).apply {
+            reread.library.onSome {
+                put("library", wire(library.value))
+                art.recutAfterScan(before)
+            }
+        }
+    }
+
+    /** The user entered [platformId]'s console: it announces no new game any more. Answers with `{"arrivals"}`. */
+    @UsedByGodot
+    public fun enterConsole(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
+        success("arrivals" to inLibrary { enter(PlatformId(platformId)) }.toWire())
+    }
+
+    /** The user left [gameId] on its shelf: it is not new any more. Answers with `{"arrivals"}`. */
+    @UsedByGodot
+    public fun leaveGame(requestId: Int, gameId: String): Unit = onLibrary(requestId) {
+        success("arrivals" to inLibrary { leave(GameId(gameId)) }.toWire())
     }
 
     /**
      * Removes [platformId] from the library (see [LibraryService.remove]), then the art of its games; answers with
-     * `{"library"}`.
+     * `{"library", "arrivals"}`.
      */
     @UsedByGodot
     public fun removePlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
         inLibrary { remove(PlatformId(platformId)) }
         trace("library") { "$platformId removed" }
-        success("library" to wire(library.value)).also { art.lookForArt() }
+        success("library" to wire(library.value), "arrivals" to library.value.arrivals().toWire()).also { art.lookForArt() }
+    }
+
+    /** The library as it now stands; answers with `{"library"}`. */
+    @UsedByGodot
+    public fun currentLibrary(requestId: Int): Unit = onLibrary(requestId) {
+        success("library" to wire(library.value))
     }
 
     /** Remembers [gameId] as the selected game of its platform, and that platform as the one shown. */
@@ -732,6 +775,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     private fun libraryIn(folder: File): LibraryService = LibraryService(
         LibraryStore(File(folder, LIBRARY_FILE)),
         SelectionStore(File(folder, "selection.json")),
+        ArrivalsStore(File(folder, "arrivals.json")),
         folders,
         FactsStore(File(folder, "facts")),
         ::prepare,
@@ -757,7 +801,12 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         scope.launch(on) { answer(requestId) { either { work() }.merge() } }
     }
 
-    private fun onLibrary(requestId: Int, work: suspend Raise<Dictionary>.() -> Dictionary) = answering(requestId, threads.library, work)
+    /**
+     * Every library call's answer tells the library's `"revision"` ([LibraryService.revision]): Godot shows a library
+     * sent before only when no answer told a newer one since.
+     */
+    private fun onLibrary(requestId: Int, work: suspend Raise<Dictionary>.() -> Dictionary) =
+        answering(requestId, threads.library) { either { work() }.merge().apply { put("revision", library.value.revision) } }
 
     private fun pendingPicker() = PendingPick<Dictionary> { requestId, payload -> answer(requestId) { payload } }
 

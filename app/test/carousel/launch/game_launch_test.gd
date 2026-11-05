@@ -78,6 +78,23 @@ func test_a_game_that_cannot_start_plays_nothing_while_it_is_checked_nor_after()
 	assert_array(codes).is_equal([&"game_missing"])
 
 
+func test_a_game_launched_as_the_hints_come_gives_them_back_whole() -> void:
+	var carousel: Carousel = await Fixtures.shown_carousel(self)
+	Fixtures.press(carousel, &"ui_accept")
+	Fixtures.step_until(carousel, Carousel.Screen.GAMES)
+	var launch := carousel._game_launch
+	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
+	android.start_code = &"not_installed"
+	launch.android = android
+	carousel._unhandled_input(Fixtures.button(&"ui_accept", true))
+	for frame in 1000:
+		if not launch.is_busy():
+			break
+		Fixtures.step_frame(carousel)
+	assert_int(android.starts).is_equal(1)
+	assert_float(carousel._games_hints.modulate.a).is_equal(1.0)
+
+
 ## One launch that comes to [param outcome], with presses under way and random inputs meanwhile.
 func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGenerator) -> void:
 	var launch := carousel._game_launch
@@ -265,6 +282,8 @@ func _carousel(platform := "gba") -> Carousel:
 	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal(platform)
 	Fixtures.press(carousel, &"ui_accept")
 	Fixtures.step_until(carousel, Carousel.Screen.GAMES)
+	# The hints' arrival at its end.
+	carousel._games_hint_fade.custom_step(10.0)
 	return carousel
 
 

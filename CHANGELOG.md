@@ -5,6 +5,15 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+### Added
+- Games copied into a console's folder show up on their own: each time Cartouche opens or comes back to the screen,
+  it reads the folders again, adds the new games and takes away the ones deleted. A console that got new games carries
+  a "+N" badge on the consoles screen until you go into it, and each new game a small glowing dot until you move past
+  it. Adding or editing a console marks nothing as new.
+
+### Fixed
+- The hints at the bottom of the games screen and the console's logo now leave with the rest while a game is launched.
+
 ## [0.3.0] - 2026-11-05
 
 ### Added

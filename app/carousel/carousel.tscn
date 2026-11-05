@@ -415,7 +415,7 @@ row = NodePath("../Row")
 spindle = NodePath("../Row/Spindle")
 sequence = NodePath("../Sequence")
 blackout = NodePath("../Front/Blackout")
-controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill"), NodePath("../ConsoleTitle"), NodePath("../ConsoleRail"), NodePath("../Search"), NodePath("../GamesLogo")]
+controls = [NodePath("../TopBar"), NodePath("../ArtProgress"), NodePath("../Pill"), NodePath("../ConsoleTitle"), NodePath("../ConsoleRail"), NodePath("../Search"), NodePath("../GamesLogo"), NodePath("../GamesHints")]
 
 [node name="Art" type="Node" parent="."]
 unique_name_in_owner = true

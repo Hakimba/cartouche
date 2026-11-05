@@ -103,6 +103,15 @@ the check, the console's launch animation or the medium's insertion, the plugin'
 `Insertion` (`insertion.gd`) is the insertion's motion as pure functions of time, its values per media kind in
 `app/data/carousel/appearance.json`. INV-21 holds that the carousel always comes back as it was.
 
+### New games
+
+Under `app/carousel/new_games/`. As the app starts and each time it comes back to the screen, `NewGames`
+(`new_games.gd`) reads every console's folder again, one request a console, and keeps the library a re-read changed
+until the carousel is free (no launch, move, screen in front, ring, toss or search ribbon): then each shelf keeps the
+game in its middle. A library the plugin wrote again meanwhile (a name, a label, an order, a form) is asked for anew
+rather than shown; one with no game left leads to "No console". The rail tile's `RailBadge` tells the new games of a console until it is entered;
+`NewGameDots` (`new_game_dots.gd`) draws a glowing dot over each new game of the row until it is left.
+
 ### Properties
 
 Under `app/carousel/properties/`. X on a game (its hint reads Edit), or a long press, opens its properties.

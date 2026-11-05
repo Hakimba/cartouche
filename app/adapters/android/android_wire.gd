@@ -396,6 +396,9 @@ class Group:
 
 ## The library, sent as JSON (see `toWireJson` in `Wire.kt`).
 class Library:
+	## The revision the answer that sent it told ([member AndroidServices.library_revision]): it is the plugin's
+	## latest while no answer told a newer one.
+	var revision := 0
 	var games: Array[Game] = []
 	## One per platform that has games, in catalog order; none when the library has no games.
 	var shelves: Array[Shelf] = []
@@ -436,6 +439,11 @@ class Library:
 	func on_ring() -> PackedStringArray:
 		return PackedStringArray(shelves.map(func(shelf: Shelf) -> String: return shelf.platform_id))
 
+	## The platforms whose folder is read again as the app comes to the screen: those with a folder.
+	func with_folders() -> PackedStringArray:
+		return PackedStringArray(_setups.keys().filter(func(platform_id: String) -> bool:
+			return _setups[platform_id].has_folder))
+
 	func games_of(platform_id: String) -> Array[Game]:
 		return games.filter(func(game: Game) -> bool: return game.platform_id == platform_id)
 
@@ -474,6 +482,7 @@ class LibraryAnswer extends Result:
 		var started := Time.get_ticks_usec()
 		var item: Dictionary = JSON.parse_string(text)
 		library = Library.new(item)
+		library.revision = payload.get("revision", 0)
 		if Diagnostics.enabled:
 			var elapsed := (Time.get_ticks_usec() - started) / 1000.0
 			Diagnostics.trace("library", "%d games read from %d characters in %.1f ms" % [
@@ -485,6 +494,35 @@ class LibraryAnswer extends Result:
 		for found: Dictionary in stored:
 			art.append(Art.new(found))
 		absent = payload.get("absent", PackedStringArray())
+
+
+## The games a re-read of their folder brought that the user has not seen yet: [member unseen] on their shelf until
+## left there, and those [member announced] on their console until it is entered.
+class Arrivals:
+	## Game ids.
+	var unseen: Dictionary[String, bool] = {}
+	## Platform id: its game ids, as keys.
+	var announced: Dictionary[String, Dictionary] = {}
+
+	func _init(item: Dictionary) -> void:
+		for game_id: String in item.get("unseen", PackedStringArray()):
+			unseen[game_id] = true
+		var by_platform: Dictionary = item.get("announced", {})
+		for platform_id: String in by_platform:
+			var games: Dictionary = {}
+			for game_id: String in by_platform[platform_id]:
+				games[game_id] = true
+			announced[platform_id] = games
+
+
+## A re-read's answer: the library when the re-read changed it, and the games not seen yet.
+class RefreshAnswer extends LibraryAnswer:
+	## Whether the re-read changed the library; [member library] is empty otherwise.
+	var has_library: bool
+
+	func _init(payload: Dictionary) -> void:
+		super(payload)
+		has_library = payload.has("library")
 
 
 class ScanReport:

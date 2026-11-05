@@ -20,6 +20,7 @@ import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.art.web
+import app.cartouche.core.library.Arrivals
 import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.ConsoleVariant
 import app.cartouche.core.library.CountedReason
@@ -164,6 +165,7 @@ class WireTest {
             BatteryState(Some(57), plugged = true).toWire(),
             BatteryState.NONE.toWire(),
             Rescraped(57, 50, listOf("gc: the folder cannot be read")).toWire(),
+            success("arrivals" to Arrivals(setOf(GameId("ps2/b")), mapOf(PlatformId("ps2") to setOf(GameId("ps2/b")))).toWire()),
         ).forEach { it.isGodotValue() shouldBe true }
         arrayOf("a").isGodotValue() shouldBe true
         listOf("a").toTypedArray<Any>().isGodotValue() shouldBe false

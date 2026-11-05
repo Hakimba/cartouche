@@ -41,7 +41,7 @@ const SHOW_S := 0.2
 @export var spindle: Spindle
 @export var sequence: ConsoleSequence
 @export var blackout: ColorRect
-## What fades out as the game turns: the title pill, the top bar.
+## What fades out as the game goes in: the title pill, the top bar, the hints.
 @export var controls: Array[CanvasItem] = []
 
 ## The Android services, replaced by a fake in tests.
@@ -130,6 +130,8 @@ func preview(at_s: float) -> void:
 	if not is_inserting():
 		_enter(Stage.INSERTING)
 		_inserted.connect(_show_carousel, CONNECT_ONE_SHOT)
+		for control in controls:
+			_presence[control] = control.modulate.a
 	_into_console = true
 	_clock_s = at_s
 	blackout.visible = true
@@ -237,6 +239,9 @@ func _insert(delta: float) -> void:
 	var origin: Vector3
 	if _into_console:
 		sequence.launch_at(t, delta)
+		for control in controls:
+			if not sequence.fades(control):
+				control.modulate.a = sequence.controls * _presence[control]
 		black = sequence.black
 		fade = sequence.fade
 		origin = sequence.black_origin()
@@ -271,7 +276,7 @@ func _insert(delta: float) -> void:
 func _show_carousel() -> void:
 	_launch_id += 1
 	if _into_console:
-		sequence.show_games()
+		sequence.stand(&"games")
 	row.pose_selected()
 	spindle.visible = false
 	for control in controls:

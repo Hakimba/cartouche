@@ -174,6 +174,8 @@ static func _expected(track: String, step: Dictionary) -> Variant:
 			return _read(step, "fx", "black")
 		"Sequence:fade":
 			return _read(step, "fx", "fade")
+		"Sequence:controls":
+			return _read(step, "ui", "tabs")
 		"TopBar:modulate:a":
 			return _read(step, "ui", "bar")
 		"Pill:modulate:a", "ArtProgress:modulate:a":

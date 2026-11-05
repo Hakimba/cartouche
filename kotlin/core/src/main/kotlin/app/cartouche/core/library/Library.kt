@@ -68,6 +68,14 @@ public data class Library(
     @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     public val consoleVariants: Map<PlatformId, ConsoleVariant> = emptyMap(),
+    /**
+     * The platforms whose setup changed since their games were last scanned: those games are still the former
+     * setup's (another folder, discs grouped otherwise), so a re-read in between finds them all new ([Arrivals.after]).
+     * Left out of the stored library while there is none.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    public val awaitingScan: Set<PlatformId> = emptySet(),
 ) {
     public fun setup(platform: PlatformId): PlatformSetup = setups.getOrElse(platform) { PlatformSetup() }
 
@@ -83,7 +91,12 @@ public data class Library(
 
     public fun game(id: GameId): Option<Game> = games.firstOrNone { it.id == id }
 
-    public fun withSetup(platform: PlatformId, setup: PlatformSetup): Library = copy(setups = setups + (platform to setup))
+    /** Stores [setup] for [platform]; a setup it did not have awaits its scan ([awaitingScan]). */
+    public fun withSetup(platform: PlatformId, setup: PlatformSetup): Library = if (setups.getOrNone(platform) == Some(setup)) {
+        this
+    } else {
+        copy(setups = setups + (platform to setup), awaitingScan = awaitingScan + platform)
+    }
 
     /** Replaces [platform]'s games with [scan]'s, keeping what the user chose for games still there. */
     public fun withScan(platform: PlatformId, scan: Scan): Library {
@@ -97,8 +110,28 @@ public data class Library(
         return copy(
             games = games.filter { it.platform != platform } + scanned,
             skippedFolders = skippedFolders + (platform to scan.skippedFolders),
+            awaitingScan = awaitingScan - platform,
         ).withIgnored(platform, scan.ignored)
     }
+
+    /** Whether [other] holds the same games of [platform], though [withScan] puts them last. */
+    public fun gamesAlike(platform: PlatformId, other: Library): Boolean = gamesOf(platform) == other.gamesOf(platform)
+
+    /**
+     * Whether [other] holds the same games of [platform] and the same files its last scan set aside, and awaits its
+     * scan as much: a scan of it changed nothing.
+     */
+    public fun scansAlike(platform: PlatformId, other: Library): Boolean {
+        fun Library.setAside() = listOf(
+            notGames.getOrNone(platform),
+            ignoredCounts.getOrNone(platform),
+            skippedFolders.getOrNone(platform),
+            platform in awaitingScan,
+        )
+        return gamesAlike(platform, other) && setAside() == other.setAside()
+    }
+
+    private fun gamesOf(platform: PlatformId): Set<Game> = games.filterTo(HashSet()) { it.platform == platform }
 
     /** Keeps [platform]'s files that are not games, and counts the others. */
     internal fun withIgnored(platform: PlatformId, ignored: List<IgnoredFile>): Library {
@@ -129,6 +162,7 @@ public data class Library(
         consoleNames = consoleNames - platform,
         consoleOrder = consoleOrder - platform,
         consoleVariants = consoleVariants - platform,
+        awaitingScan = awaitingScan - platform,
     )
 
     /**

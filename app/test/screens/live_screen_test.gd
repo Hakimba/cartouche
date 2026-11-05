@@ -80,10 +80,12 @@ func test_after_a_console_added_X_on_the_ring_shows_its_form_and_B_goes_back_to_
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 
-## From a library holding [param consoles], one console added through the form, then [param count] presses drawn by
-## [param random]: the pad's directions, A, B, X, Y, and the "+" (up held, A). After each, a person can act within the
-## wait's bound, whatever transition the press started; the walk reaches the form again. Frames are fixed at 60 a
-## second (scripts/test_godot.sh), so a seed walks the same path whatever the machine's load.
+## From a library holding [param consoles], one console added through the form, then [param count] steps drawn by
+## [param random]: the pad's directions, A, B, X, Y, the "+" (up held, A), and the app put aside and brought back, the
+## consoles' folders as they were or with games copied in or all deleted from one of them. After each, a person can
+## act within the wait's bound, whatever transition the step started, and what the carousel shows settles to its
+## screen's; the walk reaches the form again. Frames are fixed at 60 a second (scripts/test_godot.sh), so a seed walks
+## the same path whatever the machine's load.
 func _walk(consoles: Dictionary[String, int], test_seed: int, count := 150) -> void:
 	var shown := await _shown(consoles)
 	var device: Fixtures.NewDevice = shown[0]
@@ -95,22 +97,44 @@ func _walk(consoles: Dictionary[String, int], test_seed: int, count := 150) -> v
 		JOY_BUTTON_A, JOY_BUTTON_A, JOY_BUTTON_A, JOY_BUTTON_B, JOY_BUTTON_X, JOY_BUTTON_Y]
 	var seen := {}
 	for press in count:
-		# The last two draws are the "+", for the walk to come back to the form.
-		var drawn := random.randi_range(0, pads.size() + 1)
-		if drawn >= pads.size():
+		# After the pads, two draws of the "+", for the walk to come back to the form, then three of the app put aside:
+		# one with its folders as they were, two with them changed.
+		var drawn := random.randi_range(0, pads.size() + 4)
+		if drawn < pads.size():
+			await Fixtures.joypad(self, pads[drawn])
+		elif drawn <= pads.size() + 1:
 			await Fixtures.hold(self, &"ui_up")
 			await Fixtures.joypad(self, JOY_BUTTON_A)
 			await Fixtures.hold(self, &"ui_up", false)
 		else:
-			await Fixtures.joypad(self, pads[drawn])
+			await _put_aside(carousel, device, random if drawn > pads.size() + 2 else null)
 		if not await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel)):
 			fail("dead after press %d (%d) on %s, focus %s" % [press, drawn, Fixtures.shown_screen(carousel),
 				Fixtures.focus(self)])
+			return
+		if not await Fixtures.until(self, func() -> bool: return Fixtures.ScreenAgreement.disagreement(carousel).is_empty()):
+			fail("after press %d (%d), %s" % [press, drawn, Fixtures.ScreenAgreement.disagreement(carousel)])
 			return
 		var screen := Fixtures.shown_screen(carousel)
 		seen[screen.name if screen else Carousel.Screen.keys()[carousel.screen()]] = true
 	# Against an empty walk: it went back to the form after the console added.
 	assert_dict(seen).contains_keys(["AddConsole"])
+
+
+## The app put aside and brought back, its consoles' folders read again; with [param random], one console drawn by it,
+## as often the one selected as any, has a game copied in, or all of its games deleted while another console keeps some.
+func _put_aside(carousel: Carousel, device: Fixtures.NewDevice, random: RandomNumberGenerator) -> void:
+	await Fixtures.pause(self)
+	var with_games := device.consoles.keys().filter(func(platform_id: String) -> bool:
+		return device.consoles[platform_id] > 0)
+	if random and not with_games.is_empty():
+		var selected := carousel._shelves[carousel._shelf].platform_id if not carousel._shelves.is_empty() else ""
+		var drawn: String = selected if selected in with_games and random.randi_range(0, 1) == 0 \
+			else with_games[random.randi_range(0, with_games.size() - 1)]
+		device.consoles[drawn] = 0 if with_games.size() > 1 and random.randi_range(0, 1) == 0 \
+			else device.consoles[drawn] + 1
+	await Fixtures.resume(self)
+	await Fixtures.until(self, func() -> bool: return not carousel._new_games._reading)
 
 
 func test_inv_20_a_walk_of_presses_from_no_console_never_leaves_a_dead_screen() -> void:

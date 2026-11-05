@@ -34,11 +34,12 @@ order, including the ones that wait for frames. `app/dev/bridge/commands.gd` dis
 
 | Command | What it does |
 |---|---|
-| `state` | the route, screen, focus, selected console and game, frame timing, pause state, and the lights shown (`rig`) |
+| `state` | the route, screen, focus, selected console and game, frame timing, pause state, and the lights shown (`rig`); on the carousel, what it shows (below) |
 | `shot` | a picture of the screen |
 | `go {route}` | reloads the scene and plays the route's steps (`press`, `push`, `release`, `wait` in frames), faster than recorded except while a direction is held. A last step marked `hold` pauses on the first frame of what it started. A last `push` with `keep` holds its action. Fails if the scene does not settle. |
 | `step {frames}` | while paused, advances processes, animation players and tweens one frame at a time |
 | `pause`, `resume` | hold or release the tree, engine time and viewport input |
+| `lifecycle {event, arrive}` | desktop only: `event` `pause` or `resume` sends the notification Android sends as the app is put aside or brought back, then waits a frame. `arrive` (`gba:2`, as `--new-games`) has the next re-read of those consoles bring games; only a console given a folder at start (`--new-games=gba:0`) is read again. Answers `reading`, whether the consoles' folders are being read again. Refused on a device, where the re-read would write the user's library. |
 | `scrub {t}` | samples the selected console's launch animation at a time and holds it |
 | `reload {files}` | loads resources through an overlay pack, forgets their caches, reloads the scene and replays the route |
 | `restart {files}` | prepares resources read only at start for the next start (a start pack in the instance's folder). The client restarts the process. |
@@ -47,6 +48,16 @@ order, including the ones that wait for frames. `app/dev/bridge/commands.gd` dis
 | `sound {data, format, gain_db}` | plays base64 `wav` or `ogg` bytes once |
 | `sounds {map}` | plays sounds as the app's input actions and screens happen, without changing what the app does |
 | `snapshot` | the plugin's library and settings answers and the consoles' chosen models |
+
+On the carousel, `state` also tells what it shows of the parts each screen owns, by
+`app/dev/bridge/screen_agreement.gd`, the rule the INV-20 walk asserts after every step:
+
+| Field | What it holds |
+|---|---|
+| `parts` | `still` (no screen in front, no move, launch or toss under way), `consoles` (`front` or `behind`), `consoles_behind_drawn` (how much of them shows behind the games), and whether `rail` (on its ground), `console_title`, `games_logo`, `title_pill` and `games_hints` show, and `ribbon_open` |
+| `disagreement` | what shows that the screen does not have, once still: empty when they agree |
+| `badges` | the new games each console's rail tile announces, in the ring's order |
+| `new_games` | `reading` (folders read again) and `waiting` (a library read again, not shown yet) |
 
 `reload` and `restart` refuse scripts: the engine compiles every script a scene names before any of it runs, so no
 pack can replace one. `reload` also refuses fonts and files read only at start.

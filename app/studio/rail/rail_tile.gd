@@ -3,7 +3,8 @@ class_name RailTile
 extends Control
 ## One tile of the consoles rail: a satin tile of radius 19.2 px holding the console's logo made for the
 ## rail-tile slot ([LogoView]), centred. [method reflected] makes its floor reflection: the same tile
-## mirrored under its bottom edge, whose mask the rail's group gives it.
+## mirrored under its bottom edge, whose mask the rail's group gives it. A tile, not its reflection, carries the
+## badge telling the new games of its console ([RailBadge]).
 
 const SIZE := Vector2(151.04, 102.4)
 const RADIUS := 19.2
@@ -12,6 +13,8 @@ const REFLECTION_GAP := 4.48
 
 var _console := ""
 var _logo := LogoView.new()
+## None on a reflection.
+var _badge: RailBadge
 
 
 ## The face: the satin box with its radius, which is the tile's own and not satin's.
@@ -67,6 +70,8 @@ static func of(folder: String) -> RailTile:
 	if not folder.is_empty():
 		tile.name = folder
 	tile.show_console(folder)
+	tile._badge = RailBadge.new()
+	tile.add_child(tile._badge)
 	return tile
 
 
@@ -81,6 +86,19 @@ func show_console(folder: String) -> void:
 ## The console shown, its folder.
 func console() -> String:
 	return _console
+
+
+## Tells [param count] new games of its console, popping in or fading out unless not [param animated].
+func announce(count: int, animated := true) -> void:
+	# The platform's gel, a console of another model than its base one included.
+	var manifest := ConsoleManifest.of(_console)
+	var gel := manifest.gel() if manifest else StudioTokens.NEUTRAL
+	_badge.show_count(count, gel, Vector2(SIZE.x, 0.0), animated)
+
+
+## The badge telling the new games of its console.
+func badge() -> RailBadge:
+	return _badge
 
 
 ## The logo on the tile.

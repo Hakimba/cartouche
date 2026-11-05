@@ -34,6 +34,7 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 | INV-12 | A rescan keeps what the user chose for games still there, drops games whose files are gone, and touches no other platform. | Rescanning is always safe. | `LibraryTest` |
 | INV-13 | Removing a platform removes everything of it (games, choices, art, folder access, counts) and nothing else. | A removal is complete and contained. | `RemovalTest`, `LibraryServiceTest`, `ArtStoreTest`, `AbsencesTest`, `FoldersTest`, `ScrapingTest`; `console_edit_test.gd` |
 | INV-14 | Every definition and manifest shipped in `app/data` and in the console and medium folders loads without rejection. | Updating bundled data must not silently lose an emulator, a console or a medium. | `CatalogTest`; `console_folders_test.gd`, `media_folders_test.gd` |
+| INV-25 | A re-read the user did not ask for (the app coming to the screen) keeps what the user chose for the games still there, as a rescan does, and marks as new only the games that were not in the library before it, none while a console's new setup awaits its scan; a mark survives a restart and goes with its game. | The app reads the folders on its own: it must be as safe as a rescan, and never call a game new that was there. | `ArrivalsTest`, `LibraryServiceTest` |
 
 ## What the user chose is kept
 

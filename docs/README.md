@@ -135,7 +135,7 @@ Debug builds read arguments after `--` on a desktop (`$GODOT --path app -- --she
 | Argument | Effect | Read by |
 |---|---|---|
 | `--welcome=skip` | starts without waiting on the title screen | `Carousel` |
-| `--shelf=gba` | opens on that platform's shelf | `Carousel` |
+| `--shelf=gba` | opens with that platform's console selected on the consoles screen | `Carousel` |
 | `--demo-games=N` | a made-up library of N games, kept apart from the user's | `Carousel`, `DemoLibrary.kt` |
 | `--demo-shelf=ps2` | puts every demo game on one console | `Carousel` |
 | `--turntable=T` | turns the selected game at T turns a second | `Carousel` |
@@ -145,6 +145,7 @@ Debug builds read arguments after `--` on a desktop (`$GODOT --path app -- --she
 | `--launch=rehearse` | every launch check passes and no emulator starts: the insertion plays, then the carousel returns | `AndroidServices` |
 | `--snapshot=DIR` | desktop only: shows a device's library, settings and labels copied into DIR | `DesktopPlugin` |
 | `--backdrop=dark` | desktop only: starts on that background (`light`, `dark`, `light_grey`, `anthracite`, `device`) | `DesktopPlugin` |
+| `--new-games=gba:2` | desktop only: those consoles get a folder, and their first re-read brings that many made-up games (`0`: the folder alone) | `DesktopPlugin` |
 | `--pixel-veil=off` | desktop only: starts with the background's pixel veil still | `DesktopPlugin` |
 | `--bridge` | connects the debug bridge | `Diagnostics`, see [debug-bridge.md](debug-bridge.md) |
 | `--art-refused` | every art server refuses | `DebugOptions.kt` |

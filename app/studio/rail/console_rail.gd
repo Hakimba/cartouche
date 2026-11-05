@@ -39,6 +39,8 @@ var ground_alpha := 1.0:
 		_apply_ground()
 
 var _folders: Array[String] = []
+## How many new games each console announces, by its folder, as its tile's badge tells it.
+var _announced: Dictionary[String, int] = {}
 var _spring := Motion.Spring.new(0.0)
 ## One tile per console, at the slot nearest the middle.
 var _tiles: Array[RailTile] = []
@@ -180,6 +182,8 @@ func show_consoles(folders: Array[String], selected: int) -> void:
 		return
 	for folder in folders:
 		var tile := RailTile.of(folder)
+		var count: int = _announced.get(folder, 0)
+		tile.announce(count, false)
 		_cloth.add_child(tile)
 		_tiles.append(tile)
 		_mirrors.append(tile.reflected())
@@ -200,6 +204,14 @@ func go_to(target: int) -> void:
 	set_process(true)
 	_set_gel(_gel_of(target))
 	_pop()
+
+
+## Tells on each tile how many new games its console announces, [param counts] in the order of the tiles: a badge pops
+## in on a tile that had none, and fades out of one that has none any more.
+func announce(counts: Array[int]) -> void:
+	for i in mini(counts.size(), _tiles.size()):
+		_tiles[i].announce(counts[i])
+		_announced[_folders[i]] = counts[i]
 
 
 ## Moves the rail [constant StudioTokens.TR_GAMES_DROP_PX] down to nothing in [param duration_s], after

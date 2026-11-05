@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.library
 
+import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.FileStamp
 import app.cartouche.android.storage.FolderListing
@@ -13,6 +14,7 @@ import app.cartouche.android.trace
 import app.cartouche.core.ContentUri
 import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.FileReading
+import app.cartouche.core.library.Arrivals
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderPath
@@ -101,6 +103,9 @@ internal data class ScanReport(
     val milliseconds: Long,
 )
 
+/** What a re-read the user did not ask for left: the library when it changed, and the games not seen yet. */
+internal data class Reread(val library: Option<Library>, val arrivals: Arrivals)
+
 /**
  * Not thread-safe but for [finders]: the plugin runs every call on one single-threaded dispatcher. A launch reads its choice, starts the
  * emulator on the main thread, then records its disc: other calls can run in between.
@@ -108,6 +113,7 @@ internal data class ScanReport(
 internal class LibraryService(
     private val store: LibraryStore,
     private val selections: SelectionStore,
+    private val marks: ArrivalsStore,
     private val folders: Folders,
     private val facts: FactsStore,
     /** Given new [finders] to make, as soon as possible but not on the caller's thread. */
@@ -127,6 +133,12 @@ internal class LibraryService(
         private set
 
     private var selected: Option<Selection> = None
+
+    private var marked: Option<Arrivals> = None
+
+    /** One more at each write of the library: an answer telling it shows whether a library sent before is the latest. */
+    var revision: Int = 0
+        private set
 
     /** Why the stored library could not be read, if it could not; the library then started empty. */
     var loadProblem: Option<String> = None
@@ -163,6 +175,42 @@ internal class LibraryService(
             }.also { selected = Some(it) }
     }
 
+    /**
+     * The games not seen yet, of the library only, read from their file on first use; an unreadable one only means
+     * none.
+     */
+    fun arrivals(): Arrivals = storedArrivals().within(library())
+
+    private fun storedArrivals(): Arrivals = marked.getOrElse {
+        marks
+            .load()
+            .getOrElse { problem ->
+                trace("arrivals") { "not read, no game marked: ${problem.detail}" }
+                Arrivals()
+            }.also { marked = Some(it) }
+    }
+
+    /** The user entered [platform]'s console: it announces no new game any more. */
+    fun enter(platform: PlatformId): Either<LibraryFailure, Arrivals> = mark(arrivals().entered(platform))
+
+    /** The user left game [id] on its shelf: it is not new any more. */
+    fun leave(id: GameId): Either<LibraryFailure, Arrivals> = mark(arrivals().left(id))
+
+    private fun mark(arrivals: Arrivals): Either<LibraryFailure, Arrivals> = either {
+        if (arrivals != storedArrivals()) {
+            marks.save(arrivals).mapLeft(LibraryFailure::Storage).bind()
+            marked = Some(arrivals)
+            trace("arrivals") { "${arrivals.unseen.size} games new, announced on ${arrivals.announced.keys.map { it.value }}" }
+        }
+        arrivals
+    }
+
+    /** Keeps [arrivals] along with a library already saved: marks not stored then are only traced, the library stands. */
+    private fun keepMarks(arrivals: Arrivals): Arrivals = mark(arrivals).getOrElse { failure ->
+        trace("arrivals") { "not saved: ${failure.message}" }
+        arrivals
+    }
+
     /** The shelves of [platforms] (in the catalog's order), where the selection left the user. */
     fun shelves(platforms: List<PlatformId>): Option<Shelves> = Shelves.of(library(), platforms, selection())
 
@@ -186,7 +234,11 @@ internal class LibraryService(
     fun remove(platform: PlatformId): Either<LibraryFailure, Library> = either {
         // The selection first: one left remembering a platform that stayed only starts it from its first game.
         remember(selection().without(platform)).bind()
-        save(library().without(platform)).bind().also(::keepFoldersOf).also { facts.forget(platform) }
+        save(library().without(platform)).bind().also(::keepFoldersOf).also {
+            facts.forget(platform)
+            // Else they would come back with its games, the same folder added again.
+            keepMarks(storedArrivals().within(it))
+        }
     }
 
     /**
@@ -224,7 +276,37 @@ internal class LibraryService(
      */
     fun scan(platform: Platform, titles: TitleIndex, dataFolders: DataFolders): Either<LibraryFailure, Pair<Library, ScanReport>> = either {
         val (scan, report) = found(platform, library().setup(platform.id), titles, dataFolders) { factsOf(platform.id, it) }.bind()
-        save(library().withScan(platform.id, scan)).bind() to report
+        // The marks of games gone go with them: back in their folder, they are no new games.
+        save(library().withScan(platform.id, scan)).bind().also { keepMarks(storedArrivals().within(it)) } to report
+    }
+
+    /**
+     * Scans [platform] as [scan] does, the user not asking for it: the games it brings are marked as new
+     * ([Arrivals.after]). The library is written only when the scan changed it, as a re-read usually finds what was
+     * there, and answered only when its games changed. The marks are another file, written after the library: a kill
+     * in between leaves those games unmarked.
+     */
+    fun reread(platform: Platform, titles: TitleIndex, dataFolders: DataFolders): Either<LibraryFailure, Reread> = either {
+        val started = TimeSource.Monotonic.markNow()
+        val before = library()
+        val (scan, report) = found(platform, before.setup(platform.id), titles, dataFolders) { factsOf(platform.id, it) }.bind()
+        val after = before.withScan(platform.id, scan)
+        val kept = if (after.scansAlike(platform.id, before)) before else save(after).bind()
+        val shown = if (after.gamesAlike(platform.id, before)) None else Some(kept)
+        val arrivals = keepMarks(arrivals().after(platform.id, before, after))
+        trace("refresh") {
+            val written =
+                if (kept === before) {
+                    "unchanged"
+                } else if (shown.isSome()) {
+                    "written"
+                } else {
+                    "written, its games the same"
+                }
+            "${platform.id.value}: read again in ${started.elapsedNow().inWholeMilliseconds} ms (scan ${report.milliseconds} ms), " +
+                "library $written, ${arrivals.unseen.size} games new"
+        }
+        Reread(shown, arrivals)
     }
 
     /**
@@ -349,6 +431,7 @@ internal class LibraryService(
         ensure(writable) { LibraryFailure.Storage(StorageFailure.Unavailable("the unreadable library file could not be set aside")) }
         val started = TimeSource.Monotonic.markNow()
         store.save(library).mapLeft(LibraryFailure::Storage).bind()
+        revision += 1
         trace("library") { "saved ${library.games.size} games in ${started.elapsedNow().inWholeMilliseconds} ms" }
         library.also { loaded = Some(it) }
     }

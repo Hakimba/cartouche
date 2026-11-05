@@ -67,6 +67,7 @@ Package `library`.
 | `Game.kt` | A game, its discs, its label choice (`LabelChoice`) and its display name. |
 | `Library.kt` | Every platform's games and choices. Merges a rescan without losing the user's choices (INV-12), removes a platform whole (INV-13), keeps the console order and each console's chosen model. |
 | `ConsoleVariant.kt` | One entry per console model folder, with its platform. `Library.withVariant` refuses an unknown model or one of another platform. |
+| `Arrivals.kt`, `ArrivalsFormat.kt` | The games a re-read the user did not ask for brought and the user has not seen yet: new on their shelf until left, announced on their console until it is entered; only games still in the library (INV-25). Stored as versioned JSON in their own file. |
 | `LibraryFormat.kt` | Stores the library as versioned JSON and reads every earlier format (INV-11). |
 | `DemoLibrary.kt` | Makes up a library of any size, the same for the same arguments, for measuring at scale. |
 

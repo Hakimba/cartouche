@@ -5,6 +5,8 @@ extends RefCounted
 
 const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 const CAROUSEL := preload("res://carousel/carousel.tscn")
+## The rule every screen settles whole by (INV-20), shared with the bridge.
+const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
 const NAVIGATION: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_right"]
 ## The flags a screen sets while it takes no press (a screen without one, or a signal of that name, is not guarded),
 ## and must have cleared once it is shown and still.
@@ -302,6 +304,12 @@ static func enter(suite: GdUnitTestSuite) -> void:
 	await _press(suite, event)
 
 
+## The app put aside, as Android does for another app.
+static func pause(suite: GdUnitTestSuite) -> void:
+	suite.get_tree().root.propagate_notification(Node.NOTIFICATION_APPLICATION_PAUSED)
+	await suite.await_idle_frame()
+
+
 ## The app back to the front, as after an Android screen.
 static func resume(suite: GdUnitTestSuite) -> void:
 	suite.get_tree().root.propagate_notification(Node.NOTIFICATION_APPLICATION_RESUMED)
@@ -400,6 +408,17 @@ class NewDevice extends AndroidServices:
 	var names_given: Array[String] = []
 	## The orders the consoles were put in ([method order_consoles]), in turn.
 	var orders: Array[PackedStringArray] = []
+	## The consoles read again, entered and the games left, in turn, and the games not seen yet as the plugin sends them.
+	var refreshed: Array[String] = []
+	var entered: Array[String] = []
+	var left: Array[String] = []
+	var arrivals := {"unseen": PackedStringArray(), "announced": {}}
+	## The names kept by [method rename_game], by game id, as the library sends them.
+	var names: Dictionary[String, String] = {}
+	## The library as last sent.
+	var _sent := ""
+	## One more at each write, as the plugin counts them.
+	var _revision := 0
 
 	func _init() -> void:
 		catalog = AndroidServices.CatalogSummary.new(DesktopPlugin.demo("catalog"))
@@ -430,7 +449,13 @@ class NewDevice extends AndroidServices:
 		await _frames(1)
 		if has_games:
 			return AndroidServices.LibraryAnswer.new({"ok": true, "library": JSON.stringify(DesktopPlugin.demo("library"))})
-		return AndroidServices.LibraryAnswer.new({"ok": true, "library": _library()})
+		return AndroidServices.LibraryAnswer.new(_told({"ok": true, "library": _library(), "arrivals": arrivals.duplicate(true)}))
+
+	func current_library() -> AndroidServices.LibraryAnswer:
+		var answer := await _later(&"current_library")
+		if answer["ok"]:
+			answer["library"] = _library()
+		return AndroidServices.LibraryAnswer.new(_told(answer))
 
 	func curtain_allowed() -> bool:
 		return curtain
@@ -527,7 +552,7 @@ class NewDevice extends AndroidServices:
 			if not setup.variant_id.is_empty():
 				console_variants[platform_id] = setup.variant_id
 			answer["library"] = _library()
-		return AndroidServices.LibraryAnswer.new(answer)
+		return AndroidServices.LibraryAnswer.new(_told(answer, true))
 
 	func scan_platform(platform_id: String) -> AndroidServices.ScanAnswer:
 		scans += 1
@@ -536,7 +561,8 @@ class NewDevice extends AndroidServices:
 		if &"scan" in failing:
 			return AndroidServices.ScanAnswer.new(_payload(&"scan"))
 		consoles[platform_id] = scanned_games
-		return AndroidServices.ScanAnswer.new({"ok": true, "library": _library(), "report": {"games": scanned_games}})
+		return AndroidServices.ScanAnswer.new(_told({"ok": true, "library": _library(), "report": {"games": scanned_games},
+			"arrivals": arrivals.duplicate(true)}, true))
 
 	func remove_platform(platform_id: String) -> AndroidServices.LibraryAnswer:
 		var answer := _payload(&"remove")
@@ -545,7 +571,8 @@ class NewDevice extends AndroidServices:
 			consoles.erase(platform_id)
 			console_variants.erase(platform_id)
 			answer["library"] = _library()
-		return AndroidServices.LibraryAnswer.new(answer)
+			answer["arrivals"] = arrivals.duplicate(true)
+		return AndroidServices.LibraryAnswer.new(_told(answer, true))
 
 	func persisted_folders() -> AndroidServices.FolderList:
 		var folders: Array[Dictionary] = []
@@ -617,7 +644,7 @@ class NewDevice extends AndroidServices:
 				ordered[platform_id] = consoles[platform_id]
 			ordered.merge(consoles)
 			consoles = ordered
-		return AndroidServices.Result.new(answer)
+		return AndroidServices.Result.new(_told(answer, true))
 
 	## Keeps a name as `DisplayName.of` and `Library.withDisplayName` do: one line, single spaces,
 	## trimmed, 80 characters at most; blank or the game's own title, no name.
@@ -630,7 +657,52 @@ class NewDevice extends AndroidServices:
 			answer["title"] = kept if kept else original
 			if kept and kept != original:
 				answer["original_title"] = original
-		return AndroidServices.Renamed.new(answer)
+				names[game.id] = kept
+			else:
+				names.erase(game.id)
+		return AndroidServices.Renamed.new(_told(answer, true))
+
+	## [member consoles] as they now stand, with the library only when it changed since last sent, and [member arrivals].
+	func refresh_platform(platform_id: String) -> AndroidServices.RefreshAnswer:
+		refreshed.append(platform_id)
+		var answer := await _later(&"refresh_platform")
+		var changed := false
+		if answer["ok"]:
+			var before := _sent
+			var now := _library()
+			changed = now != before
+			if changed:
+				answer["library"] = now
+			answer["arrivals"] = arrivals.duplicate(true)
+		return AndroidServices.RefreshAnswer.new(_told(answer, changed))
+
+	func enter_console(platform_id: String) -> AndroidServices.Result:
+		entered.append(platform_id)
+		var answer := await _later(&"enter_console")
+		if answer["ok"]:
+			var announced: Dictionary = arrivals["announced"]
+			announced.erase(platform_id)
+			answer["arrivals"] = arrivals.duplicate(true)
+		return AndroidServices.Result.new(_told(answer))
+
+	func leave_game(game: AndroidServices.Game) -> AndroidServices.Result:
+		left.append(game.id)
+		var answer := await _later(&"leave_game")
+		if answer["ok"]:
+			var unseen: PackedStringArray = arrivals["unseen"]
+			unseen.erase(game.id)
+			arrivals["unseen"] = unseen
+			answer["arrivals"] = arrivals.duplicate(true)
+		return AndroidServices.Result.new(_told(answer))
+
+	## [param answer] with the library's revision, one more when the request [param writes] it and succeeded, read as
+	## the app reads any answer.
+	func _told(answer: Dictionary, writes := false) -> Dictionary:
+		if writes and answer["ok"]:
+			_revision += 1
+		answer["revision"] = _revision
+		_took(answer)
+		return answer
 
 	## [param request]'s answer, a few frames later, once [signal released] when it is [member slow].
 	func _later(request: StringName) -> Dictionary:
@@ -658,7 +730,7 @@ class NewDevice extends AndroidServices:
 		for frame in count:
 			await (Engine.get_main_loop() as SceneTree).process_frame
 
-	## [member consoles] as the plugin sends a library: each set up with its folder, then its games.
+	## [member consoles] as the plugin sends a library: each set up with its folder, then its games; kept as the one sent.
 	func _library() -> String:
 		var sent := {}
 		var listed: Array[Dictionary] = []
@@ -669,13 +741,19 @@ class NewDevice extends AndroidServices:
 			var indices: Array[int] = []
 			for i in consoles[platform_id]:
 				indices.append(listed.size())
-				listed.append({"id": "%s/%d" % [platform_id, i], "platform_id": platform_id, "title": "%s %d" % [platform_id, i],
+				var id := "%s/%d" % [platform_id, i]
+				var game := {"id": id, "platform_id": platform_id, "title": "%s %d" % [platform_id, i],
 					"regions": [], "medium": CarouselFixtures.media(platform_id)[0], "languages": [], "serials": [],
-					"discs": [{"name": "%d.iso" % i}], "last_disc": 0, "identified": false})
+					"discs": [{"name": "%d.iso" % i}], "last_disc": 0, "identified": false}
+				if names.has(id):
+					game["original_title"] = game["title"]
+					game["title"] = names[id]
+				listed.append(game)
 			if not indices.is_empty():
 				shelves.append({"platform": platform_id, "games": indices, "selected": 0})
-		return JSON.stringify({"setups": sent, "games": listed, "shelves": {"shelves": shelves, "selected": 0},
+		_sent = JSON.stringify({"setups": sent, "games": listed, "shelves": {"shelves": shelves, "selected": 0},
 			"console_variants": console_variants})
+		return _sent
 
 	static func _folder_uri(platform_id: String) -> String:
 		return "content://tree/card%3AROMs%2F" + platform_id

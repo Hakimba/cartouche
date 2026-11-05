@@ -49,7 +49,7 @@ previous file, never half of the new one.
 | `DocumentBytes.kt` | A document opened read-only as the core's `ByteSource`. |
 | `FactsStore.kt` | What each platform's files told, with the size and date they had then, so a rescan reads only new or changed files. |
 | `LibraryStore.kt` | The library file. An unreadable one is set aside, not lost (INV-11). |
-| `SelectionStore.kt`, `SettingsStore.kt` | The selection and the settings, each in its own file. |
+| `SelectionStore.kt`, `SettingsStore.kt`, `ArrivalsStore.kt` | The selection, the settings and the games not seen yet, each in its own file. |
 
 ## Library
 
@@ -57,7 +57,12 @@ previous file, never half of the new one.
 selections and launch lookups, one at a time on the library thread. A scan reads the facts of new or changed
 files, keeps them in `FactsStore`, and hands them to `Scan.of`. Each library it keeps is published with its
 `Finders`, built in the background, so `browse` and `titleMarks` answer a typed key within the frame. Setting up
-or removing a platform gives up the folder access no platform uses any more.
+or removing a platform gives up the folder access no platform uses any more. A re-read (`reread`, asked by
+`refreshPlatform` one console at a time as the app comes to the screen) is a scan that writes the library only when
+it changed, answers it only when its games changed, and marks the games it brought (`Arrivals`), none while the
+console's new setup awaits its scan; `enterConsole` and `leaveGame` clear those marks, a removal or a scan drops those
+of the games gone. Every library call answers the library's `revision`, one more at each write: Godot shows a library
+a re-read sent only when no answer told a newer one since, else it asks `currentLibrary`.
 
 ## Launch
 

@@ -508,6 +508,17 @@ func _arrange() -> void:
 		order += 1
 
 
+## The games drawn in the row (not one lent out, launched or hidden) whose id [param wanted] takes, each with where it
+## stands on the screen.
+func drawn(wanted: Callable) -> Array[Drawn]:
+	var found: Array[Drawn] = []
+	for game: int in _placed:
+		var view := _placed[game].media_view
+		if view and view.visible and wanted.call(_games[game].id):
+			found.append(Drawn.new(_games[game], view, selected_presence if game == selected_index() else neighbours))
+	return found
+
+
 ## The title's resting top through the screen camera, cached per fitted model with the canvas size
 ## it was measured for (x, y, then the top). While the properties lend the model out it cannot be
 ## measured again: the last top stands.
@@ -532,6 +543,21 @@ func _free_place() -> Place:
 	# Unreachable: there are as many places as games shown at once.
 	push_error("ShelfRow: no free place")
 	return _places[0]
+
+
+## A game drawn in the row: the middle of its top on the screen (px of the canvas), its height there, and how present it
+## is, from 0 (gone) to 1.
+class Drawn:
+	var game: AndroidServices.Game
+	var crown: Vector2
+	var height: float
+	var presence: float
+
+	func _init(drawn_game: AndroidServices.Game, view: MediaView, drawn_presence: float) -> void:
+		game = drawn_game
+		crown = view.crown()
+		height = view.on_screen().size.y
+		presence = drawn_presence
 
 
 ## How the selected game is shown: leaning back and turned as told, it sways slowly so that the
