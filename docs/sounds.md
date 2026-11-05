@@ -14,7 +14,7 @@ app plays them. The tool depends on Python and ffmpeg. The app side depends on n
 | `screens` | every screen, with its gestures and the cue each gesture plays |
 | `cues` | each cue's sound, or none for a silent cue |
 | `sounds` | the recipes: each sound a few pure tones, filtered and shaped |
-| `roles` | the limits a sound of each role must meet (length, loudness, attack, brightness) |
+| `roles` | the limits a sound of each role must meet (length, loudness, attack, brightness, one attack unless the role allows more) |
 | `validated` | the sounds the maintainers approved by ear, each locked by its recipe's hash |
 | `candidates` | sounds to try against the current ones |
 

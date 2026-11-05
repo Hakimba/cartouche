@@ -76,6 +76,15 @@
    "max_attack_ms": 15,
    "max_bright_hz": 1300,
    "max_crest_db": 18
+  },
+  "toss": {
+   "loudness": -29,
+   "max_s": 1.5,
+   "max_low_share": 0.15,
+   "max_attack_ms": 30,
+   "max_bright_hz": 1300,
+   "max_crest_db": 18,
+   "max_events": 2
   }
  },
  "sounds": {
@@ -841,6 +850,47 @@
      "gain_db": -6
     }
    ]
+  },
+  "toss": {
+   "role": "toss",
+   "length": 1.2,
+   "decay_s": 0.12,
+   "layers": [
+    {
+     "tone": {
+      "hz": [
+       311,
+       587
+      ],
+      "decay_ms": 260,
+      "length": 0.4,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 1100,
+     "soften_s": 0.03
+    },
+    {
+     "tone": {
+      "hz": [
+       392,
+       330
+      ],
+      "decay_ms": 28,
+      "length": 0.12,
+      "partials": []
+     },
+     "highpass": [
+      300
+     ],
+     "lowpass": 1300,
+     "soften_s": 0.003,
+     "delay": 0.94,
+     "gain_db": -2
+    }
+   ]
   }
  },
  "validated": {
@@ -923,6 +973,10 @@
   "ring_close": {
    "date": "2026-10-29",
    "recipe_sha256": "b7d0d7c58152fe2c78546e43e89b0eb8b982efb4926e368ea8c131c44aef7568"
+  },
+  "toss": {
+   "date": "2026-11-05",
+   "recipe_sha256": "58eae759b6988da090ec0c0d59b4fd52ed78781ffe1c290921287c0b059d2937"
   }
  },
  "reviews": {
@@ -1009,6 +1063,10 @@
   "ring_close": {
    "status": "validated",
    "note": "validated by ear"
+  },
+  "toss": {
+   "status": "validated",
+   "note": "validated by ear: « ouais je kiff. on valide »"
   }
  },
  "cues": {
@@ -1041,7 +1099,8 @@
   "regions": "switch_on",
   "letters": "switch_off",
   "ring_open": "ring_open",
-  "ring_close": "ring_close"
+  "ring_close": "ring_close",
+  "toss": "toss"
  },
  "board": {
   "categories": [
@@ -1105,6 +1164,12 @@
     [
      "key"
     ]
+   ],
+   [
+    "Le lancer",
+    [
+     "toss"
+    ]
    ]
   ],
   "labels": {
@@ -1128,7 +1193,8 @@
    "swap": "Changer de modèle",
    "key": "Touche · taper, effacer",
    "ring_open": "Roue · ouvrir",
-   "ring_close": "Roue · fermer"
+   "ring_close": "Roue · fermer",
+   "toss": "Lancer"
   }
  },
  "candidates": {},
@@ -1219,6 +1285,10 @@
     [
      "A : lancer le jeu",
      "launch"
+    ],
+    [
+     "↑ : un jeu au hasard, lancé comme une pièce",
+     "toss"
     ],
     [
      "lancement refusé (pas d'émulateur, fichier introuvable)",

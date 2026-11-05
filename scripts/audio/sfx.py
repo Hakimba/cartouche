@@ -335,7 +335,8 @@ def verdict(m: dict, role: dict) -> list[str]:
         fails.append(f"sharp: its peak {m['crest_db']:.1f} dB over its first 50 ms, at most {role['max_crest_db']}")
     if m["decay_ms"] > role.get("max_decay_ms", np.inf):
         fails.append(f"lingers: {m['decay_ms']:.0f} ms to 30 dB under its peak, at most {role['max_decay_ms']}")
-    if m["events"] > 1:
+    # A sound timed to a motion may strike once per beat of it (the toss: thrown, then landing).
+    if m["events"] > role.get("max_events", 1):
         fails.append(f"{m['events']} events")
     if m["end_attack"]:
         fails.append("an attack in its last 20 ms (click at the end)")

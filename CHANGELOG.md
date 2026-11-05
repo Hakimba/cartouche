@@ -12,7 +12,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
 - An **Animated background** switch, on by default: a veil of pixels drifts behind the screens, in colours made for
   each background, and keeps drifting while Cartouche rests. Turned off, a resting screen is drawn no more, as before.
 - **↑ Random** on the games screen, or a flick up from the game in the middle: the game is tossed like a coin and lands
-  as another game of the list shown (of the search's results, while one is on), drawn at random.
+  as another game of the list shown (of the search's results, while one is on), drawn at random, with a soft sound of
+  its own as it leaves and as it lands.
 
 ### Changed
 - **X Edit** on a console opens its form, the same as the one adding a console: change its folder, emulator and

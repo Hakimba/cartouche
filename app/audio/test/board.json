@@ -83,6 +83,10 @@
   "ring_close": {
    "status": "validated",
    "note": "validated by ear"
+  },
+  "toss": {
+   "status": "validated",
+   "note": "validated by ear: « ouais je kiff. on valide »"
   }
  },
  "categories": [
@@ -146,6 +150,12 @@
    [
     "key"
    ]
+  ],
+  [
+   "Le lancer",
+   [
+    "toss"
+   ]
   ]
  ],
  "labels": {
@@ -169,7 +179,8 @@
   "swap": "Changer de modèle",
   "key": "Touche · taper, effacer",
   "ring_open": "Roue · ouvrir",
-  "ring_close": "Roue · fermer"
+  "ring_close": "Roue · fermer",
+  "toss": "Lancer"
  },
  "screens": [
   [
@@ -258,6 +269,10 @@
     [
      "A : lancer le jeu",
      "launch"
+    ],
+    [
+     "↑ : un jeu au hasard, lancé comme une pièce",
+     "toss"
     ],
     [
      "lancement refusé (pas d'émulateur, fichier introuvable)",
@@ -613,6 +628,7 @@
   "regions": "switch_on",
   "letters": "switch_off",
   "ring_open": "ring_open",
-  "ring_close": "ring_close"
+  "ring_close": "ring_close",
+  "toss": "toss"
  }
 }

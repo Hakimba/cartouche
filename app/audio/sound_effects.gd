@@ -45,6 +45,7 @@ enum Cue {
 	LETTERS,
 	RING_OPEN,
 	RING_CLOSE,
+	TOSS,
 }
 
 const BUS := &"UI"

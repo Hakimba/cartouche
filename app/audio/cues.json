@@ -28,5 +28,6 @@
  "regions": "res://audio/sfx/switch_on.wav",
  "letters": "res://audio/sfx/switch_off.wav",
  "ring_open": "res://audio/sfx/ring_open.ogg",
- "ring_close": "res://audio/sfx/ring_close.ogg"
+ "ring_close": "res://audio/sfx/ring_close.ogg",
+ "toss": "res://audio/sfx/toss.ogg"
 }

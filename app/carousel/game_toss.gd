@@ -57,6 +57,7 @@ func is_busy() -> bool:
 func toss() -> void:
 	if is_busy() or not row.has_pick():
 		return
+	Sounds.play(SoundEffects.Cue.TOSS)
 	row.read_pick()
 	Diagnostics.trace("toss", "%s tossed to land as %s" % [row.selected_game().title, row.pick().title])
 	row.freeze()
