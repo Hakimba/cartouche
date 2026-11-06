@@ -56,7 +56,7 @@ func _bolt_corner() -> Vector2:
 ## Shows [param battery]: its level when known, and the bolt while it is plugged in.
 func show_battery(battery: AndroidServices.Battery) -> void:
 	_plugged = battery.plugged
-	text = "%d %%" % battery.level_percent if battery.has_level else ""
+	text = "%d %%" % battery.level_percent if battery.has_level_percent else ""
 	queue_redraw()
 	Diagnostics.trace("battery", "%s, %s" % [text if text else "level unknown", "plugged in" if _plugged else "unplugged"])
 

@@ -78,8 +78,7 @@ func test_impossible_dimensions_are_refused_by_the_rule_they_break_and_build_not
 func test_a_model_builds_faces_for_each_of_its_parts_and_nothing_else() -> void:
 	var random := Fixtures.cases(41)
 	for i in SHAPES:
-		var console := Fixtures.ps2_slim(random)
-		for shape: ModelShape in [Fixtures.disc(random), Fixtures.drawn_around(GbaCartShape.new(), random, Vector2(0.92, 1.08)), console]:
+		for shape: ModelShape in [Fixtures.disc(random), Fixtures.drawn_around(_BOX_CART, random, Vector2(0.95, 1.05))]:
 			for part in shape.parts():
 				var indices: PackedInt32Array = shape.mesh_arrays(part, 32)[Mesh.ARRAY_INDEX]
 				assert_int(indices.size()).is_greater(0)

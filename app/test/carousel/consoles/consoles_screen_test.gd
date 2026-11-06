@@ -54,7 +54,7 @@ func test_inv_20_while_the_console_opens_or_closes_nothing_pressed_acts() -> voi
 	var random := Fixtures.cases(57)
 	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
 	carousel._game_launch.android = android
-	var buttons: Array[StringName] = [&"carousel_left", &"carousel_right", &"ui_accept", &"screen_back", &"app_back"]
+	var buttons: Array[StringName] = [&"carousel_left", &"carousel_right", &"ui_accept", &"screen_back"]
 	var pressed := 0
 	for i in 40:
 		if carousel._screen == Carousel.Screen.CONSOLES:
@@ -75,7 +75,6 @@ func test_inv_20_while_the_console_opens_or_closes_nothing_pressed_acts() -> voi
 			assert_int(carousel._consoles.selected_index()).is_equal(console)
 			assert_str(carousel._row.selected_game().id).is_equal(game)
 			assert_bool(carousel._game_launch.is_busy()).is_false()
-			assert_bool(carousel._hold_select.is_stopped()).is_true()
 		assert_int(carousel._screen).is_equal(Carousel.Screen.CONSOLES if leaving else Carousel.Screen.GAMES)
 		Input.action_release(&"inspect_right")
 		# Nor once there.
@@ -90,10 +89,9 @@ func test_the_carousel_opens_on_the_consoles_screen_with_the_remembered_console(
 	var carousel := await Fixtures.shown_carousel(self)
 	var demo: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DEMO))
 	var library: Dictionary = demo["library"]
-	var shelves: Dictionary = library["shelves"]
-	var listed: Array = shelves["shelves"]
+	var listed: Array = library["shelves"]
 	for selected in listed.size():
-		shelves["selected"] = selected
+		library["selected_shelf"] = selected
 		carousel._show_library(AndroidServices.Library.new(library))
 		assert_int(carousel._screen).is_equal(Carousel.Screen.CONSOLES)
 		assert_int(carousel._consoles.selected_index()).is_equal(selected)
@@ -299,18 +297,10 @@ static func _looks(consoles: ConsoleRow) -> Array[float]:
 	return found
 
 
-## The first console whose next one has a model too.
-func _modelled_pair(consoles: ConsoleRow) -> int:
-	for i in consoles._items.size() - 1:
-		if consoles._items[i].modelled and consoles._items[i + 1].modelled:
-			return i
-	return -1
-
-
 func test_a_press_in_the_middle_of_a_swap_jumps_nothing() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var consoles := carousel._consoles
-	_select(carousel, _modelled_pair(consoles))
+	_select(carousel, 0)
 	Fixtures.step_frames(carousel, 30)
 	consoles.step(1)
 	for frame in 4:

@@ -82,13 +82,16 @@ only its own packs, under `user://dev/`.
 
 On a desktop debug build, `--snapshot=<directory>` makes `DesktopPlugin` read `snapshot.json` from that directory: the
 library, settings and models of a device, with label images under the directory's files/art folder. Changes to
-settings and models stay in memory, and the snapshot is never written.
+settings and models stay in memory, and the snapshot is never written. A snapshot not in the shape `snapshot` writes
+is refused with a `snapshot:` trace; one whose library is a JSON text inside the answer, as earlier versions wrote it,
+must be taken again.
 
 ## Caches
 
 Some data files are read once and cached. `commands.gd` lists the ones a live change must clear: lights,
 turntable poses, plinth pictures, media poses. Console and medium manifests are Godot resources, replaced before
-the scene reloads. The plugin's catalog inputs load once at start and are outside live editing.
+the scene reloads. The plugin's catalog inputs load once at start, and the platforms' tables from the installed APK: both are outside
+live editing.
 
 ## Previewing the add-console route
 

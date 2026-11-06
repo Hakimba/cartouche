@@ -16,27 +16,32 @@ permissions, each with the reason in a comment.
 |---|---|
 | `CartouchePlugin.kt` | The only class Godot sees (the `CartoucheAndroid` singleton). Its `@UsedByGodot` methods are the whole API. Getters answer at once. Operations take a request id and answer it once through the `answered` signal. |
 | `Threads.kt` | The coroutine scope and the dispatchers: one library thread that runs library work in arrival order, a low-priority planning thread, and the variant downloads. Tests pass their own through the internal constructor. |
-| `Reference.kt` | Everything `loadCatalog` loads (catalog, title lists, prints, data folders, curtain times, art extracts, texture tables) as one immutable value, with its indexes built on first use. |
+| `Reference.kt` | Everything `loadCatalog` loads (catalog, data folders, curtain times) as one immutable value. A platform's tables (title list, prints, art extract, texture table) are not sent by Godot: the plugin reads them from the APK's assets (Godot's export stores `res://data` there) the first time that platform needs them, on the thread asking (never Godot's), and indexes them once. |
 | `DebugOptions.kt` | The launch arguments of a debug build (`--art-refused`, `--art-slow`, `--launch-slow`, `--screenscraper`), parsed once. |
 | `PendingPick.kt` | A system picker awaiting its activity result. Each pick is answered exactly once (INV-06). |
 | `Battery.kt` | `BatteryWatch` follows the battery broadcast from resume to pause and sends each change through `battery_changed`. |
-| `InstalledApps.kt` | Whether a package is installed, and the apps with a launcher entry. |
+| `InstalledApps.kt` | Whether a package is installed. |
 | `NativeHeap.kt` | Hands the memory Godot and the graphics driver freed back to the system (`mallopt(M_PURGE)` in `kotlin/android/src/main/cpp/native_heap.c`, the plugin's only C). The C allocator otherwise keeps it for reuse: about 100 MB after the start. `releaseMemory` runs it off Godot's thread, when the screen comes to rest and when the app leaves the screen (`Resting`). |
 
 Inside `CartouchePlugin.kt`, each need has one helper. `onLibrary(requestId) { }` runs a call on the library
-thread and answers it. `save(note) { change }` changes the stored settings. `timed(area, describe) { }`, in
+thread and answers it. `storedSettings`, a `StateFile`, holds the stored settings. `timed(area, describe) { }`, in
 `Wire.kt`, traces how long a step took. A new method uses them rather than its own threading or error handling.
 
 ## The wire
 
 | File | Responsibility |
 |---|---|
-| `Wire.kt` | The Dictionary format of every answer, the stable error codes (`ErrorCode`), `trace` (one debug log line) and `timed`. |
-| `WireJson.kt` | The library and its shelves as one JSON text. Godot parses one text far faster than thousands of Dictionaries. |
+| `Sent.kt` | Every type the plugin sends to Godot (`Sent.Library`, `Sent.SettingsAnswer`…), and how each is made from the core's values. |
+| `Wire.kt` | The JSON every value crosses as (`wireJson`), an answer's envelope (`answered`), the failure codes (`Code`), `trace` (one debug log line) and `timed`. |
 
-A field's wire name comes from its `@SerialName`, so the stored and the sent names cannot drift. `WireTest` checks
-that only values the JNI bridge converts are sent (INV-23). The Godot side of the format is
-`app/adapters/android/android_wire.gd`, one class per answer.
+Every getter, answer and signal crosses as one JSON text: Godot parses one text far faster than thousands of
+Dictionaries, and only texts cross the JNI bridge (INV-23). An answer is `{"request_id", "ok", …its fields}`, a
+failure `{"request_id", "ok": false, "code", "detail"}`, and a library call adds the library's `"revision"`. Keys
+are the properties' names in snake_case, an enum crosses as its `@SerialName` (the stored name too), and an
+`Option` is an absent key until it has a value. `app/adapters/android/android_wire.gd` is generated from these types
+by `WireScriptTest`, with `has_<key>` beside each `Option`; only the members a class has by hand, below its
+`# By hand` line, are edited there. After changing `Sent.kt`:
+`cd kotlin && ./gradlew :android:testDebugUnitTest --tests '*WireScriptTest' -Pwire.write=true`.
 
 ## Storage
 
@@ -49,7 +54,7 @@ previous file, never half of the new one.
 | `DocumentBytes.kt` | A document opened read-only as the core's `ByteSource`. |
 | `FactsStore.kt` | What each platform's files told, with the size and date they had then, so a rescan reads only new or changed files. |
 | `LibraryStore.kt` | The library file. An unreadable one is set aside, not lost (INV-11). |
-| `SelectionStore.kt`, `SettingsStore.kt`, `ArrivalsStore.kt` | The selection, the settings and the games not seen yet, each in its own file. |
+| `StateFile.kt` | A small state in its own file (the selection, the settings, the games not seen yet, what art and ScreenScraper remember), read once and written only when it changes. |
 
 ## Library
 
@@ -99,7 +104,7 @@ package downloads, cuts and stores them.
 ## Adding a setting
 
 A setting is declared once in the core (`Setting.kt`); `saveSetting` stores any declared one, checked against its
-declaration, and `Settings.toWire` sends them all. The steps: [../adding-a-setting.md](../adding-a-setting.md).
+declaration, and `Sent.SettingsAnswer` sends them all. The steps: [../adding-a-setting.md](../adding-a-setting.md).
 
 ## Neighbours
 

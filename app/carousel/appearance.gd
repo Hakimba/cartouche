@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name Appearance
 extends RefCounted
-## How the carousel shows its platforms, as `data/carousel/appearance.json` has it: the medium each
-## kind of media falls back to, the steps of the platforms shown by their medium, label colours and
-## bands, the pose, and each media's insertion; and the media and the consoles found in their folders
-## ([MediumManifest], [ConsoleManifest]). Read once; a medium's model is loaded the first time it is
+## How the carousel shows its platforms, as `data/carousel/appearance.json` has it: the medium each kind of media falls
+## back to, label colours and bands, the pose, and each media's insertion; and the media and the consoles found in their
+## folders ([MediumManifest], [ConsoleManifest]). Read once; a medium's model is loaded the first time it is
 ## asked for (or ahead, in the background), a console's scene the first time its console or its launch animation is. What is loaded
 ## or made stays: a library edit seldom drops a medium, and scenes and animations weigh little next to
 ## the labels' viewports, which [ShelfRow] frees.
@@ -15,7 +14,6 @@ var bands: Dictionary[String, Dictionary] = {}
 var insertions: Dictionary[String, Insertion] = {}
 var pose := ShelfRow.Pose.new()
 
-var _media_animation: Animation
 var _media: Dictionary[String, MediumManifest] = {}
 var _kind_media: Dictionary[String, String] = {}
 var _models: Dictionary[String, PackedScene] = {}
@@ -35,8 +33,6 @@ static func read(path: String) -> Appearance:
 	appearance._media = shown_media(MediumManifest.found())
 	appearance._consoles = defaults(ConsoleManifest.found())
 	Diagnostics.trace("appearance", "consoles found: %s" % [appearance._consoles.keys()])
-	var media_steps: String = data["media_steps"]
-	appearance._media_animation = LaunchAnimation.read(media_steps)
 	var bands_data: Dictionary = data["bands"]
 	appearance.bands.assign(bands_data)
 	var colors_data: Dictionary = data["colors"]
@@ -91,16 +87,15 @@ static func shown_media(manifests: Dictionary[String, MediumManifest]) -> Dictio
 	return shown
 
 
-## The console of [param platform_id], as shown unless the user chooses another version; none when
-## the platform is shown by its medium.
+## The console of [param platform_id], as shown unless the user chooses another version; none for a platform without
+## a console model, which no shelf holds (the core shows only the platforms with one).
 func console_of(platform_id: String) -> ConsoleManifest:
 	return _consoles.get(platform_id)
 
 
-## The colour [param platform_id]'s console lights the screens with; neutral when it is shown by its medium.
+## The colour [param platform_id]'s console lights the screens with.
 func gel(platform_id: String) -> Color:
-	var manifest := console_of(platform_id)
-	return manifest.gel() if manifest else StudioTokens.NEUTRAL
+	return console_of(platform_id).gel()
 
 
 ## How [param platform]'s labels look: its colour and band, its name; drawn as demo art when [param demo].
@@ -117,19 +112,11 @@ func look(platform: AndroidServices.Platform, demo: bool) -> ShelfRow.LabelLook:
 	return label
 
 
-## [param platform] as the consoles screen shows it, resting as the launch animation of a game of [param medium]
-## starts: its console, or else its medium labelled with its name, the labels looking as [method look] has them.
-func console_item(platform: AndroidServices.Platform, medium: String, demo: bool) -> ConsoleRow.Item:
-	var animation := animation_of(platform, medium)
-	var manifest := console_of(platform.id)
-	var shown: Node3D
-	if manifest:
-		shown = console(platform.id)
-	else:
-		var labelled := ShelfRow.LabelledModel.new(model_of("", platform.media))
-		labelled.draw_label(platform.name, look(platform, demo))
-		shown = labelled
-	return ConsoleRow.Item.new(shown, ConsoleRow.Rest.of(animation), ConsoleManifest.folder_of(manifest), manifest != null)
+## [param platform]'s console as the consoles screen shows it, resting as the launch animation of a game of
+## [param medium] starts.
+func console_item(platform: AndroidServices.Platform, medium: String) -> ConsoleRow.Item:
+	return ConsoleRow.Item.new(console(platform.id), ConsoleRow.Rest.of(animation_of(platform, medium)),
+		ConsoleManifest.folder_of(console_of(platform.id)))
 
 
 ## The models of [param games]' media on [param platform], by medium (see [method model_of]).
@@ -184,12 +171,9 @@ func console(platform_id: String) -> ConsoleModel:
 
 ## The launch animation of [param platform] for a game of [param medium] (see [method model_of]): its
 ## console's (from its steps, the same for every medium, else the placeholder, whose medium comes from
-## its own length away), made the first time it is asked for, or the one of the platforms shown by
-## their medium.
+## its own length away), made the first time it is asked for.
 func animation_of(platform: AndroidServices.Platform, medium: String) -> Animation:
 	var manifest := console_of(platform.id)
-	if not manifest:
-		return _media_animation
 	var key := platform.id if manifest.launch else "%s %s" % [platform.id, _shown(medium, platform.media)]
 	if key not in _animations:
 		# Never in the tree: what an animation needs of a console depends on its shape alone.

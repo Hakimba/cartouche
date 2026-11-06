@@ -3,14 +3,12 @@ package app.cartouche.android.library
 
 import android.net.Uri
 import app.cartouche.android.storage.AUTHORITY
-import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.FakeDocuments
 import app.cartouche.android.storage.FileStamp
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.KnownFacts
 import app.cartouche.android.storage.LibraryStore
-import app.cartouche.android.storage.SelectionStore
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.android.storage.TREE
 import app.cartouche.android.storage.cardTree
@@ -88,8 +86,8 @@ class LibraryServiceTest {
 
     private fun service(selection: File = selectionFile, arrivals: File = arrivalsFile) = LibraryService(
         LibraryStore(file),
-        SelectionStore(selection),
-        ArrivalsStore(arrivals),
+        selection,
+        arrivals,
         Folders(context),
         FactsStore(factsFolder),
     )

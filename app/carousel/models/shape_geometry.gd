@@ -17,15 +17,9 @@ const BEHIND := Basis(Vector3.UP, PI)
 const _BEVEL_STEPS := 3
 ## Shorter than this, in millimetres, a side is none: the corners either side of it share a point.
 const _NONE := 0.0001
-## How wide a rounded solid's tip or pole is, as a share of its radius: a point would leave its
-## last ring no face.
-const TIP := 0.005
-## How far a logo's face stands over the surface it lies on, in millimetres.
-const _DECAL_OFF := 0.05
-## A cartridge slot's connector: how high it stands at the slot's foot, the cartridge's edge resting
-## on it; the slit along its top that edge goes into, its width and depth, and the housing's ends
-## beyond it; its contacts, how many, their pitch, and each one's width and height on the slit's floor.
-const CONNECTOR_HEIGHT := 3.0
+## A cartridge slot's connector: the slit along its top the cartridge's edge goes into, its width and
+## depth, and the housing's ends beyond it; its contacts, how many, their pitch, and each one's width
+## and height on the slit's floor.
 const _SLIT := Vector2(1.8, 2.0)
 const _SLIT_END := 2.0
 const _CONTACTS := 32
@@ -315,12 +309,6 @@ static func contacts(mesh: MeshBuilder, box: Rect2, high: float) -> void:
 			bottom + _CONTACT.y)
 
 
-## Whether a connector fits the box [param box]: its slit and contacts along the middle, lips on
-## either side.
-static func holds_connector(box: Rect2) -> bool:
-	return box.size.x > _CONTACTS * _CONTACT_PITCH + 2.0 * _SLIT_END and box.size.y > _SLIT.x + 0.8
-
-
 ## Adds the solid of [param loop] (a simple polygon, counter-clockwise) standing from [param low]
 ## up to a plane roof, its height at each point of [param loop] in [param roof]: square walls.
 static func wedge(mesh: MeshBuilder, loop: PackedVector2Array, low: float, roof: PackedFloat32Array,
@@ -337,13 +325,6 @@ static func wedge(mesh: MeshBuilder, loop: PackedVector2Array, low: float, roof:
 ## mirrored across.
 static func behind(box: Rect2) -> Rect2:
 	return Rect2(-box.end.x, box.position.y, box.size.x, box.size.y)
-
-
-## Adds the face a logo is drawn on: [param box], laid a hair over the surface at height [param z]
-## so as not to flicker with it, its UV square the logo's image, upright (see docs/adding-a-console.md,
-## "Logos").
-static func decal(mesh: MeshBuilder, box: Rect2, z: float) -> void:
-	flat(mesh, square(box), z + _DECAL_OFF, Vector3.BACK, box)
 
 
 ## Adds the solid swept through [param rings] (outlines of as many points, counter-clockwise seen
@@ -568,19 +549,6 @@ static func moved_in(loop: PackedVector2Array, by: float) -> PackedVector2Array:
 	var outwards := _outwards(loop)
 	for i in loop.size():
 		found.append(loop[i] - outwards[i] * by)
-	return found
-
-
-## [param loop] counter-clockwise, its points closer than [param merged] (a hundredth of a millimetre) made one.
-static func ccw(loop: PackedVector2Array, merged := 0.01) -> PackedVector2Array:
-	var found := PackedVector2Array()
-	for point in loop:
-		if found.is_empty() or point.distance_to(found[-1]) > merged:
-			found.append(point)
-	if found[0].distance_to(found[-1]) <= merged:
-		found.remove_at(found.size() - 1)
-	if Geometry2D.is_polygon_clockwise(found):
-		found.reverse()
 	return found
 
 

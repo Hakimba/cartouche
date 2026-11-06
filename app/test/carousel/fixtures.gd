@@ -64,40 +64,6 @@ static func disc(random: RandomNumberGenerator) -> DiscShape:
 	return shape
 
 
-## A PS2 slim [param random] draws that [method Ps2SlimShape.problems] accepts: from a
-## thin one for small discs to a thick one, its lid anywhere on the top, near its rounded corners,
-## the strip beside it.
-static func ps2_slim(random: RandomNumberGenerator) -> Ps2SlimShape:
-	var shape := Ps2SlimShape.new()
-	shape.bevel = random.randf_range(0.3, 2.0)
-	shape.seam = random.randf_range(2.0 * shape.bevel + 0.2, 15.0)
-	shape.lid_thickness = random.randf_range(0.5, 5.0)
-	var above := maxf(shape.lid_thickness + 3.2, 2.0 * shape.bevel + 0.2)
-	shape.height = shape.seam + above + random.randf_range(0.0, 20.0)
-	shape.seat_height = _near_limits(random, shape.seam + 2.01, shape.height - shape.lid_thickness - 1.01)
-	shape.disc_radius = random.randf_range(20.0, 60.0)
-	shape.lid_gap = random.randf_range(0.1, 2.0)
-	var side := 2.0 * shape.disc_radius + 2.2
-	shape.lid_size = Vector2(side + random.randf_range(0.0, 30.0), side + random.randf_range(0.0, 30.0))
-	shape.lid_corner = _near_limits(random, 0.2, minf(shape.lid_size.x, shape.lid_size.y) / 2.0 - 0.2)
-	shape.strip_width = random.randf_range(0.2, 20.0)
-	shape.strip_raise = random.randf_range(0.05, 1.0)
-	var margin := shape.bevel + 1.0 + shape.lid_gap
-	var strip_room := shape.strip_width + 1.0
-	shape.width = shape.lid_size.x + strip_room + 2.0 * margin + random.randf_range(0.5, 40.0)
-	shape.depth = shape.lid_size.y + 2.0 * margin + random.randf_range(0.5, 40.0)
-	shape.corner = _near_limits(random, shape.bevel + 0.2, minf(shape.width, shape.depth) / 2.0 - 0.2)
-	var room := shape.body().grow(-margin)
-	room.size.x -= strip_room
-	shape.lid_centre = _somewhere(random, room, shape.lid_size)
-	shape.strip_x = shape.opening().end.x + 0.6 + shape.strip_width / 2.0
-	shape.strip_length = random.randf_range(1.0, shape.depth - 2.0 * margin)
-	# Rounder corners than the lid's place leaves room for are rounded less.
-	_back_off(shape, &"lid_inside_the_top", func() -> void: shape.corner = maxf(shape.bevel + 0.2, shape.corner * 0.97))
-	_back_off(shape, &"strip_on_the_top_beside_the_lid", func() -> void: shape.strip_length *= 0.97)
-	return shape
-
-
 ## The steps of a launch animation [param random] draws: two to nine, from very short to long, each
 ## curve, held or not, the disc in the row or out of it and on the spindle, the black whole or not.
 ## Written as by hand: some values left out or whole, durations and holds sometimes negative, an ease
@@ -178,27 +144,39 @@ static func stand(random: RandomNumberGenerator) -> Transform3D:
 	return Transform3D(turned.scaled_local(scale), origin)
 
 
+## The carousel freed with [param suite]'s test, on [param android] (the desktop's demo library when none), the
+## welcome as short as can be; not added yet.
+static func new_carousel(suite: GdUnitTestSuite, android: AndroidServices = null) -> Carousel:
+	var carousel: Carousel = suite.auto_free(CAROUSEL.instantiate())
+	if android != null:
+		carousel.android = android
+	(carousel.get_node("%Screens") as ScreenFlow).welcome_waits = false
+	return carousel
+
+
+## [param carousel], shown, past its arrival and never resting.
+static func arrived(carousel: Carousel) -> void:
+	carousel._arrival.custom_step(10.0)
+	carousel._resting.set_process(false)
+
+
 ## The carousel of the demo library, shown on its consoles screen in [param suite], moved on by the
 ## test itself (see [method step_frame]), its games row drawing the same picks at every run.
 static func shown_carousel(suite: GdUnitTestSuite) -> Carousel:
-	var carousel: Carousel = suite.auto_free(CAROUSEL.instantiate())
+	var carousel := new_carousel(suite)
 	var row: ShelfRow = carousel.get_node("%Row")
 	row.label_images = suite.auto_free(FakeArt.new())
 	row.random = cases(0)
-	var screens: ScreenFlow = carousel.get_node("%Screens")
-	screens.welcome_waits = false
 	suite.add_child(carousel)
 	for i in 100:
 		if carousel._shown:
 			break
 		await suite.await_idle_frame()
 	suite.assert_bool(carousel._shown).is_true()
-	# The carousel's arrival at its end.
-	carousel._arrival.custom_step(10.0)
+	arrived(carousel)
 	row.set_process(false)
 	carousel.set_process(false)
 	carousel._consoles.set_process(false)
-	carousel._resting.set_process(false)
 	return carousel
 
 
@@ -245,12 +223,22 @@ static func button(action: StringName, pressed: bool) -> InputEventAction:
 
 ## The parts [param random] draws for a console: none to five, each of any role, at rest and moved
 ## anywhere, a door, a light, a hinge…
-static func moving_parts(random: RandomNumberGenerator) -> Array[MovingPart]:
-	var found: Array[MovingPart] = []
+static func moving_parts(random: RandomNumberGenerator) -> Array[ConsolePart]:
+	var found: Array[ConsolePart] = []
 	for i in random.randi_range(0, 5):
-		var role := random.randi_range(0, MovingPart.Role.size() - 1) as MovingPart.Role
-		found.append(MovingPart.new(StringName("part_%d" % i), role, _anywhere(random, 100.0), _anywhere(random, 100.0)))
+		var role := random.randi_range(0, ConsolePart.Role.size() - 1) as ConsolePart.Role
+		found.append(part(StringName("part_%d" % i), role, _anywhere(random, 100.0), _anywhere(random, 100.0)))
 	return found
+
+
+## A part moving [param property], of [param role], at [param rest] and fully moved at [param open].
+static func part(property: StringName, role: ConsolePart.Role, rest: float, open: float) -> ConsolePart:
+	var made := ConsolePart.new()
+	made.property = property
+	made.role = role
+	made.rest = rest
+	made.open = open
+	return made
 
 
 ## Every console folder, as the app finds them.
@@ -338,18 +326,14 @@ static func media(id: String) -> Array[String]:
 ## A console with no shape nor mesh, made of what the launch knows of one: its [member moving]
 ## parts, its seat and its way in.
 class Console extends ConsoleModel:
-	var moving: Array[MovingPart] = []
+	var moving: Array[ConsolePart] = []
 	var seated := Transform3D.IDENTITY
-	var way_in := Vector3.BACK
 
-	func moving_parts() -> Array[MovingPart]:
+	func moving_parts() -> Array[ConsolePart]:
 		return moving
 
 	func seat() -> Transform3D:
 		return seated
-
-	func approach() -> Vector3:
-		return way_in
 
 
 ## Disc scans kept in memory by title, ready at once; none unless given.
@@ -416,35 +400,6 @@ class FakeAndroid extends AndroidServices:
 static func _profile(id: String) -> Dictionary:
 	var profiles: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/platforms/profiles.json"))
 	return profiles[id]
-
-
-## The centre of a box of [param size] that [param random] puts anywhere within [param room], a
-## quarter of the times in one of its corners.
-static func _somewhere(random: RandomNumberGenerator, room: Rect2, size: Vector2) -> Vector2:
-	var slack := Rect2(room.position + size / 2.0, room.size - size)
-	if random.randf() < 0.25:
-		return Vector2(slack.end.x if random.randf() < 0.5 else slack.position.x,
-			slack.end.y if random.randf() < 0.5 else slack.position.y)
-	return Vector2(random.randf_range(slack.position.x, slack.end.x), random.randf_range(slack.position.y, slack.end.y))
-
-
-## Moves [param shape]'s part with [param step] until it follows [param rule]: just inside it.
-static func _back_off(shape: ModelShape, rule: StringName, step: Callable) -> void:
-	for i in 2000:
-		if rule not in shape.problems():
-			return
-		step.call()
-
-
-## A value between [param low] and [param high], a third of the times close to one of them.
-static func _near_limits(random: RandomNumberGenerator, low: float, high: float) -> float:
-	var margin := (high - low) * 0.02
-	match random.randi_range(0, 5):
-		0:
-			return random.randf_range(low, low + margin)
-		1:
-			return random.randf_range(high - margin, high)
-	return random.randf_range(low, high)
 
 
 ## [param value] most of the times, else zero.

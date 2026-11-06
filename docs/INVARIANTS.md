@@ -34,13 +34,13 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 | INV-12 | A rescan keeps what the user chose for games still there, drops games whose files are gone, and touches no other platform. | Rescanning is always safe. | `LibraryTest` |
 | INV-13 | Removing a platform removes everything of it (games, choices, art, folder access, counts) and nothing else. | A removal is complete and contained. | `RemovalTest`, `LibraryServiceTest`, `ArtStoreTest`, `AbsencesTest`, `FoldersTest`, `ScrapingTest`; `console_edit_test.gd` |
 | INV-14 | Every definition and manifest shipped in `app/data` and in the console and medium folders loads without rejection. | Updating bundled data must not silently lose an emulator, a console or a medium. | `CatalogTest`; `console_folders_test.gd`, `media_folders_test.gd`, `android_services_test.gd` |
-| INV-25 | A re-read the user did not ask for (the app coming to the screen) keeps what the user chose for the games still there, as a rescan does, and marks as new only the games that were not in the library before it, none while a console's new setup awaits its scan; a mark survives a restart and goes with its game. | The app reads the folders on its own: it must be as safe as a rescan, and never call a game new that was there. | `ArrivalsTest`, `LibraryServiceTest` |
+| INV-25 | A re-read the user did not ask for (the app coming to the screen) keeps what the user chose for the games still there, as a rescan does, and marks as new only the games that were not in the library before it, none while a console's new setup awaits its scan; a mark survives a restart and goes with its game. | The app reads the folders on its own: it must be as safe as a rescan, and never call a game new that was there. | `ArrivalsTest`, `VersionedJsonTest`, `LibraryServiceTest` |
 
 ## What the user chose is kept
 
 | Id | Invariant | Why | Tests |
 |---|---|---|---|
-| INV-15 | The selection, a game's name and chosen picture, the consoles' order and chosen models, and every setting are written and read back identical, survive a rescan and a restart, and an unreadable file only means defaults. | The user's choices are data too. | `SelectionFormatTest`, `SelectionStoreTest`, `LibraryServiceTest`, `LibraryTest`, `ShelvesTest`, `SettingsFormatTest`, `SettingTest`, `CartouchePluginTest`; `console_order_test.gd`, `android_services_test.gd` |
+| INV-15 | The selection, a game's name and chosen picture, the consoles' order and chosen models, and every setting are written and read back identical, survive a rescan and a restart, and an unreadable file only means defaults. | The user's choices are data too. | `VersionedJsonTest`, `StateFileTest`, `LibraryServiceTest`, `LibraryTest`, `ShelvesTest`, `SettingsFormatTest`, `SettingTest`, `CartouchePluginTest`; `console_order_test.gd`, `android_services_test.gd` |
 
 ## Art
 
@@ -63,6 +63,6 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 
 | Id | Invariant | Why | Tests |
 |---|---|---|---|
-| INV-23 | Everything the plugin sends to Godot is a value its JNI bridge converts: text, booleans, numbers, Dictionaries, lists of Dictionaries as `Object[]` and lists of texts as `String[]`. | Any other array, and a String inside an `Object[]`, reaches GDScript as an opaque object. | `WireTest`, `WireJsonTest` |
+| INV-23 | Everything the plugin sends to Godot, each getter's value, each answer and each signal, is one JSON text of a type declared in `Sent.kt`; the GDScript that reads it (`android_wire.gd`) is generated from those types, and a script that differs from them fails the build. | A value the JNI bridge does not convert reaches GDScript as an opaque object, and a reader written by hand drifts from what is sent. | `WireTest`, `WireScriptTest`, `CartouchePluginTest` |
 | INV-24 | A release build contains no debug bridge and starts none, and the bridge never writes the user's library, settings or labels. | The remote control is a development tool, never a door into the user's data. | `bridge_security_test.gd` |
 

@@ -31,16 +31,7 @@ func _on_consoles() -> Array:
 		{"region": "Europe", "source": "launchbox", "source_name": "LaunchBox", "path": ProjectSettings.globalize_path(EUROPE)},
 		{"region": "USA", "source": "launchbox", "source_name": "LaunchBox"},
 	]
-	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
-	return [carousel, device]
-
-
-func _settled(carousel: Carousel) -> void:
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return (carousel.screen() not in [Carousel.Screen.ENTERING, Carousel.Screen.LEAVING]
-			and not carousel._properties._busy))).is_true()
-	await await_idle_frame()
+	return [await Fixtures.shown(self, device), device]
 
 
 ## The carousel on the PS2's games, by touch.
@@ -48,7 +39,7 @@ func _on_games() -> Array:
 	var setup := await _on_consoles()
 	var carousel: Carousel = setup[0]
 	await Fixtures.touch(self, [carousel._selected_point()])
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
 	return setup
 
@@ -60,7 +51,7 @@ func test_on_the_consoles_screen_a_tap_beside_moves_to_a_console_and_one_on_it_g
 	await Fixtures.touch(self, [carousel._selected_point() - BESIDE])
 	assert_int(carousel._consoles.selected_index()).is_equal(0)
 	await Fixtures.touch(self, [carousel._selected_point()])
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
 	assert_str(carousel._row.selected_game().platform_id).is_equal("ps2")
 
@@ -76,7 +67,7 @@ func test_on_the_games_screen_a_tap_beside_moves_one_game_and_one_on_the_disc_la
 	var screens: Array[Carousel.Screen] = []
 	carousel.screen_changed.connect(screens.append)
 	await Fixtures.touch(self, [carousel._selected_point()])
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_array(screens).is_empty()
 	assert_int(device.launches).is_equal(0)
 
@@ -84,7 +75,7 @@ func test_on_the_games_screen_a_tap_beside_moves_one_game_and_one_on_the_disc_la
 func test_A_still_launches_the_game_which_the_fake_device_counts() -> void:
 	var device: Fixtures.NewDevice = (await _on_games())[1]
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return device.launches == 1)).is_true()
+	await Fixtures.wait(self, func() -> bool: return device.launches == 1)
 
 
 func test_a_finger_down_as_the_app_pauses_is_forgotten() -> void:
@@ -95,7 +86,7 @@ func test_a_finger_down_as_the_app_pauses_is_forgotten() -> void:
 	for frame in 3:
 		await await_idle_frame()
 	await Fixtures.finger(self, carousel._selected_point(), false)
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 
@@ -109,7 +100,7 @@ func test_a_drag_on_the_disc_turns_it_and_a_long_press_opens_its_properties() ->
 	assert_int(carousel._row.selected_index()).is_equal(0)
 	await Fixtures.finger(self, centre + Vector2(0.0, 120.0), false)
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.PROPERTIES)
 
 
@@ -128,7 +119,7 @@ func test_a_flick_up_from_the_disc_tosses_it_a_slow_sideways_or_downward_one_doe
 	var pick := carousel._row.pick()
 	await Fixtures.touch(self, [centre, centre - Vector2(40.0, 200.0)])
 	assert_bool(carousel._toss.is_busy()).is_true()
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.alive(carousel))
 	assert_str(carousel._row.selected_game().id).is_equal(pick.id)
 
 
@@ -137,17 +128,17 @@ func test_in_a_game_s_properties_a_tap_on_the_label_lists_its_images_and_one_on_
 	var carousel: Carousel = setup[0]
 	var device: Fixtures.NewDevice = setup[1]
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	var properties := carousel._properties
 	await Fixtures.touch(self, [properties._zone.get_global_rect().get_center()])
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(properties._step).is_equal(DiscProperties.Step.LABELS)
 	var europe: LabelCard
 	for card in properties._chooser._cards.get_children():
 		if card is LabelCard and (card as LabelCard).region == "Europe":
 			europe = card
 	await Fixtures.touch(self, [europe.get_global_rect().get_center()])
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_array(device.chosen_labels).is_equal(["launchbox/Europe"])
 	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
 
@@ -155,10 +146,10 @@ func test_in_a_game_s_properties_a_tap_on_the_label_lists_its_images_and_one_on_
 func test_a_tap_on_the_name_opens_its_keyboard_and_one_on_a_key_types_it() -> void:
 	var carousel: Carousel = (await _on_games())[0]
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	var properties := carousel._properties
 	await Fixtures.touch(self, [properties._name.get_global_rect().get_center()])
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(properties._step).is_equal(DiscProperties.Step.NAMING)
 	var typed := properties._naming.typed()
 	var key := properties._naming._keyboard.find_children("*", "Button", true, false)[0] as Button
@@ -172,7 +163,7 @@ func _back(carousel: Carousel) -> void:
 	carousel.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
 	for frame in 3:
 		await await_idle_frame()
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 
 
 ## A second finger, or a touch the system takes back, at [param at]: neither counts.
@@ -184,9 +175,9 @@ func _stray_touch(at: Vector2, canceled: bool) -> void:
 func test_the_system_s_back_is_B_on_the_games_the_ring_and_both_properties_screens() -> void:
 	var carousel: Carousel = (await _on_games())[0]
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	await Fixtures.touch(self, [carousel._properties._zone.get_global_rect().get_center()])
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.LABELS)
 	await _back(carousel)
 	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.PROPERTIES)
@@ -195,17 +186,17 @@ func test_the_system_s_back_is_B_on_the_games_the_ring_and_both_properties_scree
 	await _back(carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) != null)).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.shown_screen(carousel) != null)
 	await _back(carousel)
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return Fixtures.shown_screen(carousel) == null and carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool:
+		return Fixtures.shown_screen(carousel) == null and carousel._shown)
 	await Fixtures.joypad(self, JOY_BUTTON_DPAD_DOWN)
 	await Fixtures.settled_consoles(self, carousel)
 	await _back(carousel)
 	await Fixtures.settled_consoles(self, carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 	await Fixtures.touch(self, [carousel._selected_point()], HELD_S)
-	await _settled(carousel)
+	await Fixtures.settled(self, carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_EDIT)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	await _back(carousel)
@@ -234,15 +225,15 @@ func test_inv_20_inv_22_whatever_a_finger_does_nothing_is_launched_and_every_scr
 			for move in random.randi_range(0, 3):
 				path.append(path[-1] + Vector2(random.randf_range(-400.0, 400.0), random.randf_range(-150.0, 150.0)))
 			await Fixtures.touch(self, path, HELD_S if random.randf() < 0.15 else 0.0)
-		await _settled(carousel)
-		assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
+		await Fixtures.settled(self, carousel)
+		await Fixtures.wait(self, func() -> bool: return Fixtures.alive(carousel))
 		touched[carousel.screen()] = true
 		assert_int(device.launches).is_equal(0)
 		# Back from the screens a finger does not reach (the ring, the settings), and now and then
 		# from any, so that the walk goes on.
 		if carousel.screen() not in REACHABLE or Fixtures.shown_screen(carousel) != null or random.randf() < 0.15:
 			await Fixtures.joypad(self, JOY_BUTTON_B)
-			await _settled(carousel)
+			await Fixtures.settled(self, carousel)
 		if is_failure():
 			return
 	for screen in REACHABLE:

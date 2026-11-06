@@ -6,6 +6,8 @@ import arrow.core.Option
 import arrow.core.getOrNone
 import arrow.core.raise.ensure
 import arrow.core.raise.option
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /** A document id of Android's documents providers, such as `1A2B-3C4D:ROMs/ps2`. */
 @JvmInline public value class DocumentId(public val value: String)
@@ -18,7 +20,14 @@ import arrow.core.raise.option
 }
 
 /** The storage volume a folder is on, as the user knows it. */
-public enum class Volume { INTERNAL, CARD }
+@Serializable
+public enum class Volume {
+    @SerialName("internal")
+    INTERNAL,
+
+    @SerialName("card")
+    CARD,
+}
 
 /** Where a folder is, as the user reads it: its volume, then the folders down to it (none for the volume itself). */
 public data class FolderPlace(public val volume: Volume, public val folders: List<String>)

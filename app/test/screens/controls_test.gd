@@ -59,6 +59,6 @@ func test_the_style_stored_is_the_one_drawn_from_the_start() -> void:
 	device.has_games = true
 	device.button_style = "playstation"
 	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._shown)
 	assert_str(Controls.style).is_equal("playstation")
 	assert_str(Controls.mark(&"a")).is_equal("✕")

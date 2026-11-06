@@ -2,57 +2,45 @@
 package app.cartouche.android
 
 import android.util.Log
-import app.cartouche.android.apps.LaunchableApp
-import app.cartouche.android.art.AbsentArt
-import app.cartouche.android.art.FoundArt
-import app.cartouche.android.art.LabelDownload
 import app.cartouche.android.art.LabelFailure
-import app.cartouche.android.art.LabelNews
-import app.cartouche.android.art.OwnPicture
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.LibraryFailure
-import app.cartouche.android.library.ScanReport
-import app.cartouche.android.storage.DocumentEntry
-import app.cartouche.android.storage.EntryKind
-import app.cartouche.android.storage.Folder
 import app.cartouche.android.storage.StorageFailure
-import app.cartouche.core.art.Scraping
-import app.cartouche.core.library.Arrivals
-import app.cartouche.core.library.Coming
-import app.cartouche.core.library.GameId
-import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlacementError
 import app.cartouche.core.library.VariantError
-import app.cartouche.core.platforms.Candidate
-import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.LaunchError
-import app.cartouche.core.serialName
-import app.cartouche.core.settings.Setting
-import app.cartouche.core.settings.SettingValue
-import app.cartouche.core.settings.Settings
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.filterIsInstance
-import arrow.core.getOrElse
 import arrow.core.toOption
-import kotlinx.serialization.json.put
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.element
+import kotlinx.serialization.descriptors.elementNames
+import kotlinx.serialization.encoding.CompositeEncoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import org.godotengine.godot.Dictionary
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
-// Dictionary format shared with app/adapters/android/android_services.gd: operations answer through `answered` with
-// `{"request_id", "ok": true, …}` or `{"request_id", "ok": false, "code", "detail"}`; a missing value is an absent key.
-
-// The Dictionary format shared with the GDScript adapter (app/adapters/android/android_services.gd). Getters return
-// plain Dictionaries; operations answer through the `answered` signal with `{"request_id", "ok": true, …}` or
-// `{"request_id", "ok": false, "code", "detail"}`. A value that may be missing is an absent key, never null.
+// Everything the plugin sends to Godot is one JSON text of a type of [Sent] (INV-23). Getters return it, signals carry
+// it, and operations answer through `answered` with `{"request_id", "ok": true, …payload}` or `{"request_id", "ok":
+// false, "code", "detail"}`, and `"revision"` for a library call.
 internal const val ANSWERED_SIGNAL = "answered"
 
 internal const val ART_SIGNAL = "art_changed"
 
-/** How the download of a game's label on screen goes ([LabelDownload.toWire]). */
+/** How the download of a game's label on screen goes ([Sent.LabelDownload]). */
 internal const val ART_PROGRESS_SIGNAL = "art_progress"
 
 internal const val VARIANT_SIGNAL = "label_variant_downloaded"
@@ -72,58 +60,226 @@ internal inline fun <T> timed(area: String, describe: (T, Duration) -> String, b
     return block().also { result -> trace(area) { describe(result, started.elapsedNow()) } }
 }
 
-/** Spelled out so renaming a constant cannot change the codes. */
-internal enum class ErrorCode(val wire: String) {
-    CANCELLED("cancelled"),
-    NO_ACTIVITY("no_activity"),
-    INVALID_REQUEST("invalid_request"),
-    UNKNOWN_PLAYER("unknown_player"),
-    UNSUPPORTED_FILE("unsupported_file"),
-    INVALID_TEMPLATE("invalid_template"),
-    NOT_INSTALLED("not_installed"),
-    NO_PLAYER("no_player"),
-    GAME_MISSING("game_missing"),
-    TOO_LATE("too_late"),
-    UNKNOWN_PLATFORM("unknown_platform"),
-    UNKNOWN_VARIANT("unknown_variant"),
-    COMING_CONSOLE("coming_console"),
-    NOT_IN_LIBRARY("not_in_library"),
-    GAP_OUT_OF_RANGE("gap_out_of_range"),
-    UNKNOWN_GAME("unknown_game"),
-    NO_FOLDER("no_folder"),
-    ACTIVITY_NOT_FOUND("activity_not_found"),
-    PERMISSION_DENIED("permission_denied"),
-    FOLDER_UNAVAILABLE("folder_unavailable"),
-    TOO_MANY_FILES("too_many_files"),
-    NO_IMAGE("no_image"),
-    UNREADABLE_IMAGE("unreadable_image"),
-    UNEXPECTED("unexpected"),
+/**
+ * A property at its default, [None] above all, is left out: GDScript reads an absent key as the default (see [Sent]).
+ * An [Option] given [None] without being declared `= None` would cross as null: `WireScriptTest` refuses such a type.
+ * Written straight into one buffer, without a tree of elements.
+ */
+internal val wireJson = Json { encodeDefaults = false }
+
+internal inline fun <reified T> jsonOf(value: T): String = wireJson.encodeToString(serializer<T>(), value)
+
+/** An answer's own fields, a value of a type of [Sent]; [NONE] for an answer that only succeeds. */
+internal class Payload private constructor(private val write: (Envelope) -> String) {
+    companion object {
+        val NONE: Payload = of(Unit.serializer(), Unit)
+
+        /** [serializer] writes an object whose keys are not the envelope's: its fields go in the answer's own object. */
+        fun <T> of(serializer: KSerializer<T>, value: T): Payload {
+            val fields = serializer.descriptor
+            require(fields.kind == StructureKind.CLASS || fields.kind == StructureKind.OBJECT) { "${fields.serialName} is no object" }
+            require(fields.elementNames.none(Envelope.KEYS::contains)) { "${fields.serialName} has a key of the envelope" }
+            return Payload { envelope -> wireJson.encodeToString(envelope.around(serializer), value) }
+        }
+    }
+
+    fun answer(envelope: Envelope): String = write(envelope)
 }
 
-/** The enum's name on the wire, the one the stored format writes ([serialName]); `WireTest` pins the strings. */
-internal inline val <reified E : Enum<E>> E.wire: String get() = serialName
+internal inline fun <reified T> payload(value: T): Payload = Payload.of(serializer<T>(), value)
 
-internal val Enum<*>.plainWire: String get() = name.lowercase()
+/** What every answer says before its own fields: the request it answers, the library's revision for a library call, and whether it succeeded. */
+internal class Envelope(private val requestId: Int, private val revision: Option<Int>, private val ok: Boolean) {
+    /** [payload] written with this envelope's fields first, inside the payload's own object: one text, written once. */
+    fun <T> around(payload: SerializationStrategy<T>): SerializationStrategy<T> = object : SerializationStrategy<T> {
+        override val descriptor: SerialDescriptor = payload.descriptor
 
-internal fun dictionary(vararg entries: Pair<String, Any>): Dictionary = Dictionary().apply { putAll(entries) }
+        override fun serialize(encoder: Encoder, value: T) = payload.serialize(
+            object : Encoder by encoder {
+                override fun beginStructure(descriptor: SerialDescriptor): CompositeEncoder = encoder.beginStructure(descriptor).apply {
+                    encodeIntElement(FIELDS, 0, requestId)
+                    revision.onSome { encodeIntElement(FIELDS, 1, it) }
+                    encodeBooleanElement(FIELDS, 2, ok)
+                }
+            },
+            value,
+        )
+    }
 
-internal fun success(vararg payload: Pair<String, Any>): Dictionary = dictionary("ok" to true, *payload)
+    companion object {
+        private val FIELDS =
+            buildClassSerialDescriptor("Envelope") {
+                element<Int>("request_id")
+                element<Int>("revision")
+                element<Boolean>("ok")
+            }
 
-internal fun failure(code: ErrorCode, detail: String): Dictionary = dictionary("ok" to false, "code" to code.wire, "detail" to detail)
+        val KEYS: Set<String> = FIELDS.elementNames.toSet()
+    }
+}
+
+/** Why an operation failed, as GDScript tells failures apart; [detail] is English, for logs. */
+@Serializable
+internal class Failed(val code: Code, val detail: String)
+
+@Serializable
+internal enum class Code {
+    @SerialName("cancelled")
+    CANCELLED,
+
+    @SerialName("no_activity")
+    NO_ACTIVITY,
+
+    @SerialName("invalid_request")
+    INVALID_REQUEST,
+
+    @SerialName("unknown_player")
+    UNKNOWN_PLAYER,
+
+    @SerialName("unsupported_file")
+    UNSUPPORTED_FILE,
+
+    @SerialName("invalid_template")
+    INVALID_TEMPLATE,
+
+    @SerialName("not_installed")
+    NOT_INSTALLED,
+
+    @SerialName("no_player")
+    NO_PLAYER,
+
+    @SerialName("game_missing")
+    GAME_MISSING,
+
+    @SerialName("too_late")
+    TOO_LATE,
+
+    @SerialName("unknown_platform")
+    UNKNOWN_PLATFORM,
+
+    @SerialName("unknown_variant")
+    UNKNOWN_VARIANT,
+
+    @SerialName("coming_console")
+    COMING_CONSOLE,
+
+    @SerialName("not_in_library")
+    NOT_IN_LIBRARY,
+
+    @SerialName("gap_out_of_range")
+    GAP_OUT_OF_RANGE,
+
+    @SerialName("unknown_game")
+    UNKNOWN_GAME,
+
+    @SerialName("no_folder")
+    NO_FOLDER,
+
+    @SerialName("activity_not_found")
+    ACTIVITY_NOT_FOUND,
+
+    @SerialName("permission_denied")
+    PERMISSION_DENIED,
+
+    @SerialName("folder_unavailable")
+    FOLDER_UNAVAILABLE,
+
+    @SerialName("too_many_files")
+    TOO_MANY_FILES,
+
+    @SerialName("no_image")
+    NO_IMAGE,
+
+    @SerialName("unreadable_image")
+    UNREADABLE_IMAGE,
+
+    @SerialName("unexpected")
+    UNEXPECTED,
+}
+
+/** The answer to [requestId]: its envelope ([Envelope]), then its [result]'s fields, a failure's code and detail. */
+internal fun answered(requestId: Int, revision: Option<Int>, result: Either<Failed, Payload>): String = result.fold(
+    { wireJson.encodeToString(Envelope(requestId, revision, ok = false).around(Failed.serializer()), it) },
+    { it.answer(Envelope(requestId, revision, ok = true)) },
+)
 
 /** Where unexpected exceptions stop: logged, answered as a failure. */
-internal fun unexpected(e: Throwable): Dictionary {
+internal fun unexpected(e: Throwable): Failed {
     Log.e(TAG, "Unexpected failure", e)
-    return failure(ErrorCode.UNEXPECTED, e.toString())
+    return Failed(Code.UNEXPECTED, e.toString())
 }
 
-/** Godot's JNI bridge only turns an `Object[]` into an Array, and a String inside one stays opaque: texts are sent as `String[]`. */
-internal fun <T> List<T>.toWireArray(transform: (T) -> Dictionary): Array<Any> = map(transform).toTypedArray()
+internal fun invalid(detail: String): Failed = Failed(Code.INVALID_REQUEST, detail)
 
-/** Puts [value] under [key] when there is one: absence is an absent key. */
-internal fun Dictionary.putSome(key: String, value: Option<Any>): Dictionary = apply { value.onSome { put(key, it) } }
+internal val LaunchFailure.failed: Failed
+    get() =
+        Failed(
+            when (this) {
+                is LaunchFailure.Rejected ->
+                    when (error) {
+                        is LaunchError.UnknownPlayer -> Code.UNKNOWN_PLAYER
+                        is LaunchError.UnsupportedFile -> Code.UNSUPPORTED_FILE
+                        is LaunchError.InvalidTemplate -> Code.INVALID_TEMPLATE
+                    }
+                is LaunchFailure.NotInstalled -> Code.NOT_INSTALLED
+                is LaunchFailure.ActivityNotFound -> Code.ACTIVITY_NOT_FOUND
+                is LaunchFailure.PermissionDenied -> Code.PERMISSION_DENIED
+                is LaunchFailure.NoPlayer -> Code.NO_PLAYER
+                is LaunchFailure.GameMissing -> Code.GAME_MISSING
+                LaunchFailure.TooLate -> Code.TOO_LATE
+            },
+            message,
+        )
 
-/** The String under [key]; none when it is absent or of another type. */
+internal val StorageFailure.failed: Failed
+    get() =
+        Failed(
+            when (this) {
+                is StorageFailure.Unavailable -> Code.FOLDER_UNAVAILABLE
+                is StorageFailure.PermissionDenied -> Code.PERMISSION_DENIED
+            },
+            message,
+        )
+
+internal val LibraryFailure.failed: Failed
+    get() =
+        when (this) {
+            is LibraryFailure.Storage -> failure.failed
+            is LibraryFailure.NoFolder -> Failed(Code.NO_FOLDER, message)
+            is LibraryFailure.UnknownGame -> Failed(Code.UNKNOWN_GAME, message)
+            is LibraryFailure.NoDisc -> Failed(Code.INVALID_REQUEST, message)
+            is LibraryFailure.UnknownPlatform -> Failed(Code.UNKNOWN_PLATFORM, message)
+            is LibraryFailure.Placement ->
+                Failed(
+                    when (error) {
+                        is PlacementError.NotInLibrary -> Code.NOT_IN_LIBRARY
+                        is PlacementError.GapOutOfRange -> Code.GAP_OUT_OF_RANGE
+                    },
+                    message,
+                )
+            is LibraryFailure.Variant ->
+                Failed(
+                    when (error) {
+                        is VariantError.Unknown -> Code.UNKNOWN_VARIANT
+                        is VariantError.NotInLibrary -> Code.NOT_IN_LIBRARY
+                        is VariantError.Coming -> Code.COMING_CONSOLE
+                    },
+                    message,
+                )
+            is LibraryFailure.TooManyEntries -> Failed(Code.TOO_MANY_FILES, message)
+        }
+
+internal val LabelFailure.failed: Failed
+    get() =
+        when (this) {
+            LabelFailure.NotDownloaded -> Failed(Code.NO_IMAGE, "The image is not downloaded")
+            LabelFailure.NotPicked -> Failed(Code.NO_IMAGE, "No picture is being framed")
+            is LabelFailure.Unreadable -> Failed(Code.UNREADABLE_IMAGE, "The picture cannot be read: $reason")
+            is LabelFailure.Library -> failure.failed
+            is LabelFailure.Storage -> failure.failed
+        }
+
+/** The String under [key] of a request from GDScript; none when it is absent or of another type. */
 internal fun Dictionary.text(key: String): Option<String> = this[key].toOption().filterIsInstance<String>()
 
 /** GDScript ints arrive as Long. */
@@ -134,175 +290,3 @@ internal fun Dictionary.integer(key: String): Option<Int> = this[key].toOption()
         else -> None
     }
 }
-
-/** `{"path", "width", "height"}`. */
-internal fun OwnPicture.toWire(): Dictionary = dictionary("path" to file.path, "width" to width, "height" to height)
-
-internal fun Either<LaunchFailure, Unit>.toWire(): Dictionary = fold({ it.toWire() }, { success() })
-
-internal fun LaunchFailure.toWire(): Dictionary = failure(
-    when (this) {
-        is LaunchFailure.Rejected ->
-            when (error) {
-                is LaunchError.UnknownPlayer -> ErrorCode.UNKNOWN_PLAYER
-                is LaunchError.UnsupportedFile -> ErrorCode.UNSUPPORTED_FILE
-                is LaunchError.InvalidTemplate -> ErrorCode.INVALID_TEMPLATE
-            }
-        is LaunchFailure.NotInstalled -> ErrorCode.NOT_INSTALLED
-        is LaunchFailure.ActivityNotFound -> ErrorCode.ACTIVITY_NOT_FOUND
-        is LaunchFailure.PermissionDenied -> ErrorCode.PERMISSION_DENIED
-        is LaunchFailure.NoPlayer -> ErrorCode.NO_PLAYER
-        is LaunchFailure.GameMissing -> ErrorCode.GAME_MISSING
-        LaunchFailure.TooLate -> ErrorCode.TOO_LATE
-    },
-    message,
-)
-
-internal fun StorageFailure.toWire(): Dictionary = failure(
-    when (this) {
-        is StorageFailure.Unavailable -> ErrorCode.FOLDER_UNAVAILABLE
-        is StorageFailure.PermissionDenied -> ErrorCode.PERMISSION_DENIED
-    },
-    message,
-)
-
-/** `{"uri", "name", "path"?, "place"?: {"volume": "internal" or "card", "folders": [name]}}`. */
-internal fun Folder.toWire(): Dictionary = dictionary("uri" to uri.value, "name" to name)
-    .putSome("path", path.map { it.value })
-    .putSome("place", place.map { dictionary("volume" to it.volume.plainWire, "folders" to it.folders.toTypedArray()) })
-
-internal fun DocumentEntry.toWire(): Dictionary = dictionary(
-    "name" to name.value,
-    "document_id" to documentId.value,
-    "uri" to uri.value,
-    "is_directory" to (kind == EntryKind.DIRECTORY),
-).putSome("path", path.map { it.value })
-
-internal fun LaunchableApp.toWire(): Dictionary = dictionary("package" to packageName.value, "label" to label)
-
-internal fun LibraryFailure.toWire(): Dictionary = when (this) {
-    is LibraryFailure.Storage -> failure.toWire()
-    is LibraryFailure.NoFolder -> failure(ErrorCode.NO_FOLDER, message)
-    is LibraryFailure.UnknownGame -> failure(ErrorCode.UNKNOWN_GAME, message)
-    is LibraryFailure.NoDisc -> failure(ErrorCode.INVALID_REQUEST, message)
-    is LibraryFailure.UnknownPlatform -> failure(ErrorCode.UNKNOWN_PLATFORM, message)
-    is LibraryFailure.Placement ->
-        failure(
-            when (error) {
-                is PlacementError.NotInLibrary -> ErrorCode.NOT_IN_LIBRARY
-                is PlacementError.GapOutOfRange -> ErrorCode.GAP_OUT_OF_RANGE
-            },
-            message,
-        )
-    is LibraryFailure.Variant ->
-        failure(
-            when (error) {
-                is VariantError.Unknown -> ErrorCode.UNKNOWN_VARIANT
-                is VariantError.NotInLibrary -> ErrorCode.NOT_IN_LIBRARY
-                is VariantError.Coming -> ErrorCode.COMING_CONSOLE
-            },
-            message,
-        )
-    is LibraryFailure.TooManyEntries -> failure(ErrorCode.TOO_MANY_FILES, message)
-}
-
-/** `{"level_percent": int (absent when unknown), "plugged": bool}` */
-internal fun BatteryState.toWire(): Dictionary = dictionary("plugged" to plugged).putSome("level_percent", levelPercent)
-
-/**
- * `{"first_launch"}` and each setting of [Setting.all] under its key: a choice by its name (absent until one is made, for
- * the button style, the region and the language), a switch as a bool, a level as an int; and each choice's names
- * under its key and `s` (`"languages"`), the only ones `saveSetting` takes.
- */
-internal fun Settings.toWire(firstLaunch: Boolean): Dictionary =
-    Setting.all.fold(dictionary("first_launch" to firstLaunch)) { wire, setting ->
-        wire.putSetting(this, setting).apply { if (setting.names.isNotEmpty()) put("${setting.key}s", setting.names.toTypedArray()) }
-    }
-
-/** `{"backdrop", "pixel_veil"}`: the backdrop behind every screen and whether its pixel veil moves. */
-internal fun Settings.backdropToWire(): Dictionary =
-    listOf(Setting.BACKDROP, Setting.PIXEL_VEIL).fold(Dictionary()) { wire, setting -> wire.putSetting(this, setting) }
-
-private fun Dictionary.putSetting(settings: Settings, setting: Setting): Dictionary = putSome(
-    setting.key,
-    setting.valueIn(settings).map {
-        when (it) {
-            is SettingValue.Name -> it.name
-            is SettingValue.Switch -> it.on
-            is SettingValue.Steps -> it.steps
-        }
-    },
-)
-
-/**
- * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`, and what it just
- * learnt of games' labels, if anything: the art found under `"found"` ([FoundArt.toWire]), or the ids of games no
- * source has art for under `"absent"`.
- */
-internal fun Scraping.toWire(news: Option<LabelNews>): Dictionary =
-    dictionary("done" to done, "total" to total).putSome("stall", stall.map { it.plainWire }).apply {
-        news.onSome {
-            when (it) {
-                is FoundArt -> put("found", it.toWire())
-                is AbsentArt -> put("absent", it.games.map(GameId::value).toTypedArray())
-            }
-        }
-    }
-
-/**
- * What the `art_progress` signal carries of [game]'s label: `{"game_id", "fraction"}` while it downloads, the fraction from 0 to 1,
- * or -1 when the image's size is unknown; `{"game_id"}` once its look is over.
- */
-internal fun LabelDownload.toWire(game: GameId): Dictionary = when (this) {
-    is LabelDownload.Running -> dictionary("game_id" to game.value, "fraction" to fraction.getOrElse { -1.0 })
-    LabelDownload.Over -> dictionary("game_id" to game.value)
-}
-
-/** `{"game_id", "path"}`, the path an absolute one to a JPEG. */
-internal fun FoundArt.toWire(): Dictionary = dictionary("game_id" to game.value, "path" to art.file.path)
-
-internal fun LabelFailure.toWire(): Dictionary = when (this) {
-    LabelFailure.NotDownloaded -> failure(ErrorCode.NO_IMAGE, "The image is not downloaded")
-    LabelFailure.NotPicked -> failure(ErrorCode.NO_IMAGE, "No picture is being framed")
-    is LabelFailure.Unreadable -> failure(ErrorCode.UNREADABLE_IMAGE, "The picture cannot be read: $reason")
-    is LabelFailure.Library -> failure.toWire()
-    is LabelFailure.Storage -> failure.toWire()
-}
-
-/** `{"unseen": [game id], "announced": {platform id: [game id]}}`: the games not seen yet, and those each console announces. */
-internal fun Arrivals.toWire(): Dictionary = dictionary(
-    "unseen" to unseen.map { it.value }.toTypedArray(),
-    "announced" to
-        Dictionary().apply { announced.forEach { (platform, games) -> put(platform.value, games.map { it.value }.toTypedArray()) } },
-)
-
-internal fun ScanReport.toWire(): Dictionary = dictionary(
-    "files" to files,
-    "games" to games,
-    "identified" to identified,
-    "ignored" to ignored,
-    "skipped_folders" to skippedFolders,
-    "milliseconds" to milliseconds,
-)
-
-/**
- * How scraping again went: the games of the library, how many of the labels looked for were found, the consoles not
- * scanned and why.
- */
-internal data class Rescraped(val games: Int, val labels: Int, val failures: List<String>)
-
-internal fun Rescraped.toWire(): Dictionary = dictionary("games" to games, "labels" to labels, "failures" to failures.toTypedArray())
-
-/** The consoles a person may add, `{"id", "model", "maker"?, "coming"}`: a [coming] one is shown, never added. */
-internal fun Catalog.offeredToWire(coming: Coming): Array<Any> = offered.toWireArray {
-    dictionary("id" to it.platform.value, "model" to it.model, "coming" to (it.platform in coming)).putSome("maker", it.maker)
-}
-
-internal fun Catalog.toWire(coming: Coming): Dictionary = dictionary(
-    "platforms" to platforms.toWireArray { dictionary("id" to it.id.value, "name" to it.name, "media" to it.profile.media.wire) },
-    "rejected" to rejected.toWireArray { dictionary("source" to it.source, "detail" to it.message) },
-    "offered" to offeredToWire(coming),
-)
-
-internal fun Candidate.toWire(): Dictionary =
-    dictionary("player_id" to player.id.value, "player_name" to player.name, "platform_name" to platform.name)

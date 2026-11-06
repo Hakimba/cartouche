@@ -161,12 +161,8 @@ var _plate_kick: StudioText
 ## The note shown under a console not fully supported yet; none for one that is.
 var _note: StudioText
 var _title: StudioText
-var _opening: Tween
-var _return_tween: Tween
-var _open_clock := 0.0:
-	set(value):
-		_open_clock = value
-		_place_opening()
+## The screen's way in, which B rewinds.
+var _opening := Motion.Timeline.new(_place_opening, self)
 var _returning := false
 var _choosing := false
 ## Where each line of the screen rests, and the one the plate's ink is drawn on.
@@ -462,22 +458,16 @@ func _show_focus(moving: bool) -> void:
 ## The chooser's half of the form to chooser transition: the screen fades in, its lines, title and count come
 ## from the right and from below, the model rises (the plinth's own).
 func _open() -> void:
-	if _return_tween and _return_tween.is_valid():
-		_return_tween.kill()
-	_return_tween = null
 	_returning = false
-	if _opening and _opening.is_valid():
-		_opening.kill()
-	_open_clock = 0.0
-	_opening = create_tween()
-	var seconds := maxf(StudioTokens.TR_CHOOSER_AT_S + StudioTokens.TR_CHOOSER_LAYER_S,
-		StudioTokens.TR_CHOOSER_LINES_AT_S + StudioTokens.TR_CHOOSER_IN_S)
-	_opening.tween_property(self, ^"_open_clock", seconds, seconds)
+	_opening.stand(0.0)
+	_opening.play(maxf(StudioTokens.TR_CHOOSER_AT_S + StudioTokens.TR_CHOOSER_LAYER_S,
+		StudioTokens.TR_CHOOSER_LINES_AT_S + StudioTokens.TR_CHOOSER_IN_S))
 
 
 func _place_opening() -> void:
-	modulate.a = Motion.phase(_open_clock, StudioTokens.TR_CHOOSER_AT_S, StudioTokens.TR_CHOOSER_LAYER_S, Motion.Easing.EASE_OUT)
-	var progress := Motion.phase(_open_clock, StudioTokens.TR_CHOOSER_LINES_AT_S, StudioTokens.TR_CHOOSER_IN_S, Motion.Easing.ARRIVE)
+	modulate.a = Motion.phase(_opening.seconds, StudioTokens.TR_CHOOSER_AT_S, StudioTokens.TR_CHOOSER_LAYER_S,
+		Motion.Easing.EASE_OUT)
+	var progress := Motion.phase(_opening.seconds, StudioTokens.TR_CHOOSER_LINES_AT_S, StudioTokens.TR_CHOOSER_IN_S, Motion.Easing.ARRIVE)
 	for line in _lines():
 		line.position = _rests[line] + Vector2(StudioTokens.TR_CHOOSER_SHIFT_PX, StudioTokens.TR_CHOOSER_TITLE_PX) * (1.0 - progress)
 		line.modulate.a = progress
@@ -524,24 +514,17 @@ func _answer(picked: int, turn_back := false) -> void:
 	if picked >= 0 and _entries[picked].coming:
 		_refuse(picked)
 		return
-	if turn_back and picked < 0 and _opening and _opening.is_running() and StudioTokens.TR_REVERSE:
+	if turn_back and picked < 0 and _opening.is_playing() and StudioTokens.TR_REVERSE:
 		_returning = true
-		var seconds := _open_clock
-		_opening.kill()
-		_opening = null
-		var leaving := create_tween()
-		_return_tween = leaving
-		leaving.tween_property(self, ^"_open_clock", 0.0, maxf(seconds, 0.001))
-		await leaving.finished
-		if _return_tween != leaving:
+		_opening.play(0.0)
+		await _opening.arrived
+		# Opened again meanwhile: that opening goes on.
+		if not _returning:
 			return
-		_return_tween = null
 		_returning = false
 		if not visible or not _choosing:
 			return
-	if _opening and _opening.is_valid():
-		_opening.kill()
-	_opening = null
+	_opening.stop()
 	for motion: Tween in _motions.values():
 		motion.kill()
 	_motions.clear()

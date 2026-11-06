@@ -267,11 +267,11 @@ func spring() -> Motion.Spring:
 	return _spring
 
 
-## Where each tile stands for the spring's position. A platform shown by its medium has no tile.
+## Where each tile stands for the spring's position.
 func _place() -> void:
 	for i in _tiles.size():
 		var slots := slot(i, _spring.position, _tiles.size())
-		var shows := shown(slots) and not _folders[i].is_empty()
+		var shows := shown(slots)
 		_tiles[i].visible = shows
 		_mirrors[i].visible = shows
 		if shows:

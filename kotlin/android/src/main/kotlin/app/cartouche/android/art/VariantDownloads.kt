@@ -12,16 +12,27 @@ import arrow.core.flatMap
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
 
 /** Why an image of a game's label could not be had. */
+@Serializable
 internal enum class VariantFailure {
+    @SerialName("offline")
     OFFLINE,
+
+    @SerialName("refused")
     REFUSED,
+
+    @SerialName("not_found")
     NOT_FOUND,
 
     /** Downloaded, but not an image Android can read, or a scan of no shape its label can be cut from. */
+    @SerialName("unreadable")
     UNREADABLE,
+
+    @SerialName("storage")
     STORAGE,
 }
 

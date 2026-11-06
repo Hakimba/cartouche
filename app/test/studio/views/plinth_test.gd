@@ -38,7 +38,7 @@ func test_the_plinth_shows_nothing_until_the_picture_exists() -> void:
 	var plinth := _plinth("xbox")
 	var turntable: TextureRect = plinth.get_node("Turntable")
 	assert_object(turntable.texture).is_null()
-	assert_bool(await Fixtures.until(self, func() -> bool: return turntable.texture != null)).is_true()
+	await Fixtures.wait(self, func() -> bool: return turntable.texture != null)
 	assert_object(turntable.texture).is_same(Plinth.still_of("xbox"))
 	assert_str(plinth.console()).is_equal("xbox")
 
@@ -47,8 +47,8 @@ func test_a_console_asked_for_while_another_renders_is_the_one_shown() -> void:
 	var plinth := _plinth("snes")
 	plinth.show_console("gb")
 	var turntable: TextureRect = plinth.get_node("Turntable")
-	assert_bool(await Fixtures.until(self, func() -> bool: return Plinth.still_of("gb") != null)).is_true()
-	assert_bool(await Fixtures.until(self, func() -> bool: return Plinth.still_of("snes") != null)).is_true()
+	await Fixtures.wait(self, func() -> bool: return Plinth.still_of("gb") != null)
+	await Fixtures.wait(self, func() -> bool: return Plinth.still_of("snes") != null)
 	await await_idle_frame()
 	assert_object(turntable.texture).is_same(Plinth.still_of("gb"))
 	assert_object(Plinth.still_of("gb")).is_not_same(Plinth.still_of("snes"))
@@ -59,13 +59,13 @@ func test_a_plinth_freed_before_its_picture_is_ready_leaves_the_picture_for_the_
 	add_child(plinth)
 	plinth.show_console("gba")
 	plinth.free()
-	assert_bool(await Fixtures.until(self, func() -> bool: return Plinth.still_of("gba") != null)).is_true()
+	await Fixtures.wait(self, func() -> bool: return Plinth.still_of("gba") != null)
 
 
 func test_a_cleared_plinth_shows_no_picture_and_a_cached_one_is_shown_at_once() -> void:
 	var plinth := _plinth("gb")
 	var turntable: TextureRect = plinth.get_node("Turntable")
-	assert_bool(await Fixtures.until(self, func() -> bool: return turntable.texture != null)).is_true()
+	await Fixtures.wait(self, func() -> bool: return turntable.texture != null)
 	plinth.clear()
 	assert_object(turntable.texture).is_null()
 	assert_str(plinth.console()).is_empty()

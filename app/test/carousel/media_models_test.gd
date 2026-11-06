@@ -27,6 +27,18 @@ func test_every_model_loads_with_a_label_the_carousel_draws_on() -> void:
 		assert_array(uniforms).override_failure_message("%s: its label cannot be drawn" % path).contains(["label_texture", "has_label"])
 
 
+func test_a_baked_label_draws_its_title_and_platform_where_the_manifest_of_its_scene_s_folder_says() -> void:
+	var found := MediumManifest.found()
+	for medium: String in ["snes_pal_cart", "sfc_cart", "nes_cart"]:
+		var scene: PackedScene = load(found[medium].scene)
+		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
+		var drawn := found[ConsoleManifest.folder_of(scene)]
+		var size := Vector2(model._view.size)
+		assert_vector(model._title.position).is_equal_approx(size * drawn.title_area.position, Vector2.ONE * 0.01)
+		assert_vector(model._platform.size).is_equal_approx(size * drawn.platform_area.size, Vector2.ONE * 0.01)
+	assert_bool(found["snes_pal_cart"].title_area == ModelShape.TITLE_AREA).is_false()
+
+
 func test_an_image_of_another_shape_covers_the_label_its_middle_shown_never_stretched() -> void:
 	for path in _scenes():
 		var scene: PackedScene = load(path)

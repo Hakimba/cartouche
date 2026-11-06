@@ -2,28 +2,36 @@
 package app.cartouche.android
 
 import app.cartouche.android.storage.LibraryStore
-import app.cartouche.android.storage.SettingsStore
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.game
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.playerJson
-import app.cartouche.core.settings.Backdrop
-import app.cartouche.core.settings.Language
-import arrow.core.None
-import arrow.core.Some
+import app.cartouche.core.settings.Setting
+import app.cartouche.core.settings.Settings
+import app.cartouche.core.settings.SettingsFormat
+import app.cartouche.core.settings.settings
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.string
+import io.kotest.property.checkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.godotengine.godot.Dictionary
 import org.godotengine.godot.Godot
+import org.godotengine.godot.plugin.SignalInfo
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -53,21 +61,14 @@ class CartouchePluginTest {
             LibraryStore(File(files, "library.json")).save(Library(games = listOf(game("Okage")))).shouldBeRight()
             val definitions = Dictionary().apply { definition(playerJson("p")).let { put(it.name, it.text) } }
             val profile = """{"media": "dvd", "medium": {"default": "ps2_dvd"}, "minimumGameBytes": 1}"""
-            plugin.loadCatalog(
-                definitions,
-                """{"ps2": $profile}""",
-                Dictionary(),
-                "",
-                "",
-                Dictionary(),
-                Dictionary(),
-                Dictionary(),
-                arrayOf("ps2"),
-                coming,
-            )
+            plugin.loadCatalog(definitions, """{"ps2": $profile}""", "", "", arrayOf("ps2"), coming)
         }
 
-        fun settings() = SettingsStore(File(files, "settings.json")).load().shouldBeRight()
+        fun settings(): Settings = File(files, "settings.json").let {
+            if (it.exists()) SettingsFormat.decode(it.readText()).shouldBeRight() else Settings()
+        }
+
+        fun backdrop() = Json.parseToJsonElement(plugin.backdrop()).jsonObject
 
         fun done() {
             scope.runCurrent()
@@ -75,57 +76,43 @@ class CartouchePluginTest {
         }
     }
 
+    private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
+
     @Test
-    fun `INV-15 a sound level is stored once saved, one out of range refused and the level kept`() {
+    fun `INV-23 every signal of the plugin hands Godot JSON text`() {
         val h = Plugin()
-        h.plugin.saveSetting(1, "sound_level", "4")
-        h.scope.runCurrent()
-        h.settings().soundLevel.steps shouldBe 4
-        h.plugin.saveSetting(2, "sound_level", "11")
-        h.scope.runCurrent()
-        h.settings().soundLevel.steps shouldBe 4
+        val types = SignalInfo::class.java.getDeclaredMethod("getParamTypes").apply { isAccessible = true }
+        h.plugin.pluginSignals.map { (types.invoke(it) as Array<*>).toList() }.distinct() shouldBe listOf(listOf(String::class.java))
         h.done()
     }
 
     @Test
-    fun `INV-15 a backdrop is stored once saved, an unknown one refused and the backdrop kept, the next start drawn on it`() {
-        val h = Plugin()
-        h.plugin.backdrop()["backdrop"] shouldBe "light"
-        h.plugin.saveSetting(1, "backdrop", "light_grey")
-        h.scope.runCurrent()
-        h.settings().backdrop shouldBe Backdrop.LIGHT_GREY
-        h.plugin.saveSetting(2, "backdrop", "sepia")
-        h.scope.runCurrent()
-        h.settings().backdrop shouldBe Backdrop.LIGHT_GREY
-        h.plugin.backdrop()["backdrop"] shouldBe "light_grey"
-        h.done()
-    }
+    fun `INV-15 any setting saved is stored and drawn from at the next start, and a value it does not take changes nothing`() =
+        runBlocking<Unit> {
+            val h = Plugin()
+            var request = 0
 
-    @Test
-    fun `INV-15 the pixel veil is on until switched off, and stored`() {
-        val h = Plugin()
-        h.settings().pixelVeil shouldBe true
-        h.plugin.saveSetting(1, "pixel_veil", "false")
-        h.scope.runCurrent()
-        h.settings().pixelVeil shouldBe false
-        h.plugin.backdrop()["pixel_veil"] shouldBe false
-        h.done()
-    }
-
-    @Test
-    fun `INV-15 a language is stored once saved, an unknown one refused and the language kept, and none follows the device`() {
-        val h = Plugin()
-        h.plugin.saveSetting(1, "language", "pt_BR")
-        h.scope.runCurrent()
-        h.settings().language shouldBe Some(Language.BRAZILIAN_PORTUGUESE)
-        h.plugin.saveSetting(2, "language", "tlh")
-        h.scope.runCurrent()
-        h.settings().language shouldBe Some(Language.BRAZILIAN_PORTUGUESE)
-        h.plugin.saveSetting(3, "language", "")
-        h.scope.runCurrent()
-        h.settings().language shouldBe None
-        h.done()
-    }
+            fun save(setting: Setting, written: String) {
+                h.plugin.saveSetting(++request, setting.key, written)
+                h.scope.runCurrent()
+            }
+            checkAll(20, settings, Arb.string(0..6)) { wanted, junk ->
+                Setting.all.forEach { setting ->
+                    setting.valueIn(wanted).onSome { value ->
+                        val before = h.settings()
+                        save(setting, value.written)
+                        h.settings() shouldBe setting.change(before, value.written).shouldBeRight()
+                    }
+                    val kept = h.settings()
+                    if (setting.change(kept, junk).isLeft()) {
+                        save(setting, junk)
+                        h.settings() shouldBe kept
+                    }
+                }
+                h.backdrop() shouldBe Json.parseToJsonElement(jsonOf(h.settings().sentBackdrop())).jsonObject
+            }
+            h.done()
+        }
 
     @Test
     fun `a console whose model the app names coming is not added, and one ready is`() {

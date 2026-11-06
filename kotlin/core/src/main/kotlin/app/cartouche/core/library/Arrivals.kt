@@ -2,6 +2,7 @@
 package app.cartouche.core.library
 
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.storage.VersionedJson
 import kotlinx.serialization.Serializable
 
 /**
@@ -43,3 +44,6 @@ public data class Arrivals(public val unseen: Set<GameId> = emptySet(), public v
         )
     }
 }
+
+/** The arrivals as stored on the device, in their own small file: leaving a game rewrites a few ids, not the library. */
+public object ArrivalsFormat : VersionedJson<Arrivals>(1, "arrivals", Arrivals.serializer())

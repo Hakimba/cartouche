@@ -84,12 +84,13 @@ The code is cut in three layers. Each one depends only on the one below it.
 
 GDScript reaches the plugin through one file, the `AndroidServices` autoload
 (`app/adapters/android/android_services.gd`). It calls the plugin's `@UsedByGodot` methods, and turns each answer
-into the typed values of `AndroidWire` (`app/adapters/android/android_wire.gd`). The plugin's side of that
-format is `Wire.kt`. Only values Godot's JNI bridge converts cross it (INV-23).
+into the typed values of `AndroidWire` (`app/adapters/android/android_wire.gd`). Everything the plugin sends is one
+JSON text of a type of `Sent.kt`, and `android_wire.gd` is generated from those types (INV-23): a field is added in
+`Sent.kt`, never by hand in GDScript.
 
 On a desktop or in the editor there is no plugin. `AndroidServices` then calls `DesktopPlugin`
-(`app/adapters/desktop/desktop_plugin.gd`), which has the plugin's method names and answers from the demo library
-in `app/dev/demo/desktop.json`. The screens cannot tell the difference.
+(`app/adapters/desktop/desktop_plugin.gd`), which has the plugin's method names and answers in the same JSON, from
+the demo library in `app/dev/demo/desktop.json`. The screens cannot tell the difference.
 
 ### How a press travels
 
@@ -169,8 +170,7 @@ several library sizes.
 
 In debug builds, `Diagnostics` (`app/dev/diagnostics.gd`) traces every input event, focus change, lifecycle
 notification, plugin call and slow frame. The plugin traces intents, scans and timings the same way (`trace` in
-`Wire.kt`). Add trace points with every feature. Holding Select for two seconds opens the device check
-(`app/dev/device_check/`), one tab per device capability.
+`Wire.kt`). Add trace points with every feature.
 
 Debug builds read arguments after `--` on a desktop (`$GODOT --path app -- --shelf=gba`), and from the
 `arguments` extra on a device
@@ -222,8 +222,8 @@ Read the log before guessing. `scripts/build.sh` stops at its first failure, in 
 
 - **A test hangs.** The last test a log starts without ending is the one: an `await` on a signal that never comes,
   or a loop with no end. Fix why the signal never fires; raising the time limit hides the bug.
-- **Works in the JVM tests, wrong on the device.** Only some values cross Godot's JNI bridge (INV-23): a new
-  shape of answer needs a case in `WireTest`.
+- **`android_wire.gd` is out of date.** `Sent.kt` changed: run
+  `cd kotlin && ./gradlew :android:testDebugUnitTest --tests '*WireScriptTest' -Pwire.write=true` (INV-23).
 - **A shader error.** Headless runs never compile shaders: run the app and look for `"SHADER ERROR"` in its output.
 - **Was it already broken?** Check out `main` in a separate worktree (`git worktree add`), run the same command
   there, then remove it.
@@ -259,7 +259,7 @@ Find your task, open the page, then the files in the order given.
 | how games are identified | [architecture/core.md](architecture/core.md#library-scan-and-identification) | `TitleIndex.kt`, `GameName.kt`, `FileReading.kt` |
 | where art comes from, or its order | [architecture/core.md](architecture/core.md#art) | `ArtSources.kt`, `Regions.kt`, `ArtFetching.kt` |
 | the search ribbon | [architecture/core.md](architecture/core.md#shelves-and-search) | `Finder.kt`, `game_search.gd` |
-| what the plugin sends to Godot | [architecture/android.md](architecture/android.md#the-wire) | `Wire.kt`, `WireJson.kt`, `android_wire.gd` |
+| what the plugin sends to Godot | [architecture/android.md](architecture/android.md#the-wire) | `Sent.kt`, `Wire.kt`, `android_wire.gd` (generated) |
 | a timing, colour or size of the design | [architecture/studio.md](architecture/studio.md#values) | `studio_tokens.gd` (generated, never edited by hand) |
 | a game's pose on the games screen | [architecture/studio.md](architecture/studio.md#the-games-screen) | `app/data/media_poses.json`, `games_layout.gd` |
 | a translation | [translating.md](translating.md) | `app/locale/` |
@@ -268,7 +268,7 @@ Find your task, open the page, then the files in the order given.
 
 | I want to add… | Page | Open first |
 |---|---|---|
-| a console | [adding-a-console.md](adding-a-console.md) | `scripts/new_console.py`, `app/carousel/consoles/gba_sp/`, `glb_console.gd` |
+| a console | [adding-a-console.md](adding-a-console.md) | `scripts/new_console.py`, `app/carousel/consoles/gba_sp/`, `console_model.gd` |
 | a disc or cartridge | [adding-a-medium.md](adding-a-medium.md) | `app/carousel/media/ps2_dvd/`, `medium_manifest.gd` |
 | a platform (data only) | [adding-a-platform.md](adding-a-platform.md) | `app/data/platforms/profiles.json`, `scripts/dat_titles.py` |
 | a screen in front of the carousel, or a gesture | [adding-a-screen.md](adding-a-screen.md) | `screen_flow.gd`, `hint_row.gd`, `app/test/screens/fixtures.gd` |

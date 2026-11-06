@@ -23,12 +23,12 @@ func _carousel(consoles: Dictionary[String, int] = {"ps2": 3, "gc": 2}, veil := 
 	device.pixel_veil = veil
 	device.chosen_backdrop = backdrop
 	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.alive(carousel))
 	return carousel
 
 
 func _on(carousel: Carousel, screen: Carousel.Screen) -> void:
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == screen)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel.screen() == screen)
 
 
 ## Of [param frames] frames, how many wrote to the renderer.
@@ -114,7 +114,7 @@ func test_the_settings_at_rest_draw_nothing() -> void:
 	var carousel := await _carousel()
 	await Fixtures.action(self, &"open_settings")
 	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
-	assert_bool(await Fixtures.until(self, func() -> bool: return menu.state == SettingsMenu.State.OPEN)).is_true()
+	await Fixtures.wait(self, func() -> bool: return menu.state == SettingsMenu.State.OPEN)
 	await _assert_still_draws_nothing(carousel)
 
 

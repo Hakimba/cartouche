@@ -25,13 +25,13 @@ func library() -> LibraryAnswer:
 func installed_players(platform_id: String) -> Array[Player]:
 	if platform_id != "ps2":
 		return []
-	return [Player.new({"player_id": "ps2.armsx2", "player_name": "ps2 - ARMSX2", "emulator_name": "ARMSX2",
+	return [Player.new({"id": "ps2.armsx2", "name": "ps2 - ARMSX2", "emulator_name": "ARMSX2",
 		"extensions": PackedStringArray(["iso", "chd", "bin"])})]
 
 
 func pick_folder() -> Pick:
-	return Pick.new({"ok": true, "folder": {"uri": "content://preview/ps2", "name": "ps2",
-		"place": {"volume": "preview", "folders": PackedStringArray(["ps2"])}}})
+	return Pick.new({"ok": true, "folder": {"uri": "content://preview/ps2", "name": "ps2", "volume": "preview",
+		"folders": PackedStringArray(["ps2"])}})
 
 
 func preview_platform(_platform_id: String, _choices: PlatformSetup) -> PreviewAnswer:
@@ -56,7 +56,7 @@ func persisted_folders() -> FolderList:
 	return FolderList.new({"ok": true, "folders": []})
 
 
-func _library() -> String:
+func _library() -> Dictionary:
 	var data := DesktopPlugin.demo("library").duplicate(true)
 	var source: Array = data.get("games", [])
 	var games: Array = source.filter(func(game: Dictionary) -> bool: return game["platform_id"] in ["gc", "gba", "ps2"] \
@@ -68,8 +68,9 @@ func _library() -> String:
 		for i in games.size():
 			if games[i]["platform_id"] == platform:
 				indices.append(i)
-		shelves.append({"platform": platform, "games": indices, "selected": 0})
-	data["shelves"] = {"shelves": shelves, "selected": 0}
+		shelves.append({"platform_id": platform, "game_indexes": indices, "selected": 0})
+	data["shelves"] = shelves
+	data["selected_shelf"] = 0
 	if not _setup.is_empty():
 		data["setups"] = {"ps2": _setup}
-	return JSON.stringify(data)
+	return data

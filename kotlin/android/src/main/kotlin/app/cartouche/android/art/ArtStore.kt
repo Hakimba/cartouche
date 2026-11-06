@@ -2,8 +2,9 @@
 package app.cartouche.android.art
 
 import android.util.AtomicFile
+import app.cartouche.android.storage.StateFile
 import app.cartouche.android.storage.StorageFailure
-import app.cartouche.android.storage.read
+import app.cartouche.android.storage.orUnreadable
 import app.cartouche.android.storage.write
 import app.cartouche.core.art.Absences
 import app.cartouche.core.art.ArtVersion
@@ -19,7 +20,6 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.flatMap
-import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.right
 import arrow.core.toOption
@@ -47,16 +47,23 @@ internal value class Choices(val made: Long)
  */
 internal class ArtStore(private val folder: File) {
     private val absentGames =
-        Remembered(folder, "absent.json", Absences<GameId>(), { Absences.decode(it, GameId.serializer()) }) {
-            Absences.encode(it, GameId.serializer())
-        }
+        StateFile(
+            File(folder, "absent.json"),
+            Absences<GameId>(),
+            { Absences.decode(it, GameId.serializer()).orUnreadable() },
+            { Absences.encode(it, GameId.serializer()) },
+        )
 
     private val missingTextures =
-        Remembered(folder, "nomedia.json", Absences<Identity>(), { Absences.decode(it, Identity.serializer()) }) {
-            Absences.encode(it, Identity.serializer())
-        }
+        StateFile(
+            File(folder, "nomedia.json"),
+            Absences<Identity>(),
+            { Absences.decode(it, Identity.serializer()).orUnreadable() },
+            { Absences.encode(it, Identity.serializer()) },
+        )
 
-    private val provisionalLabels = Remembered(folder, "provisional.json", ProvisionalArt(), ProvisionalArt::decode, ProvisionalArt::encode)
+    private val provisionalLabels =
+        StateFile(File(folder, "provisional.json"), ProvisionalArt(), { ProvisionalArt.decode(it).orUnreadable() }, ProvisionalArt::encode)
 
     private val variants = File(folder, "variants")
 
@@ -65,9 +72,12 @@ internal class ArtStore(private val folder: File) {
      * only a look taken under that ask settles it (see [asked]).
      */
     private val lookedUpAgain =
-        Remembered(folder, "again.json", emptyMap<String, Long>(), { Option.catch { Json.decodeFromString<Map<String, Long>>(it) } }) {
-            Json.encodeToString(it)
-        }
+        StateFile(
+            File(folder, "again.json"),
+            emptyMap<String, Long>(),
+            { Option.catch { Json.decodeFromString<Map<String, Long>>(it) }.orUnreadable() },
+            { Json.encodeToString(it) },
+        )
 
     /** The latest [Ask]'s number; above every remembered one once [asking] ran. */
     private var asks = 0L
@@ -292,30 +302,5 @@ internal class ArtStore(private val folder: File) {
         /** Without `format`: made for every game at each start. */
         @OptIn(ExperimentalStdlibApi::class)
         internal fun sha1(text: String): String = MessageDigest.getInstance("SHA-1").digest(text.encodeToByteArray()).toHexString()
-    }
-}
-
-/** An unreadable file is [empty], which only means asking again. */
-private class Remembered<T>(
-    private val folder: File,
-    name: String,
-    private val empty: T,
-    private val decode: (String) -> Option<T>,
-    private val encode: (T) -> String,
-) {
-    private val file = AtomicFile(File(folder, name))
-
-    private var value: Option<T> = None
-
-    fun get(): T = value.getOrElse {
-        file.read(None, { it }) { text -> decode(text).right() }.getOrElse { None }.getOrElse { empty }.also { value = Some(it) }
-    }
-
-    /** Remembers [now], written only when it differs; when it cannot be written, nothing changes. */
-    fun set(now: T): Either<StorageFailure, Unit> = if (now == get()) {
-        Unit.right()
-    } else {
-        folder.mkdirs()
-        file.write(encode(now)).map { value = Some(now) }
     }
 }

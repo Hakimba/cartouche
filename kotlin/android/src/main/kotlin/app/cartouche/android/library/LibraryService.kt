@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.library
 
-import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.FileStamp
 import app.cartouche.android.storage.FolderListing
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.KnownFacts
 import app.cartouche.android.storage.LibraryStore
-import app.cartouche.android.storage.SelectionStore
+import app.cartouche.android.storage.StateFile
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.android.trace
 import app.cartouche.core.ContentUri
 import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.FileReading
 import app.cartouche.core.library.Arrivals
+import app.cartouche.core.library.ArrivalsFormat
 import app.cartouche.core.library.Coming
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DisplayName
@@ -36,6 +36,7 @@ import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.search.Finders
 import app.cartouche.core.shelves.Selection
+import app.cartouche.core.shelves.SelectionFormat
 import app.cartouche.core.shelves.Shelves
 import arrow.core.Either
 import arrow.core.None
@@ -47,6 +48,7 @@ import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.recover
 import arrow.core.right
+import java.io.File
 import kotlin.time.TimeSource
 
 internal sealed interface LibraryFailure {
@@ -114,8 +116,8 @@ internal data class Reread(val library: Option<Library>, val arrivals: Arrivals)
  */
 internal class LibraryService(
     private val store: LibraryStore,
-    private val selections: SelectionStore,
-    private val marks: ArrivalsStore,
+    selectionFile: File,
+    arrivalsFile: File,
     private val folders: Folders,
     private val facts: FactsStore,
     /** Given new [finders] to make, as soon as possible but not on the caller's thread. */
@@ -134,9 +136,17 @@ internal class LibraryService(
     var finders: Finders = Finders.NONE
         private set
 
-    private var selected: Option<Selection> = None
+    /** An unreadable selection only means starting from the first game. */
+    private val selections =
+        StateFile(selectionFile, Selection(), SelectionFormat::decode, SelectionFormat::encode) { problem ->
+            trace("selection") { "not read, starting from the first game: ${problem.detail}" }
+        }
 
-    private var marked: Option<Arrivals> = None
+    /** Unreadable arrivals only mean none. */
+    private val marks =
+        StateFile(arrivalsFile, Arrivals(), ArrivalsFormat::decode, ArrivalsFormat::encode) { problem ->
+            trace("arrivals") { "not read, no game marked: ${problem.detail}" }
+        }
 
     /** One more at each write of the library: an answer telling it shows whether a library sent before is the latest. */
     var revision: Int = 0
@@ -167,30 +177,11 @@ internal class LibraryService(
             }.also { loaded = Some(it) }
     }
 
-    /** The selection, read from its file on first use; an unreadable one only means starting from the first game. */
-    fun selection(): Selection = selected.getOrElse {
-        selections
-            .load()
-            .getOrElse { problem ->
-                trace("selection") { "not read, starting from the first game: ${problem.detail}" }
-                Selection()
-            }.also { selected = Some(it) }
-    }
+    /** The selection, read from its file on first use. */
+    fun selection(): Selection = selections.get()
 
-    /**
-     * The games not seen yet, of the library only, read from their file on first use; an unreadable one only means
-     * none.
-     */
-    fun arrivals(): Arrivals = storedArrivals().within(library())
-
-    private fun storedArrivals(): Arrivals = marked.getOrElse {
-        marks
-            .load()
-            .getOrElse { problem ->
-                trace("arrivals") { "not read, no game marked: ${problem.detail}" }
-                Arrivals()
-            }.also { marked = Some(it) }
-    }
+    /** The games not seen yet, of the library only, read from their file on first use. */
+    fun arrivals(): Arrivals = marks.get().within(library())
 
     /** The user entered [platform]'s console: it announces no new game any more. */
     fun enter(platform: PlatformId): Either<LibraryFailure, Arrivals> = mark(arrivals().entered(platform))
@@ -199,9 +190,8 @@ internal class LibraryService(
     fun leave(id: GameId): Either<LibraryFailure, Arrivals> = mark(arrivals().left(id))
 
     private fun mark(arrivals: Arrivals): Either<LibraryFailure, Arrivals> = either {
-        if (arrivals != storedArrivals()) {
-            marks.save(arrivals).mapLeft(LibraryFailure::Storage).bind()
-            marked = Some(arrivals)
+        if (arrivals != marks.get()) {
+            marks.set(arrivals).mapLeft(LibraryFailure::Storage).bind()
             trace("arrivals") { "${arrivals.unseen.size} games new, announced on ${arrivals.announced.keys.map { it.value }}" }
         }
         arrivals
@@ -246,7 +236,7 @@ internal class LibraryService(
         save(library().without(platform)).bind().also(::keepFoldersOf).also {
             facts.forget(platform)
             // Else they would come back with its games, the same folder added again.
-            keepMarks(storedArrivals().within(it))
+            keepMarks(marks.get().within(it))
         }
     }
 
@@ -263,8 +253,7 @@ internal class LibraryService(
     private fun remember(selection: Selection): Either<LibraryFailure, Selection> = either {
         if (selection != selection()) {
             val started = TimeSource.Monotonic.markNow()
-            selections.save(selection).mapLeft(LibraryFailure::Storage).bind()
-            selected = Some(selection)
+            selections.set(selection).mapLeft(LibraryFailure::Storage).bind()
             trace("selection") { "saved in ${started.elapsedNow().inWholeMilliseconds} ms" }
         }
         selection
@@ -286,7 +275,7 @@ internal class LibraryService(
     fun scan(platform: Platform, titles: TitleIndex, dataFolders: DataFolders): Either<LibraryFailure, Pair<Library, ScanReport>> = either {
         val (scan, report) = found(platform, library().setup(platform.id), titles, dataFolders) { factsOf(platform.id, it) }.bind()
         // The marks of games gone go with them: back in their folder, they are no new games.
-        save(library().withScan(platform.id, scan)).bind().also { keepMarks(storedArrivals().within(it)) } to report
+        save(library().withScan(platform.id, scan)).bind().also { keepMarks(marks.get().within(it)) } to report
     }
 
     /**

@@ -63,8 +63,7 @@ class LibraryAnswerTimingTest {
         }
         val ps2 = catalog(definition())
         val library = Library(games = games)
-        library.toWireJson(None, ps2)
-        library.toWireJsonTree(None, ps2)
+        jsonOf(library.sent(0, None, ps2))
 
         // The answer's lookups as the plugin made them before: stored, then stored again for the absent ones.
         val coldLookups =
@@ -83,8 +82,7 @@ class LibraryAnswerTimingTest {
                 val store = ArtStore(folder)
                 ms { repeat(3) { games.forEach { store.wants(it.id, None) } } }
             }
-        val json = List(15) { ms { library.toWireJson(None, ps2) } }
-        val tree = List(15) { ms { library.toWireJsonTree(None, ps2) } }
+        val json = List(15) { ms { jsonOf(library.sent(0, None, ps2)) } }
         println("TIMING cold lookups, as before: ${median(coldLookups)} ms")
         println("TIMING cold lookups, single pass: ${median(coldSingle)} ms")
         val data = File(System.getProperty("cartouche.app"), "data")
@@ -94,8 +92,7 @@ class LibraryAnswerTimingTest {
         println("TIMING titles parse (ps2): ${median(List(9) { ms { TitleIndex.parse(titles, prints) } })} ms")
         println("TIMING art parse (ps2): ${median(List(9) { ms { ArtIndex.parse(art) } })} ms")
         println("TIMING cold wants x3: ${median(coldWants)} ms")
-        println("TIMING json, direct writer: ${median(json)} ms, ${library.toWireJson(None, ps2).length} characters")
-        println("TIMING json, tree of elements: ${median(tree)} ms")
+        println("TIMING json: ${median(json)} ms, ${jsonOf(library.sent(0, None, ps2)).length} characters")
     }
 
     private fun oldLookups(store: ArtStore) {

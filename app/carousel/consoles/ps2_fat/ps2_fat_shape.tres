@@ -1,6 +1,9 @@
-[gd_resource type="Resource" script_class="Ps2FatShape" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SeatShape" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/ps2_fat/ps2_fat_shape.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/seat_shape.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+seat_centre = Vector3(60.111893, 62.02225, 16.1)
+seat_degrees = Vector3(-90, 0, 0)
+carrier = &"tray_mm"

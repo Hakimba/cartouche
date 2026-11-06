@@ -482,8 +482,7 @@ func _snapshot() -> Dictionary:
 	var settings := await android._request(&"settings")
 	if not library.get("ok", false) or not settings.get("ok", false):
 		return _error("snapshot request failed")
-	var parsed: Variant = JSON.parse_string(str(library.get("library", "{}")))
-	var content: Dictionary = parsed if parsed is Dictionary else {}
+	var content: Dictionary = library.get("library", {})
 	# The letters and regions of each shelf as the core orders them: the desktop has no core to ask.
 	var browsed := {}
 	for game: Dictionary in content.get("games", []):

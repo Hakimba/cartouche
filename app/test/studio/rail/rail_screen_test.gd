@@ -21,10 +21,8 @@ func _carousel() -> Carousel:
 	var counts: Dictionary[String, int] = {}
 	for folder in Fixtures.console_folders():
 		counts[ConsoleManifest.of(folder).platform] = 5
-	var carousel := Screens.fresh_carousel(self, Screens.past_first_launch(self, counts))
-	assert_bool(await Screens.until(self, func() -> bool: return carousel._shown)).is_true()
-	carousel._arrival.custom_step(10.0)
-	carousel._resting.set_process(false)
+	var carousel := await Screens.shown(self, Screens.past_first_launch(self, counts))
+	Fixtures.arrived(carousel)
 	return carousel
 
 
@@ -40,7 +38,7 @@ func test_covering_screens_and_an_empty_library_never_show_the_rail_or_its_groun
 	var carousel := Screens.carousel_for(self, device)
 	(carousel.get_node("%Screens") as ScreenFlow).welcome_waits = true
 	add_child(carousel)
-	assert_bool(await Screens.until(self, func() -> bool: return not carousel._shelves.is_empty())).is_true()
+	await Screens.wait(self, func() -> bool: return not carousel._shelves.is_empty())
 	for screen_name: String in ["Welcome", "ButtonStyle", "NoConsole", "PreferredRegion"]:
 		var screen := carousel._screens.get_node(screen_name) as Control
 		carousel._screens._show(screen)
@@ -63,13 +61,13 @@ func _logos_match(carousel: Carousel) -> void:
 		assert_str(rail._mirrors[i].logo().texture.resource_path).ends_with("rail-tile/%s.png" % folder)
 		if tile.visible:
 			var slots := ConsoleRail.slot(i, rail.spring().position, carousel._shelves.size())
-			assert_float(absf((tile.position.x - 564.48) / 174.08)).is_equal_approx(absf(slots), 0.001)
+			assert_float(absf((tile.position.x - ConsoleRail.TILE_LEFT) / ConsoleRail.PITCH)).is_equal_approx(absf(slots), 0.001)
 	assert_str(rail.tiles()[carousel._consoles.selected_index()].console()).is_equal(carousel._consoles.selected().folder)
 
 
 ## The games screen's logo, made ready behind the consoles screen once the row stands still, is the selected console's.
 func _games_logo_matches(carousel: Carousel) -> void:
-	assert_bool(await Screens.until(self, func() -> bool: return not carousel._consoles.is_settling())).is_true()
+	await Screens.wait(self, func() -> bool: return not carousel._consoles.is_settling())
 	await await_idle_frame()
 	assert_str(carousel._games_logo.texture.resource_path).ends_with("games-top/%s.png" % carousel._consoles.selected().folder)
 
@@ -91,5 +89,5 @@ func test_reordering_and_random_fast_wraps_keep_every_tile_and_the_games_logo_on
 	while carousel._rail.is_processing():
 		carousel._rail._process(1.0 / 60.0)
 	assert_vector(carousel._rail.tile_at(carousel._consoles.selected_index())) \
-		.is_equal_approx(Vector2(564.48, 711.68), Vector2.ONE * 0.01)
+		.is_equal_approx(Vector2(ConsoleRail.TILE_LEFT, ConsoleRail.TILE_TOP), Vector2.ONE * 0.01)
 	await _games_logo_matches(carousel)

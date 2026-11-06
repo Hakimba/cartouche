@@ -7,17 +7,15 @@ const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
 
 ## A carousel on a device holding [param consoles], on its consoles screen once the first re-read is over.
 func _carousel(device: ScreenFixtures.NewDevice) -> Carousel:
-	var carousel := ScreenFixtures.fresh_carousel(self, device)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool:
-		return carousel._shown and device.refreshed.size() == device.consoles.size() and not carousel._new_games._reading)) \
-		.is_true()
+	var carousel := await ScreenFixtures.shown(self, device)
+	await ScreenFixtures.wait(self, func() -> bool:
+		return device.refreshed.size() == device.consoles.size() and not carousel._new_games._reading)
 	await ScreenFixtures.settled_consoles(self, carousel)
 	return carousel
 
 
 func _on_games(carousel: Carousel) -> void:
-	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
+	await ScreenFixtures.press_to(self, carousel, JOY_BUTTON_A, Carousel.Screen.GAMES)
 
 
 func _shelf_ids(carousel: Carousel) -> PackedStringArray:
@@ -39,13 +37,13 @@ func test_a_library_read_again_shows_once_the_carousel_is_free_never_under_the_r
 	assert_bool(carousel._search.is_open()).is_true()
 	device.consoles["ps2"] = 8
 	await ScreenFixtures.resume(self)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.refreshed.size() == 4)).is_true()
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._new_games.has_library())).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return device.refreshed.size() == 4)
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._new_games.has_library())
 	for frame in 10:
 		await await_idle_frame()
 	assert_int(carousel._row._games.size()).is_equal(6)
 	await ScreenFixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._row._games.size() == 8)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._row._games.size() == 8)
 	assert_bool(carousel._new_games.has_library()).is_false()
 	assert_str(carousel._row.selected_game().id).is_equal("ps2/0")
 
@@ -56,16 +54,16 @@ func test_the_shelf_keeps_its_middle_game_or_shows_the_one_now_at_its_place() ->
 	await _on_games(carousel)
 	for step in 4:
 		await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return not carousel._row.is_settling())).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return not carousel._row.is_settling())
 	assert_str(carousel._row.selected_game().id).is_equal("ps2/4")
 	device.consoles["ps2"] = 9
 	await ScreenFixtures.resume(self)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._row._games.size() == 9)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._row._games.size() == 9)
 	assert_str(carousel._row.selected_game().id).is_equal("ps2/4")
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
 	device.consoles["ps2"] = 3
 	await ScreenFixtures.resume(self)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._row._games.size() == 3)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._row._games.size() == 3)
 	assert_str(carousel._row.selected_game().id).is_equal("ps2/2")
 
 
@@ -78,8 +76,7 @@ func test_a_library_read_again_on_the_games_screen_settles_on_the_screen_it_leav
 		await _on_games(carousel)
 		device.consoles["ps2"] = 8 if kept else 0
 		await ScreenFixtures.resume(self)
-		assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._shelves.size() == (2 if kept else 1))) \
-			.is_true()
+		await ScreenFixtures.wait(self, func() -> bool: return carousel._shelves.size() == (2 if kept else 1))
 		assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES if kept else Carousel.Screen.CONSOLES)
 		assert_bool(await ScreenFixtures.until(self, func() -> bool: return ScreenAgreement.disagreement(carousel).is_empty())) \
 			.override_failure_message(ScreenAgreement.disagreement(carousel)).is_true()
@@ -94,7 +91,7 @@ func test_a_console_announces_its_new_games_until_entered_but_the_one_on_screen_
 	device.consoles["gc"] = 4
 	device.arrivals = {"unseen": PackedStringArray(["gc/2", "gc/3"]), "announced": {"gc": PackedStringArray(["gc/2", "gc/3"])}}
 	await ScreenFixtures.resume(self)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return _badges(carousel)[gc] == 2)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return _badges(carousel)[gc] == 2)
 	assert_int(_badges(carousel)[ps2]).is_equal(0)
 	# On the shelf of the PS2 as its new games come: they are in view, the console announces none.
 	await _on_games(carousel)
@@ -103,16 +100,15 @@ func test_a_console_announces_its_new_games_until_entered_but_the_one_on_screen_
 	device.arrivals = {"unseen": PackedStringArray(["gc/2", "gc/3", "ps2/2"]),
 		"announced": {"gc": PackedStringArray(["gc/2", "gc/3"]), "ps2": PackedStringArray(["ps2/2"])}}
 	await ScreenFixtures.resume(self)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return "ps2" in device.entered)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return "ps2" in device.entered)
 	assert_int(_badges(carousel)[ps2]).is_equal(0)
 	assert_int(_badges(carousel)[gc]).is_equal(2)
-	await ScreenFixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.CONSOLES)).is_true()
+	await ScreenFixtures.press_to(self, carousel, JOY_BUTTON_B, Carousel.Screen.CONSOLES)
 	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
 	await ScreenFixtures.settled_consoles(self, carousel)
 	await _on_games(carousel)
 	assert_array(device.entered).contains(["gc"])
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return _badges(carousel)[gc] == 0)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return _badges(carousel)[gc] == 0)
 
 
 func test_a_new_game_stays_new_while_in_the_middle_and_is_seen_once_left() -> void:
@@ -125,12 +121,12 @@ func test_a_new_game_stays_new_while_in_the_middle_and_is_seen_once_left() -> vo
 	assert_bool(carousel._new_games.is_new("ps2/0")).is_true()
 	assert_array(device.left).is_empty()
 	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.left == ["ps2/0"])).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return device.left == ["ps2/0"])
 	assert_bool(carousel._new_games.is_new("ps2/0")).is_false()
 	assert_bool(carousel._new_games.is_new("ps2/1")).is_true()
 	# Leaving the shelf leaves the game in its middle.
 	await ScreenFixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.left == ["ps2/0", "ps2/1"])).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return device.left == ["ps2/0", "ps2/1"])
 
 
 func test_an_answer_sent_before_a_game_was_left_does_not_bring_its_mark_back() -> void:
@@ -149,8 +145,7 @@ func test_an_answer_sent_before_a_game_was_left_does_not_bring_its_mark_back() -
 	assert_bool(marks.is_new("ps2/0")).is_false()
 	device.slow.clear()
 	device.released.emit()
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.left == ["ps2/0"] and not marks._leaving)) \
-		.is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return device.left == ["ps2/0"] and not marks._leaving)
 	assert_bool(marks.is_new("ps2/0")).is_false()
 
 
@@ -160,12 +155,11 @@ func test_a_library_read_again_before_a_form_saved_never_replaces_the_form_s_onc
 	await _edit(carousel)
 	device.consoles["ps2"] = 8
 	await ScreenFixtures.resume(self)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._new_games.has_library())).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._new_games.has_library())
 	device.scanned_games = 9
 	await _save_subfolders(carousel)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool:
-		return not carousel._screens.visible and not carousel._new_games.has_library() and _shelf_size(carousel, "ps2") == 9)) \
-		.is_true()
+	await ScreenFixtures.wait(self, func() -> bool:
+		return not carousel._screens.visible and not carousel._new_games.has_library() and _shelf_size(carousel, "ps2") == 9)
 	for frame in 20:
 		await await_idle_frame()
 		assert_int(_shelf_size(carousel, "ps2")).is_equal(9)
@@ -176,20 +170,19 @@ func test_a_library_read_again_while_a_game_is_renamed_keeps_its_new_name() -> v
 	var carousel := await _carousel(device)
 	await _on_games(carousel)
 	await ScreenFixtures.joypad(self, JOY_BUTTON_X)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return _properties_still(carousel))).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return _properties_still(carousel))
 	device.consoles["ps2"] = 4
 	await ScreenFixtures.resume(self)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._new_games.has_library())).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._new_games.has_library())
 	await ScreenFixtures.action(self, &"ui_down")
 	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return _properties_still(carousel))).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return _properties_still(carousel))
 	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
 	await ScreenFixtures.joypad(self, JOY_BUTTON_START)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.names.has("ps2/0") and _properties_still(carousel))) \
-		.is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return device.names.has("ps2/0") and _properties_still(carousel))
 	var kept := device.names["ps2/0"]
 	await ScreenFixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._row._games.size() == 4)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._row._games.size() == 4)
 	assert_str(carousel._row.selected_game().id).is_equal("ps2/0")
 	assert_str(carousel._row.selected_game().title).is_equal(kept)
 
@@ -213,8 +206,8 @@ func test_a_library_read_again_waits_for_a_toss_the_order_ring_the_properties_an
 		assert_bool(carousel._is_free()).override_failure_message(case + " leaves the carousel free").is_false()
 		device.consoles["ps2"] = 5
 		await ScreenFixtures.resume(self)
-		assert_bool(await ScreenFixtures.until(self, func() -> bool:
-			return carousel._new_games.has_library() or _shelf_size(carousel, "ps2") == 5)).is_true()
+		await ScreenFixtures.wait(self, func() -> bool:
+			return carousel._new_games.has_library() or _shelf_size(carousel, "ps2") == 5)
 		if case != "toss":
 			for frame in 10:
 				await await_idle_frame()
@@ -233,8 +226,8 @@ func test_an_edit_saved_marks_no_game_new() -> void:
 	await _edit(carousel)
 	device.scanned_games = 5
 	await _save_subfolders(carousel)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool:
-		return not carousel._screens.visible and _shelf_size(carousel, "ps2") == 5)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool:
+		return not carousel._screens.visible and _shelf_size(carousel, "ps2") == 5)
 	await ScreenFixtures.settled_consoles(self, carousel)
 	assert_int(device.refreshed.size()).is_equal(refreshed)
 	assert_array(_badges(carousel)).is_equal([0, 0])
@@ -277,7 +270,7 @@ func _save_subfolders(carousel: Carousel) -> void:
 	assert_str(ScreenFixtures.focus(self).name).is_equal("Subfolders")
 	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
 	var save: Button = carousel.get_node("%Screens/AddConsole/%Add")
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return not save.disabled)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return not save.disabled)
 	save.grab_focus()
 	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
 

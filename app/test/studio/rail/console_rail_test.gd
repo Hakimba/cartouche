@@ -2,6 +2,8 @@
 extends GdUnitTestSuite
 
 const Fixtures := preload("res://test/carousel/fixtures.gd")
+## Where the tile of the console selected stands once the rail is still.
+const _MIDDLE := Vector2(ConsoleRail.TILE_LEFT, ConsoleRail.TILE_TOP)
 
 var _folders := Fixtures.console_folders()
 
@@ -37,18 +39,18 @@ func test_the_rail_wraps_both_ways() -> void:
 	var rail := _rail(12, 0)
 	rail.go_to(-1)
 	_settle(rail)
-	assert_vector(rail.tile_at(11)).is_equal_approx(Vector2(564.48, 711.68), Vector2(0.01, 0.01))
+	assert_vector(rail.tile_at(11)).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
 	rail.go_to(11)
 	_settle(rail)
 	rail.go_to(12)
 	_settle(rail)
-	assert_vector(rail.tile_at(0)).is_equal_approx(Vector2(564.48, 711.68), Vector2(0.01, 0.01))
+	assert_vector(rail.tile_at(0)).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
 
 
 func test_a_single_console_has_one_tile_in_the_middle() -> void:
 	var rail := _rail(1, 0)
 	assert_int(rail.tiles().size()).is_equal(1)
-	assert_vector(rail.tile_at(0)).is_equal_approx(Vector2(564.48, 711.68), Vector2(0.01, 0.01))
+	assert_vector(rail.tile_at(0)).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
 
 
 func test_a_walk_of_presses_with_random_frames_ends_on_the_right_console() -> void:
@@ -69,29 +71,28 @@ func test_a_walk_of_presses_with_random_frames_ends_on_the_right_console() -> vo
 			var slots := float(index - place) if ConsoleRail.is_strip(count) else _nearest(index, target, count)
 			assert_bool(rail.is_shown(index)).is_equal(absf(slots) <= 3.6)
 			if absf(slots) <= 3.6:
-				assert_float(rail.tile_at(index).x).is_equal_approx(564.48 + slots * 174.08, 0.01)
-		assert_vector(rail.tile_at(posmod(target, count))).is_equal_approx(
-			Vector2(564.48, 711.68), Vector2(0.01, 0.01))
+				assert_float(rail.tile_at(index).x).is_equal_approx(ConsoleRail.TILE_LEFT + slots * ConsoleRail.PITCH, 0.01)
+		assert_vector(rail.tile_at(posmod(target, count))).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
 
 
 func test_a_tap_under_a_tile_names_its_place_along_the_ring() -> void:
 	var rail := _rail(12, 0)
-	var middle := Vector2(564.48 + RailTile.SIZE.x / 2.0, 711.68 + 20.0)
+	var middle := _MIDDLE + Vector2(RailTile.SIZE.x / 2.0, 20.0)
 	assert_int(rail.slot_under(middle)).is_equal(0)
-	assert_int(rail.slot_under(middle + Vector2(174.08, 0.0))).is_equal(1)
-	assert_int(rail.slot_under(middle - Vector2(2.0 * 174.08, 0.0))).is_equal(-2)
-	assert_int(rail.slot_under(middle - Vector2(0.4 * 174.08, 0.0))).is_equal(0)
+	assert_int(rail.slot_under(middle + Vector2(ConsoleRail.PITCH, 0.0))).is_equal(1)
+	assert_int(rail.slot_under(middle - Vector2(2.0 * ConsoleRail.PITCH, 0.0))).is_equal(-2)
+	assert_int(rail.slot_under(middle - Vector2(0.4 * ConsoleRail.PITCH, 0.0))).is_equal(0)
 	assert_int(rail.slot_under(Vector2(middle.x, 300.0))).is_equal(ConsoleRail.NO_TILE)
 
 
 func test_a_tap_on_a_strip_steps_as_many_places_as_the_tile_is_away() -> void:
 	var rail := _rail(3, 0)
-	var middle := Vector2(564.48 + RailTile.SIZE.x / 2.0, 711.68 + 20.0)
-	assert_int(rail.slot_under(middle + Vector2(2.0 * 174.08, 0.0))).is_equal(2)
-	assert_int(rail.slot_under(middle - Vector2(174.08, 0.0))).is_equal(ConsoleRail.NO_TILE)
+	var middle := _MIDDLE + Vector2(RailTile.SIZE.x / 2.0, 20.0)
+	assert_int(rail.slot_under(middle + Vector2(2.0 * ConsoleRail.PITCH, 0.0))).is_equal(2)
+	assert_int(rail.slot_under(middle - Vector2(ConsoleRail.PITCH, 0.0))).is_equal(ConsoleRail.NO_TILE)
 	rail.go_to(2)
 	_settle(rail)
-	assert_int(rail.slot_under(middle - Vector2(2.0 * 174.08, 0.0))).is_equal(-2)
+	assert_int(rail.slot_under(middle - Vector2(2.0 * ConsoleRail.PITCH, 0.0))).is_equal(-2)
 
 
 ## Every tile shown, as (console, x), sorted, for a rail at its spring's position.
@@ -124,17 +125,12 @@ func test_a_short_ring_is_a_strip_of_its_consoles_each_shown_once() -> void:
 			assert_array(consoles).override_failure_message("n=%d target=%d" % [count, target]).is_equal(wanted)
 
 
-func test_an_empty_ring_shows_no_rail_and_a_platform_without_a_model_no_tile() -> void:
+func test_an_empty_ring_shows_no_rail() -> void:
 	var rail := _rail(3, 0)
 	rail.show_consoles([] as Array[String], 0)
 	assert_bool(rail.visible).is_false()
 	rail.go_to(1)
 	assert_int(rail.tiles().size()).is_equal(0)
-	var folders: Array[String] = ["ps2_slim", "", "nes"]
-	rail.show_consoles(folders, 0)
-	assert_bool(rail.is_shown(1)).is_false()
-	assert_bool(rail.is_shown(0)).is_true()
-	assert_int(rail.slot_under(Vector2(564.48 + 174.08 + 75.0, 760.0))).is_equal(ConsoleRail.NO_TILE)
 
 
 func test_a_tap_during_a_slide_counts_from_the_target_not_the_lagging_tiles() -> void:

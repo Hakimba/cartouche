@@ -12,6 +12,7 @@ import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.MediaRule
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.platforms.PlatformTables
 import app.cartouche.core.platforms.ScreenScraperSystem
 import app.cartouche.core.platforms.SerialScans
 import app.cartouche.core.platforms.definition
@@ -92,13 +93,14 @@ class ArtSourcesTest {
             listOf("na.png", "jp.png")
         names(sources(textures = table).requestFor(okage.copy(redumpName = Some("Okage (Europe)"))).shouldBeSome().candidates) shouldBe
             listOf("na.png", "jp.png")
-        val extracts = mapOf(PlatformId("p") to extract(listOf(ExtractGame("Okage", emptySet(), listOf("USA=na.png")))))
-        val tables = mapOf(PlatformId("p") to "# 2026-10-18\nOkage (USA)\t1234\tus\n")
-        names(
-            ArtSources.of(catalog(system = false), extracts, tables, PlatformId("p")).requestFor(okage).shouldBeSome().candidates,
-        ) shouldBe
+        val tables =
+            PlatformTables(
+                art = Some(extract(listOf(ExtractGame("Okage", emptySet(), listOf("USA=na.png"))))),
+                textures = Some("# 2026-10-18\nOkage (USA)\t1234\tus\n"),
+            )
+        names(ArtSources.of(catalog(system = false), PlatformId("p"), tables).requestFor(okage).shouldBeSome().candidates) shouldBe
             listOf("na.png")
-        names(ArtSources.of(catalog(system = true), extracts, tables, PlatformId("p")).requestFor(okage).shouldBeSome().candidates) shouldBe
+        names(ArtSources.of(catalog(system = true), PlatformId("p"), tables).requestFor(okage).shouldBeSome().candidates) shouldBe
             listOf("na.png", "ss:58:1234:support-texture(us)")
     }
 
@@ -114,15 +116,16 @@ class ArtSourcesTest {
         runBlocking<Unit> {
             val p = PlatformId("p")
             checkAll(Arb.boolean(), Arb.boolean(), Arb.boolean()) { withExtract, withTable, withSystem ->
-                val extracts = if (withExtract) mapOf(p to extract(emptyList(), "2026-09-28")) else emptyMap()
-                val tables = if (withTable) mapOf(p to "# 2026-10-18\n") else emptyMap()
+                val extract = Some(extract(emptyList(), "2026-09-28")).filter { withExtract }
+                val table = Some("# 2026-10-18\nOkage (USA)\t1234\tus\n").filter { withTable }
                 val catalog = catalog(withSystem)
                 val dates = listOfNotNull("2026-09-28".takeIf { withExtract }, "2026-10-18".takeIf { withTable && withSystem })
                 val expected = if (dates.isEmpty()) None else Some(ArtVersion(dates.joinToString(" ")))
-                ArtSources.of(catalog, extracts, tables, p).version shouldBe expected
-                ArtSources.versionOf(catalog, extracts, tables, p) shouldBe expected
+                ArtSources.of(catalog, p, PlatformTables(art = extract, textures = table)).version shouldBe expected
+                val firstLines = PlatformTables(art = extract.map { it.lines().first() }, textures = table.map { it.lines().first() })
+                ArtSources.versionOf(catalog, p, firstLines) shouldBe expected
             }
-            ArtSources.versionOf(catalog(true), emptyMap(), emptyMap(), PlatformId("other")).shouldBeNone()
+            ArtSources.versionOf(catalog(true), PlatformId("other"), PlatformTables(art = Some("# 2026-09-28\n"))).shouldBeNone()
         }
 
     @Test
@@ -219,7 +222,12 @@ class ArtSourcesTest {
                     }.toMap()
             val asked =
                 kinds.keys.map { platform ->
-                    val sources = ArtSources.of(Shipped.catalog, texts, emptyMap(), PlatformId(platform))
+                    val sources =
+                        ArtSources.of(
+                            Shipped.catalog,
+                            PlatformId(platform),
+                            PlatformTables(art = texts.getOrNone(PlatformId(platform))),
+                        )
                     val game = game(title, platform).copy(regions = regions)
                     val request = sources.requestFor(game)
                     request.onSome {

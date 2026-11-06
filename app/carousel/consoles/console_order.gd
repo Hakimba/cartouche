@@ -8,8 +8,7 @@ extends Control
 ## leaning a little) and goes with the cursor, taking at once the place of each console it passes, which slides
 ## into its own; the middle tells where it would go, in logos. A then puts it down, the order kept from then on;
 ## B lets go of it, the order as it was. B closes the ring, the consoles screen back on the console the cursor is
-## on. By touch, dragging sideways moves the cursor, tapping a console takes it, and a tap puts it down. A
-## platform without a model has no place on the ring and keeps its place in the order.
+## on. By touch, dragging sideways moves the cursor, tapping a console takes it, and a tap puts it down.
 ## The same ring places a console just added ([method place], [Placing]): it comes to the middle, an arrow moves between
 ## two consoles of the others, A flies it into that gap and the consoles screen opens on it, B flies it back.
 
@@ -80,11 +79,8 @@ var _row: Array[String] = []
 var _open := false
 ## No press counts while the ring comes or goes, nor while the plugin keeps an order.
 var _busy := false
-var _transition: Tween
-var _opening_s := 0.0:
-	set(value):
-		_opening_s = value
-		_place_opening()
+## The ring's way in, which B rewinds.
+var _opening := Motion.Timeline.new(_place_opening, self)
 var _peeling: Tween
 var _finger := Finger.new()
 var _drag_steps := 0
@@ -157,7 +153,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_press_placing(direction, accept)
 		return
 	if _busy:
-		if _transition and event.is_action_pressed(&"screen_back") and StudioTokens.TR_REVERSE:
+		if _opening.is_playing() and event.is_action_pressed(&"screen_back") and StudioTokens.TR_REVERSE:
 			_close()
 		return
 	if direction:
@@ -200,15 +196,11 @@ func is_open() -> bool:
 	return _open or _busy
 
 
-## Opens the ring on the consoles of [param platform_ids] (those of the row, in its order) that have a model, the
-## cursor on the one at [param at], or on the first when that one has none.
+## Opens the ring on the consoles of [param platform_ids] (those of the row, in its order), the cursor on the one at
+## [param at].
 func open(platform_ids: Array[String], at: int) -> void:
 	_row = platform_ids.duplicate()
-	var ringed := _ring_ids(_row)
-	if ringed.is_empty():
-		closed.emit()
-		return
-	_wheel = ConsoleWheel.new(ringed, maxi(ringed.find(_row[at]), 0))
+	_wheel = ConsoleWheel.new(_row, at)
 	_open = true
 	_finger = Finger.new()
 	_sticker.consoles = consoles
@@ -225,41 +217,29 @@ func open(platform_ids: Array[String], at: int) -> void:
 	set_process(true)
 	Diagnostics.trace("order", "ring open on %s" % _wheel.selected())
 	_busy = true
-	var opening := _tween_in()
-	_transition = opening
-	await opening.finished
-	if _transition == opening:
-		_transition = null
+	# The console pointed at glides from the hero's place, the others rise from the rail, the arrow, the middle and the
+	# hints come in after them.
+	_opening.stand(0.0)
+	_opening.play(_opening_length())
+	await _opening.arrived
+	# Rewound by B, the ring is closing.
+	if _open:
 		_busy = false
-
-
-## The consoles of [param platform_ids] that have a model: the ones the ring holds.
-func _ring_ids(platform_ids: Array[String]) -> Array[String]:
-	var ringed: Array[String] = []
-	for k in platform_ids.size():
-		if consoles.console_at(k).modelled:
-			ringed.append(platform_ids[k])
-	return ringed
 
 
 func _close() -> void:
 	Sounds.play(SoundEffects.Cue.RING_CLOSE)
-	var rewind := _transition != null
-	if _transition:
-		var interrupted := _transition
-		_transition = null
-		interrupted.kill()
-		interrupted.finished.emit()
+	var rewind := _opening.is_playing()
 	_open = false
 	_busy = true
 	Diagnostics.trace("order", "ring closed on %s" % _wheel.selected())
 	consoles.select(_row.find(_wheel.selected()))
-	var duration := maxf(_opening_s, 0.001) if rewind else StudioTokens.TR_RING_CLOSE_S
-	closing.emit(duration)
-	var leaving := create_tween() if rewind else _tween_out()
+	closing.emit(maxf(_opening.seconds, 0.001) if rewind else StudioTokens.TR_RING_CLOSE_S)
 	if rewind:
-		leaving.tween_property(self, ^"_opening_s", 0.0, duration)
-	await leaving.finished
+		_opening.play(0.0)
+		await _opening.arrived
+	else:
+		await _tween_out().finished
 	consoles.pointed = -1
 	consoles.held = -1
 	_sticker.watch(false)
@@ -267,15 +247,6 @@ func _close() -> void:
 	hide()
 	_busy = false
 	closed.emit()
-
-
-## What the ring plays opening: the console pointed at glides from the hero's place, the others rise from the rail,
-## the arrow, the middle and the hints come in after them.
-func _tween_in() -> Tween:
-	var moves := create_tween()
-	_opening_s = 0.0
-	moves.tween_property(self, ^"_opening_s", _opening_length(), _opening_length())
-	return moves
 
 
 func _opening_length() -> float:
@@ -289,12 +260,13 @@ func _opening_length() -> float:
 
 
 func _place_opening() -> void:
-	consoles.wheel = Motion.phase(_opening_s, 0.0, StudioTokens.TR_RING_OPEN_S, StudioTokens.TR_RING_OPEN_S_CURVE)
-	consoles.others_wheel = Motion.phase(_opening_s, StudioTokens.TR_RING_RISE_AT_S, StudioTokens.TR_RING_RISE_S,
+	var t := _opening.seconds
+	consoles.wheel = Motion.phase(t, 0.0, StudioTokens.TR_RING_OPEN_S, StudioTokens.TR_RING_OPEN_S_CURVE)
+	consoles.others_wheel = Motion.phase(t, StudioTokens.TR_RING_RISE_AT_S, StudioTokens.TR_RING_RISE_S,
 		StudioTokens.TR_RING_RISE_S_CURVE)
-	_marks = Motion.phase(_opening_s, StudioTokens.TR_RING_MARKS_AT_S, StudioTokens.TR_RING_MARKS_S)
-	_middle_in = Motion.phase(_opening_s, StudioTokens.TR_RING_MIDDLE_AT_S, StudioTokens.TR_RING_MIDDLE_S, StudioTokens.TR_RING_MIDDLE_S_CURVE)
-	_hints().modulate.a = Motion.phase(_opening_s, _HINTS_AFTER_S, _HINTS_S)
+	_marks = Motion.phase(t, StudioTokens.TR_RING_MARKS_AT_S, StudioTokens.TR_RING_MARKS_S)
+	_middle_in = Motion.phase(t, StudioTokens.TR_RING_MIDDLE_AT_S, StudioTokens.TR_RING_MIDDLE_S, StudioTokens.TR_RING_MIDDLE_S_CURVE)
+	_hints().modulate.a = Motion.phase(t, _HINTS_AFTER_S, _HINTS_S)
 
 
 ## What it plays closing: the console pointed at glides back to the hero’s place, the others sink towards the
@@ -310,22 +282,12 @@ func _tween_out() -> Tween:
 	return moves
 
 
-## The consoles of [param platform_ids] on the ring a console of [param platform_id] would be placed among: those of the
-## others that have a model, in their order.
-func ring_of(platform_ids: Array[String], platform_id: String) -> Array[String]:
-	var others: Array[String] = []
-	others.assign(_ring_ids(platform_ids).filter(func(other: String) -> bool: return other != platform_id))
-	return others
-
-
 ## Places the console [param platform_id], just added to the row of [param platform_ids] (the platforms shown, in
 ## their order), on the ring of the others: it comes to the middle, ← → move the arrow between two of them, A flies it
 ## there and the consoles screen opens on it (true), B flies it back (false, [signal form_wanted] as it goes).
-## Returns at once, true, when no other console has a model to stand beside.
 func place(platform_ids: Array[String], platform_id: String) -> bool:
-	var ring := ring_of(platform_ids, platform_id)
-	if ring.is_empty():
-		return true
+	var ring: Array[String] = []
+	ring.assign(platform_ids.filter(func(other: String) -> bool: return other != platform_id))
 	_row = platform_ids.duplicate()
 	_placed_id = platform_id
 	_placing = Placing.new(ring)
@@ -373,12 +335,11 @@ func place(platform_ids: Array[String], platform_id: String) -> bool:
 	return await placing_over
 
 
-## Each console of the row's place on the ring while a console is placed: the others with a model and the one placed
-## have one, the rest none.
+## Each console of the row's place on the ring while a console is placed: the others', the one placed at the first.
 func _ring_slots() -> Array[int]:
 	var slots: Array[int] = []
 	for id in _row:
-		slots.append(maxi(_placing.others.find(id), 0) if id in _placing.others or id == _placed_id else -1)
+		slots.append(maxi(_placing.others.find(id), 0))
 	return slots
 
 
@@ -548,9 +509,8 @@ func _fly_in(stood: ConsoleRow.Stand) -> void:
 	_arriving.kill()
 	_from = stood
 	var ring := _placing.others
-	var shown: Array[String] = []
-	shown.assign(_row.filter(func(id: String) -> bool: return id != _placed_id))
-	var gap := _placing.shown_gap(shown)
+	# Library.withConsoleAt counts its gap from before the first console of the ring.
+	var gap := _placing.gap + 1
 	Diagnostics.trace("order", "placing gap=%d" % gap)
 	var landed := Placing.landed(ring.size(), _placing.gap)
 	var slot := 0
@@ -676,7 +636,7 @@ func _put_down() -> void:
 	if not moved:
 		return
 	_busy = true
-	var order := _with_unmodelled(_wheel.order)
+	var order: Array[String] = _wheel.order.duplicate()
 	var answer := await android.order_consoles(PackedStringArray(order))
 	_busy = false
 	if answer.ok:
@@ -684,24 +644,9 @@ func _put_down() -> void:
 		_row = order
 	else:
 		Diagnostics.trace("order", "order not kept (%s): %s" % [answer.code, answer.detail])
-		var ringed := _ring_ids(_row)
-		_wheel = ConsoleWheel.new(ringed, ringed.find(_wheel.selected()))
+		_wheel = ConsoleWheel.new(_row, _row.find(_wheel.selected()))
 		order_failed.emit()
 	_show()
-
-
-## The row's order with [param ringed] (a permutation of the consoles the ring holds) in the places they take, and
-## every console without a model where it was.
-func _with_unmodelled(ringed: Array[String]) -> Array[String]:
-	var order: Array[String] = []
-	var next := 0
-	for platform_id in _row:
-		if platform_id in ringed:
-			order.append(ringed[next])
-			next += 1
-		else:
-			order.append(platform_id)
-	return order
 
 
 func _let_go() -> void:

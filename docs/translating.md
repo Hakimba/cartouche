@@ -34,7 +34,7 @@ Japanese is drawn with the device's own Japanese font, so any character can be u
 3. Add the language, named in itself, to `NAMES` in `app/locale/locale.gd`, and to the `languages` of the desktop
    demo in `app/adapters/desktop/desktop_plugin.gd`.
 4. Add it to `Language` in `kotlin/core/src/main/kotlin/app/cartouche/core/settings/Settings.kt`, its `@SerialName`
-   the same code: the plugin only stores the languages listed there. `WireTest` lists the codes the plugin sends.
+   the same code: the plugin only stores the languages listed there, and sends them to Godot.
 5. Run `scripts/test_godot.sh res://test/locale` and the Kotlin tests ([testing.md](testing.md)).
 
 A language written in a script the app's fonts lack (Korean, Chinese…) also needs the system's face for that

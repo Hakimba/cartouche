@@ -2,12 +2,12 @@
 class_name AndroidServices
 extends Node
 ## Typed access to Cartouche's Kotlin plugin (`kotlin/android`), registered as the `Android`
-## autoload. This is the only file that talks to the plugin: everything else gets the typed values
-## of [AndroidWire].
+## autoload. This is the only file that talks to the plugin: it reads the JSON text the plugin sends
+## into the typed values of [AndroidWire], which everything else gets.
 ##
-## Getters answer at once, and [method prepare_titles] only starts its work. Operations are coroutines
-## (`await Android.list_folder(folder)`), and [AndroidServices.Asked] asks one early. Without the
-## plugin (editor, desktop), [DesktopPlugin] answers in its place.
+## Getters answer at once, and [method prepare_tables] only starts its work. Operations are coroutines
+## (`await Android.pick_folder()`), and [AndroidServices.Asked] asks one early. Without the
+## plugin (editor, desktop), [DesktopPlugin] answers in its place, in the same JSON.
 
 ## Looking for the games' art went on: [param change] tells how, and the art just found or the
 ## game just found to have none, if any.
@@ -21,7 +21,7 @@ signal art_progress(download: LabelDownload)
 signal battery_changed(battery: Battery)
 ## An answer told the games not seen yet, as the plugin now marks them.
 signal arrivals_told(arrivals: Arrivals)
-## Every operation's answer; callers await the one carrying their request id.
+## Every operation's answer, read from its JSON; callers await the one carrying their request id.
 signal _answered(payload: Dictionary)
 
 const _SINGLETON := &"CartoucheAndroid"
@@ -29,25 +29,15 @@ const _PLATFORM_DEFINITIONS := "res://data/platforms/daijishou"
 ## Cartouche's own definitions, for platforms Daijishō has none of or names otherwise.
 const _OWN_PLATFORM_DEFINITIONS := "res://data/platforms/cartouche"
 const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
-## One reference list per platform, named after its id (`ps2.tsv`).
-const _TITLE_LISTS := "res://data/titles"
 const _DATA_FOLDERS := "res://data/scan/data_folders.json"
 const _CURTAINS := "res://data/launch/curtains.json"
-## One art extract per platform, named after its id (`ps2.tsv`).
-const _ART := "res://data/art"
-## The prints of each cartridge platform's games, named after its id (`nes.tsv`).
-const _PRINTS := "res://data/prints"
-## ScreenScraper's texture table per platform, named after its id (`ps2.tsv`).
-const _SCREENSCRAPER := "res://data/screenscraper"
 ## A start asked now that could only begin after this long is refused (`too_late`), as the carousel
 ## stops waiting for it a little later (see [constant GameLaunch.WAIT_TIMEOUT_S]).
 const START_WITHIN_S := 4.5
+## Texts longer than this have their reading traced: a library's.
+const _TRACED_CHARACTERS := 10000
 const Result := AndroidWire.Result
-const Document := AndroidWire.Document
 const Folder := AndroidWire.Folder
-const Entry := AndroidWire.Entry
-const Candidate := AndroidWire.Candidate
-const App := AndroidWire.App
 const Battery := AndroidWire.Battery
 const BackdropAnswer := AndroidWire.BackdropAnswer
 const Platform := AndroidWire.Platform
@@ -57,8 +47,6 @@ const OfferedConsole := AndroidWire.OfferedConsole
 const Placed := AndroidWire.Placed
 const Pick := AndroidWire.Pick
 const FolderList := AndroidWire.FolderList
-const Listing := AndroidWire.Listing
-const AppList := AndroidWire.AppList
 const PlatformSetup := AndroidWire.PlatformSetup
 const Disc := AndroidWire.Disc
 const Game := AndroidWire.Game
@@ -74,6 +62,7 @@ const PreviewAnswer := AndroidWire.PreviewAnswer
 const SettingsAnswer := AndroidWire.SettingsAnswer
 const ScanAnswer := AndroidWire.ScanAnswer
 const Arrivals := AndroidWire.Arrivals
+const ArrivalsAnswer := AndroidWire.ArrivalsAnswer
 const RefreshAnswer := AndroidWire.RefreshAnswer
 const RescrapeAnswer := AndroidWire.RescrapeAnswer
 const Art := AndroidWire.Art
@@ -105,12 +94,12 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	if is_available():
-		_plugin.connect(&"answered", _answered.emit)
-		_plugin.connect(&"art_changed", func(payload: Dictionary) -> void: art_changed.emit(ArtChange.new(payload)))
-		_plugin.connect(&"art_progress", func(payload: Dictionary) -> void: art_progress.emit(LabelDownload.new(payload)))
-		_plugin.connect(&"label_variant_downloaded", func(payload: Dictionary) -> void:
-			label_variant_downloaded.emit(LabelVariant.new(payload)))
-		_plugin.connect(&"battery_changed", func(payload: Dictionary) -> void: battery_changed.emit(Battery.new(payload)))
+		_plugin.connect(&"answered", func(text: String) -> void: _answered.emit(_object(text)))
+		_plugin.connect(&"art_changed", func(text: String) -> void: art_changed.emit(ArtChange.new(_object(text))))
+		_plugin.connect(&"art_progress", func(text: String) -> void: art_progress.emit(LabelDownload.new(_object(text))))
+		_plugin.connect(&"label_variant_downloaded", func(text: String) -> void:
+			label_variant_downloaded.emit(LabelVariant.new(_object(text))))
+		_plugin.connect(&"battery_changed", func(text: String) -> void: battery_changed.emit(Battery.new(_object(text))))
 	else:
 		(_plugin as DesktopPlugin).load_snapshot(Diagnostics.argument("snapshot"))
 		(_plugin as DesktopPlugin).start_with_backdrop(Diagnostics.argument("backdrop"), Diagnostics.argument("pixel-veil"))
@@ -129,26 +118,22 @@ func has_snapshot() -> bool:
 	return _plugin is DesktopPlugin and (_plugin as DesktopPlugin).has_snapshot()
 
 
-## Loads the bundled platform definitions, profiles, reference lists, art extracts, cartridge
-## prints and texture tables into the plugin, once.
+## Loads the bundled platform definitions, profiles, data folders and curtain times into the plugin, once. The
+## plugin reads a platform's tables (`res://data/titles`, `art`, `prints`, `screenscraper`) itself, off this thread,
+## as the platform first needs them.
 func _load_catalog() -> void:
 	var started := Time.get_ticks_usec()
 	var profiles := FileAccess.get_file_as_string(_PLATFORM_PROFILES)
 	var definitions := platform_definitions()
-	var titles := _files_in(_TITLE_LISTS, ".tsv", true)
 	var data_folders := FileAccess.get_file_as_string(_DATA_FOLDERS)
 	var curtains := FileAccess.get_file_as_string(_CURTAINS)
-	var art := _files_in(_ART, ".tsv", true)
-	var cartridge_prints := _files_in(_PRINTS, ".tsv", true)
-	var textures := _files_in(_SCREENSCRAPER, ".tsv", true)
 	var read := Time.get_ticks_usec()
 	# The platforms with a console model, the one source of what a person may add, and the models not ready yet.
 	var supported := PackedStringArray(Appearance.defaults(ConsoleManifest.found()).keys())
 	var coming := PackedStringArray(ConsoleManifest.found().filter(func(model: ConsoleManifest) -> bool:
 		return model.is_coming()).map(ConsoleManifest.folder_of))
-	var summary: Dictionary = _query(&"loadCatalog",
-		[definitions, profiles, titles, data_folders, curtains, art, cartridge_prints, textures, supported, coming], {})
-	catalog = CatalogSummary.new(summary)
+	catalog = CatalogSummary.new(_object(_query(&"loadCatalog",
+		[definitions, profiles, data_folders, curtains, supported, coming])))
 	if Diagnostics.enabled:
 		Diagnostics.trace("plugin", "catalog read in %.1f ms, loaded in %.1f ms" % [(read - started) / 1000.0,
 			(Time.get_ticks_usec() - read) / 1000.0])
@@ -156,81 +141,49 @@ func _load_catalog() -> void:
 
 ## Installed players of [param platform_id], in definition order.
 func installed_players(platform_id: String) -> Array[Player]:
-	var found: Array[Player] = []
-	for item: Dictionary in _query(&"installedPlayers", [platform_id], []):
-		found.append(Player.new(item))
-	return found
+	return AndroidWire.Players.new(_object(_query(&"installedPlayers", [platform_id]))).players
 
 
 ## What the carousel shows of [param platform_id]'s shelf (see [Browse]): the games found for
 ## [param typed], or with nothing typed the index by `title` or `region` ([param order]).
 func browse(platform_id: String, order: StringName, typed: String) -> Browse:
-	var view: Dictionary = JSON.parse_string(browse_text(platform_id, order, typed))
-	return Browse.new(view)
+	return Browse.new(_object(browse_text(platform_id, order, typed)))
 
 
 ## [method browse]'s answer as the plugin gives it.
 func browse_text(platform_id: String, order: StringName, typed: String) -> String:
-	return _query(&"browse", [platform_id, String(order), typed], "{}")
+	return _query(&"browse", [platform_id, String(order), typed])
 
 
 ## Where the words of [param typed] are in the title of the game at [param position] of
 ## [param platform_id]'s shelf, as (start, length) in characters; none when it is not found.
 func title_marks(platform_id: String, position: int, typed: String) -> Array[Vector2i]:
-	var text: String = _query(&"titleMarks", [platform_id, position, typed], "[]")
-	var found: Array = JSON.parse_string(text)
 	var marks: Array[Vector2i] = []
-	for mark: Array in found:
-		var start: int = mark[0]
-		var length: int = mark[1]
-		marks.append(Vector2i(start, length))
+	for mark in AndroidWire.Marks.new(_object(_query(&"titleMarks", [platform_id, position, typed]))).marks:
+		marks.append(Vector2i(mark.start, mark.length))
 	return marks
-
-
-## Installed players able to open [param file_name], in definition order.
-func candidates(file_name: String) -> Array[Candidate]:
-	var found: Array[Candidate] = []
-	for item: Dictionary in _query(&"candidates", [file_name], []):
-		found.append(Candidate.new(item))
-	return found
-
-
-func has_all_files_access() -> bool:
-	# The bridge may hand the answer over as an int; the typed variable converts it.
-	var granted: bool = _query(&"hasAllFilesAccess", [], false)
-	return granted
 
 
 ## Whether a curtain can hide an emulator until its game shows: Cartouche may display over other
 ## apps.
 func curtain_allowed() -> bool:
-	var granted: bool = _query(&"curtainAllowed", [], false)
-	return granted
+	return JSON.parse_string(_query(&"curtainAllowed", [], "false")) == true
 
 
 ## The backdrop stored, at once: the first frame is drawn on it.
 func backdrop() -> BackdropAnswer:
-	var stored: Dictionary = _query(&"backdrop", [], {})
-	return BackdropAnswer.new(stored)
+	return BackdropAnswer.new(_object(_query(&"backdrop", [])))
 
 
 func battery() -> Battery:
-	var state: Dictionary = _query(&"battery", [], {})
-	return Battery.new(state)
-
-
-## The manufacturer, model and Android version, such as "Acme Handheld 2, Android 13".
-func device_name() -> String:
-	return _query(&"deviceName", [], "")
+	return Battery.new(_object(_query(&"battery", [])))
 
 
 ## Debug builds: the arguments the app was started with (see `launchArguments` in the plugin).
 func launch_arguments() -> PackedStringArray:
-	return _query(&"launchArguments", [], PackedStringArray())
-
-
-func request_all_files_access() -> Result:
-	return Result.new(await _request(&"requestAllFilesAccess"))
+	var parsed: Variant = JSON.parse_string(_query(&"launchArguments", [], "[]"))
+	var arguments: Array = parsed if parsed is Array else []
+	return PackedStringArray(arguments)
 
 
 ## Opens the system screen letting Cartouche display over other apps, for the curtain.
@@ -248,37 +201,10 @@ func persisted_folders() -> FolderList:
 	return FolderList.new(await _request(&"persistedFolders"))
 
 
-## Lists the root of [param folder].
-func list_folder(folder: Folder) -> Listing:
-	return Listing.new(await _request(&"listFolder", [{"tree_uri": folder.uri}]))
-
-
-## Lists [param sub_folder], a directory entry of [param folder].
-func list_sub_folder(folder: Folder, sub_folder: Entry) -> Listing:
-	var location := {"tree_uri": folder.uri, "document_id": sub_folder.document_id}
-	return Listing.new(await _request(&"listFolder", [location]))
-
-
-func list_apps() -> AppList:
-	return AppList.new(await _request(&"listLaunchableApps"))
-
-
-func launch_app(package_name: String) -> Result:
-	return Result.new(await _request(&"launchApp", [package_name]))
-
-
-## Launches [param file] with [param player_id], outside the library.
-func launch_file(player_id: String, file: Entry) -> Result:
-	var game := {"name": file.name, "uri": file.uri}
-	if file.has_path:
-		game["path"] = file.path
-	return Result.new(await _request(&"launchFile", [player_id, game]))
-
-
 ## The library, read from its file on first use, with the art stored for its games; looking for
 ## the others' art starts, as [signal art_changed] tells.
 func library() -> LibraryAnswer:
-	return LibraryAnswer.new(await _request(&"library"))
+	return _typed(await _request(&"library"))
 
 
 ## Stores the choices made for [param platform_id].
@@ -291,18 +217,18 @@ func art_focus(games: Array[AndroidServices.Game]) -> void:
 	var ids := PackedStringArray()
 	for game in games:
 		ids.append(game.id)
-	_query(&"artFocus", [ids], null)
+	_query(&"artFocus", [ids])
 
 
 ## Hands the memory the app freed back to the system: as the screen comes to rest, and as the app leaves the screen.
 func release_memory() -> void:
-	_query(&"releaseMemory", [], null)
+	_query(&"releaseMemory", [])
 
 
-## Prepares in the background what looking at a folder needs (the reference lists' indexes), as a
-## console is about to be added or changed.
-func prepare_titles() -> void:
-	_query(&"prepareTitles", [], null)
+## Prepares in the background what looking at a folder of [param platform_id] needs (its tables, read and
+## indexed), as a console is about to be added or changed.
+func prepare_tables(platform_id: String) -> void:
+	_query(&"prepareTables", [platform_id])
 
 
 ## How many games a scan of [param platform_id] with [param setup] would find, without saving
@@ -335,13 +261,13 @@ func refresh_platform(platform_id: String) -> RefreshAnswer:
 
 
 ## The user entered [param platform_id]'s console: it announces no new game any more ([signal arrivals_told]).
-func enter_console(platform_id: String) -> Result:
-	return Result.new(await _request(&"enterConsole", [platform_id]))
+func enter_console(platform_id: String) -> ArrivalsAnswer:
+	return ArrivalsAnswer.new(await _request(&"enterConsole", [platform_id]))
 
 
 ## The user left [param game] on its shelf: it is not new any more ([signal arrivals_told]).
-func leave_game(game: Game) -> Result:
-	return Result.new(await _request(&"leaveGame", [game.id]))
+func leave_game(game: Game) -> ArrivalsAnswer:
+	return ArrivalsAnswer.new(await _request(&"leaveGame", [game.id]))
 
 
 ## The library as the plugin now stores it.
@@ -364,7 +290,7 @@ func select_game(game: Game) -> Result:
 ## the platforms or all on [param platform_id], stored apart from the user's, for measuring at
 ## scale.
 func use_demo_library(games: int, platform_id := "") -> LibraryAnswer:
-	return LibraryAnswer.new(await _request(&"useDemoLibrary", [games, platform_id]))
+	return _typed(await _request(&"useDemoLibrary", [games, platform_id]))
 
 
 ## Debug builds only: scans every console again, reading all of their game files anew, and looks
@@ -448,24 +374,33 @@ static func platform_definitions() -> Dictionary:
 	return _files_in(_PLATFORM_DEFINITIONS, ".json").merged(_files_in(_OWN_PLATFORM_DEFINITIONS, ".json"), true)
 
 
-## `{file name or base name: text}` for the files of [param folder] ending with [param extension].
-static func _files_in(folder: String, extension: String, by_base_name := false) -> Dictionary:
+## `{file name: text}` for the files of [param folder] ending with [param extension].
+static func _files_in(folder: String, extension: String) -> Dictionary:
 	var texts := {}
 	for file_name: String in DirAccess.get_files_at(folder):
 		if file_name.ends_with(extension):
-			var key := file_name.get_basename() if by_base_name else file_name
-			texts[key] = FileAccess.get_file_as_string(folder.path_join(file_name))
+			texts[file_name] = FileAccess.get_file_as_string(folder.path_join(file_name))
 	return texts
 
 
-## Asks the plugin; [param nothing] when it is the desktop stand-in and that has no answer.
-func _query(method: StringName, args: Array, nothing: Variant) -> Variant:
-	var value: Variant = _plugin.callv(method, args) if _answers(method) else nothing
-	# The catalog's arguments are the whole data files, a shelf's view thousands of positions: not
+## Asks the plugin for its JSON text; [param nothing] when it is the desktop stand-in and that has no answer.
+func _query(method: StringName, args: Array, nothing := "{}") -> String:
+	var answered: Variant = _plugin.callv(method, args) if _answers(method) else nothing
+	var value := str(answered) if answered != null else nothing
+	# The catalog's arguments are whole data files, a shelf's view thousands of positions: not
 	# worth formatting (the plugin traces the view's size).
 	if Diagnostics.enabled and method not in [&"loadCatalog", &"browse"]:
 		Diagnostics.trace("plugin", "%s%s = %s" % [method, args, value])
 	return value
+
+
+## The library answer read into its typed objects, timed: the start's library and the demo's.
+func _typed(payload: Dictionary) -> LibraryAnswer:
+	var started := Time.get_ticks_usec()
+	var answer := LibraryAnswer.new(payload)
+	Diagnostics.trace("library", "%d games typed in %.1f ms" % [answer.library.games.size(),
+		(Time.get_ticks_usec() - started) / 1000.0])
+	return answer
 
 
 ## Calls an operation (its first argument is the request id) and waits for its answer: the plugin
@@ -479,13 +414,18 @@ func _request(method: StringName, args: Array = []) -> Dictionary:
 	if Diagnostics.enabled:
 		Diagnostics.trace("plugin", "#%d %s%s" % [id, method, args])
 	var at_once: Variant = _plugin.callv(method, [id] + args)
-	var payload: Dictionary = at_once if at_once != null else await _answer_to(id)
+	var payload: Dictionary = _object(str(at_once)) if at_once is String else await _answer_to(id)
 	if Diagnostics.enabled:
 		var elapsed := Time.get_ticks_msec() - started
-		# The library is traced once read (LibraryAnswer): here it would cost as much as the games.
+		# The library and its labels would cost as much to trace as their games: their counts stand for them.
 		var shown := payload.duplicate()
-		shown.erase("library")
-		Diagnostics.trace("plugin", "#%d answered in %d ms: %s" % [id, elapsed, shown])
+		for key: String in ["library", "art", "absent"]:
+			shown.erase(key)
+		var sent: Dictionary = payload.get("library", {})
+		var games: Array = sent.get("games", [])
+		var art: Array = payload.get("art", [])
+		Diagnostics.trace("plugin", "#%d answered in %d ms, %d games, %d labels: %s" % [id, elapsed, games.size(),
+			art.size(), shown])
 	_took(payload)
 	return payload
 
@@ -497,6 +437,18 @@ func _took(payload: Dictionary) -> void:
 	if payload.has("arrivals"):
 		var arrivals: Dictionary = payload["arrivals"]
 		arrivals_told.emit(Arrivals.new(arrivals))
+
+
+## The object [param text] holds, read once it has crossed; none when it holds no object.
+static func _object(text: String) -> Dictionary:
+	var started := Time.get_ticks_usec()
+	var parsed: Variant = JSON.parse_string(text)
+	var read: Dictionary = parsed if parsed is Dictionary else {}
+	if Diagnostics.enabled and text.length() > _TRACED_CHARACTERS:
+		# A library's parse is traced apart: `scripts/bench.sh` measures it.
+		Diagnostics.trace("library" if read.has("library") else "plugin", "%d characters read in %.1f ms" % [text.length(),
+			(Time.get_ticks_usec() - started) / 1000.0])
+	return read
 
 
 func _answer_to(id: int) -> Dictionary:

@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/nes/nes_model.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/console_model.gd" id="1"]
 [ext_resource type="Resource" path="res://carousel/consoles/nes/nes_shape.tres" id="2"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/nes/nes.glb" id="3"]
 [ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
@@ -28,7 +28,7 @@ property = &"tray_degrees"
 node = NodePath("Model/nes/tray")
 axis = Vector3(-1, 0, 0)
 role = 0
-open_from = &"tray_tilt"
+open = 10.0
 
 [sub_resource type="Resource" id="power"]
 script = ExtResource("part")

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
-## Every console and medium the app ships with, built from its own dimensions: accepted by its rules,
+## Every medium the app ships with, built from its own dimensions or baked: accepted by its rules,
 ## each part closed and turned outwards. A dimension edited by hand that breaks a model fails here.
 
 const Fixtures := preload("res://test/carousel/fixtures.gd")
@@ -8,40 +8,27 @@ const Fixtures := preload("res://test/carousel/fixtures.gd")
 const DETAIL := 32
 
 
-func test_every_shipped_console_is_accepted_and_built_closed_part_by_part() -> void:
-	var checked := 0
-	for manifest in ConsoleManifest.found():
-		var console: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
-		if _is_glb(console):
-			continue
-		checked += 1
-		var shape := console.shape
-		assert_array(shape.problems()).override_failure_message("%s refused: %s" % [manifest.platform,
-			shape.problems()]).is_empty()
-		for part in shape.parts():
-			var meshes: Array[Array] = [shape.mesh_arrays(part, DETAIL)]
-			_assert_whole("%s %s" % [manifest.platform, part], meshes, part not in shape.surfaces())
-	assert_int(checked).is_greater(0)
-
-
 func test_every_shipped_medium_is_accepted_and_built_closed_with_its_label_on_it() -> void:
 	var media := MediumManifest.found()
 	assert_int(media.size()).is_greater(0)
 	for medium: String in media:
-		var shape := Fixtures.medium_shape(medium)
-		assert_array(shape.parts()).contains([&"label"])
-		assert_array(shape.problems()).override_failure_message("%s refused: %s" % [medium,
-			shape.problems()]).is_empty()
+		var model: Node3D = auto_free((load(media[medium].scene) as PackedScene).instantiate())
+		var label: MeshInstance3D = model.get_node(^"Label")
 		var meshes: Array[Array] = []
-		for part in shape.parts():
-			meshes.append(shape.mesh_arrays(part, DETAIL))
+		if label.mesh is ShapedMesh:
+			var shape := (label.mesh as ShapedMesh).shape
+			assert_array(shape.problems()).override_failure_message("%s refused: %s" % [medium,
+				shape.problems()]).is_empty()
+			for part in shape.parts():
+				meshes.append(shape.mesh_arrays(part, DETAIL))
+		else:
+			for part: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				meshes.append(part.mesh.surface_get_arrays(0))
 		_assert_whole(medium, meshes, true)
 
 
 func test_every_shipped_part_exported_already_built_draws_the_arrays_its_code_builds() -> void:
 	var scenes: Array[String] = []
-	for manifest in ConsoleManifest.found():
-		scenes.append(manifest.scene)
 	for medium: String in MediumManifest.found():
 		scenes.append(MediumManifest.found()[medium].scene)
 	var stored := "user://exported_part.res"
@@ -60,7 +47,7 @@ func test_every_shipped_part_exported_already_built_draws_the_arrays_its_code_bu
 			assert_bool(exported.get_mesh_arrays() == mesh.get_mesh_arrays()).override_failure_message(
 				"%s %s exported differs from its code" % [scene, mesh.part]).is_true()
 	DirAccess.remove_absolute(stored)
-	assert_int(checked).is_greater(100)
+	assert_int(checked).is_greater(0)
 
 
 func test_an_exported_part_whose_dimensions_change_is_built_again_from_them() -> void:
@@ -102,11 +89,6 @@ static func _label_of(shape: ModelShape) -> ShapedMesh:
 	mesh.part = &"label"
 	mesh.detail = DETAIL
 	return mesh
-
-
-static func _is_glb(model: Node) -> bool:
-	return model.find_children("*", "Node3D", true, false).any(func(node: Node) -> bool:
-		return node.scene_file_path.get_extension() == "glb")
 
 
 ## A one-triangle shape counting how many times it is built.

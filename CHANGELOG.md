@@ -17,8 +17,15 @@ follows [Keep a Changelog](https://keepachangelog.com).
   medium, launch animation, platform, setting, background, screen), with `scripts/new_console.py` and
   `scripts/new_medium.py` to set one up: a console without moving parts, a disc or a plain cartridge needs no code.
 
+### Changed
+- Cartouche starts about half a second sooner: the consoles and cartridges once built by code at every start are now
+  ready-made models, and each console's game lists (titles, cartridge prints, label sources) are read only when that
+  console needs them, off the screen's thread. They look and move exactly as before.
+- A hidden diagnostics screen (Select held for two seconds) is gone.
+
 ### Fixed
 - The hints at the bottom of the games screen and the console's logo now leave with the rest while a game is launched.
+- A button style that could not be saved no longer stays in use until Cartouche closes.
 
 ## [0.3.0] - 2026-11-05
 

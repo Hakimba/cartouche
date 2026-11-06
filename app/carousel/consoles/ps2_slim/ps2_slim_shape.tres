@@ -1,6 +1,8 @@
-[gd_resource type="Resource" script_class="Ps2SlimShape" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SeatShape" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/ps2_slim/ps2_slim_shape.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/seat_shape.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+seat_centre = Vector3(47.5, 19.5, 0)
+seat_degrees = Vector3(-90, 0, 0)

@@ -76,19 +76,19 @@ private object DisplayNameSerializer : KSerializer<DisplayName> by ParsedSeriali
 
 /**
  * Where a label's image comes from: the chooser names each image by its region and its source, and a chosen label
- * remembers both. Stored and sent to Godot by [wire], spelled out so that renaming a constant cannot change it; shown
- * as [label].
+ * remembers both. Stored and sent to Godot by its `@SerialName`, spelled out so that renaming a constant cannot change
+ * it; shown as [label].
  */
 @Serializable
-public enum class ArtSource(public val wire: String, public val label: String) {
+public enum class ArtSource(public val label: String) {
     @SerialName("launchbox")
-    LAUNCHBOX("launchbox", "LaunchBox"),
+    LAUNCHBOX("LaunchBox"),
 
     @SerialName("screenscraper")
-    SCREENSCRAPER("screenscraper", "ScreenScraper"),
+    SCREENSCRAPER("ScreenScraper"),
 
     @SerialName("psxdatacenter")
-    PSXDATACENTER("psxdatacenter", "psxdatacenter"),
+    PSXDATACENTER("psxdatacenter"),
 }
 
 /** Which image a game's label shows. */

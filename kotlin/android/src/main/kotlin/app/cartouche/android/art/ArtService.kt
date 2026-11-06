@@ -5,18 +5,16 @@ import android.net.ConnectivityManager
 import android.net.Network
 import app.cartouche.android.ART_PROGRESS_SIGNAL
 import app.cartouche.android.ART_SIGNAL
-import app.cartouche.android.ErrorCode
+import app.cartouche.android.Code
+import app.cartouche.android.Failed
 import app.cartouche.android.Reference
+import app.cartouche.android.Sent
 import app.cartouche.android.Threads
 import app.cartouche.android.VARIANT_SIGNAL
-import app.cartouche.android.dictionary
-import app.cartouche.android.failure
+import app.cartouche.android.failed
+import app.cartouche.android.jsonOf
 import app.cartouche.android.library.LibraryService
-import app.cartouche.android.plainWire
-import app.cartouche.android.putSome
-import app.cartouche.android.success
-import app.cartouche.android.toWire
-import app.cartouche.android.toWireArray
+import app.cartouche.android.sent
 import app.cartouche.android.trace
 import app.cartouche.core.art.ArtSources
 import app.cartouche.core.art.ArtVariant
@@ -27,16 +25,17 @@ import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.regions.PreferredRegion
+import app.cartouche.core.serialName
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.firstOrNone
 import arrow.core.getOrElse
 import arrow.core.raise.either
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.godotengine.godot.Dictionary
 
 /** Its pieces share [fetch], so every download counts on the same ScreenScraper quota and limits. */
 internal class ArtService(
@@ -48,7 +47,7 @@ internal class ArtService(
     fetch: Fetch,
     private val textures: Textures,
     private val connectivity: () -> ConnectivityManager,
-    private val emit: (String, Dictionary) -> Unit,
+    private val emit: (String, String) -> Unit,
 ) {
     private val scraper = Scraper(store, fetch, threads.scope, textures, ::downloading, ::changed)
     private val variantDownloads = VariantDownloads(store, fetch, threads.scope, threads.variants, ::variantDownloaded)
@@ -124,9 +123,9 @@ internal class ArtService(
         lookForArt { games -> ArtSources.recut(before, games) { sources(it, preferred) } }
     }
 
-    suspend fun lookAgain(games: List<Game>): Either<Dictionary, Int> = either {
+    suspend fun lookAgain(games: List<Game>): Either<Failed, Int> = either {
         val again = ArtSources.lookAgain(games) { sources(it, None) }
-        store.lookAgain(again).mapLeft { it.toWire() }.bind()
+        store.lookAgain(again).mapLeft { it.failed }.bind()
         trace("art") { "${again.asked.size} labels looked up again, ${again.unfound.size} that no source can have removed" }
         lookForArt().join()
         scraper.awaitOver()
@@ -136,25 +135,25 @@ internal class ArtService(
     }
 
     /** Downloads the images not downloaded yet, each told through [VARIANT_SIGNAL]. */
-    fun labelVariants(game: Game): Dictionary {
+    fun labelVariants(game: Game): Sent.LabelVariants {
         val sources = sources(game.platform, preferredRegion())
         val stored = sources.variantsOf(game, offered(sources.version)).map { it to store.variant(it.candidate) }
         val missing = stored.filter { it.second.isNone() }.map { it.first }
         trace("art") { "${game.title}: ${stored.size} images, ${missing.size} to download" }
         variantDownloads.download(game.id, missing, sources.cutOf(game), sources.version)
-        return success("variants" to stored.toWireArray { (variant, art) -> variant.toWire().putSome("path", art.map { it.file.path }) })
+        return Sent.LabelVariants(stored.map { (variant, art) -> variant.sent(None, art.map { it.file.path }, None) })
     }
 
-    fun chooseLabel(game: Game, region: String, source: String): Either<Dictionary, Dictionary> = either {
+    fun chooseLabel(game: Game, region: String, source: String): Either<Failed, Sent.ArtAnswer> = either {
         val sources = sources(game.platform, preferredRegion())
         val variant =
             sources
                 .variantsOf(game, offered(sources.version))
-                .firstOrNone { it.region.name == region && it.candidate.source.wire == source }
-                .getOrElse { raise(failure(ErrorCode.NO_IMAGE, "No image of ${game.title} for region '$region' at '$source'")) }
-        val art = LabelChoices(library(), store).choose(game, variant).mapLeft { it.toWire() }.bind()
+                .firstOrNone { it.region.name == region && it.candidate.source.serialName == source }
+                .getOrElse { raise(Failed(Code.NO_IMAGE, "No image of ${game.title} for region '$region' at '$source'")) }
+        val art = LabelChoices(library(), store).choose(game, variant).mapLeft { it.failed }.bind()
         trace("art") { "${game.title}: label of region '$region' at '$source' chosen" }
-        success("art" to FoundArt(game.id, art).toWire())
+        Sent.ArtAnswer(FoundArt(game.id, art).sent())
     }
 
     /** No texture while ScreenScraper is not open or the app has no key: the region's scan alone then. */
@@ -168,21 +167,16 @@ internal class ArtService(
 
     private fun sources(platform: PlatformId, preferred: Option<PreferredRegion>): ArtSources = reference().sources(platform, preferred)
 
-    private fun ArtVariant.toWire(): Dictionary =
-        dictionary("region" to region.name, "source" to candidate.source.wire, "source_name" to candidate.source.label)
-
     private fun variantDownloaded(game: GameId, variant: ArtVariant, kept: Either<VariantFailure, StoredArt>) {
         trace("art") {
-            "${variant.region.name} image of ${game.value} at ${variant.candidate.source.wire}: ${kept.fold(
-                { it.plainWire },
+            "${variant.region.name} image of ${game.value} at ${variant.candidate.source.serialName}: ${kept.fold(
+                { it.serialName },
             ) { "downloaded" }}"
         }
-        val told = variant.toWire().apply { put("game_id", game.value) }
-        kept.fold({ told.put("failure", it.plainWire) }) { told.put("path", it.file.path) }
-        emit(VARIANT_SIGNAL, told)
+        emit(VARIANT_SIGNAL, jsonOf(variant.sent(Some(game), kept.getOrNone().map { it.file.path }, kept.swap().getOrNone())))
     }
 
-    private fun changed(run: Scraping, news: Option<LabelNews>) = emit(ART_SIGNAL, run.toWire(news))
+    private fun changed(run: Scraping, news: Option<LabelNews>) = emit(ART_SIGNAL, jsonOf(run.sent(news)))
 
-    private fun downloading(game: GameId, download: LabelDownload) = emit(ART_PROGRESS_SIGNAL, download.toWire(game))
+    private fun downloading(game: GameId, download: LabelDownload) = emit(ART_PROGRESS_SIGNAL, jsonOf(download.sent(game)))
 }

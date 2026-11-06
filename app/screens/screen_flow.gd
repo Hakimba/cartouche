@@ -46,16 +46,10 @@ var arrived := false
 ## Whether the settings open now left no console with games at some point.
 var _emptied := false
 var _holding_presses := false
-## The settings' switches as stored, by their key ([method SettingsMenu.switches]).
-var _switched: Dictionary[StringName, bool] = {}
+## The settings as stored: the start's answer, each value saved since kept in it.
+var _stored: AndroidServices.SettingsAnswer
 ## Counts the switches' saves: an answer that comes once the settings closed is let go.
 var _switch_save := 0
-## The region labels' images prefer, as stored (empty for none), and those the plugin takes.
-var _preferred_region := ""
-var _preferred_regions: PackedStringArray
-## The language the app's text is written in (empty for the device's own), and those it can be.
-var _language := ""
-var _languages: PackedStringArray
 
 @onready var _welcome: Welcome = %Welcome
 @onready var _button_style: ButtonStyleScreen = %ButtonStyle
@@ -83,15 +77,10 @@ func _ready() -> void:
 ## Goes on until the library can be used, completing setup on first launch, the welcome first.
 func run(settings: AndroidServices.SettingsAnswer) -> void:
 	arrived = false
-	for key in SettingsMenu.switches():
-		_switched[key] = settings.get(key)
+	_stored = settings
 	Sounds.level = settings.sound_level
-	_preferred_region = settings.preferred_region
-	_preferred_regions = settings.preferred_regions
-	_language = settings.language
-	_languages = settings.languages
 	# Before the welcome: every text drawn from here on is in the language the user chose.
-	Locale.apply(_language)
+	Locale.apply(settings.language)
 	if settings.first_launch and welcome_waits:
 		_welcome.show()
 		await _welcome.passed()
@@ -101,7 +90,7 @@ func run(settings: AndroidServices.SettingsAnswer) -> void:
 	if settings.first_launch:
 		await _choose_button_style(false, false)
 		await _choose_preferred_region(true)
-		await _save_button_style(Controls.style)
+		await _save(&"button_style", Controls.style)
 		if not android.curtain_allowed():
 			_show(_permission)
 			_permission.focus()
@@ -198,17 +187,28 @@ func _choose_button_style(can_go_back := false, keep := true) -> void:
 	var style: StringName = await _button_style.chosen
 	if style.is_empty():
 		return
+	var kept := Controls.style
+	_draw_buttons(style)
+	# The button style marks the setup complete: the first launch saves it after the region's choice.
+	if keep and not await _save(&"button_style", style):
+		_draw_buttons(kept)
+
+
+func _draw_buttons(style: StringName) -> void:
 	Controls.style = style
 	get_tree().call_group(ButtonGlyph.GROUP, &"queue_redraw")
-	if keep:
-		await _save_button_style(style)
 
 
-## Button style marks setup complete, so first launch saves it after the region choice.
-func _save_button_style(style: StringName) -> void:
-	var saved := await android.save_setting(&"button_style", style)
+## Saves [param value] as the setting [param key], the presses held meanwhile when [param holding]; whether it was kept
+## (a refusal is traced).
+func _save(key: StringName, value: Variant, holding := false) -> bool:
+	_holding_presses = _holding_presses or holding
+	var saved := await android.save_setting(key, value)
+	if holding:
+		_holding_presses = false
 	if not saved.ok:
-		Diagnostics.trace("screens", "button style not saved (%s): %s" % [saved.code, saved.detail])
+		Diagnostics.trace("screens", "%s not saved (%s): %s" % [key, saved.code, saved.detail])
+	return saved.ok
 
 
 ## The edges' smoothing, drawn and saved once chosen; B leaves it as it was.
@@ -219,9 +219,7 @@ func _choose_edge_smoothing() -> void:
 	if smoothing.is_empty():
 		return
 	get_viewport().msaa_3d = EdgeSmoothingScreen.MSAA[smoothing]
-	var saved := await android.save_setting(&"edge_smoothing", smoothing)
-	if not saved.ok:
-		Diagnostics.trace("screens", "edge smoothing not saved (%s): %s" % [saved.code, saved.detail])
+	await _save(&"edge_smoothing", smoothing)
 
 
 ## The backdrops' cards: each one chosen shows at once on every screen and is kept, the cards staying on screen, the
@@ -233,11 +231,7 @@ func _choose_backdrop() -> void:
 	while not choice.is_empty():
 		var shown := Backdrop.choice
 		Diagnostics.trace("backdrop", Backdrop.show(choice, Backdrop.veil))
-		_holding_presses = true
-		var saved := await android.save_setting(&"backdrop", choice)
-		_holding_presses = false
-		if not saved.ok:
-			Diagnostics.trace("screens", "backdrop not saved (%s): %s" % [saved.code, saved.detail])
+		if not await _save(&"backdrop", choice, true):
 			Diagnostics.trace("backdrop", Backdrop.show(shown, Backdrop.veil))
 			_backdrop.focus()
 		choice = await _backdrop.chosen
@@ -248,17 +242,12 @@ func _choose_backdrop() -> void:
 func _choose_preferred_region(first_launch := false) -> void:
 	_show(_region_screen)
 	_region_screen.can_go_back = not first_launch
-	_region_screen.open(_preferred_region, _preferred_regions, SettingsMenu.region_name)
+	_region_screen.open(_stored.preferred_region, _stored.preferred_regions, SettingsMenu.region_name)
 	var region: String = await _region_screen.chosen
-	if region == _preferred_region and not first_launch:
+	if region == _stored.preferred_region and not first_launch:
 		return
-	_holding_presses = true
-	var saved := await android.save_setting(&"preferred_region", region)
-	_holding_presses = false
-	if saved.ok or first_launch:
-		_preferred_region = region
-	if not saved.ok:
-		Diagnostics.trace("screens", "preferred region not saved (%s): %s" % [saved.code, saved.detail])
+	if await _save(&"preferred_region", region, true) or first_launch:
+		_stored.preferred_region = region
 
 
 ## "No console" until the form adds one and it glides to the carousel. Returns at once when a console of
@@ -283,23 +272,24 @@ func _add_first_console() -> void:
 
 ## "Settings" until B.
 func _settings_menu() -> void:
-	for key in _switched:
-		_settings.snap_switch(key, _switched[key])
+	var switches := SettingsMenu.switches()
+	for key in switches:
+		_settings.snap_switch(key, _switched(key))
 	_settings.sound_level = Sounds.level
 	var focus := &"button_style"
 	while true:
-		if focus not in _switched:
+		if focus not in switches:
 			_show(_settings)
-			_settings.open(focus, _preferred_region, _language)
+			_settings.open(focus, _stored.preferred_region, _stored.language)
 		focus = await _settings.chosen
-		if focus in _switched:
+		if focus in switches:
 			_turn_switch(focus)
 			continue
 		match focus:
 			&"close":
 				_switch_save += 1
-				for key in _switched:
-					_settings.slide_switch(key, _switched[key])
+				for key in switches:
+					_settings.slide_switch(key, _switched(key))
 				_settings.saving = false
 				return
 			&"button_style":
@@ -314,31 +304,27 @@ func _settings_menu() -> void:
 				await _choose_language()
 
 
+## Whether the switch [param key] (a setting's key) is on as stored.
+func _switched(key: StringName) -> bool:
+	return _stored.get(key)
+
+
 ## The language the app's text is written in, chosen from its own page: applied once saved.
 func _choose_language() -> void:
 	_show(_language_screen)
 	_language_screen.can_go_back = true
-	_language_screen.open(_language, _languages, Locale.name_of)
+	_language_screen.open(_stored.language, _stored.languages, Locale.name_of)
 	var language: String = await _language_screen.chosen
-	if language == _language:
-		return
-	_holding_presses = true
-	var saved := await android.save_setting(&"language", language)
-	_holding_presses = false
-	if not saved.ok:
-		Diagnostics.trace("screens", "language not saved (%s): %s" % [saved.code, saved.detail])
-		return
-	_language = language
-	Locale.apply(_language)
+	if language != _stored.language and await _save(&"language", language, true):
+		_stored.language = language
+		Locale.apply(language)
 
 
 ## The sounds at [param steps] at once, heard so, and kept.
 func _change_sound_level(steps: int) -> void:
 	Sounds.level = steps
 	Sounds.play(SoundEffects.Cue.VOLUME)
-	var saved := await android.save_setting(&"sound_level", steps)
-	if not saved.ok:
-		Diagnostics.trace("settings", "sound level not saved (%s): %s" % [saved.code, saved.detail])
+	await _save(&"sound_level", steps)
 
 
 ## Turns the settings' switch [param switch] (a setting's key) over from what is stored: slid there at once, saved,
@@ -347,21 +333,19 @@ func _change_sound_level(steps: int) -> void:
 func _turn_switch(switch: StringName) -> void:
 	_switch_save += 1
 	var request := _switch_save
-	var target := not _switched[switch]
+	var target := not _switched(switch)
 	Sounds.play(SoundEffects.Cue.TOGGLE if target else SoundEffects.Cue.UNTOGGLE)
 	_settings.saving = true
 	_settings.slide_switch(switch, target)
-	var saved := await android.save_setting(switch, target)
+	var saved := await _save(switch, target)
 	if request != _switch_save:
 		return
-	if saved.ok:
-		_switched[switch] = target
+	if saved:
+		_stored.set(switch, target)
 		if switch == &"pixel_veil":
 			Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, target))
 		Diagnostics.trace("settings", "%s=%s" % [switch, str(target)])
-	else:
-		Diagnostics.trace("settings", "%s not saved (%s): %s" % [switch, saved.code, saved.detail])
-	_settings.slide_switch(switch, _switched[switch])
+	_settings.slide_switch(switch, _switched(switch))
 	_settings.saving = false
 
 
@@ -373,7 +357,7 @@ func _edit_platform(platform: AndroidServices.Platform) -> void:
 	_add_console.edit(platform.id, setup, folder)
 	while await _form_closed() == AddConsole.Outcome.REMOVE:
 		_show(_confirm)
-		_confirm.open(platform.name, library.games_of(platform.id).size(), folder.volume if folder.has_place else &"")
+		_confirm.open(platform.name, library.games_of(platform.id).size(), folder.volume if folder.has_volume else &"")
 		if await _confirm.answered:
 			var removed := await android.remove_platform(platform.id)
 			if removed.ok:

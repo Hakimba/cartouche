@@ -122,11 +122,6 @@ internal class Folders(private val context: Context) {
             .size
     }
 
-    /** Lists one level of [tree]: its root, or the sub-folder [documentId]. Nothing is filtered out. */
-    fun list(tree: ContentUri, documentId: Option<DocumentId>): Either<StorageFailure, List<DocumentEntry>> = guard {
-        entries(tree, documentId, volumeRoots())
-    }
-
     /** The files of [tree] and, with [FolderDepth.SUBFOLDERS], of its sub-folders, as [FolderWalk] finds them. */
     fun files(tree: ContentUri, depth: FolderDepth, dataFolders: DataFolders): Either<WalkFailure<StorageFailure>, FolderListing> =
         guard { volumeRoots() }.mapLeft { WalkFailure.Unlisted(it) }.flatMap { roots ->
@@ -178,7 +173,7 @@ internal class Folders(private val context: Context) {
         folder: Option<DocumentId>,
         roots: Map<VolumeId, FilePath>,
         /** Rows past one more than this are not read: the caller only needs to know there are more. */
-        atMost: Int = Int.MAX_VALUE,
+        atMost: Int,
     ): List<DocumentEntry> {
         val treeUri = Uri.parse(tree.value)
         val parent = folder.getOrElse { DocumentId(DocumentsContract.getTreeDocumentId(treeUri)) }

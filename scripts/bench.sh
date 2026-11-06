@@ -24,12 +24,14 @@
 # "value", "unit", "run", "label"}, the label naming the run (--label, empty by default).
 #
 # Usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [SIZE...]   (sizes: real or a number;
-#        default: real 150 1000 5000)
+#        default: real 150 1000)
 set -euo pipefail
 # Decimal points, whatever the machine's language.
 export LC_ALL=C
 cd "$(dirname "$0")/.."
 adb="${ANDROID_HOME:?ANDROID_HOME is not set}/platform-tools/adb"
+# The package measured: a test build installs under its own name beside the release.
+package="${CARTOUCHE_PACKAGE:-app.cartouche}"
 record=""
 label=""
 starts=3
@@ -43,7 +45,7 @@ while [ $# -gt 0 ]; do
     *) echo "usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [real|N...]" >&2; exit 2 ;;
   esac
 done
-[ ${#sizes[@]} -gt 0 ] || sizes=(real 150 1000 5000)
+[ ${#sizes[@]} -gt 0 ] || sizes=(real 150 1000)
 
 date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 commit=$(git rev-parse --short HEAD)$(git diff --quiet HEAD -- app kotlin || echo "+changes")
@@ -60,9 +62,9 @@ emit() {
 # start [ARGUMENTS]: Cartouche started anew with the comma-separated ARGUMENTS, past its welcome
 # screen (which waits for a press).
 start() {
-  "$adb" shell am force-stop app.cartouche
+  "$adb" shell am force-stop "$package"
   "$adb" logcat -c
-  "$adb" shell am start -n app.cartouche/com.godot.game.GodotAppLauncher --esa arguments "--welcome=skip${1:+,$1}" > /dev/null
+  "$adb" shell am start -n "$package"/com.godot.game.GodotAppLauncher --esa arguments "--welcome=skip${1:+,$1}" > /dev/null
 }
 
 # wait_for PATTERN SECONDS: until the log has a line matching PATTERN.
@@ -82,7 +84,7 @@ gpu=/sys/class/kgsl/kgsl-3d0
 sampled() {
   wait_for "bench: $1 started" 60
   local pid ticks started busy=0 clock=0 samples=0 reading deadline=$((SECONDS + 120))
-  pid=$("$adb" shell pidof app.cartouche | tr -d '\r')
+  pid=$("$adb" shell pidof "$package" | tr -d '\r')
   ticks=$("$adb" shell cat "/proc/$pid/stat" | awk '{ print $14 + $15 }')
   started=$(date +%s.%N)
   until "$adb" logcat -d | grep -qE "bench: $1:"; do
@@ -128,13 +130,13 @@ seconds_between() {
 # is put back first. Only the folder made for the run, marked, is ever deleted: when the app made
 # another one meanwhile, both are the user's and the run stops, for them to be put together by hand.
 put_art_back() {
-  "$adb" shell am force-stop app.cartouche
-  "$adb" shell "run-as app.cartouche sh -c 'if [ -d files/art.aside ]; then [ ! -d files/art ] || [ -f files/art/.bench ] || exit 3;
+  "$adb" shell am force-stop "$package"
+  "$adb" shell "run-as $package sh -c 'if [ -d files/art.aside ]; then [ ! -d files/art ] || [ -f files/art/.bench ] || exit 3;
     rm -rf files/art; mv files/art.aside files/art; fi'" || { echo "files/art and files/art.aside both hold the user's art" >&2; exit 1; }
 }
 set_art_aside() {
   put_art_back
-  "$adb" shell "run-as app.cartouche sh -c 'if [ -d files/art ]; then mv files/art files/art.aside; fi; mkdir files/art; touch files/art/.bench'"
+  "$adb" shell "run-as $package sh -c 'if [ -d files/art ]; then mv files/art files/art.aside; fi; mkdir files/art; touch files/art/.bench'"
   trap put_art_back EXIT
 }
 
@@ -164,10 +166,15 @@ for size in "${sizes[@]}"; do
     shown=$("$adb" logcat -d -v epoch | awk '/START u0 .*app.cartouche/ && !s { s = $1 }
       /carousel: shown/ && !e { e = $1 } END { printf "%d", (e - s) * 1000 }')
     emit start "$size" start_to_shown "$shown" ms "$run"
+    # The answer's time ends once its text is parsed, that parse included (library_read_by_godot); the typed
+    # reading of the parsed library follows it (library_typed_by_godot).
     emit library "$size" library_answer "$(first '#1 answered in [0-9]+ ms')" ms "$run"
-    emit library "$size" library_json_sent "$(first 'characters of JSON in [0-9]+ ms')" ms "$run"
-    emit library "$size" library_read_by_godot "$(first 'games read from [0-9]+ characters in [0-9.]+ ms')" ms "$run"
-    emit library "$size" library_json_characters "$(first '[0-9]+ characters of JSON')" characters "$run"
+    emit library "$size" library_made_ready "$(first 'games made ready to send in [0-9]+ ms')" ms "$run"
+    emit library "$size" library_read_by_godot "$(first 'library: [0-9]+ characters read in [0-9.]+ ms')" ms "$run"
+    emit library "$size" library_typed_by_godot "$(first 'library: [0-9]+ games typed in [0-9.]+ ms')" ms "$run"
+    emit library "$size" library_json_characters "$(first 'library: [0-9]+ characters read in')" characters "$run"
+    emit catalog "$size" catalog_read "$(first 'catalog read in [0-9.]+ ms')" ms "$run"
+    emit catalog "$size" catalog_loaded "$(first 'catalog read in [0-9.]+ ms, loaded in [0-9.]+ ms')" ms "$run"
     # The first frames showing the shelf: the slowest of them.
     worst=$("$adb" logcat -d | grep -oE "first frames: [0-9., ]+ ms" | head -1 | grep -oE "[0-9]+\.[0-9]+" | sort -n | tail -1)
     emit first_frames "$size" first_frames_worst "$worst" ms "$run"
@@ -189,7 +196,7 @@ for size in "${sizes[@]}"; do
     # to tell what a hitch was.
     "$adb" logcat -d | grep -E "frame: slow frame|carousel: (step|jump|platform) " > "build/bench/$scenario-$size.log" || true
     if [ "$scenario" = scroll ]; then
-      emit memory "$size" memory_pss "$("$adb" shell dumpsys meminfo app.cartouche | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
+      emit memory "$size" memory_pss "$("$adb" shell dumpsys meminfo "$package" | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
       # Leaving the app (here for the system settings) saves the selection.
       "$adb" shell am start -a android.settings.SETTINGS > /dev/null
       wait_for "selection: saved" 10
@@ -206,9 +213,9 @@ for size in "${sizes[@]}"; do
     shown=$("$adb" logcat -d | grep -oE "Displayed $emulator/[^ ]+: \+[0-9s]+ms" | head -1 | grep -oE "[0-9s]+ms$" |
       sed 's/ms$//' | awk -F's' '{ print NF == 2 ? $1 * 1000 + $2 : $1 + 0 }')
     [ -z "$shown" ] || emit launch "$size" emulator_shown "$shown" ms 1
-    "$adb" shell am start -n app.cartouche/com.godot.game.GodotAppLauncher > /dev/null
+    "$adb" shell am start -n "$package"/com.godot.game.GodotAppLauncher > /dev/null
     sleep 2
     [ -z "$emulator" ] || "$adb" shell am force-stop "$emulator"
   fi
 done
-"$adb" shell am force-stop app.cartouche
+"$adb" shell am force-stop "$package"

@@ -1,6 +1,6 @@
 {
  "choice": 4,
- "model_hash": "b17d3f6604b083e45cf7fa509581a429e4761a74ae61e19168c84d85f94ef216",
+ "model_hash": "a3bca732150d81ed95dd2e9433739df690f5bbe5fa532216b9da9da6bf9e88b0",
  "proposal": "PS2 fat, proposed launch (not in the app): built from ps2_slim's launch.json, its lid replaced by eject, the tray out, the disc into the recess, the tray in, power and the light",
  "steps": [
   {

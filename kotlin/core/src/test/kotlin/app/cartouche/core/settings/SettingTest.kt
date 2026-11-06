@@ -9,6 +9,7 @@ import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.descriptors.elementNames
@@ -48,12 +49,24 @@ class SettingTest {
     }
 
     @Test
-    fun `an empty name clears the region and the language, and a choice's names are those the file stores`() {
-        val chosen = Settings(preferredRegion = Some(PreferredRegion.JAPAN), language = Some(Language.GERMAN))
-        Setting.change(chosen, "preferred_region", "").shouldBeRight(chosen.copy(preferredRegion = None))
-        Setting.change(chosen, "language", "").shouldBeRight(chosen.copy(language = None))
-        Setting.PREFERRED_REGION.names shouldBe PreferredRegion.entries.map { it.region }
-        Setting.LANGUAGE.names shouldBe listOf("en", "fr", "de", "es", "it", "pt", "pt_BR", "ja")
-        Setting.GAMES_FLOAT.names shouldBe emptyList()
-    }
+    fun `an empty name clears the region and the language, and a choice's names are the values it sends and the file stores`() =
+        runBlocking<Unit> {
+            val chosen = Settings(preferredRegion = Some(PreferredRegion.JAPAN), language = Some(Language.GERMAN))
+            Setting.change(chosen, "preferred_region", "").shouldBeRight(chosen.copy(preferredRegion = None))
+            Setting.change(chosen, "language", "").shouldBeRight(chosen.copy(language = None))
+            Setting.all.forEach { setting ->
+                setting.names.forEach { name ->
+                    val changed = setting.change(Settings(), name).shouldBeRight()
+                    setting.valueIn(changed) shouldBe Some(SettingValue.Name(name))
+                    SettingsFormat.encode(changed) shouldContain "\"$name\""
+                }
+            }
+            checkAll(settings) { settings ->
+                Setting.all.forEach { setting ->
+                    setting.valueIn(settings).onSome { value ->
+                        (if (value is SettingValue.Name) setting.names.contains(value.name) else setting.names.isEmpty()) shouldBe true
+                    }
+                }
+            }
+        }
 }

@@ -9,15 +9,13 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.settings.Settings
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
+import arrow.core.Some
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import org.godotengine.godot.Dictionary
 import org.junit.Test
 import java.io.File
 
@@ -50,22 +48,16 @@ class DesktopDemoTest {
         val desktopCatalog = catalog.copy(platforms = catalog.platforms.filter { it.id in catalog.supported })
 
         fun library(platforms: List<PlatformId>): JsonElement = DemoLibrary.of(DESKTOP_GAMES, platforms).let {
-            Json.parseToJsonElement(it.toWireJson(Shelves.of(it, platforms, Selection()), catalog))
+            Json.parseToJsonElement(jsonOf(it.sent(0, Shelves.of(it, platforms, Selection()), catalog)))
         }
         val expected =
             buildJsonObject {
-                put("catalog", desktopCatalog.toWire(coming).toJson())
+                put("catalog", Json.parseToJsonElement(jsonOf(desktopCatalog.sent(coming))))
                 put("library", library(catalog.offered.map { it.platform }.filter { it !in coming }))
                 put("library_with_coming", library(catalog.offered.map { it.platform }))
                 // The settings of a fresh install, as the plugin sends them: the desktop's until changed.
-                put("settings", Settings().toWire(firstLaunch = false).toJson())
-                put(
-                    "battery",
-                    buildJsonObject {
-                        put("level_percent", JsonPrimitive(100))
-                        put("plugged", JsonPrimitive(true))
-                    },
-                )
+                put("settings", Json.parseToJsonElement(jsonOf(Settings().sent(firstLaunch = false))))
+                put("battery", Json.parseToJsonElement(jsonOf(Sent.Battery(Some(100), plugged = true))))
             }
         val fixture = File(app, "dev/demo/desktop.json")
         val found = if (fixture.exists()) Json.parseToJsonElement(fixture.readText()) else JsonObject(emptyMap())
@@ -83,15 +75,6 @@ class DesktopDemoTest {
             val manifest = folder.resolve("console.tres").readText()
             PlatformId(checkNotNull(Regex("""^platform = "(.*)"$""", RegexOption.MULTILINE).find(manifest)).groupValues[1])
         }.toSet()
-
-    private fun Any?.toJson(): JsonElement = when (this) {
-        is Dictionary -> JsonObject(entries.associate { it.key to it.value.toJson() })
-        is Array<*> -> JsonArray(map { it.toJson() })
-        is String -> JsonPrimitive(this)
-        is Number -> JsonPrimitive(this)
-        is Boolean -> JsonPrimitive(this)
-        else -> error("Not a wire value: $this")
-    }
 
     private companion object {
         /** Enough games for every shelf of a few of the supported consoles to be an endless row. */

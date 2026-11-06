@@ -7,6 +7,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ktlint)
 }
 
@@ -73,6 +74,14 @@ tasks.withType<Test>().configureEach {
     systemProperty("cartouche.build", layout.buildDirectory.get().asFile.path)
     // `-Probolectric.enabledSdks=33` runs the Robolectric tests on one Android only, for quick runs.
     providers.gradleProperty("robolectric.enabledSdks").orNull?.let { systemProperty("robolectric.enabledSdks", it) }
+    // WireScriptTest checks app/adapters/android/android_wire.gd against the types the plugin sends; `-Pwire.write=true`
+    // writes it.
+    inputs.file(rootProject.file("../app/adapters/android/android_wire.gd"))
+    providers.gradleProperty("wire.write").orNull?.let {
+        systemProperty("cartouche.wire.write", it)
+        outputs.upToDateWhen { false }
+        outputs.cacheIf { false }
+    }
 }
 
 kotlin {
@@ -88,6 +97,7 @@ dependencies {
     implementation(project(":core"))
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
+    implementation(libs.arrow.serialization)
     testImplementation(libs.bundles.test)
     testImplementation(testFixtures(project(":core")))
     testImplementation(libs.robolectric)

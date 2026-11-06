@@ -13,7 +13,7 @@ func after_test() -> void:
 ## A carousel of two consoles, still, its first console selected.
 func _still() -> Carousel:
 	var carousel := Fixtures.fresh_carousel(self, Fixtures.past_first_launch(self, {"ps2": 3, "gba": 2}))
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._shown)
 	while carousel._consoles.selected_index() > 0:
 		await Fixtures.action(self, &"carousel_left")
 	carousel._resting.stays_awake = false

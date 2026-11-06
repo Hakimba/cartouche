@@ -197,10 +197,10 @@ func back_from_removal(failed: bool) -> void:
 ## The choices made, as the plugin takes them.
 func setup() -> AndroidServices.PlatformSetup:
 	var choices := AndroidServices.PlatformSetup.new()
-	choices.has_folder = _has_folder
+	choices.has_folder_uri = _has_folder
 	choices.folder_uri = _folder.uri if _has_folder else ""
-	choices.has_player = _player >= 0
-	choices.player_id = _players[_player].id if choices.has_player else ""
+	choices.has_player_id = _player >= 0
+	choices.player_id = _players[_player].id if choices.has_player_id else ""
 	choices.folder_depth = "subfolders" if _subfolders.button_pressed else "top_level"
 	choices.variant_id = _folders.get(platform_id, "")
 	choices.disc_grouping = "grouped" if _discs.button_pressed else "separate"
@@ -209,7 +209,7 @@ func setup() -> AndroidServices.PlatformSetup:
 
 ## Where [param folder] is, as the user reads it: "SD card › ROMs › ps2".
 static func folder_place(folder: AndroidServices.Folder) -> String:
-	if not folder.has_place:
+	if not folder.has_volume:
 		return folder.name
 	var parts := PackedStringArray([TranslationServer.translate("SD card") if folder.volume == &"card"
 		else TranslationServer.translate("Internal storage")])
@@ -227,7 +227,6 @@ func platform_name() -> String:
 
 func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: AndroidServices.Folder,
 		taken: PackedStringArray) -> void:
-	android.prepare_titles()
 	# An answer still on its way belongs to the form as it was.
 	_counts += 1
 	_edited_id = edited_id
@@ -247,7 +246,7 @@ func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: An
 	_cancel.position.x = _REMOVE_X if editing else _cancel_x
 	_add.text = tr("Save") if editing else tr("Add")
 	_folder = folder
-	_has_folder = choices.has_folder
+	_has_folder = choices.has_folder_uri
 	_games = -1
 	_subfolders.set_pressed_no_signal(choices.folder_depth == "subfolders")
 	_discs.set_pressed_no_signal(choices.disc_grouping == "grouped")
@@ -269,13 +268,14 @@ func _fill(edited_id: String, choices: AndroidServices.PlatformSetup, folder: An
 
 
 ## The installed players, [param preferred_id] chosen if it is one of them, else none; then the
-## count again with it.
+## count again with it, the platform's tables prepared for it meanwhile.
 func _read_players(preferred_id := "") -> void:
 	_games = -1
 	# A count still on its way belongs to the players as they were.
 	_counts += 1
 	_players.clear()
 	if platform_id:
+		android.prepare_tables(platform_id)
 		_players = android.installed_players(platform_id)
 	_player = _players.find_custom(func(player: AndroidServices.Player) -> bool: return player.id == preferred_id)
 	_show_player()

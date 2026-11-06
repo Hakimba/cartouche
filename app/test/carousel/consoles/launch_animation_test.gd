@@ -96,8 +96,8 @@ func test_every_console_takes_a_game_to_the_whole_screen_black_in_2_4_s_unless_i
 func _console() -> Fixtures.Console:
 	var console: Fixtures.Console = auto_free(Fixtures.Console.new())
 	console.name = "Console"
-	console.moving = [MovingPart.new(&"lid_degrees", MovingPart.Role.OPENING, 0.0, 88.0),
-		MovingPart.new(&"flap_cm", MovingPart.Role.POWER, 1.5, -2.0)]
+	console.moving = [Fixtures.part(&"lid_degrees", ConsolePart.Role.OPENING, 0.0, 88.0),
+		Fixtures.part(&"flap_cm", ConsolePart.Role.POWER, 1.5, -2.0)]
 	return console
 
 

@@ -69,8 +69,7 @@ page that explains it. Start from [README.md](README.md) if you have not.
 - **Model variant**: one of several models of a platform (the slim and the original PS2). The user's choice is kept
   per platform (`ConsoleVariant`, `Library.withVariant`).
 - **Moving part**: a part of a console that moves (a lid, a tray, a light), a float property of its model with a
-  role and its values at rest and fully moved (`MovingPart`); declared as data in a glb console's scene
-  (`ConsolePart`).
+  role and its values at rest and fully moved, declared as data in its scene (`ConsolePart`).
 - **Pace**: how fast what moves by itself goes, from 1 awake down to 0 at rest. Nodes that move by themselves join
   the group `paced` (`Resting`).
 - **Place**: one of the games row's recycled slots (`ShelfRow`).
@@ -124,7 +123,8 @@ page that explains it. Start from [README.md](README.md) if you have not.
 - **Texture table**: `app/data/screenscraper/<platform>.tsv`: per release, its ScreenScraper game and textures
   (`TextureTable`).
 - **Walk**: listing a folder and its sub-folders for a scan (`FolderWalk`).
-- **Wire format**: what crosses the JNI bridge between the plugin and GDScript (`Wire.kt`, `AndroidWire`).
+- **Wire format**: what crosses the JNI bridge between the plugin and GDScript, as JSON text (`Sent.kt`, `Wire.kt`,
+  and `AndroidWire`, generated from them).
 
 ## Neighbours
 

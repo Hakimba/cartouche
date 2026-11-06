@@ -140,7 +140,7 @@ static func read(path: String, console: ConsoleModel = null) -> Animation:
 ## The parts [param data]'s steps move that [param console] does not have, by name (all of them
 ## without a console): steps written for another model.
 static func problems(data: Dictionary, console: ConsoleModel = null) -> Array[StringName]:
-	var declared := _moving_parts(console).map(func(part: MovingPart) -> StringName: return part.property)
+	var declared := _moving_parts(console).map(func(part: ConsolePart) -> StringName: return part.property)
 	var unknown: Array[StringName] = []
 	for step in _steps(data):
 		for key: String in _group(step, "parts"):
@@ -199,19 +199,19 @@ static func back_out(u: float) -> float:
 ## medium holding it open, so that it never cuts a flap half open; a press as the console comes
 ## forward, let go as the openings open; a power press as the console comes on, let go at the next
 ## step; a pose never; power, lights and spins from the step the console closes.
-static func _moved(role: MovingPart.Role, i: int) -> bool:
+static func _moved(role: ConsolePart.Role, i: int) -> bool:
 	match role:
-		MovingPart.Role.OPENING:
+		ConsolePart.Role.OPENING:
 			return _OPENS <= i and i < _CLOSES
-		MovingPart.Role.FLAP:
+		ConsolePart.Role.FLAP:
 			return i >= _SEATS - 1
-		MovingPart.Role.PRESS:
+		ConsolePart.Role.PRESS:
 			return i == _OPENS - 1
-		MovingPart.Role.POWER_PRESS:
+		ConsolePart.Role.POWER_PRESS:
 			return i == _CLOSES
-		MovingPart.Role.POSE:
+		ConsolePart.Role.POSE:
 			return false
-		MovingPart.Role.POWER, MovingPart.Role.LIGHT, MovingPart.Role.SPIN:
+		ConsolePart.Role.POWER, ConsolePart.Role.LIGHT, ConsolePart.Role.SPIN:
 			return i >= _CLOSES
 	push_error("LaunchAnimation: no placeholder for the role %d" % role)
 	return false
@@ -226,8 +226,8 @@ static func _steps(data: Dictionary) -> Array[Dictionary]:
 	return steps
 
 
-static func _moving_parts(console: ConsoleModel) -> Array[MovingPart]:
-	return console.moving_parts() if console else ([] as Array[MovingPart])
+static func _moving_parts(console: ConsoleModel) -> Array[ConsolePart]:
+	return console.moving_parts() if console else ([] as Array[ConsolePart])
 
 
 ## When each step is reached (x) and when its hold is over (y).

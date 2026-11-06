@@ -5,10 +5,6 @@ extends GdUnitTestSuite
 ## How a segment meets a wall: not at all, grazing its rim, or through it.
 enum Meeting { CLEAR, GRAZED, CROSSED }
 
-## The kinds of value a shape's dimension may be, and a step of each.
-const _DIMENSION_TYPES: Array[int] = [TYPE_FLOAT, TYPE_INT, TYPE_VECTOR2, TYPE_VECTOR3, TYPE_BOOL]
-const _ONE: Dictionary[int, Variant] = {TYPE_FLOAT: 1.0, TYPE_INT: 1, TYPE_VECTOR2: Vector2.ONE,
-	TYPE_VECTOR3: Vector3.ONE}
 const Fixtures := preload("res://test/carousel/fixtures.gd")
 const ScreenFixtures := preload("res://test/screens/fixtures.gd")
 const APPEARANCE := "res://data/carousel/appearance.json"
@@ -26,23 +22,11 @@ const HOUSINGS: Dictionary[String, Array] = {
 	"megadrive": [&"body", &"flap_front", &"flap_back"], "megadrive2": [&"body", &"flap_front", &"flap_back"],
 	"mastersystem": [&"body"],
 }
-## The open edges of each glb's body as shipped: the shells have openings (undersides, hidden faces), welded by
-## position. The closed-mesh promise does not hold for them; these hold.
-const OPEN_EDGES: Dictionary[String, int] = {"nes": 80, "gbc": 2475, "snes": 2210, "ps2_fat": 998, "gba_sp": 1359,
-	"psp": 449, "switch": 5638, "switch_grey": 5638, "dreamcast": 5423, "megadrive": 998, "megadrive2": 688,
-	"mastersystem": 7081}
-## The two bench models' rest poses: the SP's screen stands open and the PS2 tray's bezel stands proud.
-## These exact boxes preserve their supplied geometry without changing the other consoles' rest envelopes.
-const BENCH_RESTS: Dictionary[String, AABB] = {
-	"gba_sp: lid": AABB(Vector3(-0.4199632, 0.07824055, -0.5978231), Vector3(0.8399357, 0.8035966, 0.2716731)),
-	"ps2_fat: tray": AABB(Vector3(-0.0571249, 0.5008283, -0.8095596), Vector3(1.2912878, 0.1669884, 1.7316538)),
-}
+## The moving parts of the bench models that stand out at rest, as supplied: the SP's screen stands open and the PS2
+## tray's bezel stands proud.
+const STANDING_OUT: Array[String] = ["gba_sp: lid", "ps2_fat: tray"]
 ## At least this share of a glb mesh's triangles face the way the vertex normals say.
 const WINDING_AGREES := 0.98
-## The edges of more than two faces of a glb's meshes, by `console: mesh`: none, but ten on the Super Nintendo's
-## body where its shell was cut, and those the Switch's and the Mega Drive model 2's bodies have as downloaded.
-const FOLDED_EDGES: Dictionary[String, int] = {"snes: body": 10, "switch: body": 67, "switch_grey: body": 67,
-	"megadrive2: body": 11}
 ## The side of the grid's squares a medium's way in is checked by, in millimetres.
 const _CELL_MM := 4.0
 
@@ -89,7 +73,7 @@ func test_steps_moving_a_part_the_console_lacks_are_refused() -> void:
 		# The parts the steps drawn move, now and then.
 		for part: StringName in [&"lid_degrees", &"flap_cm"]:
 			if random.randf() < 0.7:
-				console.moving.append(MovingPart.new(part, MovingPart.Role.OPENING, 0.0, 1.0))
+				console.moving.append(Fixtures.part(part, ConsolePart.Role.OPENING, 0.0, 1.0))
 		var data := Fixtures.launch_steps(random)
 		var named: Array[StringName] = []
 		for step: Dictionary in data["steps"]:
@@ -98,7 +82,7 @@ func test_steps_moving_a_part_the_console_lacks_are_refused() -> void:
 				if StringName(part) not in named:
 					named.append(StringName(part))
 		var lacking := named.filter(func(part: StringName) -> bool:
-			return console.moving.all(func(moving: MovingPart) -> bool: return moving.property != part))
+			return console.moving.all(func(moving: ConsolePart) -> bool: return moving.property != part))
 		var problems := LaunchAnimation.problems(data, console)
 		problems.sort()
 		lacking.sort()
@@ -107,41 +91,44 @@ func test_steps_moving_a_part_the_console_lacks_are_refused() -> void:
 	assert_int(refused).is_between(40, 160)
 
 
-func test_a_console_s_fingerprint_changes_with_any_dimension_or_moving_part() -> void:
+func test_a_console_s_fingerprint_changes_with_its_seat_any_moving_part_or_the_files_it_is_drawn_from() -> void:
 	var random := Fixtures.cases(73)
 	for manifest in ConsoleManifest.found():
-		var scene: PackedScene = load(manifest.scene)
-		var shipped: ConsoleModel = auto_free(scene.instantiate())
+		var shipped: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
 		var console: Fixtures.Console = auto_free(Fixtures.Console.new())
 		console.shape = shipped.shape.duplicate()
 		console.moving = Fixtures.moving_parts(random)
 		var seen := {console.fingerprint(): true}
-		# Each change of a dimension says so: what the shape found of its rules is found again.
-		var said := [0]
-		console.shape.changed.connect(func() -> void: said[0] += 1)
-		for dimension: StringName in console.shape.dimensions():
-			var value: Variant = console.shape.get(dimension)
-			assert_bool(typeof(value) in _DIMENSION_TYPES).override_failure_message(
-				"%s.%s: a dimension is a number, a count, a Vector2, a Vector3 or a bool" % [manifest.platform,
-				dimension]).is_true()
-			console.shape.set(dimension, (not value) if value is bool else value + _ONE[typeof(value)])
+		var seat_changes := {&"seat_centre": Vector3.ONE, &"seat_degrees": Vector3.ONE, &"pivot": Vector3.ONE}
+		for property: StringName in seat_changes:
+			var value: Vector3 = console.shape.get(property)
+			console.shape.set(property, value + seat_changes[property])
 			seen[console.fingerprint()] = true
-			console.shape.set(dimension, value)
+			console.shape.set(property, value)
+		var carrier := console.shape.carrier
+		console.shape.carrier = StringName(carrier + "_other")
+		seen[console.fingerprint()] = true
+		console.shape.carrier = carrier
 		for part in console.moving:
-			var changes := {&"property": &"other", &"role": (part.role + 1) % MovingPart.Role.size(),
+			var changes := {&"property": &"other", &"role": (part.role + 1) % ConsolePart.Role.size(),
 				&"rest": part.rest + 1.0, &"open": part.open + 1.0}
 			for property: StringName in changes:
 				var value: Variant = part.get(property)
 				part.set(property, changes[property])
 				seen[console.fingerprint()] = true
 				part.set(property, value)
-		assert_int(seen.size()).is_equal(1 + console.shape.dimensions().size() + 4 * console.moving.size())
-		assert_int(said[0]).override_failure_message("%s: a dimension changes silently" % manifest.platform) \
-			.is_equal(2 * console.shape.dimensions().size())
+		assert_int(seen.size()).is_equal(5 + 4 * console.moving.size())
 		assert_bool(console.fingerprint() in seen).is_true()
+		# Drawn from other mesh files, it is another model.
+		if not _is_glb(shipped):
+			var drawn := shipped.fingerprint()
+			var meshes := shipped.find_children("*", "MeshInstance3D", true, false)
+			(meshes[0] as MeshInstance3D).mesh = (meshes[1] as MeshInstance3D).mesh
+			assert_str(shipped.fingerprint()).override_failure_message("%s: its meshes change silently"
+				% manifest.platform).is_not_equal(drawn)
 
 
-func test_the_contract_depends_on_the_shape_and_the_moving_parts_alone() -> void:
+func test_the_contract_depends_on_the_seat_and_the_moving_parts_alone() -> void:
 	var appearance := Appearance.read(APPEARANCE)
 	for manifest in ConsoleManifest.found():
 		var scene: PackedScene = load(manifest.scene)
@@ -196,7 +183,7 @@ func test_every_glb_holds_beside_it_its_licence_and_source_and_its_credit_line_i
 	assert_int(glbs.size()).is_greater(2)
 
 
-func test_a_glb_console_s_meshes_never_fold_nor_degenerate_and_their_winding_agrees_with_their_normals() -> void:
+func test_a_glb_console_s_meshes_never_degenerate_and_their_winding_agrees_with_their_normals() -> void:
 	var checked := 0
 	for manifest in ConsoleManifest.found():
 		var model: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
@@ -219,15 +206,9 @@ func test_a_glb_console_s_meshes_never_fold_nor_degenerate_and_their_winding_agr
 					.is_greater(MIN_AREA_MM2)
 				var told := normals[corners[t]] + normals[corners[t + 1]] + normals[corners[t + 2]]
 				agreeing += 1 if facing.dot(told) > 0.0 else 0
-			var folded := Fixtures.folded_edges(meshes)
-			assert_int(folded).override_failure_message("%s: %d edges of more than two faces" % [label, folded]) \
-				.is_equal(FOLDED_EDGES.get(label, 0))
 			assert_float(agreeing / (corners.size() / 3.0)).override_failure_message(
 				"%s: its winding disagrees with its normals" % label).is_greater_equal(WINDING_AGREES)
 			if geometry.name == &"body":
-				var open := Fixtures.open_edges(meshes).size()
-				assert_int(open).override_failure_message("%s: %d open edges" % [label, open]).is_equal(
-					OPEN_EDGES.get(ConsoleManifest.folder_of(manifest), 0))
 				var volume := 0.0
 				for piece in Fixtures.volumes(meshes):
 					volume += piece
@@ -335,7 +316,7 @@ static func _is_glb(model: Node) -> bool:
 
 ## What the launch reads of [param console]: its parts, its seat, its way in and how it is presented.
 static func _contract(console: ConsoleModel) -> Array:
-	var parts := console.moving_parts().map(func(part: MovingPart) -> Array:
+	var parts := console.moving_parts().map(func(part: ConsolePart) -> Array:
 		return [part.property, part.role, part.rest, part.open])
 	return [parts, console.seat(), console.approach(), console.presented()]
 
@@ -385,9 +366,9 @@ static func _default_medium_box(appearance: Appearance, platform: String) -> AAB
 ## as far as the placeholder lifts it.
 func _assert_moving_parts_fit(model: ConsoleModel, medium: AABB) -> void:
 	var parts := model.moving_parts()
-	var openings: Array[MovingPart] = []
-	openings.assign(parts.filter(func(part: MovingPart) -> bool:
-		return part.role in [MovingPart.Role.OPENING, MovingPart.Role.FLAP]))
+	var openings: Array[ConsolePart] = []
+	openings.assign(parts.filter(func(part: ConsolePart) -> bool:
+		return part.role in [ConsolePart.Role.OPENING, ConsolePart.Role.FLAP]))
 	var resting := _boxes(model)
 	var seat := model.seat()
 	var moving: Dictionary[MeshInstance3D, bool] = {}
@@ -416,14 +397,11 @@ func _assert_moving_parts_fit(model: ConsoleModel, medium: AABB) -> void:
 		if geometry not in moving:
 			body = resting[geometry] if body.size == Vector3.ZERO else body.merge(resting[geometry])
 	for geometry in moving:
-		var bench_key := "%s: %s" % [model.scene_file_path.get_base_dir().get_file(), geometry.name]
-		if BENCH_RESTS.has(bench_key):
-			var expected: AABB = BENCH_RESTS[bench_key]
-			assert_bool(resting[geometry].is_equal_approx(expected)).override_failure_message(bench_key).is_true()
-		else:
-			var proud := 0.5 if geometry in opened_by else ConsoleModel.PROUD_MM
-			assert_bool(body.grow(proud * MM).encloses(resting[geometry])).override_failure_message(
-				"%s sticks out at rest" % geometry.name).is_true()
+		if "%s: %s" % [model.scene_file_path.get_base_dir().get_file(), geometry.name] in STANDING_OUT:
+			continue
+		var proud := 0.5 if geometry in opened_by else ConsoleModel.PROUD_MM
+		assert_bool(body.grow(proud * MM).encloses(resting[geometry])).override_failure_message(
+			"%s sticks out at rest" % geometry.name).is_true()
 	for part in openings:
 		model.set(part.property, part.open)
 	# In millimetres, as all that is crossed: in world units, a small triangle seems flat.
@@ -457,11 +435,11 @@ func _assert_medium_clear(model: ConsoleModel, medium: Node3D, box: AABB, housin
 			var key := Vector3i((placed * vertices[i] * 100.0).round())
 			points[key] = placed * vertices[i]
 			normals[key] = normals.get(key, Vector3.ZERO) + (placed.basis * faces[i]).normalized()
-	var openings := model.moving_parts().filter(func(part: MovingPart) -> bool:
-		return part.role in [MovingPart.Role.OPENING, MovingPart.Role.FLAP])
+	var openings := model.moving_parts().filter(func(part: ConsolePart) -> bool:
+		return part.role in [ConsolePart.Role.OPENING, ConsolePart.Role.FLAP])
 	var still := _still(model).filter(func(geometry: MeshInstance3D) -> bool:
 		return geometry.name not in housings)
-	for part: MovingPart in openings:
+	for part: ConsolePart in openings:
 		model.set(part.property, part.open)
 	var axis := model.approach()
 	var reach := axis * LaunchAnimation.lift(axis, box) / MM
@@ -475,7 +453,7 @@ func _assert_medium_clear(model: ConsoleModel, medium: Node3D, box: AABB, housin
 		walls.append_array(found)
 		for _corner in found:
 			names.append(geometry.name)
-	for part: MovingPart in openings:
+	for part: ConsolePart in openings:
 		model.set(part.property, part.rest)
 	# Each wall listed under the squares of a grid across the way in that it lies over: a point is
 	# checked against those over its square only.

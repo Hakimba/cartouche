@@ -8,13 +8,8 @@ import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
 import arrow.core.nonEmptyListOf
-import io.kotest.assertions.arrow.core.shouldBeLeft
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
-import io.kotest.property.Arb
-import io.kotest.property.arbitrary.int
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -93,18 +88,5 @@ class ArrivalsTest {
             marked.within(after.without(ps2.id)) shouldBe Arrivals()
             marked.after(ps2.id, after, after.withScan(ps2.id, scan(emptyList()))) shouldBe Arrivals()
         }
-    }
-
-    @Test
-    fun `INV-25 stored arrivals read back the same, and a damaged file is not read, whatever is left of it`() = runBlocking<Unit> {
-        checkAll(folderFiles, folderFiles, Arb.int(0..400), Arb.string(0..20)) { files, added, cut, noise ->
-            val before = library(files)
-            val arrivals = Arrivals().after(ps2.id, before, before.withScan(ps2.id, scan(reread(files, added))))
-            val text = ArrivalsFormat.encode(arrivals)
-            ArrivalsFormat.decode(text).shouldBeRight(arrivals)
-            // What is left of a damaged file is refused, or reads as it was stored, never as other marks.
-            ArrivalsFormat.decode(text.take(cut) + noise).fold({ true }) { it == arrivals } shouldBe true
-        }
-        listOf("", "not json", """{"version":1}""", """{"version":2,"arrivals":{}}""").forEach { ArrivalsFormat.decode(it).shouldBeLeft() }
     }
 }

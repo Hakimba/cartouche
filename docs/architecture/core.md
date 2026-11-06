@@ -60,7 +60,7 @@ Package `library`.
 | `Game.kt` | A game, its discs, its label choice (`LabelChoice`) and its display name. |
 | `Library.kt` | Every platform's games and choices. Merges a rescan without losing the user's choices (INV-12), removes a platform whole (INV-13), keeps the console order and each console's chosen model. |
 | `ConsoleVariant.kt` | One entry per console model folder, with its platform. `Library.withVariant` refuses an unknown model or one of another platform. |
-| `Arrivals.kt`, `ArrivalsFormat.kt` | The games a re-read the user did not ask for brought and the user has not seen yet: new on their shelf until left, announced on their console until it is entered; only games still in the library (INV-25). Stored as versioned JSON in their own file. |
+| `Arrivals.kt` | The games a re-read the user did not ask for brought and the user has not seen yet: new on their shelf until left, announced on their console until it is entered; only games still in the library (INV-25). Stored as versioned JSON in their own file. |
 | `LibraryFormat.kt` | Stores the library as versioned JSON and reads every earlier format (INV-11). |
 | `DemoLibrary.kt` | Makes up a library of any size, the same for the same arguments, for measuring at scale. |
 
@@ -86,8 +86,7 @@ Packages `shelves` and `search`.
 
 | File | Responsibility |
 |---|---|
-| `Shelves.kt` | One shelf per platform with games, in title order, and the `Selection` restored on them. |
-| `SelectionFormat.kt` | Stores the selection in its own small file, so saving it costs the same at any library size. |
+| `Shelves.kt` | One shelf per platform with games, in title order, and the `Selection` restored on them, stored in its own small file so saving it costs the same at any library size. |
 | `Words.kt` | Reads a title as the search does: words of folded letters and digits, each with its place in the title for underlining. |
 | `Query.kt` | What the user typed. |
 | `TitleLetter.kt` | The letter a title is filed under (`#` for a digit, a sign or another script). |
@@ -119,8 +118,8 @@ Packages `settings` and `storage`.
 
 | File | Responsibility |
 |---|---|
-| `Settings.kt` | The app's choices apart from the library: button style, edge smoothing, preferred region, games floating, sound level, language, background, pixel veil, and whether the first launch is still to do. |
-| `SettingsFormat.kt` | Their stored format. |
+| `Settings.kt` | The app's choices apart from the library: button style, edge smoothing, preferred region, games floating, sound level, language, background, pixel veil, whether the first launch is still to do, and their stored format. |
+| `VersionedJson.kt` | The stored format of a small state in its own file: versioned JSON, checked like any input when read back. |
 | `DocumentPaths.kt` | Maps a document id (`1A2B-3C4D:ROMs/ps2`) to a path and to a place the user reads. |
 
 ## Neighbours

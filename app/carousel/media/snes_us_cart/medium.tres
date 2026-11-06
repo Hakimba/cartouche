@@ -7,3 +7,5 @@ script = ExtResource("1")
 media = "cartridge"
 scene = "res://carousel/media/snes_us_cart/snes_us_cart.tscn"
 triangle_budget = 5000
+title_area = Rect2(0.06, 0.1, 0.88, 0.56)
+platform_area = Rect2(0.2, 0.74, 0.6, 0.16)

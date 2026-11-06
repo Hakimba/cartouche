@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/n64/n64_model.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/console_model.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/console_part.gd" id="part"]
 [ext_resource type="Resource" path="res://carousel/consoles/n64/n64_shape.tres" id="2"]
-[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
 [ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
 [ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
 [ext_resource type="Texture2D" path="res://carousel/consoles/n64/n64_badge_logo.svg" id="badge_logo_image"]
@@ -11,6 +11,31 @@
 [ext_resource type="Texture2D" path="res://carousel/consoles/n64/n64_switch_label.svg" id="switch_label_image"]
 [ext_resource type="Texture2D" path="res://carousel/consoles/n64/n64_power_label.svg" id="power_label_image"]
 [ext_resource type="Texture2D" path="res://carousel/consoles/n64/n64_reset_label.svg" id="reset_label_image"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/feet.res" id="feet_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/lower.res" id="lower_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/upper.res" id="upper_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/pods.res" id="pods_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/well.res" id="well_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/bezel.res" id="bezel_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/lid.res" id="lid_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/logo.res" id="logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/badge.res" id="badge_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/vents.res" id="vents_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/side_vents.res" id="side_vents_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/recesses.res" id="recesses_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/flap_front.res" id="flap_front_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/flap_back.res" id="flap_back_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/power_knob.res" id="power_knob_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/power_label.res" id="power_label_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/reset_knob.res" id="reset_knob_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/reset_label.res" id="reset_label_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/ports.res" id="ports_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/pins.res" id="pins_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/led.res" id="led_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/badge_logo.res" id="badge_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/maker_logo.res" id="maker_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/lid_label.res" id="lid_label_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/n64/meshes/switch_label.res" id="switch_label_mesh"]
 
 [sub_resource type="ShaderMaterial" id="body_material"]
 shader = ExtResource("solid")
@@ -43,116 +68,6 @@ shader_parameter/albedo = Color(0.3, 0.02, 0.02, 1)
 shader_parameter/roughness = 0.3
 shader_parameter/emission = Color(1, 0.08, 0.05, 1)
 shader_parameter/emission_energy = 0
-
-[sub_resource type="PrimitiveMesh" id="feet_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"feet"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="lower_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"lower"
-detail = 64
-
-[sub_resource type="PrimitiveMesh" id="upper_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"upper"
-detail = 64
-
-[sub_resource type="PrimitiveMesh" id="pods_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"pods"
-detail = 64
-
-[sub_resource type="PrimitiveMesh" id="well_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"well"
-
-[sub_resource type="PrimitiveMesh" id="bezel_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"bezel"
-detail = 64
-
-[sub_resource type="PrimitiveMesh" id="flap_front_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"flap_front"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="flap_back_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"flap_back"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="lid_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"lid"
-detail = 32
-
-[sub_resource type="PrimitiveMesh" id="logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"logo"
-detail = 32
-
-[sub_resource type="PrimitiveMesh" id="badge_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"badge"
-detail = 32
-
-[sub_resource type="PrimitiveMesh" id="vents_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"vents"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="side_vents_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"side_vents"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="recesses_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"recesses"
-detail = 64
-
-[sub_resource type="PrimitiveMesh" id="power_knob_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"power_knob"
-detail = 32
-
-[sub_resource type="PrimitiveMesh" id="reset_knob_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"reset_knob"
-detail = 32
-
-[sub_resource type="PrimitiveMesh" id="ports_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"ports"
-
-[sub_resource type="PrimitiveMesh" id="pins_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"pins"
-
-[sub_resource type="PrimitiveMesh" id="led_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"led"
 
 [sub_resource type="ShaderMaterial" id="badge_logo_material"]
 shader = ExtResource("label")
@@ -202,149 +117,164 @@ shader_parameter/roughness = 0.55
 shader_parameter/varnish = 0.12
 shader_parameter/grain = 0.0
 
-[sub_resource type="PrimitiveMesh" id="badge_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"badge_logo"
+[sub_resource type="Resource" id="part_flaps_degrees"]
+script = ExtResource("part")
+property = &"flaps_degrees"
+node = NodePath("FrontFlap")
+axis = Vector3(-1, 0, 0)
+role = 5
+open = 90.0
 
-[sub_resource type="PrimitiveMesh" id="maker_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"maker_logo"
+[sub_resource type="Resource" id="part_flaps_degrees_2"]
+script = ExtResource("part")
+property = &"flaps_degrees"
+node = NodePath("BackFlap")
+role = 5
+open = 90.0
 
-[sub_resource type="PrimitiveMesh" id="lid_label_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"lid_label"
+[sub_resource type="Resource" id="part_power_mm"]
+script = ExtResource("part")
+property = &"power_mm"
+node = NodePath("Power")
+motion = 1
+axis = Vector3(0, 0, -1)
+role = 1
+open = 16.0
 
-[sub_resource type="PrimitiveMesh" id="switch_label_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"switch_label"
+[sub_resource type="Resource" id="part_reset_mm"]
+script = ExtResource("part")
+property = &"reset_mm"
+node = NodePath("Reset")
+motion = 1
+axis = Vector3(0, 0, -1)
+role = 4
+open = 12.0
 
-[sub_resource type="PrimitiveMesh" id="power_label_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"power_label"
-
-[sub_resource type="PrimitiveMesh" id="reset_label_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"reset_label"
+[sub_resource type="Resource" id="part_light_energy"]
+script = ExtResource("part")
+property = &"light_energy"
+node = NodePath("Light")
+motion = 2
+role = 2
+open = 2.5
 
 [node name="N64" type="Node3D"]
 script = ExtResource("1")
 shape = ExtResource("2")
+parts = Array[ExtResource("part")]([SubResource("part_flaps_degrees"), SubResource("part_flaps_degrees_2"), SubResource("part_power_mm"), SubResource("part_reset_mm"), SubResource("part_light_energy")])
+way_in = Vector3(0, 1, 0)
 
 [node name="Feet" type="MeshInstance3D" parent="."]
-mesh = SubResource("feet_mesh")
+mesh = ExtResource("feet_mesh")
 surface_material_override/0 = SubResource("dark_material")
 
 [node name="Lower" type="MeshInstance3D" parent="."]
-mesh = SubResource("lower_mesh")
+mesh = ExtResource("lower_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Upper" type="MeshInstance3D" parent="."]
-mesh = SubResource("upper_mesh")
+mesh = ExtResource("upper_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Pods" type="MeshInstance3D" parent="."]
-mesh = SubResource("pods_mesh")
+mesh = ExtResource("pods_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Well" type="MeshInstance3D" parent="."]
-mesh = SubResource("well_mesh")
+mesh = ExtResource("well_mesh")
 surface_material_override/0 = SubResource("dark_material")
 
 [node name="Bezel" type="MeshInstance3D" parent="."]
-mesh = SubResource("bezel_mesh")
+mesh = ExtResource("bezel_mesh")
 surface_material_override/0 = SubResource("dark_material")
 
 [node name="Lid" type="MeshInstance3D" parent="."]
-mesh = SubResource("lid_mesh")
+mesh = ExtResource("lid_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Logo" type="MeshInstance3D" parent="."]
-mesh = SubResource("logo_mesh")
+mesh = ExtResource("logo_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Badge" type="MeshInstance3D" parent="."]
-mesh = SubResource("badge_mesh")
+mesh = ExtResource("badge_mesh")
 surface_material_override/0 = SubResource("badge_material")
 
 [node name="Vents" type="MeshInstance3D" parent="."]
-mesh = SubResource("vents_mesh")
+mesh = ExtResource("vents_mesh")
 surface_material_override/0 = SubResource("dark_material")
 
 [node name="SideVents" type="MeshInstance3D" parent="."]
-mesh = SubResource("side_vents_mesh")
+mesh = ExtResource("side_vents_mesh")
 surface_material_override/0 = SubResource("dark_material")
 
 [node name="Recesses" type="MeshInstance3D" parent="."]
-mesh = SubResource("recesses_mesh")
+mesh = ExtResource("recesses_mesh")
 surface_material_override/0 = SubResource("dark_material")
 
 [node name="FrontFlap" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.56, -0.299)
 unique_name_in_owner = true
 
 [node name="Cover" type="MeshInstance3D" parent="FrontFlap"]
-mesh = SubResource("flap_front_mesh")
+mesh = ExtResource("flap_front_mesh")
 surface_material_override/0 = SubResource("grey_material")
 
 [node name="BackFlap" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.56, -0.54099995)
 unique_name_in_owner = true
 
 [node name="Cover" type="MeshInstance3D" parent="BackFlap"]
-mesh = SubResource("flap_back_mesh")
+mesh = ExtResource("flap_back_mesh")
 surface_material_override/0 = SubResource("grey_material")
 
 [node name="Power" type="Node3D" parent="."]
 unique_name_in_owner = true
 
 [node name="Knob" type="MeshInstance3D" parent="Power"]
-mesh = SubResource("power_knob_mesh")
+mesh = ExtResource("power_knob_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Reset" type="Node3D" parent="."]
 unique_name_in_owner = true
 
 [node name="Knob" type="MeshInstance3D" parent="Reset"]
-mesh = SubResource("reset_knob_mesh")
+mesh = ExtResource("reset_knob_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Ports" type="MeshInstance3D" parent="."]
-mesh = SubResource("ports_mesh")
+mesh = ExtResource("ports_mesh")
 surface_material_override/0 = SubResource("grey_material")
 
 [node name="Pins" type="MeshInstance3D" parent="."]
-mesh = SubResource("pins_mesh")
+mesh = ExtResource("pins_mesh")
 surface_material_override/0 = SubResource("dark_material")
 
 [node name="Light" type="MeshInstance3D" parent="."]
 unique_name_in_owner = true
-mesh = SubResource("led_mesh")
+mesh = ExtResource("led_mesh")
 surface_material_override/0 = SubResource("led_material")
 
 [node name="BadgeLogo" type="MeshInstance3D" parent="."]
-mesh = SubResource("badge_logo_mesh")
+mesh = ExtResource("badge_logo_mesh")
 surface_material_override/0 = SubResource("badge_logo_material")
 
 [node name="MakerLogo" type="MeshInstance3D" parent="."]
-mesh = SubResource("maker_logo_mesh")
+mesh = ExtResource("maker_logo_mesh")
 surface_material_override/0 = SubResource("maker_logo_material")
 
 [node name="LidLabel" type="MeshInstance3D" parent="."]
-mesh = SubResource("lid_label_mesh")
+mesh = ExtResource("lid_label_mesh")
 surface_material_override/0 = SubResource("lid_label_material")
 
 [node name="SwitchLabel" type="MeshInstance3D" parent="."]
-mesh = SubResource("switch_label_mesh")
+mesh = ExtResource("switch_label_mesh")
 surface_material_override/0 = SubResource("switch_label_material")
 
 [node name="Label" type="MeshInstance3D" parent="Power"]
-mesh = SubResource("power_label_mesh")
+mesh = ExtResource("power_label_mesh")
 surface_material_override/0 = SubResource("power_label_material")
 
 [node name="Label" type="MeshInstance3D" parent="Reset"]
-mesh = SubResource("reset_label_mesh")
+mesh = ExtResource("reset_label_mesh")
 surface_material_override/0 = SubResource("reset_label_material")

@@ -232,6 +232,13 @@ public data class Catalog(
 
     public fun platform(id: PlatformId): Option<Platform> = platforms.firstOrNone { it.id == id }
 
+    /**
+     * The platforms whose consoles the carousel shows, those of the catalog that are [supported], in its order. A
+     * library's games of another platform (saved before its model went, or by hand) stay in the library, on no shelf.
+     */
+    public val shown: List<PlatformId>
+        get() = platforms.map { it.id }.filter { it in supported }
+
     /** The platforms a person may add, those of the catalog that are [supported], in the order of their names. */
     public val offered: List<OfferedConsole>
         get() = platforms.filter { it.id in supported }.sortedBy { it.name.lowercase() }.map(OfferedConsole::of)

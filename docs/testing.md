@@ -91,8 +91,8 @@ Tests live under `app/test/`, in folders that mirror `app/`. Shared helpers:
 
 | Helper | What it gives |
 |---|---|
-| `app/test/carousel/fixtures.gd` | `cases(seed)` (seeded random cases, so a failure always comes back), `shown_carousel`, `step_frame` and `step_until` (drive frames by hand), `press`, shape generators such as `drawn_around` |
-| `app/test/screens/fixtures.gd` | `NewDevice`, an `AndroidServices` whose answers a test sets; `carousel_for`, `past_first_launch`, `on_form`; `alive`, which says something on screen takes the next press |
+| `app/test/carousel/fixtures.gd` | `cases(seed)` (seeded random cases, so a failure always comes back), `new_carousel` (the scene every harness starts from), `arrived`, `shown_carousel`, `step_frame` and `step_until` (drive frames by hand), `press`, shape generators such as `drawn_around` |
+| `app/test/screens/fixtures.gd` | `NewDevice`, an `AndroidServices` whose answers a test sets (`slow` holds a request until `released`, `failing` refuses it); `past_first_launch`, `shown` (a carousel once it shows), `on_form`; `wait`, `on_screen`, `press_to`, `settled`; `alive`, which says something on screen takes the next press |
 | `app/test/studio/views/views_fixtures.gd` | the media views and plinth, for the Studio tests |
 | `app/test/dev/bridge/fixtures.gd` | a bridge and its commands, for the bridge tests |
 
@@ -122,8 +122,7 @@ too. With Godot's fixed frame time, two runs of the same code give the same pict
 $GODOT --path app --fixed-fps 60 --resolution 1280x960 -- --welcome=skip --shelf=ps2 --shots="$PWD/build/shots/before"
 ```
 
-Run it before and after a change, once on a console with its own model and once on a platform drawn by its medium,
-and compare the pictures. An optimisation must leave all of them identical.
+Run it before and after a change and compare the pictures. An optimisation must leave all of them identical.
 
 `scripts/bench.sh` measures the debug build installed on a device: cold starts, then each `CarouselBench` scenario
 (`app/dev/carousel_bench.gd`) for a fixed time, at several library sizes. `--record FILE` appends each measure as

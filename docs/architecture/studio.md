@@ -83,6 +83,9 @@ Text that must keep the design's width (a title, a note, a count) draws through 
 - `Motion.restart(node, old)` kills a running tween and makes the next. `Motion.animate` plays one named motion of
   a set.
 - `Motion.phase` gives where a step of a longer move stands at a time.
+- `Motion.Timeline` is a transition's clock, played forward or back to a time; the screen samples its steps with
+  `Motion.phase` at each move. Its own tween plays it, or the screen's frame does when that frame reads what the clock
+  places (the settings card, a game's properties).
 
 ## Screens built on these pieces
 

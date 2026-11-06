@@ -4,7 +4,6 @@
     "minidisc": "gc_mini_dvd",
     "cartridge": "gba_cart"
   },
-  "media_steps": "res://data/launch/media.json",
   "colors": {
     "ps2": "#c9ccd1",
     "gc": "#f2f2ee",

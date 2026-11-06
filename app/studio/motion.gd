@@ -135,3 +135,64 @@ static func animate(node: Node, motions: Dictionary[StringName, Tween], key: Str
 ## A timed part of a shared transition clock, at rest before its start and after its end.
 static func phase(seconds: float, start: float, duration: float, easing := Easing.LINEAR) -> float:
 	return eased(easing, clampf((seconds - start) / maxf(duration, 0.001), 0.0, 1.0))
+
+
+## A transition's clock, played forward or back at real speed to a time; its screen samples its phases there
+## ([method phase]) through [param apply], called at each move. Its own tween plays it, or, made without [param owner],
+## its owner's frame does ([method tick]): a screen whose frame reads what the clock places, the clock first.
+class Timeline:
+	extends RefCounted
+
+	## The clock got where it was played to.
+	signal arrived
+
+	## Where the clock stands, in seconds.
+	var seconds := 0.0
+	var _apply: Callable
+	var _owner: Node
+	var _tween: Tween
+	var _to := 0.0
+	var _playing := false
+
+	func _init(apply: Callable, owner: Node = null) -> void:
+		_apply = apply
+		_owner = owner
+
+	## Stands the clock at [param at] at once, nothing playing.
+	func stand(at: float) -> void:
+		stop()
+		_move(at)
+
+	## Plays the clock from where it stands to [param to]; [signal arrived] once there, unless stopped or played
+	## elsewhere first.
+	func play(to: float) -> void:
+		stop()
+		_to = to
+		_playing = true
+		if _owner:
+			_tween = _owner.create_tween()
+			_tween.tween_method(_move, seconds, to, absf(to - seconds))
+			_tween.tween_callback(_arrive)
+
+	## Moves a clock its owner's frame plays by [param delta] seconds.
+	func tick(delta: float) -> void:
+		if _playing:
+			_move(move_toward(seconds, _to, delta))
+			if seconds == _to:
+				_arrive()
+
+	func stop() -> void:
+		_playing = false
+		if _tween:
+			_tween.kill()
+
+	func is_playing() -> bool:
+		return _playing
+
+	func _move(at: float) -> void:
+		seconds = at
+		_apply.call()
+
+	func _arrive() -> void:
+		_playing = false
+		arrived.emit()

@@ -9,6 +9,10 @@ import app.cartouche.core.art.front
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.launch.TemplateError
+import app.cartouche.core.library.Library
+import app.cartouche.core.library.game
+import app.cartouche.core.shelves.Selection
+import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
@@ -113,6 +117,16 @@ class CatalogTest {
             catalog.offered.map { it.platform } shouldBe byName.filter { it in named }
             catalog.offered.map { it.platform }.shouldBeUnique()
             catalog.platforms shouldBe shippedCatalog.platforms
+        }
+    }
+
+    @Test
+    fun `only the platforms with a model get a shelf, whatever games the library holds`() = runBlocking<Unit> {
+        val known = shippedCatalog.platforms.map { it.id }
+        val library = Library(games = known.map { game("A", it.value) })
+        checkAll(Arb.set(Arb.element(known), 0..known.size)) { named ->
+            val shelves = Shelves.of(library, Catalog.parse(shipped, Shipped.profiles, named).shown, Selection())
+            shelves.fold({ emptyList() }) { found -> found.shelves.map { it.platform } } shouldBe known.filter { it in named }
         }
     }
 

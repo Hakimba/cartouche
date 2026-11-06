@@ -52,9 +52,7 @@ var _openings := 0
 var _along := HeldDirection.new({&"ui_left": -1, &"ui_right": 1})
 var _across := HeldDirection.new({&"ui_up": -1, &"ui_down": 1})
 var _held := Vector2i.ZERO
-var _held_steps := 0
-var _next_repeat_s := 0.0
-var _clock_s := 0.0
+var _repeat := CarouselLayout.Repeat.new()
 
 
 func _init() -> void:
@@ -124,10 +122,7 @@ func _gui_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if not visible:
 		return
-	_clock_s += delta
-	if _held != Vector2i.ZERO and _clock_s >= _next_repeat_s:
-		_held_steps += 1
-		_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(_held_steps)
+	if _held != Vector2i.ZERO and _repeat.due(delta):
 		_go(_target(_held, true))
 	_glide(delta)
 
@@ -180,8 +175,7 @@ func _let_go() -> void:
 
 func _press(direction: Vector2i) -> void:
 	_held = direction
-	_held_steps = 0
-	_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(0)
+	_repeat.start()
 	_go(_target(direction, false))
 
 

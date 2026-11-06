@@ -8,6 +8,8 @@ import arrow.core.Option
 import arrow.core.Some
 import arrow.core.firstOrNone
 import arrow.core.getOrNone
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -25,9 +27,15 @@ public data class ArtRequest(
 )
 
 /** Why a scraping run waits: no network, a server refusing (a quota) or failing, or no room to store images. */
+@Serializable
 public enum class Stall {
+    @SerialName("offline")
     OFFLINE,
+
+    @SerialName("refused")
     REFUSED,
+
+    @SerialName("storage")
     STORAGE,
 }
 

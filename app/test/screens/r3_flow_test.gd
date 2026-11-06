@@ -2,15 +2,14 @@
 extends GdUnitTestSuite
 
 const Fixtures := preload("res://test/screens/fixtures.gd")
+const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 
 
 func _shown(device: Fixtures.NewDevice) -> Carousel:
-	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
-	carousel._arrival.custom_step(10.0)
+	var carousel := await Fixtures.shown(self, device)
+	CarouselFixtures.arrived(carousel)
 	if carousel._title_fade:
 		carousel._title_fade.custom_step(10.0)
-	carousel._resting.set_process(false)
 	return carousel
 
 
@@ -25,20 +24,10 @@ func test_freeing_the_ring_mid_placing_returns_false_to_the_waiting_caller() -> 
 	assert_array(answers).is_equal([false])
 
 
-class SlowRegionDevice extends Fixtures.NewDevice:
-	func save_setting(key: StringName, value: Variant) -> AndroidServices.Result:
-		if key != &"preferred_region":
-			return await super(key, value)
-		saved.get_or_add(key, [])
-		saved[key].append(value)
-		await released
-		preferred_region = value
-		return AndroidServices.Result.new({"ok": true})
-
-
 func test_two_presses_on_a_region_card_start_only_one_save() -> void:
-	var device: SlowRegionDevice = auto_free(SlowRegionDevice.new())
+	var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
 	device.curtain = true
+	device.slow.append(&"save_preferred_region")
 	var carousel := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -46,6 +35,7 @@ func test_two_presses_on_a_region_card_start_only_one_save() -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_array(device.saves(&"preferred_region")).is_equal([""])
+	device.slow.clear()
 	device.released.emit()
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 	assert_array(device.saves(&"preferred_region")).is_equal([""])

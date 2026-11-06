@@ -1,37 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android
 
-import app.cartouche.android.art.AbsentArt
-import app.cartouche.android.art.FoundArt
-import app.cartouche.android.art.LabelDownload
-import app.cartouche.android.art.StoredArt
-import app.cartouche.android.art.VariantFailure
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.LibraryFailure
-import app.cartouche.android.library.ScanReport
-import app.cartouche.android.storage.DocumentEntry
-import app.cartouche.android.storage.EntryKind
-import app.cartouche.android.storage.Folder
 import app.cartouche.core.FileName
-import app.cartouche.core.FilePath
 import app.cartouche.core.PackageName
-import app.cartouche.core.art.ArtRequest
-import app.cartouche.core.art.PS2_DISC
-import app.cartouche.core.art.Scraping
-import app.cartouche.core.art.Stall
-import app.cartouche.core.art.web
-import app.cartouche.core.library.Arrivals
 import app.cartouche.core.library.ArtSource
-import app.cartouche.core.library.Coming
 import app.cartouche.core.library.ConsoleVariant
-import app.cartouche.core.library.CountedReason
-import app.cartouche.core.library.Disc
-import app.cartouche.core.library.DiscGrouping
 import app.cartouche.core.library.DisplayName
-import app.cartouche.core.library.FolderDepth
-import app.cartouche.core.library.FolderPath
 import app.cartouche.core.library.Game
-import app.cartouche.core.library.GameId
 import app.cartouche.core.library.IgnoreReason
 import app.cartouche.core.library.IgnoredCount
 import app.cartouche.core.library.IgnoredFile
@@ -40,200 +17,112 @@ import app.cartouche.core.library.LabelRegion
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.Scan
-import app.cartouche.core.library.SkipReason
-import app.cartouche.core.library.SkippedFolder
 import app.cartouche.core.library.VariantError
 import app.cartouche.core.library.game
 import app.cartouche.core.library.listed
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.LaunchError
-import app.cartouche.core.platforms.MediaType
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.platforms.catalog
 import app.cartouche.core.platforms.definition
-import app.cartouche.core.regions.PreferredRegion
-import app.cartouche.core.search.Group
-import app.cartouche.core.search.Mark
-import app.cartouche.core.search.View
-import app.cartouche.core.settings.ButtonStyle
-import app.cartouche.core.settings.EdgeSmoothing
-import app.cartouche.core.settings.Language
 import app.cartouche.core.settings.Setting
-import app.cartouche.core.settings.SoundLevel
 import app.cartouche.core.settings.settings
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
-import app.cartouche.core.storage.DocumentId
-import app.cartouche.core.storage.FolderPlace
-import app.cartouche.core.storage.Volume
 import app.cartouche.core.uri
 import arrow.core.Either
 import arrow.core.None
+import arrow.core.Option
 import arrow.core.Some
-import arrow.core.getOrElse
-import arrow.core.nonEmptyListOf
-import arrow.core.toOption
 import io.kotest.assertions.arrow.core.shouldBeSome
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.godotengine.godot.Dictionary
+import org.godotengine.godot.plugin.UsedByGodot
 import org.junit.Test
-import java.io.File
 import app.cartouche.core.settings.Settings as AppSettings
 
 class WireTest {
-    @Test
-    fun `the library sends effective model choices including the base for old setups`() {
-        val ps2Id = PlatformId("ps2")
-        val gbaId = PlatformId("gba")
-        val library =
-            Library(
-                setups = mapOf(ps2Id to PlatformSetup(), gbaId to PlatformSetup()),
-                consoleVariants = mapOf(ps2Id to ConsoleVariant.PS2_FAT),
-            )
-        val sent = Json.parseToJsonElement(library.toWireJson(None, ps2)).jsonObject
-        sent.getValue("console_variants").jsonObject.mapValues { it.value.jsonPrimitive.content } shouldBe
-            mapOf("ps2" to "ps2_fat", "gba" to "gba")
-        LibraryFailure.Variant(VariantError.Unknown(ps2Id, "gba_sp")).toWire()["code"] shouldBe "unknown_variant"
-        LibraryFailure.Variant(VariantError.NotInLibrary(ps2Id)).toWire()["code"] shouldBe "not_in_library"
-        LibraryFailure.Variant(VariantError.Coming(ps2Id, "ps2_slim")).toWire()["code"] shouldBe "coming_console"
-    }
-
     /** The `ps2` platform, whose games are all one medium. */
     private val ps2 = catalog(definition())
 
-    private val found = FoundArt(GameId("ps2/a"), StoredArt(File("/data/art/a.jpg")))
+    private fun parsed(json: String): JsonObject = Json.parseToJsonElement(json).jsonObject
 
-    /** The values Godot's JNI bridge converts to Variants; see [toWireArray]. */
-    private fun Any.isGodotValue(): Boolean = when (this) {
-        is String, is Boolean, is Int, is Long, is Double -> true
-        is Dictionary -> values.all { it.isGodotValue() }
-        // A String inside an Object[] reaches GDScript as an opaque JavaObject; a String[] becomes a PackedStringArray.
-        is Array<*> ->
-            when (this::class.java) {
-                Array<Any>::class.java -> all { it is Dictionary && it.isGodotValue() }
-                Array<String>::class.java -> true
-                else -> false
-            }
-        else -> false
-    }
+    private fun Library.sentJson(shelves: Option<Shelves> = None, catalog: Catalog = ps2): JsonObject =
+        parsed(jsonOf(sent(0, shelves, catalog)))
 
-    /** A library with every field the GDScript adapter reads. */
-    private val library =
-        Library()
-            .withSetup(PlatformId("ps2"), PlatformSetup(Some(uri("content://p/tree/t")), Some(PlayerId("ps2.x"))))
-            .withScan(
-                PlatformId("ps2"),
-                Scan(
-                    listOf(game("G", discs = nonEmptyListOf(Disc(Some(1), listed("G (Disc 1).chd"))), version = Some("v1.1"))),
-                    listOf(
-                        IgnoredFile(listed("bios.bin"), IgnoreReason.NOT_A_GAME),
-                        IgnoredFile(listed("a.json"), IgnoreReason.UNSUPPORTED),
-                        IgnoredFile(listed("._G.chd"), IgnoreReason.HIDDEN),
-                    ),
-                    listOf(SkippedFolder(FolderPath(".Trash"), SkipReason.HIDDEN)),
-                ),
-            )
+    private fun sentGames(vararg games: Game, catalog: Catalog = ps2) =
+        Library(games = games.toList()).sentJson(catalog = catalog).getValue("games").jsonArray.map { it.jsonObject }
+
+    private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
 
     @Test
-    fun `INV-23 everything sent to Godot is a value its bridge converts`() {
-        val uri = uri("content://p/tree/t")
-        val folder = Folder(uri, "ps2", Some(FilePath("/storage/x")))
-        val entry = DocumentEntry(FileName("g.chd"), EntryKind.FILE, DocumentId("x:g.chd"), uri, None, None, None)
-        val broken = Catalog.parse(listOf(DefinitionSource("broken.json", "{")), DefinitionSource("profiles.json", "{}"))
-        listOf(
-            success("library" to library.toWireJson(None, ps2)),
-            ScanReport(1, 1, 0, 1, 1, 12).toWire(),
-            success("folders" to listOf(folder).toWireArray { it.toWire() }),
-            success("entries" to listOf(entry).toWireArray { it.toWire() }),
-            broken.toWire(Coming.NONE),
-            failure(ErrorCode.CANCELLED, "x"),
-            Scraping.NONE.toWire(Some(found)),
-            Scraping.NONE.toWire(Some(AbsentArt(listOf(GameId("ps2/b"))))),
-            LabelDownload.Running(Some(0.5)).toWire(GameId("ps2/b")),
-            success("library" to library.toWireJson(None, ps2), "art" to listOf(found).artWireJson(), "absent" to arrayOf("ps2/b")),
-            success("order" to arrayOf("ps2", "gba")),
-            failure(ErrorCode.GAP_OUT_OF_RANGE, "x"),
-            failure(ErrorCode.NOT_IN_LIBRARY, "x"),
-            dictionary("offered" to ps2.copy(supported = ps2.platforms.map { it.id }.toSet()).offeredToWire(Coming.NONE)),
-            success("folder" to placed.toWire()),
-            BatteryState(Some(57), plugged = true).toWire(),
-            BatteryState.NONE.toWire(),
-            Rescraped(57, 50, listOf("gc: the folder cannot be read")).toWire(),
-            success("arrivals" to Arrivals(setOf(GameId("ps2/b")), mapOf(PlatformId("ps2") to setOf(GameId("ps2/b")))).toWire()),
-        ).forEach { it.isGodotValue() shouldBe true }
-        arrayOf("a").isGodotValue() shouldBe true
-        listOf("a").toTypedArray<Any>().isGodotValue() shouldBe false
-        arrayOf(dictionary()).isGodotValue() shouldBe false
+    fun `INV-23 every getter of the plugin hands Godot JSON text`() {
+        CartouchePlugin::class.java.declaredMethods
+            .filter { it.isAnnotationPresent(UsedByGodot::class.java) && it.returnType != String::class.java && it.returnType != Void.TYPE }
+            .map { it.name }
+            .shouldBeEmpty()
     }
 
-    private val placed = Folder(uri("content://p/tree/t"), "ps2", None, Some(FolderPlace(Volume.CARD, listOf("ROMs", "ps2"))))
+    @Test
+    fun `an answer carries its payload's fields beside its request id, a library call's revision, and a failure's code`() {
+        val renamed = payload(Sent.Renamed("Okage: Shadow King", Some("Okage")))
+        parsed(answered(7, Some(3), Either.Right(renamed))) shouldBe
+            parsed("""{"request_id": 7, "revision": 3, "ok": true, "title": "Okage: Shadow King", "original_title": "Okage"}""")
+        // A value the plugin does not have is an absent key.
+        parsed(answered(8, None, Either.Right(payload(Sent.Renamed("Okage"))))) shouldBe
+            parsed("""{"request_id": 8, "ok": true, "title": "Okage"}""")
+        parsed(answered(9, None, Either.Right(Payload.NONE))) shouldBe parsed("""{"request_id": 9, "ok": true}""")
+        parsed(answered(10, None, Either.Left(LaunchFailure.TooLate.failed))).let {
+            it.text("code") shouldBe "too_late"
+            it.getValue("ok") shouldBe JsonPrimitive(false)
+        }
+    }
+
+    @Serializable
+    class Clash(val revision: Int)
 
     @Test
-    fun `INV-23 every setting reaches Godot under its key as a value its bridge converts, and is taken back as Godot sends it`() =
+    fun `a payload is an object, none of whose keys is the envelope's`() {
+        shouldThrow<IllegalArgumentException> { payload(3) }
+        shouldThrow<IllegalArgumentException> { payload(listOf("Okage")) }
+        shouldThrow<IllegalArgumentException> { payload(Clash(2)) }
+    }
+
+    @Test
+    fun `INV-23 every setting reaches Godot under its key as its declaration writes it, and is taken back as Godot sends it`() =
         runBlocking<Unit> {
             checkAll(settings) { settings ->
-                val wire = settings.toWire(false)
-                wire.isGodotValue() shouldBe true
+                val wire = parsed(jsonOf(settings.sent(firstLaunch = false)))
+                val backdrop = parsed(jsonOf(settings.sentBackdrop()))
                 Setting.all.forEach { setting ->
+                    val sent = Option.fromNullable(wire[setting.key]).map { it.jsonPrimitive.content }
+                    sent shouldBe setting.valueIn(settings).map { it.written }
                     // GDScript sends a value back as `str()` writes it.
-                    wire[setting.key].toOption().onSome { sent ->
-                        Setting.change(AppSettings(), setting.key, sent.toString()).map { setting.valueIn(it) } shouldBe
+                    sent.onSome {
+                        Setting.change(AppSettings(), setting.key, it).map(setting::valueIn) shouldBe
                             Either.Right(setting.valueIn(settings))
                     }
-                    if (setting.names.isNotEmpty()) (wire["${setting.key}s"] as Array<*>).toList() shouldBe setting.names
+                    if (setting.names.isNotEmpty()) {
+                        wire.getValue("${setting.key}s").jsonArray.map { it.jsonPrimitive.content } shouldBe setting.names
+                    }
+                    if (setting.key in backdrop) backdrop[setting.key] shouldBe wire[setting.key]
                 }
-                settings.backdropToWire().toMap() shouldBe wire.filterKeys { it == "backdrop" || it == "pixel_veil" }
             }
         }
-
-    @Test
-    fun `the settings and a folder's place reach Godot with the keys and names the GDScript adapter reads`() {
-        val names = listOf("button_styles", "edge_smoothings", "preferred_regions", "languages", "backdrops")
-        AppSettings().toWire(true) - names shouldBe
-            dictionary(
-                "first_launch" to true,
-                "edge_smoothing" to "4x",
-                "games_float" to false,
-                "sound_level" to 10,
-                "backdrop" to "light",
-                "pixel_veil" to true,
-            )
-        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false)["button_style"] shouldBe "playstation"
-        AppSettings(soundLevel = SoundLevel.of(3).getOrElse { SoundLevel.FULL }).toWire(false)["sound_level"] shouldBe 3
-        AppSettings(preferredRegion = Some(PreferredRegion.NORTH_AMERICA)).toWire(false)["preferred_region"] shouldBe "North America"
-        AppSettings(language = Some(Language.BRAZILIAN_PORTUGUESE)).toWire(false)["language"] shouldBe "pt_BR"
-        val place = placed.toWire()["place"] as Dictionary
-        place["volume"] shouldBe "card"
-        (place["folders"] as Array<*>).toList() shouldBe listOf("ROMs", "ps2")
-    }
-
-    @Test
-    fun `a run's progress and the art found reach Godot with the keys and codes the GDScript adapter reads`() {
-        val request = ArtRequest(GameId("ps2/a"), "A", nonEmptyListOf(web("https://a/a.png")), None, PS2_DISC)
-        val (_, underWay) = Scraping.NONE.with(listOf(request)).take().shouldBeSome()
-        underWay.toWire(None) shouldBe dictionary("done" to 0, "total" to 1)
-        Stall.entries.map { underWay.stalled(request.game, it).toWire(None)["stall"] } shouldBe listOf("offline", "refused", "storage")
-        underWay.toWire(Some(found)) shouldBe dictionary("done" to 0, "total" to 1, "found" to found.toWire())
-        (underWay.toWire(Some(AbsentArt(listOf(GameId("ps2/a"), GameId("ps2/b")))))["absent"] as Array<*>).toList() shouldBe
-            listOf("ps2/a", "ps2/b")
-        LabelDownload.Running(Some(0.25)).toWire(GameId("ps2/b")) shouldBe dictionary("game_id" to "ps2/b", "fraction" to 0.25)
-        LabelDownload.Running(None).toWire(GameId("ps2/b")) shouldBe dictionary("game_id" to "ps2/b", "fraction" to -1.0)
-        LabelDownload.Over.toWire(GameId("ps2/b")) shouldBe dictionary("game_id" to "ps2/b")
-        found.toWire() shouldBe dictionary("game_id" to "ps2/a", "path" to "/data/art/a.jpg")
-        Json.parseToJsonElement(listOf(found).artWireJson()) shouldBe
-            Json.parseToJsonElement("""[{"game_id": "ps2/a", "path": "/data/art/a.jpg"}]""")
-    }
 
     @Test
     fun `each launch failure reaches Godot with its own code, which the carousel tells apart`() {
@@ -249,40 +138,39 @@ class WireTest {
                 LaunchFailure.ActivityNotFound("com.armsx2/.Main") to "activity_not_found",
                 LaunchFailure.PermissionDenied("denied") to "permission_denied",
             )
-        codes.forEach { (failure, code) -> failure.toWire()["code"] shouldBe code }
+        codes.forEach { (failure, code) -> parsed(jsonOf(failure.failed)).text("code") shouldBe code }
     }
 
     @Test
-    fun `the library and its shelves reach Godot as JSON of this shape, which the GDScript adapter reads`() {
-        val shelves = Shelves.of(library, listOf(PlatformId("ps2")), Selection())
-        Json.parseToJsonElement(library.toWireJson(shelves, ps2)) shouldBe Json.parseToJsonElement(GOLDEN)
+    fun `the library sends effective model choices including the base for old setups`() {
+        val ps2Id = PlatformId("ps2")
+        val library =
+            Library(
+                setups = mapOf(ps2Id to PlatformSetup(), PlatformId("gba") to PlatformSetup()),
+                consoleVariants = mapOf(ps2Id to ConsoleVariant.PS2_FAT),
+            )
+        val sent = library.sentJson()
+        sent.getValue("console_variants").jsonObject.mapValues { it.value.jsonPrimitive.content } shouldBe
+            mapOf("ps2" to "ps2_fat", "gba" to "gba")
+        sent.getValue("setups").jsonObject.getValue("ps2").jsonObject.text("variant_id") shouldBe "ps2_fat"
+        listOf(
+            VariantError.Unknown(ps2Id, "gba_sp") to "unknown_variant",
+            VariantError.NotInLibrary(ps2Id) to "not_in_library",
+            VariantError.Coming(ps2Id, "ps2_slim") to "coming_console",
+        ).forEach { (error, code) -> parsed(jsonOf(LibraryFailure.Variant(error).failed)).text("code") shouldBe code }
     }
 
     @Test
     fun `each shelf sent to Godot points at its own games in the library, and at the one shown`() {
         val library = Library(games = listOf(game("B", platform = "gba"), game("Z"), game("A"), game("C", platform = "gba")))
         val selection = Selection().with(library.games[3])
-        val shelves = Shelves.of(library, listOf(PlatformId("ps2"), PlatformId("gba")), selection)
-        val sent = Json.parseToJsonElement(library.toWireJson(shelves, ps2)).jsonObject
-        val ids = sent.getValue("games").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }
-        val shelved =
-            sent.getValue("shelves").jsonObject.getValue("shelves").jsonArray.map { shelf ->
-                shelf.jsonObject.getValue("games").jsonArray.map { ids[it.jsonPrimitive.int] }
-            }
-        shelved shouldBe listOf(listOf("ps2/A", "ps2/Z"), listOf("gba/B", "gba/C"))
-        val found = sent.getValue("shelves").jsonObject
-        found.getValue("selected").jsonPrimitive.int shouldBe 1
-        found.getValue("shelves").jsonArray.map { it.jsonObject.getValue("selected").jsonPrimitive.int } shouldBe listOf(0, 1)
-    }
-
-    @Test
-    fun `what the carousel shows of a shelf reaches Godot as JSON of this shape, which the GDScript adapter reads`() {
-        val view = View(listOf(2, 0), listOf(Group("A", 0), Group("#", 1)), mapOf('a' to 0, ' ' to 1))
-        Json.parseToJsonElement(view.toWireJson(3)) shouldBe
-            Json.parseToJsonElement(
-                """{"count": 3, "games": [2, 0], "groups": [{"label": "A", "start": 0}, {"label": "#", "start": 1}], "keys": {"a": 0, " ": 1}}""",
-            )
-        Json.parseToJsonElement(listOf(Mark(0, 3), Mark(13, 4)).toWireJson()) shouldBe Json.parseToJsonElement("[[0, 3], [13, 4]]")
+        val sent = library.sentJson(Shelves.of(library, listOf(PlatformId("ps2"), PlatformId("gba")), selection))
+        val ids = sent.getValue("games").jsonArray.map { it.jsonObject.text("id") }
+        val shelves = sent.getValue("shelves").jsonArray.map { it.jsonObject }
+        shelves.map { shelf -> shelf.getValue("game_indexes").jsonArray.map { ids[it.jsonPrimitive.content.toInt()] } } shouldBe
+            listOf(listOf("ps2/A", "ps2/Z"), listOf("gba/B", "gba/C"))
+        sent.text("selected_shelf") shouldBe "1"
+        shelves.map { it.text("selected") } shouldBe listOf("0", "1")
     }
 
     @Test
@@ -295,52 +183,10 @@ class WireTest {
                         IgnoredFile(listed("._%05d.chd".format(it)), IgnoreReason.HIDDEN),
                     )
                 }
-            return Library().withScan(PlatformId("ps2"), Scan(listOf(game("G")), ignored, emptyList())).toWireJson(None, ps2).length
+            return jsonOf(Library().withScan(PlatformId("ps2"), Scan(listOf(game("G")), ignored, emptyList())).sent(0, None, ps2)).length
         }
         sent(5_000) shouldBeLessThanOrEqual sent(IgnoredCount.EXAMPLES) + 10
     }
-
-    @Test
-    fun `values from GDScript are read by type, ints arriving as Long`() {
-        val request = dictionary("disc" to 2L, "small" to 3, "huge" to Long.MAX_VALUE, "flag" to true, "name" to "x")
-        request.integer("disc") shouldBe Some(2)
-        request.integer("small") shouldBe Some(3)
-        request.integer("huge") shouldBe None
-        request.integer("name") shouldBe None
-        dictionary("disc" to 1.9).integer("disc") shouldBe None
-        request.text("name") shouldBe Some("x")
-        request.text("missing") shouldBe None
-    }
-
-    private companion object {
-        // Absent keys are values the library does not have (here, a Redump name).
-        const val GOLDEN = """{
-            "setups": {
-                "ps2": {"disc_grouping": "grouped", "folder_depth": "top_level", "folder_uri": "content://p/tree/t", "player_id": "ps2.x"}
-            },
-            "games": [{
-                "id": "ps2/G", "platform_id": "ps2", "title": "G", "regions": [], "languages": [], "serials": [],
-                "discs": [{"name": "G (Disc 1).chd", "number": 1}], "last_disc": 0, "identified": false, "version": "v1.1",
-                "medium": "ps2_dvd"
-            }],
-            "not_games": {"ps2": ["bios.bin"]},
-            "ignored_counts": {
-                "ps2": {"unsupported": {"count": 1, "examples": ["a.json"]}, "hidden": {"count": 1, "examples": ["._G.chd"]}}
-            },
-            "skipped_folders": {"ps2": [{"path": ".Trash", "reason": "hidden"}]},
-            "console_variants": {"ps2": "ps2_slim"},
-            "shelves": {"shelves": [{"platform": "ps2", "games": [0], "selected": 0}], "selected": 0}
-        }"""
-    }
-
-    private fun sentGames(vararg games: Game, catalog: Catalog = ps2) = Json
-        .parseToJsonElement(Library(games = games.toList()).toWireJson(None, catalog))
-        .jsonObject
-        .getValue("games")
-        .jsonArray
-        .map { it.jsonObject }
-
-    private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
 
     @Test
     fun `a renamed game reaches Godot under its name, its chosen label under its own keys, an automatic one under none`() {
@@ -357,24 +203,9 @@ class WireTest {
             it.text("label_source") shouldBe "launchbox"
         }
         label(LabelChoice.Region(LabelRegion("Japan"), ArtSource.SCREENSCRAPER)).text("label_source") shouldBe "screenscraper"
-        label(LabelChoice.Automatic).containsKey("label_region") shouldBe false
+        label(LabelChoice.Automatic).keys shouldBe plain.keys
         label(LabelChoice.Own).text("label_own") shouldBe "true"
         label(LabelChoice.Own).containsKey("label_region") shouldBe false
-    }
-
-    @Test
-    fun `every enum reaches Godot as the word GDScript reads`() {
-        Setting.BUTTON_STYLE.names shouldBe listOf("xbox", "nintendo", "playstation")
-        Setting.EDGE_SMOOTHING.names shouldBe listOf("4x", "2x", "off")
-        Setting.BACKDROP.names shouldBe listOf("light", "dark", "light_grey", "anthracite", "device")
-        DiscGrouping.entries.map { it.wire } shouldBe listOf("grouped", "separate")
-        FolderDepth.entries.map { it.wire } shouldBe listOf("top_level", "subfolders")
-        SkipReason.entries.map { it.wire } shouldBe listOf("hidden", "emulator_data", "too_deep", "unreadable")
-        IgnoreReason.entries.map { it.wire } shouldBe listOf("hidden", "unsupported", "not_a_game")
-        CountedReason.entries.map { it.wire } shouldBe listOf("hidden", "unsupported")
-        MediaType.entries.map { it.wire } shouldBe listOf("dvd", "cartridge", "minidisc")
-        Volume.entries.map { it.plainWire } shouldBe listOf("internal", "card")
-        VariantFailure.entries.map { it.plainWire } shouldBe listOf("offline", "refused", "not_found", "unreadable", "storage")
     }
 
     @Test
@@ -391,5 +222,24 @@ class WireTest {
             )
         sent.take(2).map { it.text("medium") } shouldBe listOf("famicom_cart", "nes_cart")
         sent.last().containsKey("medium") shouldBe false
+    }
+
+    @Test
+    fun `values from GDScript are read by type, ints arriving as Long`() {
+        val request =
+            Dictionary().apply {
+                put("disc", 2L)
+                put("small", 3)
+                put("huge", Long.MAX_VALUE)
+                put("flag", true)
+                put("name", "x")
+            }
+        request.integer("disc") shouldBe Some(2)
+        request.integer("small") shouldBe Some(3)
+        request.integer("huge") shouldBe None
+        request.integer("name") shouldBe None
+        Dictionary().apply { put("disc", 1.9) }.integer("disc") shouldBe None
+        request.text("name") shouldBe Some("x")
+        request.text("missing") shouldBe None
     }
 }

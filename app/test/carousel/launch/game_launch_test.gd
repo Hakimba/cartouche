@@ -16,11 +16,11 @@ enum Outcome {
 	START_REFUSED_TOO_LATE,
 }
 ## What is under way as A is pressed.
-enum Press { NOTHING, DIRECTION, STICK, SELECT }
+enum Press { NOTHING, DIRECTION, STICK }
 
 const Fixtures := preload("res://test/carousel/fixtures.gd")
 const FAILURES: Array[StringName] = [&"not_installed", &"no_player", &"game_missing", &"activity_not_found", &"unexpected"]
-const BUTTONS: Array[StringName] = [&"carousel_left", &"carousel_right", &"screen_back", &"ui_accept", &"app_back"]
+const BUTTONS: Array[StringName] = [&"carousel_left", &"carousel_right", &"screen_back", &"ui_accept"]
 ## INV-21's bound on waiting, in seconds, and the longest frame the test draws.
 const WAIT_S := 5.0
 const LONGEST_FRAME_S := 1.0 / 20.0
@@ -128,7 +128,6 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 		assert_str(row.selected_game().id).is_equal(game)
 		assert_int(carousel._shelf).is_equal(shelf)
 		assert_bool(row._turn.turned.is_equal_approx(turned)).is_true()
-		assert_bool(carousel._hold_select.is_stopped()).is_true()
 		if launch._stage == GameLaunch.Stage.CHECKING:
 			_assert_nothing_shown(carousel, as_it_was)
 		if launch._stage == GameLaunch.Stage.INSERTING and launch._into_console:
@@ -172,8 +171,6 @@ func _press(carousel: Carousel, press: Press, random: RandomNumberGenerator) -> 
 			carousel._unhandled_input(Fixtures.button(BUTTONS[random.randi_range(0, 1)], true))
 		Press.STICK:
 			Input.action_press(&"inspect_right", random.randf_range(0.3, 1.0))
-		Press.SELECT:
-			carousel._unhandled_input(Fixtures.button(&"app_back", true))
 	for frame in random.randi_range(0, 30):
 		Fixtures.step_frame(carousel)
 
@@ -182,7 +179,6 @@ func _press(carousel: Carousel, press: Press, random: RandomNumberGenerator) -> 
 func _let_go(carousel: Carousel) -> void:
 	Input.action_release(&"inspect_right")
 	carousel._direction = HeldDirection.new()
-	carousel._hold_select.stop()
 
 
 ## Android leaving for the emulator and coming back, as [param outcome] has it, and at any time where

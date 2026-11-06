@@ -190,13 +190,13 @@ func test_rewind_after_50_ms_never_answers_after_the_chooser_is_hidden() -> void
 	var answers: Array[int] = []
 	chooser.chosen.connect(answers.append)
 	await _open_types(chooser, _offered())
-	chooser._opening.custom_step(0.05)
+	chooser._opening._tween.custom_step(0.05)
 	var back := InputEventAction.new()
 	back.action = &"screen_back"
 	back.pressed = true
 	chooser._unhandled_input(back)
 	chooser.hide()
-	chooser._return_tween.custom_step(1.0)
+	chooser._opening._tween.custom_step(1.0)
 	assert_array(answers).is_empty()
 	assert_bool(chooser._returning).is_false()
 	StudioTokens.TR_REVERSE = original_reverse

@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/xbox/xbox_model.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/console_model.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/console_part.gd" id="part"]
 [ext_resource type="Resource" path="res://carousel/consoles/xbox/xbox_shape.tres" id="2"]
-[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="3"]
 [ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
 [ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="label"]
 [ext_resource type="Texture2D" path="res://carousel/consoles/xbox/xbox_bezel_logo.svg" id="bezel_logo_logo"]
@@ -17,6 +17,45 @@
 [ext_resource type="Texture2D" path="res://carousel/consoles/xbox/xbox_disc_marks.svg" id="disc_marks_logo"]
 [ext_resource type="Texture2D" path="res://carousel/consoles/xbox/xbox_eject_mark.svg" id="eject_mark_logo"]
 [ext_resource type="Texture2D" path="res://carousel/consoles/xbox/xbox_power_mark.svg" id="power_mark_logo"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/lower.res" id="lower_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/strip.res" id="strip_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/upper.res" id="upper_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/cross.res" id="cross_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/facets.res" id="facets_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/fins.res" id="fins_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/vents.res" id="vents_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/grille.res" id="grille_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/grille_bars.res" id="grille_bars_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/feet.res" id="feet_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/module.res" id="module_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/jewel_ring.res" id="jewel_ring_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/jewel.res" id="jewel_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/power_ring.res" id="power_ring_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/ports.res" id="ports_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/port_openings.res" id="port_openings_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/connectors.res" id="connectors_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/back_vent.res" id="back_vent_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/vent_bars.res" id="vent_bars_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/tray.res" id="tray_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/tray_window.res" id="tray_window_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/hub.res" id="hub_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/clamp_ring.res" id="clamp_ring_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/bezel_logo.res" id="bezel_logo_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/drive_opening.res" id="drive_opening_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/eject.res" id="eject_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/eject_mark.res" id="eject_mark_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/power.res" id="power_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/power_mark.res" id="power_mark_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/jewel_x_left.res" id="jewel_x_left_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/jewel_b.res" id="jewel_b_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/jewel_o.res" id="jewel_o_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/jewel_x_right.res" id="jewel_x_right_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/port_1.res" id="port_1_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/port_2.res" id="port_2_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/port_3.res" id="port_3_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/port_4.res" id="port_4_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/microsoft.res" id="microsoft_logo_mesh"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/xbox/meshes/disc_marks.res" id="disc_marks_logo_mesh"]
 
 [sub_resource type="ShaderMaterial" id="body_material"]
 shader = ExtResource("solid")
@@ -87,104 +126,6 @@ shader_parameter/roughness = 0.3
 shader_parameter/emission = Color(0.32, 0.95, 0.26, 1)
 shader_parameter/emission_energy = 0.0
 
-[sub_resource type="PrimitiveMesh" id="lower_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"lower"
-
-[sub_resource type="PrimitiveMesh" id="strip_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"strip"
-
-[sub_resource type="PrimitiveMesh" id="upper_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"upper"
-
-[sub_resource type="PrimitiveMesh" id="cross_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"cross"
-
-[sub_resource type="PrimitiveMesh" id="facets_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"facets"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="fins_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"fins"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="vents_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"vents"
-
-[sub_resource type="PrimitiveMesh" id="grille_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"grille"
-
-[sub_resource type="PrimitiveMesh" id="grille_bars_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"grille_bars"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="feet_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"feet"
-detail = 16
-
-[sub_resource type="PrimitiveMesh" id="module_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"module"
-
-[sub_resource type="PrimitiveMesh" id="tray_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"tray"
-detail = 64
-
-[sub_resource type="PrimitiveMesh" id="tray_window_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"tray_window"
-detail = 64
-
-[sub_resource type="PrimitiveMesh" id="hub_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"hub"
-detail = 48
-
-[sub_resource type="PrimitiveMesh" id="clamp_ring_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"clamp_ring"
-detail = 48
-
-[sub_resource type="PrimitiveMesh" id="drive_opening_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"drive_opening"
-
-[sub_resource type="PrimitiveMesh" id="eject_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"eject"
-
-[sub_resource type="PrimitiveMesh" id="power_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"power"
-
 [sub_resource type="ShaderMaterial" id="bezel_logo_logo_material"]
 shader = ExtResource("label")
 shader_parameter/label_texture = ExtResource("bezel_logo_logo")
@@ -192,12 +133,6 @@ shader_parameter/has_label = true
 shader_parameter/roughness = 0.15
 shader_parameter/varnish = 0.7
 shader_parameter/grain = 0.0
-
-[sub_resource type="PrimitiveMesh" id="bezel_logo_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"bezel_logo"
-detail = 8
 
 [sub_resource type="ShaderMaterial" id="jewel_x_logo_material"]
 shader = ExtResource("label")
@@ -207,12 +142,6 @@ shader_parameter/roughness = 0.08
 shader_parameter/varnish = 1.0
 shader_parameter/grain = 0.0
 
-[sub_resource type="PrimitiveMesh" id="jewel_x_left_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"jewel_x_left"
-detail = 8
-
 [sub_resource type="ShaderMaterial" id="jewel_b_logo_material"]
 shader = ExtResource("label")
 shader_parameter/label_texture = ExtResource("jewel_b_logo")
@@ -220,12 +149,6 @@ shader_parameter/has_label = true
 shader_parameter/roughness = 0.08
 shader_parameter/varnish = 1.0
 shader_parameter/grain = 0.0
-
-[sub_resource type="PrimitiveMesh" id="jewel_b_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"jewel_b"
-detail = 8
 
 [sub_resource type="ShaderMaterial" id="jewel_o_logo_material"]
 shader = ExtResource("label")
@@ -235,18 +158,6 @@ shader_parameter/roughness = 0.08
 shader_parameter/varnish = 1.0
 shader_parameter/grain = 0.0
 
-[sub_resource type="PrimitiveMesh" id="jewel_o_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"jewel_o"
-detail = 8
-
-[sub_resource type="PrimitiveMesh" id="jewel_x_right_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"jewel_x_right"
-detail = 8
-
 [sub_resource type="ShaderMaterial" id="port_1_logo_material"]
 shader = ExtResource("label")
 shader_parameter/label_texture = ExtResource("port_1_logo")
@@ -254,12 +165,6 @@ shader_parameter/has_label = true
 shader_parameter/roughness = 0.62
 shader_parameter/varnish = 0.0
 shader_parameter/grain = 0.0
-
-[sub_resource type="PrimitiveMesh" id="port_1_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"port_1"
-detail = 8
 
 [sub_resource type="ShaderMaterial" id="port_2_logo_material"]
 shader = ExtResource("label")
@@ -269,12 +174,6 @@ shader_parameter/roughness = 0.62
 shader_parameter/varnish = 0.0
 shader_parameter/grain = 0.0
 
-[sub_resource type="PrimitiveMesh" id="port_2_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"port_2"
-detail = 8
-
 [sub_resource type="ShaderMaterial" id="port_3_logo_material"]
 shader = ExtResource("label")
 shader_parameter/label_texture = ExtResource("port_3_logo")
@@ -282,12 +181,6 @@ shader_parameter/has_label = true
 shader_parameter/roughness = 0.62
 shader_parameter/varnish = 0.0
 shader_parameter/grain = 0.0
-
-[sub_resource type="PrimitiveMesh" id="port_3_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"port_3"
-detail = 8
 
 [sub_resource type="ShaderMaterial" id="port_4_logo_material"]
 shader = ExtResource("label")
@@ -297,12 +190,6 @@ shader_parameter/roughness = 0.62
 shader_parameter/varnish = 0.0
 shader_parameter/grain = 0.0
 
-[sub_resource type="PrimitiveMesh" id="port_4_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"port_4"
-detail = 8
-
 [sub_resource type="ShaderMaterial" id="microsoft_logo_material"]
 shader = ExtResource("label")
 shader_parameter/label_texture = ExtResource("microsoft_logo")
@@ -310,12 +197,6 @@ shader_parameter/has_label = true
 shader_parameter/roughness = 0.62
 shader_parameter/varnish = 0.0
 shader_parameter/grain = 0.0
-
-[sub_resource type="PrimitiveMesh" id="microsoft_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"microsoft"
-detail = 8
 
 [sub_resource type="ShaderMaterial" id="disc_marks_logo_material"]
 shader = ExtResource("label")
@@ -325,12 +206,6 @@ shader_parameter/roughness = 0.15
 shader_parameter/varnish = 0.7
 shader_parameter/grain = 0.0
 
-[sub_resource type="PrimitiveMesh" id="disc_marks_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"disc_marks"
-detail = 8
-
 [sub_resource type="ShaderMaterial" id="eject_mark_logo_material"]
 shader = ExtResource("label")
 shader_parameter/label_texture = ExtResource("eject_mark_logo")
@@ -338,12 +213,6 @@ shader_parameter/has_label = true
 shader_parameter/roughness = 0.3
 shader_parameter/varnish = 0.0
 shader_parameter/grain = 0.0
-
-[sub_resource type="PrimitiveMesh" id="eject_mark_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"eject_mark"
-detail = 8
 
 [sub_resource type="ShaderMaterial" id="power_mark_logo_material"]
 shader = ExtResource("label")
@@ -353,218 +222,208 @@ shader_parameter/roughness = 0.35
 shader_parameter/varnish = 0.0
 shader_parameter/grain = 0.0
 
-[sub_resource type="PrimitiveMesh" id="power_mark_logo_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"power_mark"
-detail = 8
+[sub_resource type="Resource" id="part_tray_mm"]
+script = ExtResource("part")
+property = &"tray_mm"
+node = NodePath("Tray")
+motion = 1
+axis = Vector3(0, 0, 1)
+role = 0
+open = 132.5
 
-[sub_resource type="PrimitiveMesh" id="jewel_ring_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"jewel_ring"
+[sub_resource type="Resource" id="part_power_mm"]
+script = ExtResource("part")
+property = &"power_mm"
+node = NodePath("Power")
+motion = 1
+axis = Vector3(0, 0, -1)
+role = 7
+open = 0.2
 
-[sub_resource type="PrimitiveMesh" id="jewel_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"jewel"
+[sub_resource type="Resource" id="part_eject_mm"]
+script = ExtResource("part")
+property = &"eject_mm"
+node = NodePath("Eject")
+motion = 1
+axis = Vector3(0, 0, -1)
+role = 6
+open = 0.2
 
-[sub_resource type="PrimitiveMesh" id="power_ring_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"power_ring"
-
-[sub_resource type="PrimitiveMesh" id="ports_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"ports"
-
-[sub_resource type="PrimitiveMesh" id="port_openings_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"port_openings"
-
-[sub_resource type="PrimitiveMesh" id="connectors_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"connectors"
-
-[sub_resource type="PrimitiveMesh" id="back_vent_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"back_vent"
-
-[sub_resource type="PrimitiveMesh" id="vent_bars_mesh"]
-script = ExtResource("3")
-shape = ExtResource("2")
-part = &"vent_bars"
+[sub_resource type="Resource" id="part_light_energy"]
+script = ExtResource("part")
+property = &"light_energy"
+node = NodePath("Light")
+motion = 2
+role = 2
+open = 2.5
 
 [node name="Xbox" type="Node3D"]
 script = ExtResource("1")
 shape = ExtResource("2")
+parts = Array[ExtResource("part")]([SubResource("part_tray_mm"), SubResource("part_power_mm"), SubResource("part_eject_mm"), SubResource("part_light_energy")])
 
 [node name="Lower" type="MeshInstance3D" parent="."]
-mesh = SubResource("lower_mesh")
+mesh = ExtResource("lower_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Strip" type="MeshInstance3D" parent="."]
-mesh = SubResource("strip_mesh")
+mesh = ExtResource("strip_mesh")
 surface_material_override/0 = SubResource("gloss_material")
 
 [node name="Upper" type="MeshInstance3D" parent="."]
-mesh = SubResource("upper_mesh")
+mesh = ExtResource("upper_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Cross" type="MeshInstance3D" parent="."]
-mesh = SubResource("cross_mesh")
+mesh = ExtResource("cross_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Facets" type="MeshInstance3D" parent="."]
-mesh = SubResource("facets_mesh")
+mesh = ExtResource("facets_mesh")
 surface_material_override/0 = SubResource("gloss_material")
 
 [node name="Fins" type="MeshInstance3D" parent="."]
-mesh = SubResource("fins_mesh")
+mesh = ExtResource("fins_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Vents" type="MeshInstance3D" parent="."]
-mesh = SubResource("vents_mesh")
+mesh = ExtResource("vents_mesh")
 surface_material_override/0 = SubResource("inside_material")
 
 [node name="Grille" type="MeshInstance3D" parent="."]
-mesh = SubResource("grille_mesh")
+mesh = ExtResource("grille_mesh")
 surface_material_override/0 = SubResource("metal_material")
 
 [node name="GrilleBars" type="MeshInstance3D" parent="."]
-mesh = SubResource("grille_bars_mesh")
+mesh = ExtResource("grille_bars_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Feet" type="MeshInstance3D" parent="."]
-mesh = SubResource("feet_mesh")
+mesh = ExtResource("feet_mesh")
 surface_material_override/0 = SubResource("rubber_material")
 
 [node name="Module" type="MeshInstance3D" parent="."]
-mesh = SubResource("module_mesh")
+mesh = ExtResource("module_mesh")
 surface_material_override/0 = SubResource("gloss_material")
 
 [node name="JewelRing" type="MeshInstance3D" parent="."]
-mesh = SubResource("jewel_ring_mesh")
+mesh = ExtResource("jewel_ring_mesh")
 surface_material_override/0 = SubResource("jewel_ring_material")
 
 [node name="Jewel" type="MeshInstance3D" parent="."]
-mesh = SubResource("jewel_mesh")
+mesh = ExtResource("jewel_mesh")
 surface_material_override/0 = SubResource("jewel_material")
 
 [node name="Light" type="MeshInstance3D" parent="."]
 unique_name_in_owner = true
-mesh = SubResource("power_ring_mesh")
+mesh = ExtResource("power_ring_mesh")
 surface_material_override/0 = SubResource("light_material")
 
 [node name="Ports" type="MeshInstance3D" parent="."]
-mesh = SubResource("ports_mesh")
+mesh = ExtResource("ports_mesh")
 surface_material_override/0 = SubResource("port_material")
 
 [node name="PortOpenings" type="MeshInstance3D" parent="."]
-mesh = SubResource("port_openings_mesh")
+mesh = ExtResource("port_openings_mesh")
 surface_material_override/0 = SubResource("rubber_material")
 
 [node name="Connectors" type="MeshInstance3D" parent="."]
-mesh = SubResource("connectors_mesh")
+mesh = ExtResource("connectors_mesh")
 surface_material_override/0 = SubResource("rubber_material")
 
 [node name="BackVent" type="MeshInstance3D" parent="."]
-mesh = SubResource("back_vent_mesh")
+mesh = ExtResource("back_vent_mesh")
 surface_material_override/0 = SubResource("metal_material")
 
 [node name="VentBars" type="MeshInstance3D" parent="."]
-mesh = SubResource("vent_bars_mesh")
+mesh = ExtResource("vent_bars_mesh")
 surface_material_override/0 = SubResource("body_material")
 
 [node name="Tray" type="Node3D" parent="."]
 unique_name_in_owner = true
 
 [node name="Drawer" type="MeshInstance3D" parent="Tray"]
-mesh = SubResource("tray_mesh")
+mesh = ExtResource("tray_mesh")
 surface_material_override/0 = SubResource("gloss_material")
 
 [node name="TrayWindow" type="MeshInstance3D" parent="Tray"]
-mesh = SubResource("tray_window_mesh")
+mesh = ExtResource("tray_window_mesh")
 surface_material_override/0 = SubResource("inside_material")
 
 [node name="Hub" type="MeshInstance3D" parent="Tray"]
-mesh = SubResource("hub_mesh")
+mesh = ExtResource("hub_mesh")
 surface_material_override/0 = SubResource("metal_material")
 
 [node name="ClampRing" type="MeshInstance3D" parent="Tray"]
-mesh = SubResource("clamp_ring_mesh")
+mesh = ExtResource("clamp_ring_mesh")
 surface_material_override/0 = SubResource("rubber_material")
 
 [node name="DriveOpening" type="MeshInstance3D" parent="."]
-mesh = SubResource("drive_opening_mesh")
+mesh = ExtResource("drive_opening_mesh")
 surface_material_override/0 = SubResource("inside_material")
 
 [node name="Eject" type="Node3D" parent="."]
 unique_name_in_owner = true
 
 [node name="Cap" type="MeshInstance3D" parent="Eject"]
-mesh = SubResource("eject_mesh")
+mesh = ExtResource("eject_mesh")
 surface_material_override/0 = SubResource("silver_material")
 
 [node name="Power" type="Node3D" parent="."]
 unique_name_in_owner = true
 
 [node name="Cap" type="MeshInstance3D" parent="Power"]
-mesh = SubResource("power_mesh")
+mesh = ExtResource("power_mesh")
 surface_material_override/0 = SubResource("button_material")
 
 [node name="BezelLogo" type="MeshInstance3D" parent="Tray"]
-mesh = SubResource("bezel_logo_logo_mesh")
+mesh = ExtResource("bezel_logo_logo_mesh")
 surface_material_override/0 = SubResource("bezel_logo_logo_material")
 
 [node name="JewelX1" type="MeshInstance3D" parent="."]
-mesh = SubResource("jewel_x_left_logo_mesh")
+mesh = ExtResource("jewel_x_left_logo_mesh")
 surface_material_override/0 = SubResource("jewel_x_logo_material")
 
 [node name="JewelB" type="MeshInstance3D" parent="."]
-mesh = SubResource("jewel_b_logo_mesh")
+mesh = ExtResource("jewel_b_logo_mesh")
 surface_material_override/0 = SubResource("jewel_b_logo_material")
 
 [node name="JewelO" type="MeshInstance3D" parent="."]
-mesh = SubResource("jewel_o_logo_mesh")
+mesh = ExtResource("jewel_o_logo_mesh")
 surface_material_override/0 = SubResource("jewel_o_logo_material")
 
 [node name="JewelX2" type="MeshInstance3D" parent="."]
-mesh = SubResource("jewel_x_right_logo_mesh")
+mesh = ExtResource("jewel_x_right_logo_mesh")
 surface_material_override/0 = SubResource("jewel_x_logo_material")
 
 [node name="Port1Number" type="MeshInstance3D" parent="."]
-mesh = SubResource("port_1_logo_mesh")
+mesh = ExtResource("port_1_logo_mesh")
 surface_material_override/0 = SubResource("port_1_logo_material")
 
 [node name="Port2Number" type="MeshInstance3D" parent="."]
-mesh = SubResource("port_2_logo_mesh")
+mesh = ExtResource("port_2_logo_mesh")
 surface_material_override/0 = SubResource("port_2_logo_material")
 
 [node name="Port3Number" type="MeshInstance3D" parent="."]
-mesh = SubResource("port_3_logo_mesh")
+mesh = ExtResource("port_3_logo_mesh")
 surface_material_override/0 = SubResource("port_3_logo_material")
 
 [node name="Port4Number" type="MeshInstance3D" parent="."]
-mesh = SubResource("port_4_logo_mesh")
+mesh = ExtResource("port_4_logo_mesh")
 surface_material_override/0 = SubResource("port_4_logo_material")
 
 [node name="Microsoft" type="MeshInstance3D" parent="."]
-mesh = SubResource("microsoft_logo_mesh")
+mesh = ExtResource("microsoft_logo_mesh")
 surface_material_override/0 = SubResource("microsoft_logo_material")
 
 [node name="DiscMarks" type="MeshInstance3D" parent="."]
-mesh = SubResource("disc_marks_logo_mesh")
+mesh = ExtResource("disc_marks_logo_mesh")
 surface_material_override/0 = SubResource("disc_marks_logo_material")
 
 [node name="EjectMark" type="MeshInstance3D" parent="Eject"]
-mesh = SubResource("eject_mark_logo_mesh")
+mesh = ExtResource("eject_mark_logo_mesh")
 surface_material_override/0 = SubResource("eject_mark_logo_material")
 
 [node name="PowerMark" type="MeshInstance3D" parent="Power"]
-mesh = SubResource("power_mark_logo_mesh")
+mesh = ExtResource("power_mark_logo_mesh")
 surface_material_override/0 = SubResource("power_mark_logo_material")

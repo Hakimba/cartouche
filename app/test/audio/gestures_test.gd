@@ -69,7 +69,7 @@ func test_a_on_a_settings_row_plays_a_choice_once() -> void:
 	carousel.set_process(true)
 	Fixtures.press(carousel, &"open_settings")
 	var settings: SettingsMenu = carousel.get_node("%Screens/Settings")
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return settings.state == SettingsMenu.State.OPEN)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return settings.state == SettingsMenu.State.OPEN)
 	_hush()
 	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
 	assert_array(_heard()).is_equal([Cue.SELECT])
@@ -80,7 +80,7 @@ func test_left_and_right_on_the_sounds_line_turn_them_down_and_up_heard_at_their
 	carousel.set_process(true)
 	Fixtures.press(carousel, &"open_settings")
 	var settings: SettingsMenu = carousel.get_node("%Screens/Settings")
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return settings.state == SettingsMenu.State.OPEN)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return settings.state == SettingsMenu.State.OPEN)
 	settings.row_of(&"sounds").grab_focus()
 	var bus := AudioServer.get_bus_index(SoundEffects.BUS)
 	for step in SoundEffects.LEVELS + 2:

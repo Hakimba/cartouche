@@ -55,9 +55,7 @@ var _cursor := 0
 var _before := 0
 var _home := 0
 var _held := 0
-var _held_steps := 0
-var _next_repeat_s := 0.0
-var _clock_s := 0.0
+var _repeat := CarouselLayout.Repeat.new()
 var _rise: Tween
 var _big_fade: Tween
 ## The ribbon's hints shown, as (button, text).
@@ -89,11 +87,8 @@ func _ready() -> void:
 
 # Runs while a direction is held on the ribbon: its cursor goes on, faster and faster.
 func _process(delta: float) -> void:
-	_clock_s += delta
-	if _clock_s >= _next_repeat_s:
+	if _repeat.due(delta):
 		_move(_held)
-		_held_steps += 1
-		_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(_held_steps)
 
 
 ## Searches [param games], [param platform_id]'s shelf in its order, from now on: nothing typed,
@@ -212,9 +207,7 @@ func take(event: InputEvent, held: HeldDirection, moved: bool) -> void:
 func _hold(direction: int) -> void:
 	_move(direction)
 	_held = direction
-	_held_steps = 0
-	_clock_s = 0.0
-	_next_repeat_s = CarouselLayout.repeat_delay(0)
+	_repeat.start()
 	set_process(true)
 
 

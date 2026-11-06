@@ -13,7 +13,7 @@ extends Node3D
 ## To be put in order ([ConsoleOrder]), the consoles leave the row for an ellipse where all of them
 ## show ([RingFit]): [member wheel] takes the one [member pointed] at there, [member others_wheel] the
 ## others, [member wheel_slots] says where each one stands round it (-1 for a console that has no
-## place, a platform without a model), and each one slides to a new place. Each stands at its real
+## place: the others while one arrives alone from the form), and each one slides to a new place. Each stands at its real
 ## size on the shared [member ring_scale], as its picture stands in the consoles screen's frame. The one
 ## pointed at grows a little; the one [member held] peels off as [member peel] has it, drawn as a sticker
 ## only ([ConsoleSticker]) until it lies flat again.
@@ -354,7 +354,7 @@ func arrange() -> void:
 		var chosen := i == selected_index()
 		var leaver := _leaver_of(i)
 		var going := leaver != null and not chosen and leaver.seconds < _OUT_S
-		item.model.visible = (chosen or going) and item.modelled or on_ring and wheel_slots[i] >= 0
+		item.model.visible = chosen or going or on_ring and wheel_slots[i] >= 0
 		if not item.model.visible:
 			continue
 		var offset := 0.0 if chosen or going else CarouselLayout.nearest(_position, i, _items.size()) - _scroll
@@ -655,8 +655,6 @@ class Item:
 	var model: Node3D
 	## Its folder under res://carousel/consoles.
 	var folder: String
-	## Whether it is a console of ours, with a model: a platform shown by its medium is shown nowhere here.
-	var modelled := true
 	## Takes how transparent the model is, from 0 (opaque) to 1 (gone).
 	var fade: Callable
 	var rest: Rest
@@ -666,12 +664,11 @@ class Item:
 	var hero: Hero
 
 	## [param shown] has a `fade(amount)` method.
-	func _init(shown: Node3D, resting: Rest, from := "", has_model := true) -> void:
+	func _init(shown: Node3D, resting: Rest, from := "") -> void:
 		model = shown
 		fade = Callable(shown, &"fade")
 		rest = resting
 		folder = from
-		modelled = has_model
 
 
 ## Where a console rests: its launch animation's first values.

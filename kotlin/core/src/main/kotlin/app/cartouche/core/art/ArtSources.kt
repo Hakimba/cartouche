@@ -12,6 +12,7 @@ import app.cartouche.core.platforms.MediaRule
 import app.cartouche.core.platforms.MediumId
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.PlatformProfile
+import app.cartouche.core.platforms.PlatformTables
 import app.cartouche.core.platforms.ScreenScraperSystem
 import app.cartouche.core.platforms.SerialScans
 import app.cartouche.core.regions.PreferredRegion
@@ -98,54 +99,39 @@ public class ArtSources(
         public val NONE: ArtSources = ArtSources(ArtKind.Disc, MediaRule(MediumId.NONE), ArtIndex.EMPTY, None, TextureTable.EMPTY)
 
         /**
-         * [platform]'s sources: its profile's in [catalog], its extract and its texture table the ones [extracts] and
-         * [tables] (texts by platform) hold for it, the table read only when the profile names the platform's
-         * ScreenScraper system.
+         * [platform]'s sources: its profile's in [catalog], its extract and its texture table those of [tables], the
+         * table read only when the profile names the platform's ScreenScraper system.
          */
-        public fun of(
-            catalog: Catalog,
-            extracts: Map<PlatformId, String>,
-            tables: Map<PlatformId, String>,
-            platform: PlatformId,
-        ): ArtSources = catalog
+        public fun of(catalog: Catalog, platform: PlatformId, tables: PlatformTables): ArtSources = catalog
             .platform(platform)
             .flatMap { found ->
                 found.profile.art.map { kind ->
-                    val index = extracts.getOrNone(platform).fold({ ArtIndex.EMPTY }, ArtIndex::parse)
-                    val textures =
-                        tableOf(
-                            found.profile,
-                            tables,
-                            platform,
-                        ).fold({ TextureTable.EMPTY }) { (text, system) -> TextureTable.parse(text, system) }
-                    ArtSources(kind, found.profile.medium, index, found.profile.scansBySerial, textures)
+                    ArtSources(
+                        kind,
+                        found.profile.medium,
+                        tables.art.fold({ ArtIndex.EMPTY }, ArtIndex::parse),
+                        found.profile.scansBySerial,
+                        tableOf(found.profile, tables).fold({ TextureTable.EMPTY }) { (text, system) -> TextureTable.parse(text, system) },
+                    )
                 }
             }.getOrElse { NONE }
 
         /**
-         * The version [of] gives [platform]'s sources, read from their first lines alone: no extract or table is
-         * indexed.
+         * The version [of] gives [platform]'s sources, read from the first lines of [tables] alone: no extract or table
+         * is indexed, and their first lines are enough.
          */
-        public fun versionOf(
-            catalog: Catalog,
-            extracts: Map<PlatformId, String>,
-            tables: Map<PlatformId, String>,
-            platform: PlatformId,
-        ): Option<ArtVersion> = catalog.platform(platform).flatMap { found ->
-            found.profile.art.flatMap {
-                ArtVersion.of(
-                    extracts.getOrNone(platform).flatMap(ArtIndex::versionOf),
-                    tableOf(found.profile, tables, platform).flatMap { (text, _) -> ArtIndex.versionOf(text) },
-                )
+        public fun versionOf(catalog: Catalog, platform: PlatformId, tables: PlatformTables): Option<ArtVersion> =
+            catalog.platform(platform).flatMap { found ->
+                found.profile.art.flatMap {
+                    ArtVersion.of(
+                        tables.art.flatMap(ArtIndex::versionOf),
+                        tableOf(found.profile, tables).flatMap { (text, _) -> ArtIndex.versionOf(text) },
+                    )
+                }
             }
-        }
 
-        private fun tableOf(
-            profile: PlatformProfile,
-            tables: Map<PlatformId, String>,
-            platform: PlatformId,
-        ): Option<Pair<String, ScreenScraperSystem>> =
-            profile.screenScraperSystem.flatMap { system -> tables.getOrNone(platform).map { it to system } }
+        private fun tableOf(profile: PlatformProfile, tables: PlatformTables): Option<Pair<String, ScreenScraperSystem>> =
+            profile.screenScraperSystem.flatMap { system -> tables.textures.map { it to system } }
 
         /**
          * The order a game of [regions] tries its images in. An image is of the game's

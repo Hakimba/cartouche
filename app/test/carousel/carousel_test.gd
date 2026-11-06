@@ -12,7 +12,7 @@ func test_the_art_bar_follows_a_run_greys_while_it_waits_and_fades_once_it_is_ov
 	var text: Label = carousel.get_node("%ArtText")
 	var content: Control = carousel.get_node("%Content")
 	var tell := func(payload: Dictionary) -> void:
-		carousel._on_art_changed(AndroidServices.ArtChange.new(payload))
+		carousel._on_art_changed(AndroidServices.ArtChange.new({"progress": payload}))
 		# The bar moves on its tween: moved to its end here, rather than waited for.
 		if progress._tween:
 			progress._tween.custom_step(ArtBar._STEP_S + 0.01)
@@ -82,7 +82,7 @@ func test_the_battery_shows_its_level_and_the_bolt_exactly_while_plugged_in_as_s
 func test_while_labels_download_the_app_does_not_rest_once_they_wait_or_are_over_it_does() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var tell := func(payload: Dictionary) -> void:
-		carousel._on_art_changed(AndroidServices.ArtChange.new(payload))
+		carousel._on_art_changed(AndroidServices.ArtChange.new({"progress": payload}))
 	assert_bool(carousel._resting.moving.call()).is_false()
 	for stall: String in ["offline", "refused", "storage"]:
 		tell.call({"done": 3, "total": 50})
@@ -124,21 +124,19 @@ func _shown(carousel: Carousel) -> Dictionary:
 func test_selection_priority_waits_for_the_last_selection_and_follows_a_shelf_change() -> void:
 	var device := ScreenFixtures.past_first_launch(self, {"ps2": 6, "gc": 1})
 	var carousel := ScreenFixtures.fresh_carousel(self, device)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._shown)).is_true()
-	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._art_focus.is_stopped())).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._shown)
+	await ScreenFixtures.press_to(self, carousel, JOY_BUTTON_A, Carousel.Screen.GAMES)
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._art_focus.is_stopped())
 	device.art_focus_calls.clear()
 	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
 	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
 	assert_array(device.art_focus_calls).is_empty()
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.art_focus_calls.size() == 1)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return device.art_focus_calls.size() == 1)
 	assert_array(device.art_focus_calls).is_equal([PackedStringArray(["ps2/2", "ps2/3", "ps2/1"])])
-	await ScreenFixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.CONSOLES)).is_true()
+	await ScreenFixtures.press_to(self, carousel, JOY_BUTTON_B, Carousel.Screen.CONSOLES)
 	device.art_focus_calls.clear()
 	await ScreenFixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return device.art_focus_calls.size() == 1)).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return device.art_focus_calls.size() == 1)
 	assert_array(device.art_focus_calls).is_equal([PackedStringArray(["gc/0"])])
 
 
@@ -149,7 +147,7 @@ func test_the_selection_priority_timer_sends_nothing_for_an_empty_row() -> void:
 	device.art_focus_calls.clear()
 	assert_bool(carousel._row.has_games()).is_false()
 	carousel._art_focus.start()
-	assert_bool(await ScreenFixtures.until(self, func() -> bool: return carousel._art_focus.is_stopped())).is_true()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._art_focus.is_stopped())
 	assert_array(device.art_focus_calls).is_empty()
 
 
@@ -158,10 +156,10 @@ func test_the_games_told_absent_are_known_so_and_a_download_told_rings_until_it_
 	var games: Array[AndroidServices.Game] = carousel._row._games
 	# A game of another shelf too.
 	var absent := PackedStringArray([games[0].id, "gba/other"])
-	carousel._on_art_changed(AndroidServices.ArtChange.new({"done": 1, "total": 3, "absent": absent}))
+	carousel._on_art_changed(AndroidServices.ArtChange.new({"progress": {"done": 1, "total": 3}, "absent": absent}))
 	assert_dict(carousel._art._absent).is_equal({games[0].id: true, "gba/other": true})
 	assert_bool(carousel._art.is_absent(games[1])).is_false()
-	carousel._on_art_progress(AndroidServices.LabelDownload.new({"game_id": games[1].id, "fraction": 0.5}))
+	carousel._on_art_progress(AndroidServices.LabelDownload.new({"game_id": games[1].id, "running": true, "fraction": 0.5}))
 	assert_dict(carousel._row._downloads).is_equal({games[1].id: 0.5})
 	carousel._on_art_progress(AndroidServices.LabelDownload.new({"game_id": games[1].id}))
 	assert_dict(carousel._row._downloads).is_empty()

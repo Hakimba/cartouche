@@ -105,13 +105,6 @@ func done() -> void:
 			state = State.FORM
 
 
-## The gap as [method Library.withConsoleAt] counts it among all [param others_shown], the platform ids of every
-## console but the new one in the order shown, those without a model included: the console goes after the console of
-## the ring the gap follows.
-func shown_gap(others_shown: Array[String]) -> int:
-	return others_shown.find(others[gap]) + 1 if not others.is_empty() else others_shown.size()
-
-
 ## The angles the [param count] consoles of the ring stand at (radians, in their order) with the gap after console
 ## [param after] open. 0 is the bottom of the ring and angles grow counter-clockwise on the screen: the first gap faces the
 ## user. One console alone stands at the top and leaves the whole bottom to the gap.

@@ -112,3 +112,26 @@ static func scrolled(scroll: float, target: float, delta: float) -> float:
 ## The wait before the next step of a direction held for [param steps] steps already.
 static func repeat_delay(steps: int) -> float:
 	return maxf(FASTEST_REPEAT_S, FIRST_REPEAT_S * pow(REPEAT_SPEED_UP, steps))
+
+
+## The steps of a direction held, again and again, faster and faster ([method repeat_delay]): the owner steps once as
+## it is pressed ([method start]), then whenever [method due] says so.
+class Repeat:
+	extends RefCounted
+
+	## The steps repeated since the press.
+	var steps := 0
+	var _left_s := 0.0
+
+	func start() -> void:
+		steps = 0
+		_left_s = CarouselLayout.repeat_delay(0)
+
+	## Whether a step is due once [param delta] more seconds have passed.
+	func due(delta: float) -> bool:
+		_left_s -= delta
+		if _left_s > 0.0:
+			return false
+		steps += 1
+		_left_s = CarouselLayout.repeat_delay(steps)
+		return true

@@ -17,6 +17,10 @@ const CARTRIDGE := "cartridge"
 @export_file("*.tscn") var scene: String
 ## The most triangles its model may be drawn with.
 @export var triangle_budget := 0
+## Where the title and the platform are drawn on its label, as fractions of its image, unless its label is built
+## from a shape, which says where ([method ModelShape.title_area]).
+@export var title_area := ModelShape.TITLE_AREA
+@export var platform_area := ModelShape.PLATFORM_AREA
 
 
 ## The manifest of every medium folder under [param folders], by its folder's name. The listing
@@ -29,6 +33,12 @@ static func found(folders := FOLDERS) -> Dictionary[String, MediumManifest]:
 			var manifest: MediumManifest = load(path)
 			manifests[entry.trim_suffix("/")] = manifest
 	return manifests
+
+
+## The manifest of the folder holding [param model]: a medium showing another's scene is drawn as that one.
+static func of_scene(model: PackedScene) -> MediumManifest:
+	var path := model.resource_path.get_base_dir().path_join(FILE)
+	return load(path) if ResourceLoader.exists(path) else MediumManifest.new()
 
 
 ## Whether [param medium]'s folder makes it a cartridge: the shell tells cartridges from discs by

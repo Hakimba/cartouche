@@ -3,6 +3,7 @@ package app.cartouche.android.art
 
 import app.cartouche.core.art.Closure
 import app.cartouche.core.art.Day
+import app.cartouche.core.art.KeptClosures
 import app.cartouche.core.art.Moment
 import app.cartouche.core.art.Refusal
 import app.cartouche.core.art.ScreenScraperAnswer
@@ -363,6 +364,20 @@ class ScreenScraperFetchTest {
         later.getCompleted().shouldBeRight() shouldBe png
         http.asked.size shouldBe 2
         http.underWay shouldBe 0
+    }
+
+    @Test
+    fun `a state change that keeps nothing new leaves the kept closures' file alone`() {
+        folder.mkdirs()
+        stateFile.writeText(KeptClosures.encode(KeptClosures.NONE))
+        val scope = TestScope(StandardTestDispatcher())
+        val harness = Harness(folder, key, FakeHttp { ok("<html>not an image</html>".encodeToByteArray()) }, scope)
+        scope.launch { harness.fetch.get(texture(1), Progress.NONE) }
+        scope.advanceUntilIdle()
+        scope.launch { harness.fetch.newRun() }
+        scope.advanceUntilIdle()
+        harness.states.map { it.second::class } shouldBe listOf(ScreenScraperState.ClosedForRun::class, ScreenScraperState.Open::class)
+        stateFile.exists() shouldBe true
     }
 
     @Test

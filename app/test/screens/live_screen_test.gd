@@ -16,7 +16,7 @@ func _shown(consoles: Dictionary[String, int]) -> Array:
 	var device := Fixtures.past_first_launch(self, consoles)
 	device.players_everywhere = true
 	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.alive(carousel))
 	return [device, carousel]
 
 
@@ -30,16 +30,16 @@ func _add(carousel: Carousel, device: Fixtures.NewDevice, platform_id: String) -
 		assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	else:
 		await Fixtures.open_add_console(self, carousel)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.alive(carousel))
 	await Fixtures.choose_console(self, carousel, device, platform_id)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.focus(self).name == "Add")).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.focus(self).name == "Add")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	if device.consoles.size() > 2:
-		assert_bool(await Fixtures.until(self, func() -> bool:
-			return carousel._order._placing != null and carousel._order._placing.state == Placing.State.CHOOSING)).is_true()
+		await Fixtures.wait(self, func() -> bool:
+			return carousel._order._placing != null and carousel._order._placing.state == Placing.State.CHOOSING)
 		await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel._shown)
 	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal(platform_id)
 
 
@@ -50,16 +50,16 @@ func test_after_a_console_added_the_form_opened_again_from_the_plus_shows_with_i
 	await _add(carousel, device, "gc")
 	await Fixtures.open_add_console(self, carousel)
 	var form: AddConsole = carousel.get_node("%Screens/AddConsole")
-	assert_bool(await Fixtures.until(self, func() -> bool: return form.modulate.a == 1.0 and Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool: return form.modulate.a == 1.0 and Fixtures.alive(carousel))
 	assert_str(Fixtures.focus(self).name).is_equal("Type")
 	assert_str(form.platform_id).is_empty()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel._shown)
 	await _add(carousel, device, "gba")
 	assert_array(carousel._platform_ids()).contains_exactly_in_any_order(["ps2", "gc", "gba"])
 	# Once more after the ring placed it.
 	await Fixtures.open_add_console(self, carousel)
-	assert_bool(await Fixtures.until(self, func() -> bool: return form.modulate.a == 1.0 and Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool: return form.modulate.a == 1.0 and Fixtures.alive(carousel))
 	assert_str(Fixtures.focus(self).name).is_equal("Type")
 
 
@@ -71,12 +71,12 @@ func test_after_a_console_added_X_on_the_ring_shows_its_form_and_B_goes_back_to_
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	var form: AddConsole = carousel.get_node("%Screens/AddConsole")
-	assert_bool(await Fixtures.until(self, func() -> bool: return form.modulate.a == 1.0 and Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool: return form.modulate.a == 1.0 and Fixtures.alive(carousel))
 	assert_str(Fixtures.focus(self).name).is_equal("Emulator")
 	assert_bool(form.is_editing()).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return Fixtures.shown_screen(carousel) == null and Fixtures.alive(carousel))).is_true()
+	await Fixtures.wait(self, func() -> bool:
+		return Fixtures.shown_screen(carousel) == null and Fixtures.alive(carousel))
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 

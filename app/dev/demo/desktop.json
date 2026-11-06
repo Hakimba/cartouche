@@ -1,199 +1,200 @@
 {
     "catalog": {
-        "rejected": [],
-        "offered": [
-            {
-                "maker": "Microsoft",
-                "model": "Xbox",
-                "id": "xbox",
-                "coming": false
-            },
-            {
-                "maker": "Microsoft",
-                "model": "Xbox 360",
-                "id": "xbox360",
-                "coming": false
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Game Boy",
-                "id": "gb",
-                "coming": false
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Game Boy Advance",
-                "id": "gba",
-                "coming": false
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Game Boy Color",
-                "id": "gbc",
-                "coming": false
-            },
-            {
-                "maker": "Nintendo",
-                "model": "GameCube",
-                "id": "gc",
-                "coming": false
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Nintendo 64",
-                "id": "n64",
-                "coming": false
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Nintendo Entertainment System",
-                "id": "nes",
-                "coming": false
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Switch",
-                "id": "switch",
-                "coming": true
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Wii",
-                "id": "wii",
-                "coming": false
-            },
-            {
-                "maker": "Sega",
-                "model": "Dreamcast",
-                "id": "dreamcast",
-                "coming": true
-            },
-            {
-                "maker": "Sega",
-                "model": "Master System",
-                "id": "master",
-                "coming": true
-            },
-            {
-                "maker": "Sega",
-                "model": "Mega Drive",
-                "id": "genesis",
-                "coming": true
-            },
-            {
-                "maker": "Sony",
-                "model": "PlayStation",
-                "id": "psx",
-                "coming": false
-            },
-            {
-                "maker": "Sony",
-                "model": "PlayStation 2",
-                "id": "ps2",
-                "coming": false
-            },
-            {
-                "maker": "Sony",
-                "model": "PSP",
-                "id": "psp",
-                "coming": true
-            },
-            {
-                "maker": "Nintendo",
-                "model": "Super Nintendo Entertainment System",
-                "id": "snes",
-                "coming": false
-            }
-        ],
         "platforms": [
             {
-                "name": "Microsoft Xbox",
                 "id": "xbox",
+                "name": "Microsoft Xbox",
                 "media": "dvd"
             },
             {
-                "name": "Microsoft Xbox 360",
                 "id": "xbox360",
+                "name": "Microsoft Xbox 360",
                 "media": "dvd"
             },
             {
-                "name": "Nintendo 64",
                 "id": "n64",
+                "name": "Nintendo 64",
                 "media": "cartridge"
             },
             {
-                "name": "Nintendo Entertainment System",
                 "id": "nes",
+                "name": "Nintendo Entertainment System",
                 "media": "cartridge"
             },
             {
-                "name": "Nintendo - Game Boy",
                 "id": "gb",
+                "name": "Nintendo - Game Boy",
                 "media": "cartridge"
             },
             {
-                "name": "Nintendo - Game Boy Advance",
                 "id": "gba",
+                "name": "Nintendo - Game Boy Advance",
                 "media": "cartridge"
             },
             {
-                "name": "Nintendo - Game Boy Color",
                 "id": "gbc",
+                "name": "Nintendo - Game Boy Color",
                 "media": "cartridge"
             },
             {
-                "name": "Nintendo - GameCube",
                 "id": "gc",
+                "name": "Nintendo - GameCube",
                 "media": "minidisc"
             },
             {
-                "name": "Nintendo Switch",
                 "id": "switch",
+                "name": "Nintendo Switch",
                 "media": "cartridge"
             },
             {
-                "name": "Nintendo Wii",
                 "id": "wii",
+                "name": "Nintendo Wii",
                 "media": "dvd"
             },
             {
-                "name": "Sega Dreamcast",
                 "id": "dreamcast",
+                "name": "Sega Dreamcast",
                 "media": "dvd"
             },
             {
-                "name": "Sega Mega Drive",
                 "id": "genesis",
+                "name": "Sega Mega Drive",
                 "media": "cartridge"
             },
             {
-                "name": "Sega Master System",
                 "id": "master",
+                "name": "Sega Master System",
                 "media": "cartridge"
             },
             {
-                "name": "Sony PSP",
                 "id": "psp",
+                "name": "Sony PSP",
                 "media": "dvd"
             },
             {
-                "name": "Sony PlayStation",
                 "id": "psx",
+                "name": "Sony PlayStation",
                 "media": "dvd"
             },
             {
-                "name": "Sony PlayStation 2",
                 "id": "ps2",
+                "name": "Sony PlayStation 2",
                 "media": "dvd"
             },
             {
-                "name": "Super Nintendo Entertainment System",
                 "id": "snes",
+                "name": "Super Nintendo Entertainment System",
                 "media": "cartridge"
             }
-        ]
+        ],
+        "offered": [
+            {
+                "id": "xbox",
+                "model": "Xbox",
+                "maker": "Microsoft",
+                "coming": false
+            },
+            {
+                "id": "xbox360",
+                "model": "Xbox 360",
+                "maker": "Microsoft",
+                "coming": false
+            },
+            {
+                "id": "gb",
+                "model": "Game Boy",
+                "maker": "Nintendo",
+                "coming": false
+            },
+            {
+                "id": "gba",
+                "model": "Game Boy Advance",
+                "maker": "Nintendo",
+                "coming": false
+            },
+            {
+                "id": "gbc",
+                "model": "Game Boy Color",
+                "maker": "Nintendo",
+                "coming": false
+            },
+            {
+                "id": "gc",
+                "model": "GameCube",
+                "maker": "Nintendo",
+                "coming": false
+            },
+            {
+                "id": "n64",
+                "model": "Nintendo 64",
+                "maker": "Nintendo",
+                "coming": false
+            },
+            {
+                "id": "nes",
+                "model": "Nintendo Entertainment System",
+                "maker": "Nintendo",
+                "coming": false
+            },
+            {
+                "id": "switch",
+                "model": "Switch",
+                "maker": "Nintendo",
+                "coming": true
+            },
+            {
+                "id": "wii",
+                "model": "Wii",
+                "maker": "Nintendo",
+                "coming": false
+            },
+            {
+                "id": "dreamcast",
+                "model": "Dreamcast",
+                "maker": "Sega",
+                "coming": true
+            },
+            {
+                "id": "master",
+                "model": "Master System",
+                "maker": "Sega",
+                "coming": true
+            },
+            {
+                "id": "genesis",
+                "model": "Mega Drive",
+                "maker": "Sega",
+                "coming": true
+            },
+            {
+                "id": "psx",
+                "model": "PlayStation",
+                "maker": "Sony",
+                "coming": false
+            },
+            {
+                "id": "ps2",
+                "model": "PlayStation 2",
+                "maker": "Sony",
+                "coming": false
+            },
+            {
+                "id": "psp",
+                "model": "PSP",
+                "maker": "Sony",
+                "coming": true
+            },
+            {
+                "id": "snes",
+                "model": "Super Nintendo Entertainment System",
+                "maker": "Nintendo",
+                "coming": false
+            }
+        ],
+        "rejected": []
     },
     "library": {
+        "revision": 0,
         "setups": {},
         "games": [
             {
@@ -681,115 +682,114 @@
         "ignored_counts": {},
         "skipped_folders": {},
         "console_variants": {},
-        "shelves": {
-            "shelves": [
-                {
-                    "platform": "xbox",
-                    "games": [
-                        0,
-                        12,
-                        24
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "xbox360",
-                    "games": [
-                        13,
-                        1,
-                        25
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gb",
-                    "games": [
-                        2,
-                        14,
-                        26
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gba",
-                    "games": [
-                        3,
-                        27,
-                        15
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gbc",
-                    "games": [
-                        28,
-                        4,
-                        16
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gc",
-                    "games": [
-                        29,
-                        17,
-                        5
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "n64",
-                    "games": [
-                        18,
-                        6
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "nes",
-                    "games": [
-                        19,
-                        7
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "wii",
-                    "games": [
-                        20,
-                        8
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "psx",
-                    "games": [
-                        9,
-                        21
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "ps2",
-                    "games": [
-                        10,
-                        22
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "snes",
-                    "games": [
-                        23,
-                        11
-                    ],
-                    "selected": 0
-                }
-            ],
-            "selected": 0
-        }
+        "shelves": [
+            {
+                "platform_id": "xbox",
+                "game_indexes": [
+                    0,
+                    12,
+                    24
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "xbox360",
+                "game_indexes": [
+                    13,
+                    1,
+                    25
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gb",
+                "game_indexes": [
+                    2,
+                    14,
+                    26
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gba",
+                "game_indexes": [
+                    3,
+                    27,
+                    15
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gbc",
+                "game_indexes": [
+                    28,
+                    4,
+                    16
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gc",
+                "game_indexes": [
+                    29,
+                    17,
+                    5
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "n64",
+                "game_indexes": [
+                    18,
+                    6
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "nes",
+                "game_indexes": [
+                    19,
+                    7
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "wii",
+                "game_indexes": [
+                    20,
+                    8
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "psx",
+                "game_indexes": [
+                    9,
+                    21
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "ps2",
+                "game_indexes": [
+                    10,
+                    22
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "snes",
+                "game_indexes": [
+                    23,
+                    11
+                ],
+                "selected": 0
+            }
+        ],
+        "selected_shelf": 0
     },
     "library_with_coming": {
+        "revision": 0,
         "setups": {},
         "games": [
             {
@@ -1277,177 +1277,159 @@
         "ignored_counts": {},
         "skipped_folders": {},
         "console_variants": {},
-        "shelves": {
-            "shelves": [
-                {
-                    "platform": "xbox",
-                    "games": [
-                        0,
-                        17
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "xbox360",
-                    "games": [
-                        18,
-                        1
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gb",
-                    "games": [
-                        19,
-                        2
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gba",
-                    "games": [
-                        20,
-                        3
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gbc",
-                    "games": [
-                        21,
-                        4
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "gc",
-                    "games": [
-                        22,
-                        5
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "n64",
-                    "games": [
-                        23,
-                        6
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "nes",
-                    "games": [
-                        7,
-                        24
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "switch",
-                    "games": [
-                        8,
-                        25
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "wii",
-                    "games": [
-                        9,
-                        26
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "dreamcast",
-                    "games": [
-                        10,
-                        27
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "master",
-                    "games": [
-                        28,
-                        11
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "genesis",
-                    "games": [
-                        29,
-                        12
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "psx",
-                    "games": [
-                        13
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "ps2",
-                    "games": [
-                        14
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "psp",
-                    "games": [
-                        15
-                    ],
-                    "selected": 0
-                },
-                {
-                    "platform": "snes",
-                    "games": [
-                        16
-                    ],
-                    "selected": 0
-                }
-            ],
-            "selected": 0
-        }
+        "shelves": [
+            {
+                "platform_id": "xbox",
+                "game_indexes": [
+                    0,
+                    17
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "xbox360",
+                "game_indexes": [
+                    18,
+                    1
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gb",
+                "game_indexes": [
+                    19,
+                    2
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gba",
+                "game_indexes": [
+                    20,
+                    3
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gbc",
+                "game_indexes": [
+                    21,
+                    4
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "gc",
+                "game_indexes": [
+                    22,
+                    5
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "n64",
+                "game_indexes": [
+                    23,
+                    6
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "nes",
+                "game_indexes": [
+                    7,
+                    24
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "switch",
+                "game_indexes": [
+                    8,
+                    25
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "wii",
+                "game_indexes": [
+                    9,
+                    26
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "dreamcast",
+                "game_indexes": [
+                    10,
+                    27
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "master",
+                "game_indexes": [
+                    28,
+                    11
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "genesis",
+                "game_indexes": [
+                    29,
+                    12
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "psx",
+                "game_indexes": [
+                    13
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "ps2",
+                "game_indexes": [
+                    14
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "psp",
+                "game_indexes": [
+                    15
+                ],
+                "selected": 0
+            },
+            {
+                "platform_id": "snes",
+                "game_indexes": [
+                    16
+                ],
+                "selected": 0
+            }
+        ],
+        "selected_shelf": 0
     },
     "settings": {
+        "first_launch": false,
         "edge_smoothing": "4x",
         "games_float": false,
-        "languages": [
-            "en",
-            "fr",
-            "de",
-            "es",
-            "it",
-            "pt",
-            "pt_BR",
-            "ja"
-        ],
+        "sound_level": 10,
         "backdrop": "light",
-        "edge_smoothings": [
-            "4x",
-            "2x",
-            "off"
-        ],
-        "backdrops": [
-            "light",
-            "dark",
-            "light_grey",
-            "anthracite",
-            "device"
-        ],
+        "pixel_veil": true,
         "button_styles": [
             "xbox",
             "nintendo",
             "playstation"
         ],
-        "pixel_veil": true,
-        "first_launch": false,
+        "edge_smoothings": [
+            "4x",
+            "2x",
+            "off"
+        ],
         "preferred_regions": [
             "Europe",
             "North America",
@@ -1465,7 +1447,23 @@
             "Taiwan",
             "World"
         ],
-        "sound_level": 10
+        "languages": [
+            "en",
+            "fr",
+            "de",
+            "es",
+            "it",
+            "pt",
+            "pt_BR",
+            "ja"
+        ],
+        "backdrops": [
+            "light",
+            "dark",
+            "light_grey",
+            "anthracite",
+            "device"
+        ]
     },
     "battery": {
         "level_percent": 100,

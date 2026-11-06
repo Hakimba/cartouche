@@ -126,7 +126,7 @@ def unpack_images(document: dict, binary: bytes, glb_folder: Path, folder: Path,
 def scene_values(base: str) -> list[str]:
     """The way in and the pose of [base]'s scene, which a variant of it starts from."""
     text = (CONSOLES / base / f"{base}.tscn").read_text()
-    return re.findall(r"^(?:way_in|pose) = .*$", text, re.M)
+    return re.findall(r"^(?:way_in|pose_degrees) = .*$", text, re.M)
 
 
 def add_variant_entry(folder: str, platform: str) -> str:
@@ -221,7 +221,7 @@ def main() -> None:
     shown = "".join(line + "\n" for line in scene_values(base)) if base else ""
     (folder / f"{name}.tscn").write_text(
         '[gd_scene format=3]\n\n'
-        '[ext_resource type="Script" path="res://carousel/consoles/glb_console.gd" id="1"]\n'
+        '[ext_resource type="Script" path="res://carousel/consoles/console_model.gd" id="1"]\n'
         f'[ext_resource type="Resource" path="{res}/{name}_shape.tres" id="2"]\n'
         f'[ext_resource type="PackedScene" path="{res}/{name}.glb" id="3"]\n\n'
         f'[node name="{"".join(word.title() for word in name.split("_"))}" type="Node3D"]\n'
@@ -248,12 +248,11 @@ ConsoleVariant {name.upper()}: {variant}; README credit added{f'; listed among t
 
 To measure and fill:
 - {name}_shape.tres: seat_centre (mm, the model's axes) and seat_degrees, where the medium stands once in.
-- {name}.tscn: way_in (the way the medium comes down) and pose (0 way in, 1 standing, 2 three quarters){' (from ' + base + ')' if base else ''};
+- {name}.tscn: way_in (the way the medium comes down) and pose_degrees (none: its way in towards the camera; (15, 0, 0) standing; (25, 20, 0) three quarters){' (from ' + base + ')' if base else ''};
   moving parts, once the launch is designed (docs/adding-a-console.md, "Moving parts").
 - console.tres: ring_size, the console's size on the ordering ring (zero weighs it as the PS2).
 - README.md: the console in the table of consoles.
-- app/test/carousel/consoles/console_folders_test.gd: HOUSINGS (the parts the medium lies in), OPEN_EDGES and any
-  FOLDED_EDGES, as the test reports them.
+- app/test/carousel/consoles/console_folders_test.gd: HOUSINGS (the parts the medium lies in).
 - Logos{' missing: ' + ', '.join(f'app/studio/logos/{slot}/{name}.png' for slot in logos) if logos else ': found'}.
 - Colour (gel): {'found' if gel else 'none yet; the maintainers add it (the console shows the neutral one)'}.
 Then: git add the new files, import (godot --headless --path app --import) and run

@@ -99,16 +99,6 @@ func test_the_gap_wraps_both_ways_and_a_ring_of_one_has_nothing_to_move() -> voi
 	assert_int(alone.press(Placing.Press.A)).is_equal(Placing.Action.FLY)
 
 
-func test_the_gap_counts_among_all_the_others_shown_the_consoles_without_a_model_included() -> void:
-	var placing := Placing.new(["a", "c"] as Array[String])
-	var shown: Array[String] = ["a", "x", "c", "y"]
-	# After "a" is the gap before "x"; after "c" the one before "y".
-	placing.gap = 0
-	assert_int(placing.shown_gap(shown)).is_equal(1)
-	placing.gap = 1
-	assert_int(placing.shown_gap(shown)).is_equal(3)
-
-
 func test_a_seeded_walk_of_presses_keeps_to_the_table_and_the_gap_in_range() -> void:
 	var random := RandomNumberGenerator.new()
 	random.seed = 1202
@@ -148,11 +138,11 @@ func _form_filled(consoles: Dictionary[String, int], added: String, order: Packe
 	device.players_everywhere = true
 	device.order = order
 	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._shown)
 	await Fixtures.open_add_console(self, carousel)
 	await Fixtures.choose_console(self, carousel, device, added)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.focus(self).name == "Add")).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.focus(self).name == "Add")
 	return [carousel, device]
 
 
@@ -160,8 +150,8 @@ func _form_filled(consoles: Dictionary[String, int], added: String, order: Packe
 func _on_ring(carousel: Carousel) -> ConsoleOrder:
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	var order := carousel._order
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return order._placing != null and order._placing.state == Placing.State.CHOOSING)).is_true()
+	await Fixtures.wait(self, func() -> bool:
+		return order._placing != null and order._placing.state == Placing.State.CHOOSING)
 	# The consoles are placed a frame after the state changes.
 	await await_idle_frame()
 	return order
@@ -184,7 +174,7 @@ func test_leave_takes_the_form_away_without_a_press_or_a_focus_and_resume_brings
 	# A press reaches nothing of it.
 	await Fixtures.action(self, &"ui_left")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.until(self, func() -> bool: return not gone.is_running())).is_true()
+	await Fixtures.wait(self, func() -> bool: return not gone.is_running())
 	assert_bool(form.visible).is_false()
 	assert_array(device.set_up).is_empty()
 	form.resume()
@@ -227,7 +217,7 @@ func test_Ajouter_brings_the_ring_and_A_flies_the_console_into_the_chosen_gap_sa
 	assert_int(carousel._consoles.pointed).is_equal(-1)
 	assert_bool(order.visible).is_false()
 	assert_object(order._placing).is_null()
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._console_title.modulate.a == 1.0)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._console_title.modulate.a == 1.0)
 	assert_bool(carousel._rail.visible).is_true()
 	# And the consoles screen works as before.
 	await Fixtures.joypad(self, JOY_BUTTON_X)
@@ -259,9 +249,9 @@ func test_B_flies_the_console_back_to_the_form_filled_with_its_focus_on_Add_and_
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_int(order._placing.state).is_equal(Placing.State.BACK)
 	# The form is wanted back as the ring leaves, then the ring is gone and the consoles screen is not shown.
-	assert_bool(await Fixtures.until(self, func() -> bool: return form.is_visible_in_tree())).is_true()
-	assert_bool(await Fixtures.until(self, func() -> bool: return not order.visible)).is_true()
-	assert_bool(await Fixtures.until(self, func() -> bool: return form.modulate.a == 1.0)).is_true()
+	await Fixtures.wait(self, func() -> bool: return form.is_visible_in_tree())
+	await Fixtures.wait(self, func() -> bool: return not order.visible)
+	await Fixtures.wait(self, func() -> bool: return form.modulate.a == 1.0)
 	assert_str(Fixtures.focus(self).name).is_equal("Add")
 	assert_str(form.platform_id).is_equal("psx")
 	assert_array(device.placed).is_empty()
@@ -313,8 +303,8 @@ func _refused(code: String) -> void:
 		device.consoles["psx"] = 0
 	# The plugin's order knows two others, not three: the gap 3 is out of range.
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return order._placing == null and form.is_visible_in_tree() and form.modulate.a == 1.0)).is_true()
+	await Fixtures.wait(self, func() -> bool:
+		return order._placing == null and form.is_visible_in_tree() and form.modulate.a == 1.0)
 	assert_array(device.placed).is_equal([["psx", 3]])
 	assert_array(orders).is_empty()
 	assert_array(carousel._platform_ids()).is_equal(shown)
@@ -342,7 +332,7 @@ func test_a_click_or_a_tap_on_Add_while_the_console_flies_back_does_nothing() ->
 	var order := await _on_ring(carousel)
 	var added := device.set_up.size()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.until(self, func() -> bool: return form.is_visible_in_tree())).is_true()
+	await Fixtures.wait(self, func() -> bool: return form.is_visible_in_tree())
 	assert_int(order._placing.state).is_equal(Placing.State.BACK)
 	var centre := add.get_global_rect().get_center()
 	for pressed: bool in [true, false]:
@@ -355,7 +345,7 @@ func test_a_click_or_a_tap_on_Add_while_the_console_flies_back_does_nothing() ->
 		await await_idle_frame()
 	await Fixtures.finger(self, centre, true)
 	await Fixtures.finger(self, centre, false)
-	assert_bool(await Fixtures.until(self, func() -> bool: return order._placing == null)).is_true()
+	await Fixtures.wait(self, func() -> bool: return order._placing == null)
 	assert_int(device.set_up.size()).is_equal(added)
 	assert_array(device.placed).is_empty()
 
@@ -369,8 +359,8 @@ func test_B_pressed_twice_flies_back_once_and_A_then_B_while_flying_places_it_on
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_int(order._placing.state).is_equal(Placing.State.BACK)
-	assert_bool(await Fixtures.until(self, func() -> bool:
-		return order._placing == null and form.is_visible_in_tree() and form.modulate.a == 1.0)).is_true()
+	await Fixtures.wait(self, func() -> bool:
+		return order._placing == null and form.is_visible_in_tree() and form.modulate.a == 1.0)
 	assert_array(device.placed).is_empty()
 	# Again: A, then B in the middle of the flight, which it ignores.
 	order = await _on_ring(carousel)
@@ -409,7 +399,7 @@ func test_a_walk_of_presses_through_the_whole_flow_leaves_one_placing_per_A_and_
 		Placing.State.FLYING: [Placing.State.LANDING], Placing.State.LANDING: [Placing.State.MORPHING],
 		Placing.State.MORPHING: [Placing.State.DONE], Placing.State.BACK: [Placing.State.FORM]}
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return order._placing != null)).is_true()
+	await Fixtures.wait(self, func() -> bool: return order._placing != null)
 	var last := Placing.State.FORM
 	var gap_at_fly := -1
 	var steps := 0
@@ -420,7 +410,7 @@ func test_a_walk_of_presses_through_the_whole_flow_leaves_one_placing_per_A_and_
 			if placing.state != last:
 				assert_bool(legal[last].has(placing.state)).is_true()
 				if placing.state == Placing.State.FLYING:
-					gap_at_fly = placing.shown_gap(["ps2", "gc", "gba", "nes"] as Array[String])
+					gap_at_fly = placing.gap + 1
 				last = placing.state
 			assert_int(placing.gap).is_between(0, 3)
 			assert_bool(is_finite(carousel._consoles.flier_stand.centre.x)).is_true()

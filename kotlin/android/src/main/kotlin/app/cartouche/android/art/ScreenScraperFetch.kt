@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.art
 
-import android.util.AtomicFile
 import app.cartouche.android.BuildConfig
-import app.cartouche.android.storage.read
-import app.cartouche.android.storage.write
+import app.cartouche.android.storage.StateFile
+import app.cartouche.android.storage.orUnreadable
 import app.cartouche.android.trace
 import app.cartouche.core.art.Account
 import app.cartouche.core.art.Candidate
@@ -95,17 +94,11 @@ internal class ScreenScraperFetch(
     /** The gate: guards [state], [limits], [member], [checkedOn], [sent] and [underWay]. */
     private val lock = Mutex()
 
-    private val stateFile = AtomicFile(stateFile)
-
     private val key = KeyHash(ArtStore.sha1("${credentials.devId}:${credentials.devPassword}"))
 
-    private var kept: KeptClosures =
-        this.stateFile
-            .read(None, { it }) { text -> KeptClosures.decode(text).right() }
-            .getOrElse { None }
-            .getOrElse { KeptClosures.NONE }
+    private val kept = StateFile(stateFile, KeptClosures.NONE, { KeptClosures.decode(it).orUnreadable() }, KeptClosures::encode)
 
-    @Volatile private var state: ScreenScraperState = kept.state(key, today())
+    @Volatile private var state: ScreenScraperState = kept.get().state(key, today())
 
     @Volatile private var limits = Limits.KEY_ALONE
 
@@ -281,14 +274,11 @@ internal class ScreenScraperFetch(
         if (next != state) {
             state = next
             changed(next)
-            val before = kept
-            kept = kept.after(next, key)
-            if (kept != before) {
-                if (kept == KeptClosures.NONE) {
-                    stateFile.delete()
-                } else {
-                    stateFile.write(KeptClosures.encode(kept)).onLeft { trace("art") { "ScreenScraper closure not kept: ${it.message}" } }
-                }
+            val before = kept.get()
+            when (val after = before.after(next, key)) {
+                before -> Unit
+                KeptClosures.NONE -> kept.clear()
+                else -> kept.set(after).onLeft { trace("art") { "ScreenScraper closure not kept: ${it.message}" } }
             }
         }
         return next

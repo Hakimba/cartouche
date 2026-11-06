@@ -10,6 +10,7 @@ import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.Shell
 import app.cartouche.core.files.facts
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.platforms.PlatformTables
 import arrow.core.None
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeRight
@@ -90,7 +91,7 @@ class ScanTest {
                     mapOf(file.uri to facts("gbc", "Rayman.gbc", rom)),
                 ).games
                 .single()
-        return ArtSources.of(Shipped.catalog, emptyMap(), emptyMap(), gbc.id).cutOf(game).on(663, 755).shouldBeSome()
+        return ArtSources.of(Shipped.catalog, gbc.id, PlatformTables()).cutOf(game).on(663, 755).shouldBeSome()
     }
 
     @Test
@@ -127,7 +128,7 @@ class ScanTest {
                 .single()
                 .copy(label = label)
         }
-        val sources = ArtSources.of(Shipped.catalog, emptyMap(), emptyMap(), gbc.id)
+        val sources = ArtSources.of(Shipped.catalog, gbc.id, PlatformTables())
         val recut = { before: Game, after: Game -> ArtSources.recut(listOf(before), listOf(after)) { sources } }
         val unknown = game(Shell.UNKNOWN, LabelChoice.Automatic)
         recut(unknown, game(Shell.EXCLUSIVE, LabelChoice.Automatic)) shouldBe setOf(unknown.id)

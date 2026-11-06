@@ -8,7 +8,8 @@ extends Node
 ## unit, every node it moves and every material parameter it sets, at rest and fully moved, and the
 ## seat once it is fully moved), and its fingerprint ([method ConsoleModel.fingerprint]): steps tuned
 ## on it carry it, and scripts/launch_steps.py refuses them once the model has changed. For a medium: its
-## kind, where its title and platform's name are drawn on its label, and its dimensions' hash.
+## kind, where its title and platform's name are drawn on its label, and the hash of its dimensions or of its baked
+## meshes.
 
 ## Our shaders' colour, by the first of these parameters they have.
 const _COLOURS: Array[StringName] = [&"albedo", &"tint", &"mirror_color", &"blank_color"]
@@ -47,12 +48,15 @@ func _ready() -> void:
 			"hash": shown.fingerprint(),
 		})
 	else:
-		var shape := ((model.get_node(^"Label") as MeshInstance3D).mesh as ShapedMesh).shape
+		var label := (model.get_node(^"Label") as MeshInstance3D).mesh
+		var drawn := MediumManifest.of_scene(load(medium.scene) as PackedScene)
+		var shape: ModelShape = (label as ShapedMesh).shape if label is ShapedMesh else null
+		var made: Variant = shape.dimensions() if shape else _mesh_hashes(model)
 		description.merge({
 			"media": medium.media,
-			"title_area": _rect(shape.title_area()),
-			"platform_area": _rect(shape.platform_area()),
-			"hash": var_to_str(shape.dimensions()).sha256_text(),
+			"title_area": _rect(shape.title_area() if shape else drawn.title_area),
+			"platform_area": _rect(shape.platform_area() if shape else drawn.platform_area),
+			"hash": var_to_str(made).sha256_text(),
 		})
 	for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		geometry.mesh = _plain(geometry)
@@ -98,7 +102,7 @@ static func _moving_parts(model: ConsoleModel) -> Array[Dictionary]:
 			else:
 				materials.append(change.merged({"surface": key[1], "parameter": key[2]}))
 		found.append({
-			"property": part.property, "role": MovingPart.Role.find_key(part.role), "rest": part.rest,
+			"property": part.property, "role": ConsolePart.Role.find_key(part.role), "rest": part.rest,
 			"open": part.open, "unit": part.property.get_slice("_", part.property.get_slice_count("_") - 1),
 			"nodes": nodes, "materials": materials, "seat": _pose(model.seat()),
 		})
@@ -194,6 +198,14 @@ static func _standard(shaded: ShaderMaterial) -> StandardMaterial3D:
 		standard.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		standard.albedo_color.a = opacity
 	return standard
+
+
+## The hash of each baked mesh file of [param model]'s parts.
+static func _mesh_hashes(model: Node3D) -> PackedStringArray:
+	var hashes := PackedStringArray()
+	for part: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		hashes.append(FileAccess.get_sha256(part.mesh.resource_path))
+	return hashes
 
 
 func _fail(message: String) -> void:

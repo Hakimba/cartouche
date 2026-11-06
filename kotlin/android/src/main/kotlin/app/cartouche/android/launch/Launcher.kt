@@ -22,7 +22,6 @@ import arrow.core.getOrElse
 import arrow.core.raise.catch
 import arrow.core.raise.either
 import arrow.core.raise.ensure
-import arrow.core.raise.ensureNotNull
 import arrow.core.toOption
 
 internal sealed interface LaunchFailure {
@@ -87,10 +86,6 @@ internal class Launcher(
         checkGame(launch, game).onRight {
             if (launch.runningInstance == RunningInstance.STOP && wanted()) launch.spec.targetPackage.onSome(stopInstance)
         }
-
-    fun appIntent(packageName: PackageName): Either<LaunchFailure, Intent> = either {
-        ensureNotNull(context.packageManager.getLaunchIntentForPackage(packageName.value)) { LaunchFailure.NotInstalled(packageName) }
-    }
 
     fun start(activity: Activity, intent: Intent): Either<LaunchFailure, Unit> = starting(intent) { activity.startActivity(intent) }
 

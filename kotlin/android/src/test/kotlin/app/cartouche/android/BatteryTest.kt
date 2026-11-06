@@ -49,15 +49,12 @@ class BatteryTest {
         var known = 0
         checkAll(Arb.int(-5..300), Arb.int(-5..300), chargers) { level, scale, plugged ->
             val state = BatteryState.of(broadcast(level, scale, plugged))
-            val wire = state.toWire()
-            wire["plugged"] shouldBe (plugged != 0)
+            state.plugged shouldBe (plugged != 0)
             state.levelPercent.isSome() shouldBe (scale > 0 && level in 1..scale)
             state.levelPercent.onSome { percent ->
                 known++
-                wire["level_percent"] shouldBe percent
                 (percent * scale <= level * 100 && level * 100 < (percent + 1) * scale) shouldBe true
             }
-            wire.containsKey("level_percent") shouldBe state.levelPercent.isSome()
         }
         known shouldBeGreaterThan 100
     }

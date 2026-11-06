@@ -5,6 +5,7 @@ package app.cartouche.core.settings
 
 import app.cartouche.core.library.Library
 import app.cartouche.core.regions.PreferredRegion
+import app.cartouche.core.storage.VersionedJson
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
@@ -129,3 +130,6 @@ public data class Settings(
      */
     public fun isFirstLaunch(library: Library): Boolean = buttonStyle.isNone() && library.setups.isEmpty()
 }
+
+/** The settings as stored on the device. */
+public object SettingsFormat : VersionedJson<Settings>(2, "settings", Settings.serializer())

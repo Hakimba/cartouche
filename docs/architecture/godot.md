@@ -14,9 +14,9 @@ The main scene is `app/carousel/carousel.tscn`. Three autoloads start before it 
 
 | File | Responsibility |
 |---|---|
-| `app/adapters/android/android_services.gd` | `AndroidServices`, the `Android` autoload: the only code that calls the plugin. Getters return typed values. Operations are coroutines (`await Android.list_folder(folder)`). |
-| `app/adapters/android/android_wire.gd` | `AndroidWire`: one class per answer of the plugin (`Game`, `Library`, `SettingsAnswer`…), read from its wire Dictionary. `AndroidServices` names each one (`AndroidServices.Game`). |
-| `app/adapters/desktop/desktop_plugin.gd` | `DesktopPlugin`: stands in for the plugin on a desktop or in the editor, with the plugin's method names. It answers from `app/dev/demo/desktop.json`, or from a device's data with `--snapshot=DIR`, and keeps the choices made in memory. A call it has no method for gets an empty value or fails as `unavailable`. |
+| `app/adapters/android/android_services.gd` | `AndroidServices`, the `Android` autoload: the only code that calls the plugin. Getters return typed values. Operations are coroutines (`await Android.pick_folder()`). Everything the plugin sends arrives as JSON text, read here into `AndroidWire`'s classes. |
+| `app/adapters/android/android_wire.gd` | `AndroidWire`: one class per type the plugin sends (`Game`, `Library`, `SettingsAnswer`…), generated from `Sent.kt` by `WireScriptTest` (INV-23); only a class's `# By hand` lines are edited. `AndroidServices` names each one (`AndroidServices.Game`). |
+| `app/adapters/desktop/desktop_plugin.gd` | `DesktopPlugin`: stands in for the plugin on a desktop or in the editor, with the plugin's method names, answering in the same JSON text. It answers from `app/dev/demo/desktop.json`, or from a device's data with `--snapshot=DIR`, and keeps the choices made in memory. A call it has no method for gets an empty value or fails as `unavailable`. |
 | `app/adapters/android/android_buttons.gd` | `AndroidButtons`: makes A confirm and B go back as Android names the buttons, whatever Godot's controller database says. |
 
 `desktop.json` is what the plugin would send for a demo library. `DesktopDemoTest` (Kotlin) fails when it is out
@@ -64,8 +64,8 @@ screen, going from one to the other, launching, the properties, and remembering 
 
 | File | Responsibility |
 |---|---|
-| `carousel.gd` | The screens and their input: pad, keys, touch, the system's back. Where the user was is saved before going out of a console, launching or leaving the app. |
-| `carousel_layout.gd` | `CarouselLayout`: the carousel's screen mechanics as pure functions (which game stands where, how a held direction repeats). |
+| `carousel.gd` | The screens and their input: pad, keys, touch, the system's back. One state says who holds the presses (the carousel, a press waiting for the row, the screens in front, the add form's steps), one table what the carousel takes on each screen. Where the user was is saved before going out of a console, launching or leaving the app. |
+| `carousel_layout.gd` | `CarouselLayout`: the carousel's screen mechanics as pure functions (which game stands where, how a held direction repeats, `Repeat` for the row, the search ribbon and the model swatches). |
 | `held_direction.gd` | `HeldDirection`: which way the carousel is held, from input events; also whether up is held, so that a stick held up tosses once. |
 | `finger.gd` | `Finger`: the first finger read as a tap, a long press, a drag or a flick. A swipe moves exactly one game or console. |
 | `stick_turn.gd` | `StickTurn`: the right stick or a finger turning the selected console or game. |
@@ -90,8 +90,8 @@ Under `app/carousel/consoles/`. One folder per console model, plus the code they
 
 | File | Responsibility |
 |---|---|
-| `console_manifest.gd`, `console_model.gd`, `moving_part.gd` | What a console folder tells the app, and the contract every console model meets. [../adding-a-console.md](../adding-a-console.md) describes them. |
-| `glb_console.gd`, `console_part.gd`, `glb_console_shape.gd`, `seat_shape.gd` | A console drawn from a glb, declared as data in its scene: its seat, way in, pose and moving parts. |
+| `console_manifest.gd` | What a console folder tells the app. |
+| `console_model.gd`, `console_part.gd`, `seat_shape.gd` | `ConsoleModel`, the one contract every console meets, declared as data in its scene: its seat, way in, pose and moving parts. [../adding-a-console.md](../adding-a-console.md) describes them. |
 | `console_row.gd` | `ConsoleRow`: the consoles screen. The selected console stands alone in its pose, and moves in and out as the selection changes. |
 | `launch_animation.gd` | `LaunchAnimation`: turns a console's steps (`launch.json`) into a Godot `Animation`. A console without steps plays a placeholder made from its moving parts. |
 | `console_sequence.gd` | `ConsoleSequence`: plays that animation into and out of the games screen. |
@@ -129,11 +129,12 @@ Under `app/carousel/properties/`. X on a game (its hint reads Edit), or a long p
 
 ### Models and shaders
 
-Under `app/carousel/models/`: what console and medium models are built from. `ModelShape` holds a model's
+Under `app/carousel/models/`: what medium models are built from, and what consoles share (`Spindle`). `ModelShape` holds a model's
 dimensions in millimetres and the rules they must keep. Each `ShapedMesh` is one part built from them, through
 `MeshBuilder` and the pieces of `ShapeGeometry`. An exported app finds every part already built: the export plugin
 `app/addons/cartouche_dev/shaped_mesh_export.gd` stores the arrays the code builds, so the code stays their only
-source and the app does not build them at start. `ModelFade` fades a model on the mobile renderer, which ignores
+source and the app does not build them at start. The cartridges that are more than a box, and the first consoles,
+are `ArrayMesh` files in their folders: their scenes draw those, with no code behind them. `ModelFade` fades a model on the mobile renderer, which ignores
 per-instance transparency: a faded model draws with the `*_fading.gdshader` copies of its shaders. Every distinct
 material is a shader the GPU driver keeps, so models share `solid.gdshader`, `label.gdshader` and the few others
 here rather than standard materials.
@@ -165,7 +166,6 @@ draws nothing.
 | `app/dev/carousel_bench.gd` | `CarouselBench`: drives the carousel like a user for `scripts/bench.sh`, one scenario per run. |
 | `app/dev/frame_shots.gd` | `FrameShots`: pictures at set frames, to prove a change keeps every pixel ([../testing.md](../testing.md#pictures-and-benchmarks)). |
 | `app/dev/dev_sounds.gd` | `DevSounds`: sounds dropped by hand into the user folder, to try a launch's sounds. |
-| `app/dev/device_check/` | The device check: one tab per device capability (storage, launch, library, pad, performance). |
 | `app/dev/bridge/` | The debug bridge, left out of release builds. See [../debug-bridge.md](../debug-bridge.md). |
 | `app/addons/cartouche_android/` | Adds the plugin's AARs and dependencies to Android exports. Versions are declared once, in `kotlin/gradle/libs.versions.toml`. |
 | `app/addons/cartouche_dev/` | Leaves `app/dev/bridge/` out of release exports. `scripts/check_release.sh` checks a real release pack. |

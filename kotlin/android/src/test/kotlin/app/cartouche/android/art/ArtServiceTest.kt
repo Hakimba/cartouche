@@ -4,13 +4,13 @@ package app.cartouche.android.art
 import android.net.ConnectivityManager
 import app.cartouche.android.DebugOptions
 import app.cartouche.android.Reference
+import app.cartouche.android.Table
 import app.cartouche.android.Threads
 import app.cartouche.android.library.LibraryService
-import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
-import app.cartouche.android.storage.SelectionStore
+import app.cartouche.android.tableTexts
 import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.art.Day
 import app.cartouche.core.art.ExtractGame
@@ -40,7 +40,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
-import org.godotengine.godot.Dictionary
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -81,8 +84,8 @@ class ArtServiceTest {
         planning: CoroutineDispatcher? = null,
     ) {
         val store = ArtStore(File(context.filesDir, "art"))
-        val signals = mutableListOf<Pair<String, Dictionary>>()
-        var reference = Reference(catalog, artLists = mapOf(ps2 to extract), textureLists = mapOf(ps2 to textureTable))
+        val signals = mutableListOf<Pair<String, String>>()
+        var reference = Reference(catalog, files = tableTexts(Table.ART to ps2 to extract, Table.TEXTURES to ps2 to textureTable))
         var preferred: Option<PreferredRegion> = None
 
         init {
@@ -92,8 +95,8 @@ class ArtServiceTest {
         val library =
             LibraryService(
                 LibraryStore(File(context.filesDir, "library.json")),
-                SelectionStore(File(context.filesDir, "selection.json")),
-                ArrivalsStore(File(context.filesDir, "arrivals.json")),
+                File(context.filesDir, "selection.json"),
+                File(context.filesDir, "arrivals.json"),
                 Folders(context),
                 FactsStore(File(context.filesDir, "facts")),
             )
@@ -259,9 +262,11 @@ class ArtServiceTest {
         rig.store.save(stored.id, byteArrayOf(1)).shouldBeRight()
         rig.art.lookForArt()
         rig.run()
-        rig.signals.mapNotNull { (_, payload) -> (payload["absent"] as? Array<*>)?.toList() } shouldBe listOf(listOf(unknown.id.value))
+        rig.signals
+            .flatMap { (_, payload) -> Option.fromNullable(Json.parseToJsonElement(payload).jsonObject["absent"]).toList() }
+            .map { absent -> absent.jsonArray.map { it.jsonPrimitive.content } } shouldBe listOf(listOf(unknown.id.value))
         rig.store.labelsOf(listOf(okage, unknown, stored)) { rig.reference.artVersion(it) }.second shouldBe listOf(unknown.id.value)
-        rig.reference = Reference(catalog, artLists = mapOf(ps2 to okageExtract.replace("2026-10-18", "2026-10-19")))
+        rig.reference = Reference(catalog, files = tableTexts(Table.ART to ps2 to okageExtract.replace("2026-10-18", "2026-10-19")))
         rig.store.labelsOf(listOf(unknown)) { rig.reference.artVersion(it) }.second shouldBe emptyList()
         rig.scope.cancel()
     }

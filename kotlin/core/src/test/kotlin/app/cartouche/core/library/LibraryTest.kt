@@ -5,6 +5,7 @@ import app.cartouche.core.FileName
 import app.cartouche.core.Shipped.ps2
 import app.cartouche.core.Shipped.ps2Titles
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.serialName
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
@@ -45,7 +46,7 @@ class LibraryTest {
             ConsoleVariant.entries.forEach { variant ->
                 val platform = variant.platform
                 val base = ConsoleVariant.base(platform).shouldBeSome()
-                val added = Library().setUp(platform, setup, Some(variant.wire), coming)
+                val added = Library().setUp(platform, setup, Some(variant.serialName), coming)
                 if (base in models || variant in models) {
                     added.shouldBeLeft().shouldBeInstanceOf<VariantError.Coming>()
                 } else {
@@ -53,7 +54,7 @@ class LibraryTest {
                 }
                 val held = Library().withSetup(platform, PlatformSetup())
                 held.setUp(platform, setup, None, coming).shouldBeRight().setup(platform) shouldBe setup
-                held.setUp(platform, setup, Some(variant.wire), coming).isLeft() shouldBe (variant != base && variant in models)
+                held.setUp(platform, setup, Some(variant.serialName), coming).isLeft() shouldBe (variant != base && variant in models)
             }
         }
     }

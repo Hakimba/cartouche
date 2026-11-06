@@ -57,9 +57,6 @@ adb shell am start -n app.cartouche.test/com.godot.game.GodotAppLauncher --esa a
 launch to its end without starting an emulator. `--art-refused`, `--art-slow=MS`, `--launch-slow=MS` and
 `--screenscraper=quota` make the network or storage misbehave on purpose.
 
-Holding Select for two seconds opens the device check (`app/dev/device_check/`): one tab per capability the app
-relies on (storage, launch, library, pad, performance).
-
 ## Traces
 
 ```sh

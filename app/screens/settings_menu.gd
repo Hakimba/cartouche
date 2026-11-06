@@ -66,8 +66,8 @@ var saving := false:
 		_save_started_ms = Time.get_ticks_msec()
 var state := State.OPEN
 var _save_started_ms := 0
-var _time := DURATION_S
-var _direction := 1.0
+## The card's clock: the opening's, or the closing's while [member _closing].
+var _clock := Motion.Timeline.new(_sample)
 var _closing := false
 var _cursor_y := 0.0
 var _cursor_tween: Tween
@@ -121,6 +121,8 @@ func _ready() -> void:
 	_panel.add_child(_ink)
 	_ink.draw.connect(_draw_card)
 	_place_rows()
+	_clock.seconds = DURATION_S
+	_clock.arrived.connect(_settled)
 	visibility_changed.connect(func() -> void:
 		if not visible:
 			set_process(false))
@@ -166,28 +168,28 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func enter() -> void:
 	state = State.OPENING
-	_time = 0.0
-	_direction = 1.0
+	_clock.stop()
+	_clock.seconds = 0.0
 	_closing = false
-	set_process(false)
 
 
 func _reverse(opening: bool) -> void:
 	Sounds.play(SoundEffects.Cue.SETTINGS if opening else SoundEffects.Cue.BACK)
 	if state == State.OPEN:
 		_closing = true
-		_time = 0.0
-	_direction = (1.0 if opening == (not _closing) else -1.0)
+		_clock.seconds = 0.0
 	state = State.OPENING if opening else State.CLOSING
+	_clock.play(_duration() if opening != _closing else 0.0)
 	set_process(true)
 
 
+# The clock moves first: what it places is drawn this frame.
 func _process(delta: float) -> void:
-	_time = clampf(_time + minf(delta, 0.1) * _direction, 0.0, _duration())
-	_sample()
-	if _time > 0.0 and _time < _duration():
-		return
-	var opened := (_time == _duration()) != _closing
+	_clock.tick(minf(delta, 0.1))
+
+
+func _settled() -> void:
+	var opened := (_clock.seconds == _duration()) != _closing
 	state = State.OPEN if opened else State.CLOSED
 	set_process(false)
 	if not opened:
@@ -199,26 +201,23 @@ func _duration() -> float:
 
 
 func _sample() -> void:
-	var card := _portion(0.0, StudioTokens.TR_SETTINGS_CARD_OUT_S, StudioTokens.TR_SETTINGS_CARD_OUT_S_CURVE) if _closing \
-		else 1.0 - _portion(StudioTokens.TR_SETTINGS_CARD_AT_S, StudioTokens.TR_SETTINGS_CARD_S, StudioTokens.TR_SETTINGS_CARD_S_CURVE)
+	var t := _clock.seconds
+	var card := Motion.phase(t, 0.0, StudioTokens.TR_SETTINGS_CARD_OUT_S, StudioTokens.TR_SETTINGS_CARD_OUT_S_CURVE) if _closing \
+		else 1.0 - Motion.phase(t, StudioTokens.TR_SETTINGS_CARD_AT_S, StudioTokens.TR_SETTINGS_CARD_S, StudioTokens.TR_SETTINGS_CARD_S_CURVE)
 	_panel.modulate.a = 1.0 - card
 	_panel.position.y = _CARD_TOP + card * (25.6 if _closing else StudioTokens.TR_SETTINGS_RISE_PX)
 	_panel.scale = Vector2.ONE * lerpf(1.0, 0.98 if _closing else 0.97, card)
-	($Dim as ColorRect).modulate.a = 1.0 - _portion(0.06, 0.2, Motion.Easing.EASE_IN) if _closing \
-		else _portion(StudioTokens.TR_SETTINGS_VEIL_AT_S, StudioTokens.TR_SETTINGS_VEIL_S, Motion.Easing.EASE_OUT)
-	($Hints as Control).modulate.a = 1.0 - _portion(0.0, 0.12, Motion.Easing.LINEAR) if _closing \
-		else _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
-	var back_s := maxf(0.001, StudioTokens.TR_SETTINGS_CLOSE_S - StudioTokens.TR_SETTINGS_BACK_AT_S)
-	var back := _portion(StudioTokens.TR_SETTINGS_BACK_AT_S, back_s, Motion.Easing.ARRIVE)
-	var subject := back if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_LEAVE_S, StudioTokens.TR_SETTINGS_LEAVE_S_CURVE)
-	var rail := back if _closing else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_SINK_S, StudioTokens.TR_SETTINGS_SINK_S_CURVE)
-	var chrome := _portion(0.21, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR) if _closing \
-		else 1.0 - _portion(0, StudioTokens.TR_SETTINGS_HINTS_S, Motion.Easing.LINEAR)
+	($Dim as ColorRect).modulate.a = 1.0 - Motion.phase(t, 0.06, 0.2, Motion.Easing.EASE_IN) if _closing \
+		else Motion.phase(t, StudioTokens.TR_SETTINGS_VEIL_AT_S, StudioTokens.TR_SETTINGS_VEIL_S, Motion.Easing.EASE_OUT)
+	($Hints as Control).modulate.a = 1.0 - Motion.phase(t, 0.0, 0.12) if _closing \
+		else Motion.phase(t, 0.21, StudioTokens.TR_SETTINGS_HINTS_S)
+	var back := Motion.phase(t, StudioTokens.TR_SETTINGS_BACK_AT_S, StudioTokens.TR_SETTINGS_CLOSE_S - StudioTokens.TR_SETTINGS_BACK_AT_S,
+		Motion.Easing.ARRIVE)
+	var subject := back if _closing else 1.0 - Motion.phase(t, 0, StudioTokens.TR_SETTINGS_LEAVE_S, StudioTokens.TR_SETTINGS_LEAVE_S_CURVE)
+	var rail := back if _closing else 1.0 - Motion.phase(t, 0, StudioTokens.TR_SETTINGS_SINK_S, StudioTokens.TR_SETTINGS_SINK_S_CURVE)
+	var chrome := Motion.phase(t, 0.21, StudioTokens.TR_SETTINGS_HINTS_S) if _closing \
+		else 1.0 - Motion.phase(t, 0, StudioTokens.TR_SETTINGS_HINTS_S)
 	transition_frame.emit(subject, rail, chrome)
-
-
-func _portion(start: float, duration: float, curve: Motion.Easing) -> float:
-	return Motion.eased(curve, clampf((_time - start) / duration, 0.0, 1.0))
 
 
 func _focus_row(index: int) -> void:
@@ -379,8 +378,7 @@ func open(focus: StringName, region: String, language: String) -> void:
 	if state == State.CLOSED:
 		state = State.OPEN
 		_closing = false
-		_time = DURATION_S
-		_sample()
+		_clock.stand(DURATION_S)
 	_rows_of[&"button_style"].show_value(Controls.style_name())
 	_rows_of[&"graphics"].show_value(tr(EdgeSmoothingScreen.NAMES[EdgeSmoothingScreen.of(get_viewport())]))
 	_rows_of[&"backdrop"].show_value(tr(Backdrop.NAMES[Backdrop.choice]))
@@ -394,6 +392,7 @@ func open(focus: StringName, region: String, language: String) -> void:
 	_focus_row(maxi(_rows.find(get_viewport().gui_get_focus_owner() as FieldButton), 0))
 	if state == State.OPENING:
 		_sample()
+		_clock.play(DURATION_S)
 		set_process(true)
 
 

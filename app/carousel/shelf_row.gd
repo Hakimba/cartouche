@@ -56,8 +56,7 @@ var _spring := Motion.Spring.new(0.0)
 var _title_tops: Dictionary[PackedScene, Vector3] = {}
 ## The direction held (-1 or 1), 0 when none.
 var _held := 0
-var _held_steps := 0
-var _next_repeat_s := 0.0
+var _repeat := CarouselLayout.Repeat.new()
 var _clock_s := 0.0
 ## How far the selected game's float and sway have gone, in seconds at full pace.
 var _pose_s := 0.0
@@ -114,10 +113,8 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	_clock_s += delta
 	_pose_s += delta * pace
-	if _held != 0 and _clock_s >= _next_repeat_s:
+	if _held != 0 and _repeat.due(delta):
 		step(_held)
-		_held_steps += 1
-		_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(_held_steps)
 	_spring.target = _position
 	_spring.step(delta)
 	_scroll = _spring.position
@@ -270,8 +267,7 @@ func selected_index() -> int:
 func hold(direction: int) -> void:
 	step(direction)
 	_held = direction
-	_held_steps = 0
-	_next_repeat_s = _clock_s + CarouselLayout.repeat_delay(0)
+	_repeat.start()
 
 
 ## Stops the steps of [param direction] at once: no step is left pending.
@@ -438,7 +434,7 @@ func step(direction: int) -> void:
 	_position += direction
 	_turn.release()
 	if Diagnostics.enabled:
-		Diagnostics.trace("carousel", "step %d to %d (held for %d steps)" % [direction, selected_index(), _held_steps])
+		Diagnostics.trace("carousel", "step %d to %d (held for %d steps)" % [direction, selected_index(), _repeat.steps])
 	_selected()
 
 
@@ -743,9 +739,11 @@ class LabelledModel extends Node3D:
 		# To a ten-thousandth: a disc's face, built round, is square.
 		label_proportion = snappedf(face.x / face.y, 0.0001)
 		_view.size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH / label_proportion))
-		# Where the title and the platform go is the shape's: round a disc's hub, for one.
-		var title := ModelShape.TITLE_AREA
-		var platform := ModelShape.PLATFORM_AREA
+		# Where the title and the platform go is the medium's manifest's, or its shape's when built from one: round a
+		# disc's hub, for one.
+		var manifest := MediumManifest.of_scene(model)
+		var title := manifest.title_area
+		var platform := manifest.platform_area
 		if label.mesh is ShapedMesh:
 			var shape := (label.mesh as ShapedMesh).shape
 			title = shape.title_area()

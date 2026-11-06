@@ -2,6 +2,7 @@
 package app.cartouche.core.library
 
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.serialName
 import arrow.core.Either
 import arrow.core.Option
 import arrow.core.firstOrNone
@@ -13,69 +14,69 @@ import kotlinx.serialization.Serializable
 
 /** The models a supported console can show. The first of each platform is its base model. */
 @Serializable
-public enum class ConsoleVariant(public val platform: PlatformId, public val wire: String) {
+public enum class ConsoleVariant(public val platform: PlatformId) {
     @SerialName("ps2_slim")
-    PS2_SLIM(PlatformId("ps2"), "ps2_slim"),
+    PS2_SLIM(PlatformId("ps2")),
 
     @SerialName("ps2_fat")
-    PS2_FAT(PlatformId("ps2"), "ps2_fat"),
+    PS2_FAT(PlatformId("ps2")),
 
     @SerialName("gba")
-    GBA(PlatformId("gba"), "gba"),
+    GBA(PlatformId("gba")),
 
     @SerialName("gba_sp")
-    GBA_SP(PlatformId("gba"), "gba_sp"),
+    GBA_SP(PlatformId("gba")),
 
     @SerialName("gb")
-    GB(PlatformId("gb"), "gb"),
+    GB(PlatformId("gb")),
 
     @SerialName("gbc")
-    GBC(PlatformId("gbc"), "gbc"),
+    GBC(PlatformId("gbc")),
 
     @SerialName("gc")
-    GC(PlatformId("gc"), "gc"),
+    GC(PlatformId("gc")),
 
     @SerialName("n64")
-    N64(PlatformId("n64"), "n64"),
+    N64(PlatformId("n64")),
 
     @SerialName("nes")
-    NES(PlatformId("nes"), "nes"),
+    NES(PlatformId("nes")),
 
     @SerialName("snes")
-    SNES(PlatformId("snes"), "snes"),
+    SNES(PlatformId("snes")),
 
     @SerialName("psx")
-    PSX(PlatformId("psx"), "psx"),
+    PSX(PlatformId("psx")),
 
     @SerialName("wii")
-    WII(PlatformId("wii"), "wii"),
+    WII(PlatformId("wii")),
 
     @SerialName("xbox")
-    XBOX(PlatformId("xbox"), "xbox"),
+    XBOX(PlatformId("xbox")),
 
     @SerialName("xbox360")
-    XBOX360(PlatformId("xbox360"), "xbox360"),
+    XBOX360(PlatformId("xbox360")),
 
     @SerialName("psp")
-    PSP(PlatformId("psp"), "psp"),
+    PSP(PlatformId("psp")),
 
     @SerialName("switch")
-    SWITCH(PlatformId("switch"), "switch"),
+    SWITCH(PlatformId("switch")),
 
     @SerialName("switch_grey")
-    SWITCH_GREY(PlatformId("switch"), "switch_grey"),
+    SWITCH_GREY(PlatformId("switch")),
 
     @SerialName("dreamcast")
-    DREAMCAST(PlatformId("dreamcast"), "dreamcast"),
+    DREAMCAST(PlatformId("dreamcast")),
 
     @SerialName("megadrive")
-    MEGADRIVE(PlatformId("genesis"), "megadrive"),
+    MEGADRIVE(PlatformId("genesis")),
 
     @SerialName("megadrive2")
-    MEGADRIVE2(PlatformId("genesis"), "megadrive2"),
+    MEGADRIVE2(PlatformId("genesis")),
 
     @SerialName("mastersystem")
-    MASTERSYSTEM(PlatformId("master"), "mastersystem"),
+    MASTERSYSTEM(PlatformId("master")),
     ;
 
     public companion object {
@@ -83,7 +84,7 @@ public enum class ConsoleVariant(public val platform: PlatformId, public val wir
 
         public fun of(platform: PlatformId, id: String): Either<VariantError, ConsoleVariant> = either {
             entries
-                .firstOrNone { it.platform == platform && it.wire == id }
+                .firstOrNone { it.platform == platform && it.serialName == id }
                 .getOrElse { raise(VariantError.Unknown(platform, id)) }
         }
     }
@@ -99,7 +100,7 @@ public value class Coming(public val models: Set<ConsoleVariant>) {
 
     /** [variant] unless it is coming. */
     public fun ready(variant: ConsoleVariant): Either<VariantError, ConsoleVariant> = either {
-        ensure(variant !in models) { VariantError.Coming(variant.platform, variant.wire) }
+        ensure(variant !in models) { VariantError.Coming(variant.platform, variant.serialName) }
         variant
     }
 
@@ -107,6 +108,6 @@ public value class Coming(public val models: Set<ConsoleVariant>) {
         public val NONE: Coming = Coming(emptySet())
 
         /** The models of the console folders named [folders]; a folder of no model is left out. */
-        public fun of(folders: Collection<String>): Coming = Coming(ConsoleVariant.entries.filter { it.wire in folders }.toSet())
+        public fun of(folders: Collection<String>): Coming = Coming(ConsoleVariant.entries.filter { it.serialName in folders }.toSet())
     }
 }

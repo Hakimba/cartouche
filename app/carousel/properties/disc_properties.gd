@@ -46,8 +46,6 @@ static var _to_naming := Move.new(Leave.FADE, 0.15, 0.42, Arrive.RISE, 0.24, 0.2
 ## Set by the carousel before the first [method open].
 var row: ShelfRow
 var art: GameArt
-var _opening_parts: Dictionary[Part, Interval] = {}
-var _back_parts: Dictionary[Part, Interval] = {}
 var _on_properties := Staging.new(1.0, 0.2, 0.98, 1.0, 400.0)
 var _step := Step.CLOSED
 var _game: AndroidServices.Game
@@ -66,9 +64,9 @@ var _body_vertices := PackedVector3Array()
 var _model_centre := Vector3.ZERO
 var _row_stand := Transform3D.IDENTITY
 var _travel_stand := Transform3D.IDENTITY
+## The travel between the row and the staging: the opening's parts, or the way back's while [member _back_profile].
+var _clock := Motion.Timeline.new(_apply_travel)
 var _back_profile := false
-var _travel := 0.0
-var _direction := 0
 var _name_text: _NameText
 var _projected := false
 var _projected_stand := Transform3D.IDENTITY
@@ -120,11 +118,12 @@ func _ready() -> void:
 	_name.focus_exited.connect(_name_text.queue_redraw)
 	_zone.gui_input.connect(_on_zone_input)
 	_framing_screen.gui_input.connect(_on_framing_input)
+	_clock.arrived.connect(_travelled)
 
 
 func _process(delta: float) -> void:
-	if _direction != 0:
-		_tick_travel(minf(delta, 0.1))
+	# The travel first: the overlays are placed on where it puts the medium this frame.
+	_clock.tick(minf(delta, 0.1))
 	if not _medium:
 		return
 	if _step == Step.FRAMING and not _busy:
@@ -134,7 +133,7 @@ func _process(delta: float) -> void:
 	if shown.dirty:
 		_medium.redraw()
 		shown.dirty = false
-	var at := _travel_stand if _direction != 0 or (_step == Step.PROPERTIES and not _busy) else row.selected_stand()
+	var at := _travel_stand if _clock.is_playing() or (_step == Step.PROPERTIES and not _busy) else row.selected_stand()
 	var stand := row.global_transform * at
 	var camera := get_viewport().get_camera_3d()
 	var changed := _refresh_extents(stand, camera)
@@ -201,7 +200,7 @@ static func _vertices(node: Node3D, relative_to: Node3D) -> PackedVector3Array:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _step == Step.CLOSED or event.is_echo() or _direction != 0:
+	if _step == Step.CLOSED or event.is_echo() or _clock.is_playing():
 		return
 	if _step == Step.FRAMING and event.is_action_pressed(&"ui_accept"):
 		get_viewport().set_input_as_handled()
@@ -231,11 +230,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if _direction != 0 and event.is_pressed():
+	if _clock.is_playing() and event.is_pressed():
 		if event.is_action_pressed(&"screen_back"):
-			_direction = -1
+			_travel_to(false)
 		elif event.is_action_pressed(&"open_properties"):
-			_direction = 1
+			_travel_to(true)
 		get_viewport().set_input_as_handled()
 		return
 	var pinch := event as InputEventMagnifyGesture
@@ -251,7 +250,6 @@ func is_open() -> bool:
 
 ## Opens the properties of the selected game of the row.
 func open() -> void:
-	_refresh_profiles()
 	_game = row.selected_game()
 	_kind = LabelZone.Shape.RECTANGLE if MediumManifest.is_cartridge(row.selected_medium()) else LabelZone.Shape.DISC
 	var focus := get_theme_stylebox(&"focus", &"Button") as SatinStyle
@@ -271,14 +269,13 @@ func open() -> void:
 		return
 	_row_stand = row.selected_stand()
 	_staging = _in_row
-	_travel = 0.0
 	_back_profile = false
-	_direction = 1
 	_properties.show()
 	_zone.show()
 	_zone.grab_focus()
 	set_process(true)
-	_apply_travel()
+	_clock.stand(0.0)
+	_travel_to(true)
 	Diagnostics.trace("carousel", "zone shape=%s" % ("rect" if _kind == LabelZone.Shape.RECTANGLE else "circle"))
 	Diagnostics.trace("properties", "open %s" % _game.title)
 
@@ -342,7 +339,7 @@ static func _meshes_ready(model: Node3D) -> bool:
 func _abort_model() -> void:
 	_return_model()
 	_step = Step.CLOSED
-	_direction = 0
+	_clock.stop()
 	_busy = false
 	row.stage = 0.0
 	row.neighbours = 1.0
@@ -389,28 +386,33 @@ func _point_at_focus(centre: Vector2, ring: float) -> void:
 
 
 func _close() -> void:
-	_refresh_profiles()
 	_busy = true
 	_release_focus()
 	_callout.timeline = true
 	_callout.clear()
 	_back_profile = true
-	_travel = 1.0
-	_direction = -1
+	_clock.seconds = 0.0
+	_travel_to(false)
 
 
-func _tick_travel(delta: float) -> void:
-	var length := StudioTokens.TR_PROPERTIES_BACK_S if _back_profile else StudioTokens.TR_PROPERTIES_OPEN_S
-	_travel = clampf(_travel + delta * _direction / length, 0.0, 1.0)
-	_apply_travel()
-	if _travel == 1.0 and _direction > 0:
-		_direction = 0
+## The medium travels towards the staging ([param staged]) or the row, from where it is on the travel shown.
+func _travel_to(staged: bool) -> void:
+	_clock.play((0.0 if staged else StudioTokens.TR_PROPERTIES_BACK_S) if _back_profile
+		else (StudioTokens.TR_PROPERTIES_OPEN_S if staged else 0.0))
+
+
+## Whether the travel shown stands at the staging.
+func _staged() -> bool:
+	return _clock.seconds == (0.0 if _back_profile else StudioTokens.TR_PROPERTIES_OPEN_S)
+
+
+func _travelled() -> void:
+	if _staged():
 		_staging = _on_properties
 		_callout.timeline = false
 		_busy = false
 		_zone.grab_focus()
-	elif _travel == 0.0 and _direction < 0:
-		_direction = 0
+	else:
 		_busy = false
 		_step = Step.CLOSED
 		if _chooser.framed_game:
@@ -429,36 +431,43 @@ func _tick_travel(delta: float) -> void:
 		closed.emit()
 
 
-func _refresh_profiles() -> void:
-	_opening_parts = {
-		Part.MEDIUM: Interval.new(0.0, StudioTokens.TR_PROPERTIES_TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE),
-		Part.POOL: Interval.new(0.0, StudioTokens.TR_PROPERTIES_POOL_S, StudioTokens.TR_PROPERTIES_POOL_S_CURVE),
-		Part.NEIGHBOURS: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
-		Part.BEHIND: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
-		Part.ZONE: Interval.new(StudioTokens.TR_PROPERTIES_ZONE_AT_S, maxf(0.001,
-			StudioTokens.TR_PROPERTIES_OPEN_S - StudioTokens.TR_PROPERTIES_ZONE_AT_S), Motion.Easing.EASE_OUT),
-		Part.NAME: Interval.new(StudioTokens.TR_PROPERTIES_NAME_AT_S, maxf(0.001,
-			StudioTokens.TR_PROPERTIES_OPEN_S - StudioTokens.TR_PROPERTIES_NAME_AT_S), Motion.Easing.ARRIVE),
-		Part.CALLOUT: Interval.new(StudioTokens.TR_PROPERTIES_CALLOUT_AT_S, maxf(0.001,
-			StudioTokens.TR_PROPERTIES_OPEN_S - StudioTokens.TR_PROPERTIES_CALLOUT_AT_S)),
-		Part.HINTS: Interval.new(0.2, 0.15),
-	}
-	_back_parts = {
-		Part.MEDIUM: Interval.new(0.0, StudioTokens.TR_PROPERTIES_TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE, 1.0, 0.0),
-		Part.POOL: Interval.new(0.0, 0.3, Motion.Easing.EASE_IN, 1.0, 0.0),
-		Part.NEIGHBOURS: Interval.new(0.28, 0.1),
-		Part.BEHIND: Interval.new(0.22, 0.16),
-		Part.ZONE: Interval.new(0.0, 0.1, Motion.Easing.LINEAR, 1.0, 0.0),
-		Part.NAME: Interval.new(0.0, 0.16, Motion.Easing.EASE_IN, 1.0, 0.0),
-		Part.CALLOUT: Interval.new(0.0, 0.12, Motion.Easing.LINEAR, 1.0, 0.0),
-		Part.HINTS: Interval.new(0.0, StudioTokens.TR_PROPERTIES_FADE_S, Motion.Easing.LINEAR, 1.0, 0.0),
-	}
-
-
+## How far [param part] has come on the travel shown: the opening's, or the way back's.
 func _part(part: Part) -> float:
-	var profile := _back_parts if _back_profile else _opening_parts
-	var elapsed := (1.0 - _travel) * StudioTokens.TR_PROPERTIES_BACK_S if _back_profile else _travel * StudioTokens.TR_PROPERTIES_OPEN_S
-	return profile[part].at(elapsed)
+	var t := _clock.seconds
+	if _back_profile:
+		match part:
+			Part.MEDIUM:
+				return 1.0 - Motion.phase(t, 0.0, StudioTokens.TR_PROPERTIES_TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE)
+			Part.POOL:
+				return 1.0 - Motion.phase(t, 0.0, 0.3, Motion.Easing.EASE_IN)
+			Part.NEIGHBOURS:
+				return Motion.phase(t, 0.28, 0.1)
+			Part.BEHIND:
+				return Motion.phase(t, 0.22, 0.16)
+			Part.ZONE:
+				return 1.0 - Motion.phase(t, 0.0, 0.1)
+			Part.NAME:
+				return 1.0 - Motion.phase(t, 0.0, 0.16, Motion.Easing.EASE_IN)
+			Part.CALLOUT:
+				return 1.0 - Motion.phase(t, 0.0, 0.12)
+		return 1.0 - Motion.phase(t, 0.0, StudioTokens.TR_PROPERTIES_FADE_S)
+	var open_s := StudioTokens.TR_PROPERTIES_OPEN_S
+	match part:
+		Part.MEDIUM:
+			return Motion.phase(t, 0.0, StudioTokens.TR_PROPERTIES_TRAVEL_S, StudioTokens.TR_PROPERTIES_TRAVEL_S_CURVE)
+		Part.POOL:
+			return Motion.phase(t, 0.0, StudioTokens.TR_PROPERTIES_POOL_S, StudioTokens.TR_PROPERTIES_POOL_S_CURVE)
+		Part.NEIGHBOURS, Part.BEHIND:
+			return 1.0 - Motion.phase(t, 0.0, StudioTokens.TR_PROPERTIES_FADE_S)
+		Part.ZONE:
+			return Motion.phase(t, StudioTokens.TR_PROPERTIES_ZONE_AT_S, open_s - StudioTokens.TR_PROPERTIES_ZONE_AT_S,
+				Motion.Easing.EASE_OUT)
+		Part.NAME:
+			return Motion.phase(t, StudioTokens.TR_PROPERTIES_NAME_AT_S, open_s - StudioTokens.TR_PROPERTIES_NAME_AT_S,
+				Motion.Easing.ARRIVE)
+		Part.CALLOUT:
+			return Motion.phase(t, StudioTokens.TR_PROPERTIES_CALLOUT_AT_S, open_s - StudioTokens.TR_PROPERTIES_CALLOUT_AT_S)
+	return Motion.phase(t, 0.2, 0.15)
 
 
 func _apply_travel() -> void:
@@ -481,14 +490,14 @@ func _apply_travel() -> void:
 	_callout.timeline = true
 	_callout.modulate.a = _part(Part.CALLOUT)
 	_hints.modulate.a = _part(Part.HINTS)
-	if _travel == 1.0:
+	if _staged():
 		for item in behind:
 			item.hide()
 	_zone.pivot_offset = _zone.size / 2.0
 
 
 func _name_drop() -> float:
-	return StudioTokens.TR_PROPERTIES_RISE_PX * (1.0 - _part(Part.NAME)) if _direction != 0 else 0.0
+	return StudioTokens.TR_PROPERTIES_RISE_PX * (1.0 - _part(Part.NAME)) if _clock.is_playing() else 0.0
 
 
 func _show_name(name_button: Button, title: String) -> void:
@@ -725,22 +734,3 @@ class _NameText extends Control:
 			_backing = null
 		if line:
 			line.draw(self, Vector2(30.72, 6.4), Backdrop.palette.ink)
-
-
-class Interval extends RefCounted:
-	var start: float
-	var duration: float
-	var curve: Motion.Easing
-	var from: float
-	var to: float
-
-	func _init(at_s: float, seconds: float, easing := Motion.Easing.LINEAR, first := 0.0, last := 1.0) -> void:
-		start = at_s
-		duration = seconds
-		curve = easing
-		from = first
-		to = last
-
-	func at(elapsed: float) -> float:
-		var part := Motion.eased(curve, clampf((elapsed - start) / duration, 0.0, 1.0))
-		return lerpf(from, to, part)

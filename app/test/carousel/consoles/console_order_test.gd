@@ -22,9 +22,7 @@ func after_test() -> void:
 func _on_consoles(device: Fixtures.NewDevice = null) -> Array:
 	if device == null:
 		device = Fixtures.past_first_launch(self, {"ps2": 2, "gc": 1, "gba": 1})
-	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
-	return [carousel, device]
+	return [await Fixtures.shown(self, device), device]
 
 
 func _press(carousel: Carousel, button: JoyButton) -> void:
@@ -91,7 +89,7 @@ func test_down_opens_the_ring_on_the_selected_console_and_B_closes_it_on_the_one
 	assert_bool(order.visible).is_false()
 	assert_int(carousel._consoles.selected_index()).is_equal(1)
 	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal("gc")
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._console_title.modulate.a == 1.0)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._console_title.modulate.a == 1.0)
 	# And the consoles screen works as before.
 	await _press(carousel, JOY_BUTTON_X)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLE_EDIT)
@@ -111,7 +109,7 @@ func test_inv_15_a_console_taken_and_moved_shows_the_order_at_once_and_A_keeps_i
 	assert_bool(order._moving.visible and not order._choosing.visible).is_true()
 	assert_array(_words(order)).is_equal([tr("in its place", &"ring")])
 	# It peels off: drawn as a sticker only, apart from the others.
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._consoles.peel == 1.0)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._consoles.peel == 1.0)
 	await await_idle_frame()
 	for part in carousel._consoles.peeled_geometry():
 		assert_int(part.layers).is_equal(ConsoleLayer.STICKER)
@@ -134,9 +132,9 @@ func test_inv_15_a_console_taken_and_moved_shows_the_order_at_once_and_A_keeps_i
 	# Each console went with its shelf, standing where it was round the ring.
 	assert_dict(_consoles_of(carousel)).is_equal(consoles)
 	assert_array(carousel._consoles.wheel_slots).is_equal([0, 1, 2])
-	assert_bool(await Fixtures.until(self, func() -> bool:
+	await Fixtures.wait(self, func() -> bool:
 		return carousel._consoles.peel == 0.0 and range(3).all(func(i: int) -> bool:
-			return absf(wrapf(carousel._consoles._slid[i] - i, -1.5, 1.5)) < 0.01))).is_true()
+			return absf(wrapf(carousel._consoles._slid[i] - i, -1.5, 1.5)) < 0.01))
 	for part in carousel._consoles._items[0].geometry:
 		assert_int(part.layers).is_equal(ConsoleLayer.FRONT)
 	await _press(carousel, JOY_BUTTON_B)
@@ -159,8 +157,7 @@ func test_closed_on_another_console_than_the_one_moved_the_consoles_screen_is_on
 	assert_array(carousel._platform_ids()).is_equal(["gc", "ps2", "gba"])
 	_assert_row(carousel, consoles)
 	assert_str(carousel._shelves[carousel._shelf].platform_id).is_equal("ps2")
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)).is_true()
+	await Fixtures.press_to(self, carousel, JOY_BUTTON_A, Carousel.Screen.GAMES)
 	assert_str(carousel._row.selected_game().platform_id).is_equal("ps2")
 
 
@@ -300,39 +297,6 @@ func test_whatever_is_pressed_the_ring_shows_every_console_once_where_the_order_
 	assert_int(told.size()).is_greater(0)
 
 
-func test_a_platform_without_a_model_has_no_place_on_the_ring_and_keeps_its_place_in_the_order() -> void:
-	# Two platforms of the profiles no console folder models, between modelled ones.
-	var modelled := Appearance.defaults(ConsoleManifest.found())
-	var profiles: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/platforms/profiles.json"))
-	var without: Array = profiles.keys().filter(func(id: String) -> bool: return id not in modelled).slice(0, 2)
-	var unmodelled_device := Fixtures.past_first_launch(self, {"ps2": 1, without[0]: 1, "gc": 1, without[1]: 1, "gba": 1})
-	for id: String in without:
-		unmodelled_device.catalog.platforms.append(AndroidServices.Platform.new({"id": id, "name": id, "media": "dvd"}))
-	var setup := await _on_consoles(unmodelled_device)
-	var carousel: Carousel = setup[0]
-	var device: Fixtures.NewDevice = setup[1]
-	var ids := carousel._platform_ids()
-	var unmodelled: Array[String] = []
-	for k in ids.size():
-		if not carousel._consoles.console_at(k).modelled:
-			unmodelled.append(ids[k])
-	assert_array(unmodelled).is_not_empty()
-	await _press(carousel, JOY_BUTTON_DPAD_DOWN)
-	var wheel := carousel._order._wheel
-	assert_int(wheel.order.size()).is_equal(ids.size() - unmodelled.size())
-	for k in ids.size():
-		assert_bool(carousel._consoles.wheel_slots[k] >= 0).is_equal(ids[k] not in unmodelled)
-		assert_bool(carousel._consoles.console_at(k).model.visible).is_equal(ids[k] not in unmodelled)
-	for button: JoyButton in [JOY_BUTTON_A, JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_A]:
-		await _press(carousel, button)
-	var kept: Array[String] = []
-	kept.assign(device.orders[0])
-	for platform_id in unmodelled:
-		assert_int(kept.find(platform_id)).is_equal(ids.find(platform_id))
-	assert_array(kept).contains_exactly_in_any_order(ids)
-	assert_array(kept).is_not_equal(ids)
-
-
 func test_presses_during_the_glides_in_and_out_change_nothing_and_the_ring_closes_once() -> void:
 	var carousel: Carousel = (await _on_consoles())[0]
 	var order := carousel._order
@@ -343,7 +307,7 @@ func test_presses_during_the_glides_in_and_out_change_nothing_and_the_ring_close
 	for action: StringName in [&"ui_accept", &"screen_back", &"ui_accept"]:
 		order._unhandled_input(CarouselFixtures.button(action, true))
 	assert_int(carousel._consoles.held).is_equal(-1)
-	assert_bool(await Fixtures.until(self, func() -> bool: return order._open and not order._busy)).is_true()
+	await Fixtures.wait(self, func() -> bool: return order._open and not order._busy)
 	assert_bool(order._wheel.is_holding()).is_false()
 	order._unhandled_input(CarouselFixtures.button(&"screen_back", true))
 	# During the way out: A and B again and again.
@@ -351,7 +315,7 @@ func test_presses_during_the_glides_in_and_out_change_nothing_and_the_ring_close
 		order._unhandled_input(CarouselFixtures.button(action, true))
 		await await_idle_frame()
 		assert_int(carousel._consoles.held).is_equal(-1)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel.screen() == Carousel.Screen.CONSOLES)).is_true()
+	await Fixtures.on_screen(self, carousel, Carousel.Screen.CONSOLES)
 	await get_tree().create_timer(0.3).timeout
 	assert_int(closings.size()).is_equal(1)
 	assert_int(carousel._consoles.held).is_equal(-1)

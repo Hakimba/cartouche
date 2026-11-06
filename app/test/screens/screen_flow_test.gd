@@ -36,16 +36,16 @@ func test_a_fresh_install_goes_from_the_welcome_to_its_console_with_the_controll
 	assert_bool(device.setting_opened).is_true()
 	await Fixtures.resume(self)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	assert_int(device.titles_prepared).is_equal(0)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
-	# What counting a folder's games needs is prepared as the form opens.
-	assert_int(device.titles_prepared).is_equal(1)
+	assert_array(device.tables_prepared).is_empty()
 	await Fixtures.choose_console(self, carousel, device)
+	# What counting a folder's games needs is prepared as its console is chosen, before a folder is.
+	assert_array(device.tables_prepared).contains_exactly(["ps2"])
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return Fixtures.focus(self).name == "Add")).is_true()
+	await Fixtures.wait(self, func() -> bool: return Fixtures.focus(self).name == "Add")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._shown)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 	assert_bool(carousel._consoles.visible).is_true()
 	assert_bool(carousel.get_node("%Screens").get_node_or_null("Discovery") == null).is_true()
@@ -59,7 +59,7 @@ func test_a_fresh_install_goes_from_the_welcome_to_its_console_with_the_controll
 
 func test_the_battery_shows_as_the_carousel_starts() -> void:
 	var carousel := Fixtures.fresh_carousel(self, Fixtures.past_first_launch(self, {"ps2": 3}))
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._shown)
 	var chip: BatteryChip = carousel.get_node("%Battery")
 	assert_str(chip.text).is_equal("99 %")
 	assert_array(chip.bolt()).is_empty()
@@ -75,9 +75,9 @@ func test_an_app_already_set_up_opens_straight_on_its_consoles_the_welcome_never
 	add_child(carousel)
 	var welcome: Welcome = carousel.get_node("%Screens/Welcome")
 	var welcome_seen := [false]
-	assert_bool(await Fixtures.until(self, func() -> bool:
+	await Fixtures.wait(self, func() -> bool:
 		welcome_seen[0] = welcome_seen[0] or (is_instance_valid(welcome) and welcome.is_visible_in_tree())
-		return carousel._shown)).is_true()
+		return carousel._shown)
 	assert_bool(welcome_seen[0]).is_false()
 	assert_array(seen).is_empty()
 	assert_array(device.saves(&"button_style")).is_empty()
@@ -145,7 +145,7 @@ func test_coming_back_to_the_app_without_opening_the_setting_keeps_the_permissio
 
 func test_the_welcome_stays_until_a_button_and_that_press_chooses_no_style() -> void:
 	var device := _new_device()
-	var carousel: Carousel = auto_free(Fixtures.CAROUSEL.instantiate())
+	var carousel: Carousel = auto_free(CarouselFixtures.CAROUSEL.instantiate())
 	carousel.android = device
 	add_child(carousel)
 	for frame in 30:
@@ -180,7 +180,7 @@ func test_inv_20_on_every_screen_where_something_is_chosen_exactly_one_control_o
 func test_the_floating_setting_survives_closing_and_a_new_carousel() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._shown)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	var menu: SettingsMenu = carousel.get_node("%Screens/Settings")
 	assert_bool(await Fixtures.until(self,
@@ -190,13 +190,13 @@ func test_the_floating_setting_survives_closing_and_a_new_carousel() -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(device.games_float).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_B)
-	assert_bool(await Fixtures.until(self, func() -> bool: return carousel._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return carousel._shown)
 	assert_bool(carousel._row.games_float).is_true()
 	remove_child(carousel)
 	carousel.queue_free()
 	await await_idle_frame()
 	var restarted := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.until(self, func() -> bool: return restarted._shown)).is_true()
+	await Fixtures.wait(self, func() -> bool: return restarted._shown)
 	await Fixtures.joypad(self, JOY_BUTTON_Y)
 	var reopened: SettingsMenu = restarted.get_node("%Screens/Settings")
 	assert_bool(await Fixtures.until(self,

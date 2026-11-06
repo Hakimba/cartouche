@@ -39,10 +39,11 @@ its pose in `media_poses.json`, and look again.
 
 ## The contract
 
-A medium is a scene whose root holds its parts: `ShapedMesh`es of one `ModelShape`. One part is the `Label`, drawn
-with `app/carousel/models/label.gdshader`, its face's UV square the label image. The shape's `title_area()` and
-`platform_area()` say where a game without a scan has its title and platform drawn, and
-`progress_ring_radius()` where its download ring turns.
+A medium is a scene whose root holds its parts: `ShapedMesh`es of one `ModelShape`, or baked meshes. One part is
+the `Label`, drawn with `app/carousel/models/label.gdshader`, its face's UV square the label image. A shape's
+`title_area()` and `platform_area()` say where a game without a scan has its title and platform drawn, and
+`progress_ring_radius()` where its download ring turns; a baked medium's manifest says where the title and platform go
+(`title_area`, `platform_area`).
 
 A medium stands in its own frame, the one a console's seat takes. Its root's scale is its size in the games row
 only: on its way into a console it takes its real size.
@@ -51,10 +52,10 @@ only: on its way into a console it takes its real size.
 
 | File | Holds |
 |---|---|
-| `medium.tres` | the manifest (`MediumManifest`): its kind in `media` (`dvd`, `minidisc` or `cartridge`, as its platforms declare), its scene, its triangle budget |
-| `<medium>_shape.tres` | the measured dimensions |
+| `medium.tres` | the manifest (`MediumManifest`): its kind in `media` (`dvd`, `minidisc` or `cartridge`, as its platforms declare), its scene, its triangle budget, and for a baked medium where its title and platform are drawn |
+| `<medium>_shape.tres` | the measured dimensions, for a disc or a box cartridge |
 | `<medium>.tscn` | the scene, on the existing shaders |
-| `<medium>_shape.gd`, `<medium>_geometry.gd` | a shape and geometry of its own, only when the shared ones cannot express it |
+| `<medium>_<part>.res` | a baked part's mesh, for a cartridge the shared shapes cannot express |
 
 ## The shared shapes
 
@@ -66,18 +67,19 @@ only: on its way into a console it takes its real size.
   the front above the label. The Mega Drive's, the Master System's and the Switch's game card are made so.
 
 A cartridge whose outline, back or connector shows more than a box (the NES's notches and stub, the Game Boy's
-ridged back, the GBA's hump) has a shape of its own in its folder, built from `ShapeGeometry`'s pieces: copy the
-closest one (`nes_cart`, `gb_cart`, `gba_cart`). A family shared by several media lives in its first medium's
-folder and the others build on it (`GbCartShape` in `app/carousel/media/gb_cart/`). A medium that looks exactly
-like another names the other's scene in its manifest, as `app/carousel/media/gbc_cart/medium.tres` does.
+ridged back, the GBA's hump) is drawn from baked meshes, one `<medium>_<part>.res` per part (an `ArrayMesh`, its
+label's UVs in it), as `nes_cart`, `gb_cart` and `gba_cart` are. Such a cartridge is modelled outside the app (in
+Blender or a model of your own) and arrives as mesh files, like a console's glb. A medium that looks exactly like another names the other's scene
+in its manifest, as `app/carousel/media/gbc_cart/medium.tres` does; its title is then drawn where the manifest of
+that scene's folder says.
 
 There is no solid subtraction. A label's recess or a screw hole is faces laid around a hole and sunk into it
 (`ShapeGeometry`'s `holed` and `sunk`). A slit too narrow to show its walls from the carousel's distance is a dark
 face just over the surface.
 
 A medium drawn from a downloaded model (a glb) is not accepted yet: the app would show it, its title drawn where
-the defaults put it, but the tests want every part a `ShapedMesh` built closed. The first such medium brings a
-label face of its own kind of shape and the tests' check for it.
+its manifest says, but the tests want every part a mesh of the scene's root, closed. The first such medium brings
+the tests' check for a part inside an instanced model.
 
 ## Shared files a new medium needs
 
@@ -102,8 +104,8 @@ GODOT=$GODOT scripts/test_godot.sh res://test/carousel/media res://test/carousel
 `app/test/carousel/media/media_folders_test.gd` runs on every folder. It checks the manifest loads and its medium
 is declared by platforms of its kind (INV-14), that every medium a platform declares has its folder (or is listed
 in `AWAITING`), that each label face has the proportions of the labels cut for it and sits where the crop cuts
-them, and that a folder with problems is left out. `shipped_shapes_test.gd` builds every medium from its dimensions:
-accepted by its shape's rules, closed, its faces turned outwards. `console_folders_test.gd` checks every medium
+them, and that a folder with problems is left out. `shipped_shapes_test.gd` builds every medium from its dimensions, or takes its baked
+meshes: accepted by its shape's rules, closed, its faces turned outwards. `console_folders_test.gd` checks every medium
 comes down its console's way in at its real size, clear of the console's parts
 ([adding-a-console.md](adding-a-console.md#the-tests-that-hold-it)). `games_layout_test.gd` checks a medium stands
 in the row as the others of its kind. The disc family has its own tests in

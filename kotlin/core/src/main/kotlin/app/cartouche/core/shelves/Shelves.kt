@@ -7,6 +7,7 @@ import app.cartouche.core.library.Game
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.Library
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.storage.VersionedJson
 import arrow.core.NonEmptyList
 import arrow.core.None
 import arrow.core.Option
@@ -36,6 +37,12 @@ public data class Selection(public val platform: Option<PlatformId> = None, publ
     /** Nothing remembered of [platform]: its game, and that it was shown. */
     public fun without(platform: PlatformId): Selection = Selection(this.platform.filter { it != platform }, games - platform)
 }
+
+/**
+ * The selection as stored on the device, in its own small file: saving it costs the same whatever the size of the
+ * library.
+ */
+public object SelectionFormat : VersionedJson<Selection>(1, "selection", Selection.serializer())
 
 /** The games of one platform, in title order, and the index of the one shown first. */
 public data class Shelf(public val platform: PlatformId, public val games: NonEmptyList<Game>, public val selected: Int)

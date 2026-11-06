@@ -123,7 +123,7 @@ static func _grab(where: Callable, nudges: Array[Callable], apply: Callable) -> 
 ## The mesh of [param model] that [param part] moves the furthest, from rest to fully moved: where it
 ## stands now, how far it goes on the picture for one unit of the property and the values it goes
 ## between; empty when nothing visible moves (a light, a hidden spring).
-static func _grab_part(camera: Camera3D, model: ConsoleModel, part: MovingPart) -> Dictionary:
+static func _grab_part(camera: Camera3D, model: ConsoleModel, part: ConsolePart) -> Dictionary:
 	var now: Variant = model.get(part.property)
 	var at := _centres(model)
 	model.set(part.property, part.rest)

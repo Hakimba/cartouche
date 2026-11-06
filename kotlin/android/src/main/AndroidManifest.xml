@@ -2,9 +2,9 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Library scans read ROM folders through the filesystem, one to two orders of magnitude faster
-         than through the Storage Access Framework on large SD cards. Not accepted on Google Play;
-         Cartouche is distributed outside it. -->
+    <!-- Declared so that all files access can be granted to Cartouche in Android's settings; the app
+         never asks for it and reads games through the folders picked in the system picker. Not accepted
+         on Google Play; Cartouche is distributed outside it. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- Stops an emulator left in the background so it loads the new game (effective up to Android 13,
@@ -18,8 +18,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Emulators and the apps shown in the Apps menu all have a launcher entry, which is all the
-         package visibility Cartouche needs. -->
+    <!-- Emulators all have a launcher entry, which is all the package visibility Cartouche needs to
+         tell whether one is installed. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />

@@ -2,11 +2,9 @@
 package app.cartouche.android.art
 
 import app.cartouche.android.library.LibraryService
-import app.cartouche.android.storage.ArrivalsStore
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
-import app.cartouche.android.storage.SelectionStore
 import app.cartouche.core.art.ArtVariant
 import app.cartouche.core.art.web
 import app.cartouche.core.library.LabelChoice
@@ -39,8 +37,8 @@ class LabelChoicesTest {
 
     private fun library() = LibraryService(
         LibraryStore(libraryFile),
-        SelectionStore(File(context.filesDir, "selection.json")),
-        ArrivalsStore(File(context.filesDir, "arrivals.json")),
+        File(context.filesDir, "selection.json"),
+        File(context.filesDir, "arrivals.json"),
         Folders(context),
         FactsStore(File(context.filesDir, "facts")),
     )

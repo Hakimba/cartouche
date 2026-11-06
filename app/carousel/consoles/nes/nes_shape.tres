@@ -1,6 +1,10 @@
-[gd_resource type="Resource" script_class="NesShape" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SeatShape" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/nes/nes_shape.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/seat_shape.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+seat_centre = Vector3(-20.05, 46.7718, 34.999996)
+seat_degrees = Vector3(-90, 180, 0)
+carrier = &"tray_degrees"
+pivot = Vector3(-20.05, 46.7718, -31.5)
