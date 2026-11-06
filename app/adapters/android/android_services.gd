@@ -315,47 +315,12 @@ func settings() -> SettingsAnswer:
 	return SettingsAnswer.new(await _request(&"settings"))
 
 
-## Stores the button style the user chose, [param style] as [SettingsAnswer] names it.
-func save_button_style(style: StringName) -> Result:
-	return Result.new(await _request(&"saveButtonStyle", [style]))
-
-
-## Stores the language the app's text is written in, [param language] one of
-## [member SettingsAnswer.languages] (empty follows the device's).
-func save_language(language: String) -> Result:
-	return Result.new(await _request(&"saveLanguage", [language]))
-
-
-## Stores the edge smoothing the user chose, [param smoothing] as [SettingsAnswer] names it.
-func save_edge_smoothing(smoothing: StringName) -> Result:
-	return Result.new(await _request(&"saveEdgeSmoothing", [smoothing]))
-
-
-## Stores whether the selected game sways and bobs ([param floating]); the consoles never do.
-func save_games_float(floating: bool) -> Result:
-	return Result.new(await _request(&"saveGamesFloat", [floating]))
-
-
-## Stores the backdrop the user chose, [param chosen] as [BackdropAnswer] names it.
-func save_backdrop(chosen: StringName) -> Result:
-	return Result.new(await _request(&"saveBackdrop", [chosen]))
-
-
-## Stores whether a veil of pixels animates over the backdrop ([param on]).
-func save_pixel_veil(on: bool) -> Result:
-	return Result.new(await _request(&"savePixelVeil", [on]))
-
-
-## Stores how loud the sounds play, [param steps] from 0 (silenced) to [constant SoundEffects.LEVELS].
-func save_sound_level(steps: int) -> Result:
-	return Result.new(await _request(&"saveSoundLevel", [steps]))
-
-
-## Stores the region labels' images prefer, [param region] one of
-## [member SettingsAnswer.preferred_regions] (empty for none); the labels it changes are looked for
-## again, as [signal art_changed] tells.
-func save_preferred_region(region: String) -> Result:
-	return Result.new(await _request(&"savePreferredRegion", [region]))
+## Stores [param value] as the setting [param key] (as [SettingsAnswer] names both): a choice's name, a switch's
+## bool or a level's int, sent as [method @GlobalScope.str] writes it. The plugin refuses a key or a value its
+## settings do not declare; a preferred region changed looks again for the labels it changes, as
+## [signal art_changed] tells.
+func save_setting(key: StringName, value: Variant) -> Result:
+	return Result.new(await _request(&"saveSetting", [String(key), str(value)]))
 
 
 ## Scans the folder of [param platform_id] and replaces its games.

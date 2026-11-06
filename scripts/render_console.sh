@@ -20,5 +20,5 @@ override=app/override.cfg
 printf '[display]\n\nwindow/size/no_focus=true\n' > "$override"
 trap 'rm -f "$override"' EXIT
 timeout 300 "$GODOT" --headless --path app --import > /dev/null
-timeout 120 "$GODOT" --path app --resolution 640x480 -s "$PWD/scripts/render_console.gd" -- "$1" "$png" ${label:+"$label"} 2>&1 \
+timeout 120 "$GODOT" --path app --resolution 640x480 -s "$PWD/scripts/godot_tool.gd" -- "$PWD/scripts/render_console.gd" "$1" "$png" ${label:+"$label"} 2>&1 \
   | grep -v '^Cartouche '

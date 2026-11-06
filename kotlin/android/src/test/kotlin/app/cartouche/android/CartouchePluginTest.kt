@@ -78,10 +78,10 @@ class CartouchePluginTest {
     @Test
     fun `INV-15 a sound level is stored once saved, one out of range refused and the level kept`() {
         val h = Plugin()
-        h.plugin.saveSoundLevel(1, 4)
+        h.plugin.saveSetting(1, "sound_level", "4")
         h.scope.runCurrent()
         h.settings().soundLevel.steps shouldBe 4
-        h.plugin.saveSoundLevel(2, 11)
+        h.plugin.saveSetting(2, "sound_level", "11")
         h.scope.runCurrent()
         h.settings().soundLevel.steps shouldBe 4
         h.done()
@@ -91,10 +91,10 @@ class CartouchePluginTest {
     fun `INV-15 a backdrop is stored once saved, an unknown one refused and the backdrop kept, the next start drawn on it`() {
         val h = Plugin()
         h.plugin.backdrop()["backdrop"] shouldBe "light"
-        h.plugin.saveBackdrop(1, "light_grey")
+        h.plugin.saveSetting(1, "backdrop", "light_grey")
         h.scope.runCurrent()
         h.settings().backdrop shouldBe Backdrop.LIGHT_GREY
-        h.plugin.saveBackdrop(2, "sepia")
+        h.plugin.saveSetting(2, "backdrop", "sepia")
         h.scope.runCurrent()
         h.settings().backdrop shouldBe Backdrop.LIGHT_GREY
         h.plugin.backdrop()["backdrop"] shouldBe "light_grey"
@@ -105,7 +105,7 @@ class CartouchePluginTest {
     fun `INV-15 the pixel veil is on until switched off, and stored`() {
         val h = Plugin()
         h.settings().pixelVeil shouldBe true
-        h.plugin.savePixelVeil(1, false)
+        h.plugin.saveSetting(1, "pixel_veil", "false")
         h.scope.runCurrent()
         h.settings().pixelVeil shouldBe false
         h.plugin.backdrop()["pixel_veil"] shouldBe false
@@ -115,13 +115,13 @@ class CartouchePluginTest {
     @Test
     fun `INV-15 a language is stored once saved, an unknown one refused and the language kept, and none follows the device`() {
         val h = Plugin()
-        h.plugin.saveLanguage(1, "pt_BR")
+        h.plugin.saveSetting(1, "language", "pt_BR")
         h.scope.runCurrent()
         h.settings().language shouldBe Some(Language.BRAZILIAN_PORTUGUESE)
-        h.plugin.saveLanguage(2, "tlh")
+        h.plugin.saveSetting(2, "language", "tlh")
         h.scope.runCurrent()
         h.settings().language shouldBe Some(Language.BRAZILIAN_PORTUGUESE)
-        h.plugin.saveLanguage(3, "")
+        h.plugin.saveSetting(3, "language", "")
         h.scope.runCurrent()
         h.settings().language shouldBe None
         h.done()

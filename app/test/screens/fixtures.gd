@@ -368,13 +368,8 @@ class NewDevice extends AndroidServices:
 		"emulator_name": "ARMSX2 (Refresh/GitHub)", "extensions": PackedStringArray(["iso", "chd", "bin"])}]
 	var slow: Array[StringName] = []
 	var failing: Array[StringName] = []
-	var saved_styles: Array[StringName] = []
-	var saved_smoothings: Array[StringName] = []
-	var saved_regions: Array[String] = []
-	var saved_languages: Array[String] = []
-	var saved_floats: Array[bool] = []
-	var saved_backdrops: Array[StringName] = []
-	var saved_veils: Array[bool] = []
+	## The values saved for each setting, by its key, in order ([method saves]).
+	var saved: Dictionary[StringName, Array] = {}
 	## The consoles placed, each as `[platform id, gap]`.
 	var placed: Array[Array] = []
 	## The order the consoles are in, as placing answers it.
@@ -432,7 +427,7 @@ class NewDevice extends AndroidServices:
 	## A frame after it is asked for, as the plugin answers: after the scene's first frame.
 	func settings() -> AndroidServices.SettingsAnswer:
 		await _frames(1)
-		var answer := {"ok": true, "first_launch": first_launch, "games_float": games_float,
+		var answer := {"ok": true, "first_launch": first_launch, "games_float": games_float, "pixel_veil": pixel_veil,
 			"preferred_regions": preferred_regions, "languages": languages}
 		if button_style:
 			answer["button_style"] = button_style
@@ -464,32 +459,18 @@ class NewDevice extends AndroidServices:
 		setting_opened = true
 		return AndroidServices.Result.new(_payload(&"curtain"))
 
-	func save_button_style(style: StringName) -> AndroidServices.Result:
-		saved_styles.append(style)
-		return AndroidServices.Result.new({"ok": true})
-
-	func save_edge_smoothing(smoothing: StringName) -> AndroidServices.Result:
-		saved_smoothings.append(smoothing)
-		return AndroidServices.Result.new({"ok": true})
-
-	func save_games_float(floating: bool) -> AndroidServices.Result:
-		saved_floats.append(floating)
-		games_float = floating
-		return AndroidServices.Result.new({"ok": true})
-
-	func save_backdrop(chosen: StringName) -> AndroidServices.Result:
-		saved_backdrops.append(chosen)
-		var answer := _payload(&"save_backdrop")
+	## Kept as the plugin keeps it, in the field of its key, unless its `save_<key>` is [member failing].
+	func save_setting(key: StringName, value: Variant) -> AndroidServices.Result:
+		saved.get_or_add(key, [])
+		saved[key].append(value)
+		var answer := _payload(&"save_" + key)
 		if answer["ok"]:
-			chosen_backdrop = chosen
+			set(&"chosen_backdrop" if key == &"backdrop" else key, value)
 		return AndroidServices.Result.new(answer)
 
-	func save_pixel_veil(on: bool) -> AndroidServices.Result:
-		saved_veils.append(on)
-		var answer := _payload(&"save_pixel_veil")
-		if answer["ok"]:
-			pixel_veil = on
-		return AndroidServices.Result.new(answer)
+	## The values saved for the setting [param key], in order.
+	func saves(key: StringName) -> Array:
+		return saved.get(key, [])
 
 	## Places as the plugin does, answering as it sends it: `not_in_library` for a console not set up or without games,
 	## `gap_out_of_range`, else the whole order.
@@ -506,20 +487,6 @@ class NewDevice extends AndroidServices:
 			order = PackedStringArray(others)
 			answer["order"] = order
 		return AndroidServices.Placed.new(answer)
-
-	func save_preferred_region(region: String) -> AndroidServices.Result:
-		saved_regions.append(region)
-		var answer := _payload(&"save_preferred_region")
-		if answer["ok"]:
-			preferred_region = region
-		return AndroidServices.Result.new(answer)
-
-	func save_language(chosen: String) -> AndroidServices.Result:
-		saved_languages.append(chosen)
-		var answer := _payload(&"save_language")
-		if answer["ok"]:
-			language = chosen
-		return AndroidServices.Result.new(answer)
 
 	func installed_players(platform_id: String) -> Array[AndroidServices.Player]:
 		var found: Array[AndroidServices.Player] = []

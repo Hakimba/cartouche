@@ -40,21 +40,6 @@ const _ORDER_PRESSES: Array[StringName] = [&"ui_accept", &"carousel_right", &"ca
 const _HELD: Dictionary[String, StringName] = {
 	"scroll": &"carousel_right", "scrape": &"carousel_right", "turn": &"inspect_right",
 }
-## A bench approximation of the games row: its places and sizes (for a disc the chosen one's place, for a
-## cartridge its lift over its pose's place; the chosen one's size, a neighbour's place (x, y) and size), and each
-## medium family's pose.
-const _DISC_ROW := {&"centre": Vector3(0.0, 0.15, 0.0), &"size": 0.78, &"side": Vector2(0.96, -0.25), &"side_size": 0.56}
-const _CART_ROW := {&"lift": 0.22, &"size": 0.85, &"side": Vector2(1.25, 0.02), &"side_size": 0.66}
-## (position, rotation YXZ in degrees)
-const _MEDIUM_POSES: Dictionary[StringName, Array] = {
-	&"disc": [Vector3(0.015, 0.066, -0.003), Vector3(-13.4, 21.0, 0.2)],
-	&"nes": [Vector3(0.046, 0.037, -0.03), Vector3(-17.3, 20.4, 0.0)],
-	&"home": [Vector3(0.028, 0.099, -0.042), Vector3(-16.0, 22.3, 0.0)],
-	&"handheld": [Vector3(0.028, 0.023, -0.015), Vector3(-12.1, 18.5, 0.0)],
-}
-const _POSE_FAMILY: Dictionary[String, StringName] = {"nes_cart": &"nes", "famicom_cart": &"nes", "snes_pal_cart": &"home",
-	"sfc_cart": &"home", "snes_us_cart": &"home", "n64_cart": &"home", "gb_cart": &"handheld", "gbc_cart": &"handheld",
-	"gba_cart": &"handheld"}
 ## A medium fits a box this large.
 const _MEDIUM_FIT := 1.2
 const _MEDIA_TITLES: Array[String] = ["Crystal Knights", "Iron Valley", "Moss Kingdom", "Paper Comet", "Sky Garden"]
@@ -77,6 +62,7 @@ var _drawn_before := 0
 var _next_action_s := 0.0
 var _steps := 0
 var _media: Array[MediaView] = []
+var _media_layout: GamesLayout
 var _row_spring: Motion.Spring
 
 
@@ -133,8 +119,9 @@ func _ready() -> void:
 		var count_given := Diagnostics.argument("media")
 		var count := count_given.to_int() if count_given else 5
 		_media = media_row(count, "ps2_dvd", _carousel.get_viewport().get_camera_3d(), _carousel)
+		_media_layout = GamesLayout.new("ps2_dvd")
 		_row_spring = Motion.Spring.new(0.0)
-		place_row(_media, 0.0)
+		place_row(_media, 0.0, _media_layout)
 	if _scenario in ["idle", "idle_consoles", "settings"]:
 		await get_tree().create_timer(_STILL_AFTER_S).timeout
 	else:
@@ -183,7 +170,7 @@ func _process(delta: float) -> void:
 			_steps += 1
 			_row_spring.target += 1.0
 		_row_spring.step(delta)
-		place_row(_media, _row_spring.position)
+		place_row(_media, _row_spring.position, _media_layout)
 	elif _scenario == "swipe" and _elapsed_s >= _next_action_s:
 		_next_action_s += _ENTER_EVERY_S
 		_swipe()
@@ -282,32 +269,16 @@ static func media_row(count: int, medium: String, camera: Camera3D, front: Node)
 	return views
 
 
-## [param views] with the row standing [param at] places on: each game drawn at its place, the farthest
-## first.
-static func place_row(views: Array[MediaView], at: float, medium := "ps2_dvd") -> void:
+## [param views] with the row standing [param at] places on, as the app's [param layout] places them: each game
+## drawn at its place, the farthest first.
+static func place_row(views: Array[MediaView], at: float, layout: GamesLayout) -> void:
 	var order := MediaView.drawing_order(views.size(), at)
 	for j in views.size():
 		views[j].visible = j in order
 	for j in order:
 		var d := MediaView.offset(j, at, views.size())
-		views[j].place(_standing(d, medium), MediaView.softness(d))
+		views[j].place(MediaView.standing(d, layout.chosen, layout.side, layout.side_size), MediaView.softness(d))
 		views[j].move_to_front()
-
-
-## Where a game of [param medium] [param d] places from the centre stands, by this bench's row.
-static func _standing(d: float, medium: String) -> Transform3D:
-	var cart := medium in _POSE_FAMILY
-	var row: Dictionary = _CART_ROW if cart else _DISC_ROW
-	var pose: Array = _MEDIUM_POSES[_POSE_FAMILY.get(medium, &"disc")]
-	var posed: Vector3 = pose[0]
-	var turn: Vector3 = pose[1]
-	var lift: float = row.get(&"lift", 0.0)
-	var size: float = row[&"size"]
-	var side: Vector2 = row[&"side"]
-	var side_size: float = row[&"side_size"]
-	var centre: Vector3 = posed + Vector3(0.0, lift, 0.0) if cart else row[&"centre"]
-	var chosen := Transform3D(Basis.from_euler(turn * PI / 180.0, EULER_ORDER_YXZ).scaled(Vector3.ONE * size), centre)
-	return MediaView.standing(d, chosen, side, side_size)
 
 
 ## [param model] centred on its box, its largest side [constant _MEDIUM_FIT].

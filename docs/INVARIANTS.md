@@ -40,7 +40,7 @@ chose, then art from the network, then the screens, then the wire to Godot and t
 
 | Id | Invariant | Why | Tests |
 |---|---|---|---|
-| INV-15 | The selection, a game's name and chosen picture, the consoles' order and chosen models, and every setting are written and read back identical, survive a rescan and a restart, and an unreadable file only means defaults. | The user's choices are data too. | `SelectionFormatTest`, `SelectionStoreTest`, `LibraryServiceTest`, `LibraryTest`, `ShelvesTest`, `SettingsFormatTest`, `CartouchePluginTest`; `console_order_test.gd`, `android_services_test.gd` |
+| INV-15 | The selection, a game's name and chosen picture, the consoles' order and chosen models, and every setting are written and read back identical, survive a rescan and a restart, and an unreadable file only means defaults. | The user's choices are data too. | `SelectionFormatTest`, `SelectionStoreTest`, `LibraryServiceTest`, `LibraryTest`, `ShelvesTest`, `SettingsFormatTest`, `SettingTest`, `CartouchePluginTest`; `console_order_test.gd`, `android_services_test.gd` |
 
 ## Art
 

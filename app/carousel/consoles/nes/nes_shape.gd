@@ -1,14 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 @tool
 class_name NesShape
-extends GlbShape
+extends GlbConsoleShape
 ## What the launch reads of the NES (its glb, `nes.glb`), in millimetres, in the model's axes: X to the
 ## right, Y up from the table, Z towards the front, from the body's middle.
-
-## The door open, in degrees, its lid standing up under its face tipped back.
-const DOOR_OPEN := 65.0
-## How far the power button latches in and the reset button goes in pressed, in millimetres.
-const BUTTON_IN := 2.5
 
 ## The cartridges the slot takes: their width, length and thickness.
 @export var cartridge := Vector3(119.0, 133.0, 19.0):
@@ -34,6 +29,6 @@ func tray(degrees: float) -> Transform3D:
 
 ## Where a seated cartridge's centre is, in the model's space, the tray tilted [param degrees]: its label up,
 ## its top edge towards the front.
-func seat(degrees: float) -> Transform3D:
+func seat(degrees := 0.0) -> Transform3D:
 	var centre := Vector3(0.0, 0.0, cartridge.y / 2.0) * MeshBuilder.UNITS_PER_MM
 	return tray(degrees) * Transform3D(Basis(Vector3.LEFT, Vector3.BACK, Vector3.UP), centre)

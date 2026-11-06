@@ -5,6 +5,8 @@ const Fixtures := preload("res://test/carousel/fixtures.gd")
 ## Building a mesh takes a while: fewer cases than the carousel's properties.
 const SHAPES := 50
 const EPSILON := 0.001
+## A cartridge shaped as a box, as one ships.
+const _BOX_CART := preload("res://carousel/media/switch_card/switch_card_shape.tres")
 
 
 func test_a_disc_has_no_gap_its_parts_join_into_one_closed_outline() -> void:
@@ -51,20 +53,26 @@ func test_impossible_dimensions_are_refused_by_the_rule_they_break_and_build_not
 		[&"data_on_mirror", func(disc: DiscShape) -> void: disc.data_inner = disc.mirror_inner],
 		[&"data_on_mirror", func(disc: DiscShape) -> void: disc.data_outer = disc.mirror_outer],
 		[&"data_on_mirror", func(disc: DiscShape) -> void: disc.data_outer = disc.data_inner],
+		[&"gap_inside_data", func(disc: DiscShape) -> void: disc.data_gap = Vector2(disc.data_inner + 1.0, disc.data_outer)],
 		[&"sizes_positive", func(disc: DiscShape) -> void: disc.thickness = 0.0],
 		[&"sizes_positive", func(disc: DiscShape) -> void: disc.ring_height = -0.1],
 		[&"sizes_positive", func(disc: DiscShape) -> void: disc.ring_width = 0.0],
 		[&"mirror_inside_rim", func(disc: DiscShape) -> void: disc.mirror_outer = disc.radius],
 	]
+	var box_breaks: Array[Array] = [
+		[&"sizes_positive", func(box: BoxCartShape) -> void: box.recess = 0.0],
+		[&"sizes_positive", func(box: BoxCartShape) -> void: box.label_corner = -0.1],
+		[&"bevel_fits", func(box: BoxCartShape) -> void: box.bevel = box.corner],
+		[&"bevel_fits", func(box: BoxCartShape) -> void: box.depth = 2.0 * (box.bevel + box.recess)],
+		[&"label_on_the_front", func(box: BoxCartShape) -> void: box.label = Rect2(0.0, box.label.position.y, box.label.size.x,
+			box.label.size.y)],
+		[&"label_on_the_front", func(box: BoxCartShape) -> void: box.label_corner = minf(box.label.size.x, box.label.size.y) / 2.0],
+		[&"grip_fits", func(box: BoxCartShape) -> void: box.grip = Vector3(2.0, 0.5, 1.0)],
+		[&"grip_fits", func(box: BoxCartShape) -> void: box.grip = Vector3(1.0, 2.0, box.height)],
+	]
 	for i in SHAPES:
-		var shape := Fixtures.disc(random)
-		assert_array(shape.problems()).is_empty()
-		var broken := disc_breaks[i % disc_breaks.size()]
-		var breaking: Callable = broken[1]
-		breaking.call(shape)
-		assert_array(shape.problems()).contains([broken[0]])
-		for part in shape.parts():
-			assert_array(shape.mesh_arrays(part, 32)).is_empty()
+		_assert_refused(Fixtures.disc(random), disc_breaks[i % disc_breaks.size()])
+		_assert_refused(Fixtures.drawn_around(_BOX_CART, random, Vector2(0.95, 1.05)), box_breaks[i % box_breaks.size()])
 
 
 func test_a_model_builds_faces_for_each_of_its_parts_and_nothing_else() -> void:
@@ -162,3 +170,13 @@ static func _meshes(shape: ModelShape, detail: int) -> Array[Array]:
 	for part in shape.parts():
 		found.append(shape.mesh_arrays(part, detail))
 	return found
+
+
+## [param shape], accepted, then [param broken]: refused by the rule it names, and building nothing.
+func _assert_refused(shape: ModelShape, broken: Array) -> void:
+	assert_array(shape.problems()).is_empty()
+	var breaking: Callable = broken[1]
+	breaking.call(shape)
+	assert_array(shape.problems()).contains([broken[0]])
+	for part in shape.parts():
+		assert_array(shape.mesh_arrays(part, 32)).is_empty()

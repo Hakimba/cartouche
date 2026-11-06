@@ -22,8 +22,10 @@ static func profiles(shape: DiscShape, part: StringName) -> Array[PackedVector2A
 		&"label":
 			return [PackedVector2Array([Vector2(shape.label_inner, top), Vector2(shape.label_outer, top)])]
 		&"mirror":
-			var radii := PackedFloat32Array([
-				shape.mirror_outer, shape.data_outer, shape.data_inner, shape.mirror_inner])
+			var radii := PackedFloat32Array([shape.mirror_outer, shape.data_outer])
+			if shape.data_gap != Vector2.ZERO:
+				radii.append_array([shape.data_gap.y, shape.data_gap.x])
+			radii.append_array([shape.data_inner, shape.mirror_inner])
 			var bands: Array[PackedVector2Array] = []
 			for i in radii.size() - 1:
 				bands.append(PackedVector2Array([Vector2(radii[i], -top), Vector2(radii[i + 1], -top)]))
@@ -53,7 +55,8 @@ static func arrays(shape: DiscShape, part: StringName, segments: int) -> Array:
 	for profile in profiles(shape, part):
 		var bends := _normals(profile)
 		var middle := (profile[0].x + profile[-1].x) / 2.0
-		var recorded := 1.0 if middle > shape.data_inner and middle < shape.data_outer else 0.0
+		var gap := middle > shape.data_gap.x and middle < shape.data_gap.y
+		var recorded := 1.0 if middle > shape.data_inner and middle < shape.data_outer and not gap else 0.0
 		var beyond_label := func(point: Vector2) -> bool: return point.x > shape.label_outer
 		var rim := part == &"shell" and Array(profile).any(beyond_label)
 		var marks := Color(recorded, 1.0 if rim else 0.0, 0.0)

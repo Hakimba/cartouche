@@ -80,7 +80,7 @@ func test_an_app_already_set_up_opens_straight_on_its_consoles_the_welcome_never
 		return carousel._shown)).is_true()
 	assert_bool(welcome_seen[0]).is_false()
 	assert_array(seen).is_empty()
-	assert_array(device.saved_styles).is_empty()
+	assert_array(device.saves(&"button_style")).is_empty()
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.CONSOLES)
 
 
@@ -153,7 +153,7 @@ func test_the_welcome_stays_until_a_button_and_that_press_chooses_no_style() -> 
 	assert_str(Fixtures.shown_screen(carousel).name).is_equal("Welcome")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
-	assert_array(device.saved_styles).is_empty()
+	assert_array(device.saves(&"button_style")).is_empty()
 
 
 func test_inv_20_on_every_screen_where_something_is_chosen_exactly_one_control_of_it_has_the_focus() -> void:
@@ -202,7 +202,7 @@ func test_the_floating_setting_survives_closing_and_a_new_carousel() -> void:
 	assert_bool(await Fixtures.until(self,
 		func() -> bool: return reopened.is_visible_in_tree() and reopened.state == SettingsMenu.State.OPEN)).is_true()
 	assert_bool(reopened.switch_on(&"games_float")).is_true()
-	assert_array(device.saved_floats).is_equal([true])
+	assert_array(device.saves(&"games_float")).is_equal([true])
 
 
 func test_the_region_cards_follow_the_focus_whole_in_view_to_the_last_and_back() -> void:

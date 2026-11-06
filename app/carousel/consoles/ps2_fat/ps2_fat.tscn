@@ -4,6 +4,7 @@
 [ext_resource type="Resource" path="res://carousel/consoles/ps2_fat/ps2_fat_shape.tres" id="2"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/ps2_fat/ps2_fat.glb" id="3"]
 [ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="Script" path="res://carousel/consoles/console_part.gd" id="part"]
 
 [sub_resource type="ShaderMaterial" id="led_material"]
 resource_local_to_scene = true
@@ -13,9 +14,45 @@ shader_parameter/roughness = 0.3
 shader_parameter/emission = Color(0.1, 1, 0.2, 1)
 shader_parameter/emission_energy = 0.0
 
+[sub_resource type="Resource" id="tray"]
+script = ExtResource("part")
+property = &"tray_mm"
+node = NodePath("Model/ps2_fat/tray")
+motion = 1
+axis = Vector3(0, 0, 1)
+role = 0
+open_from = &"tray_travel"
+
+[sub_resource type="Resource" id="eject"]
+script = ExtResource("part")
+property = &"eject_mm"
+node = NodePath("Model/ps2_fat/eject")
+motion = 1
+axis = Vector3(0, 0, -1)
+role = 6
+open = 1.5
+
+[sub_resource type="Resource" id="power"]
+script = ExtResource("part")
+property = &"power_mm"
+node = NodePath("Model/ps2_fat/power")
+motion = 1
+axis = Vector3(0, 0, -1)
+role = 7
+open = 1.5
+
+[sub_resource type="Resource" id="led"]
+script = ExtResource("part")
+property = &"light_energy"
+node = NodePath("Model/ps2_fat/power/led")
+motion = 2
+role = 2
+open = 2.0
+
 [node name="Ps2Fat" type="Node3D"]
 script = ExtResource("1")
 shape = ExtResource("2")
+parts = Array[ExtResource("part")]([SubResource("tray"), SubResource("eject"), SubResource("power"), SubResource("led")])
 
 [node name="Model" parent="." instance=ExtResource("3")]
 

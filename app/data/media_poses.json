@@ -1,6 +1,19 @@
 {
   "about": "each medium's pose on the games screen (position in the fitted design frame, rotation in degrees); posed by hand",
   "media": {
+    "dreamcast_gd": {
+      "position": [
+        0,
+        0.15,
+        0
+      ],
+      "rotation": [
+        -13.4,
+        21,
+        0.2
+      ],
+      "scale": 0.78
+    },
     "famicom_cart": {
       "position": [
         0.046,
@@ -65,6 +78,32 @@
         0.2
       ],
       "scale": 0.78
+    },
+    "genesis_cart": {
+      "position": [
+        0.028,
+        0.319,
+        -0.042
+      ],
+      "rotation": [
+        -16,
+        22.3,
+        0
+      ],
+      "scale": 0.85
+    },
+    "master_cart": {
+      "position": [
+        0.028,
+        0.319,
+        -0.042
+      ],
+      "rotation": [
+        -16,
+        22.3,
+        0
+      ],
+      "scale": 0.85
     },
     "n64_cart": {
       "position": [
@@ -153,6 +192,19 @@
       "rotation": [
         -16,
         22.3,
+        0
+      ],
+      "scale": 0.85
+    },
+    "switch_card": {
+      "position": [
+        0.028,
+        0.243,
+        -0.015
+      ],
+      "rotation": [
+        -12.1,
+        18.5,
         0
       ],
       "scale": 0.85

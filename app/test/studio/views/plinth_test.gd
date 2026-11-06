@@ -88,3 +88,10 @@ func _picture(folder: String) -> Texture2D:
 	Plinth.request_still(folder, func(picture: Texture2D) -> void: asked.append(picture))
 	await Fixtures.until(self, func() -> bool: return not asked.is_empty())
 	return asked[0]
+
+
+func test_a_console_the_turntable_does_not_list_stands_as_its_model_is_drawn() -> void:
+	var start := Plinth.start_of("not_listed")
+	assert_vector(start.rotation).is_equal(Vector3.ZERO)
+	assert_vector(start.position).is_equal(Vector3.ZERO)
+	assert_float(start.size).is_equal(1.0)

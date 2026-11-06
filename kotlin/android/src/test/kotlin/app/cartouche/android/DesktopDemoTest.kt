@@ -6,6 +6,7 @@ import app.cartouche.core.library.DemoLibrary
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.DefinitionSource
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.settings.Settings
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
 import io.kotest.assertions.withClue
@@ -22,7 +23,7 @@ import java.io.File
 
 /**
  * Without the plugin (the Godot editor, a desktop run), the GDScript adapter answers with
- * `app/dev/demo/desktop.json`: the catalog and a demo library exactly as the plugin sends them.
+ * `app/dev/demo/desktop.json`: the catalog, a demo library and a fresh install's settings exactly as the plugin sends them.
  */
 class DesktopDemoTest {
     private val app = File(checkNotNull(System.getProperty("cartouche.app")) { "Run the tests through Gradle" })
@@ -56,6 +57,8 @@ class DesktopDemoTest {
                 put("catalog", desktopCatalog.toWire(coming).toJson())
                 put("library", library(catalog.offered.map { it.platform }.filter { it !in coming }))
                 put("library_with_coming", library(catalog.offered.map { it.platform }))
+                // The settings of a fresh install, as the plugin sends them: the desktop's until changed.
+                put("settings", Settings().toWire(firstLaunch = false).toJson())
                 put(
                     "battery",
                     buildJsonObject {

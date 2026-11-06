@@ -12,3 +12,4 @@ model_name = "Model 1"
 scene = "res://carousel/consoles/megadrive/megadrive.tscn"
 triangle_budget = 10000
 ring_size = Vector2(1.818, 0.067)
+variants = PackedStringArray("megadrive2")

@@ -32,7 +32,7 @@ func _ready() -> void:
 	_plinth.show_console(console)
 	if views.contains("media"):
 		_views = CarouselBench.media_row(5, _medium, _camera, $Media)
-		CarouselBench.place_row(_views, float(_argument("row", "0")), _medium)
+		CarouselBench.place_row(_views, float(_argument("row", "0")), GamesLayout.new(_medium))
 	var frames := _argument("frames", "")
 	_shots = PackedInt32Array(Array(frames.split(",", false)).map(func(f: String) -> int: return f.to_int()))
 

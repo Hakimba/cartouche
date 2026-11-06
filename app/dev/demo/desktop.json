@@ -1415,6 +1415,58 @@
             "selected": 0
         }
     },
+    "settings": {
+        "edge_smoothing": "4x",
+        "games_float": false,
+        "languages": [
+            "en",
+            "fr",
+            "de",
+            "es",
+            "it",
+            "pt",
+            "pt_BR",
+            "ja"
+        ],
+        "backdrop": "light",
+        "edge_smoothings": [
+            "4x",
+            "2x",
+            "off"
+        ],
+        "backdrops": [
+            "light",
+            "dark",
+            "light_grey",
+            "anthracite",
+            "device"
+        ],
+        "button_styles": [
+            "xbox",
+            "nintendo",
+            "playstation"
+        ],
+        "pixel_veil": true,
+        "first_launch": false,
+        "preferred_regions": [
+            "Europe",
+            "North America",
+            "Japan",
+            "France",
+            "Germany",
+            "United Kingdom",
+            "Spain",
+            "Italy",
+            "Netherlands",
+            "Australia",
+            "Brazil",
+            "Korea",
+            "China",
+            "Taiwan",
+            "World"
+        ],
+        "sound_level": 10
+    },
     "battery": {
         "level_percent": 100,
         "plugged": true

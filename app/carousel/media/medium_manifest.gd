@@ -8,6 +8,7 @@ extends Resource
 
 const FOLDERS := "res://carousel/media/"
 const FILE := "medium.tres"
+const CARTRIDGE := "cartridge"
 
 ## Its kind, as the platforms declaring it have it: `dvd`, `minidisc` or `cartridge`.
 @export var media: String
@@ -28,6 +29,13 @@ static func found(folders := FOLDERS) -> Dictionary[String, MediumManifest]:
 			var manifest: MediumManifest = load(path)
 			manifests[entry.trim_suffix("/")] = manifest
 	return manifests
+
+
+## Whether [param medium]'s folder makes it a cartridge: the shell tells cartridges from discs by
+## their kind, never by their name.
+static func is_cartridge(medium: String, folders := FOLDERS) -> bool:
+	var path := folders.path_join(medium).path_join(FILE)
+	return ResourceLoader.exists(path) and (load(path) as MediumManifest).media == CARTRIDGE
 
 
 ## The rules this manifest breaks, by name; none when the medium can be shown.

@@ -6,7 +6,7 @@ extends ModelShape
 ## the disc from them (see [DiscGeometry]). From the centre out, the clear hub holds the hole and
 ## the stacking ring; the label is printed on top from [member label_inner] to [member label_outer];
 ## underneath, the mirror layer runs from [member mirror_inner] to [member mirror_outer], recorded
-## from [member data_inner] to [member data_outer]; a clear rim closes the disc.
+## from [member data_inner] to [member data_outer] but across [member data_gap]; a clear rim closes the disc.
 
 @export var radius := 60.0:
 	set(value):
@@ -57,6 +57,12 @@ extends ModelShape
 	set(value):
 		data_outer = value
 		emit_changed()
+## The inner and outer radii of a band left unrecorded across the data, such as the ring between a
+## GD-ROM's two areas; none when zero.
+@export var data_gap := Vector2.ZERO:
+	set(value):
+		data_gap = value
+		emit_changed()
 
 
 func parts() -> Array[StringName]:
@@ -78,6 +84,8 @@ func _rules() -> Dictionary[StringName, bool]:
 		&"data_on_mirror":
 			mirror_inner < data_inner and data_inner < data_outer and data_outer < mirror_outer,
 		&"mirror_inside_rim": mirror_outer < edge,
+		&"gap_inside_data": data_gap == Vector2.ZERO or data_inner < data_gap.x and data_gap.x < data_gap.y
+			and data_gap.y < data_outer,
 	}
 
 

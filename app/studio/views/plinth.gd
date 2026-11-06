@@ -54,15 +54,15 @@ static func forget() -> void:
 
 
 ## The pose the model of the console in [param folder] starts at; a console the file gives only a yaw and a
-## roll is neither leaned, moved nor sized.
+## roll is neither leaned, moved nor sized, and one it does not list stands as its model is drawn.
 static func start_of(folder: String) -> Start:
 	if _starts.is_empty():
 		var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TURNTABLE_FILE))
 		_starts = data["consoles"]
-	var pose: Dictionary = _starts[folder]
+	var pose: Dictionary = _starts.get(folder, {})
 	var pitch: float = pose.get("pitch", 0.0)
-	var yaw: float = pose["yaw"]
-	var roll: float = pose["roll"]
+	var yaw: float = pose.get("yaw", 0.0)
+	var roll: float = pose.get("roll", 0.0)
 	var at: PackedFloat32Array = pose.get("position", [0.0, 0.0, 0.0])
 	var sized: float = pose.get("size", 1.0)
 	return Start.new(Vector3(pitch, yaw, roll), StudioLights._vector(at), sized)

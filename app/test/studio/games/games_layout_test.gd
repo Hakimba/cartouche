@@ -40,3 +40,15 @@ func test_the_bounded_pool_matches_the_whole_ring_including_small_shelves_and_la
 
 func test_a_medium_without_an_entry_stands_as_the_disc() -> void:
 	assert_bool(GamesLayout.new("unlisted_medium").chosen == GamesLayout.new("ps2_dvd").chosen).is_true()
+
+
+func test_a_medium_stands_in_the_row_as_the_others_of_its_kind_whatever_its_name() -> void:
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/carousel/appearance.json"))
+	var kind_media: Dictionary = data["kind_media"]
+	var found := MediumManifest.found()
+	for medium in found:
+		var own := GamesLayout.new(medium)
+		var kind_medium: String = kind_media[found[medium].media]
+		var kind := GamesLayout.new(kind_medium)
+		assert_bool(own.side == kind.side and own.side_size == kind.side_size).override_failure_message(
+			"%s stands unlike its kind %s" % [medium, found[medium].media]).is_true()

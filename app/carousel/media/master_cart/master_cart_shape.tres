@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="BoxCartShape" format=3]
+
+[ext_resource type="Script" path="res://carousel/models/box_cart_shape.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+width = 108.0
+height = 69.0
+depth = 16.0
+corner = 1.5
+label = Rect2(3.0, 21.0, 102.0, 44.0)
+grip = Vector3(3.0, 3.0, 1.5)

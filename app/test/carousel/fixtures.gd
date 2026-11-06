@@ -253,6 +253,13 @@ static func moving_parts(random: RandomNumberGenerator) -> Array[MovingPart]:
 	return found
 
 
+## Every console folder, as the app finds them.
+static func console_folders() -> Array[String]:
+	var folders: Array[String] = []
+	folders.assign(ConsoleManifest.found().map(ConsoleManifest.folder_of))
+	return folders
+
+
 ## A new console of [param scene], not in the tree.
 static func new_console(scene: String) -> ConsoleModel:
 	return (load(scene) as PackedScene).instantiate()

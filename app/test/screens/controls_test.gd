@@ -28,11 +28,11 @@ func test_the_device_s_a_confirms_and_its_b_goes_back_whatever_style_is_chosen()
 			await Fixtures.action(self, &"ui_right")
 		# B chooses nothing: it is the device's going back.
 		await Fixtures.joypad(self, JOY_BUTTON_B)
-		assert_array(device.saved_styles).is_empty()
+		assert_array(device.saves(&"button_style")).is_empty()
 		await Fixtures.joypad(self, JOY_BUTTON_A)
 		await Fixtures.choose_initial_region(self, carousel)
 		assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-		assert_array(device.saved_styles).is_equal([STYLES[style_index]])
+		assert_array(device.saves(&"button_style")).is_equal([STYLES[style_index]])
 		assert_str(Controls.style).is_equal(STYLES[style_index])
 		assert_dict(_input_map()).is_equal(standard)
 		await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -50,7 +50,7 @@ func test_a_style_can_be_chosen_with_the_keyboard() -> void:
 	await Fixtures.enter(self)
 	await Fixtures.choose_initial_region(self, carousel)
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	assert_array(device.saved_styles).is_equal([&"xbox"])
+	assert_array(device.saves(&"button_style")).is_equal([&"xbox"])
 
 
 func test_the_style_stored_is_the_one_drawn_from_the_start() -> void:

@@ -26,10 +26,13 @@ func test_freeing_the_ring_mid_placing_returns_false_to_the_waiting_caller() -> 
 
 
 class SlowRegionDevice extends Fixtures.NewDevice:
-	func save_preferred_region(region: String) -> AndroidServices.Result:
-		saved_regions.append(region)
+	func save_setting(key: StringName, value: Variant) -> AndroidServices.Result:
+		if key != &"preferred_region":
+			return await super(key, value)
+		saved.get_or_add(key, [])
+		saved[key].append(value)
 		await released
-		preferred_region = region
+		preferred_region = value
 		return AndroidServices.Result.new({"ok": true})
 
 
@@ -42,10 +45,10 @@ func test_two_presses_on_a_region_card_start_only_one_save() -> void:
 	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_array(device.saved_regions).is_equal([""])
+	assert_array(device.saves(&"preferred_region")).is_equal([""])
 	device.released.emit()
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	assert_array(device.saved_regions).is_equal([""])
+	assert_array(device.saves(&"preferred_region")).is_equal([""])
 
 
 func test_an_arrival_stops_and_releases_its_caller_when_its_row_leaves_the_tree() -> void:

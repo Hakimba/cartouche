@@ -98,18 +98,8 @@ package downloads, cuts and stores them.
 
 ## Adding a setting
 
-A setting crosses every layer. Follow `soundLevel` (the sound level) through these files:
-
-1. `kotlin/core/src/main/kotlin/app/cartouche/core/settings/Settings.kt`: the field and its default.
-   `SettingsFormat.kt` stores it with the rest.
-2. `CartouchePlugin.kt`: a `@UsedByGodot` method such as `saveSoundLevel` that validates and calls `save(note) { change }`.
-3. `Wire.kt`: the field in `Settings.toWire`.
-4. `app/adapters/android/android_wire.gd`: the field in `SettingsAnswer`.
-5. `app/adapters/android/android_services.gd`: the coroutine, such as `save_sound_level`.
-6. `app/adapters/desktop/desktop_plugin.gd`: the default in its settings and the same method, so the desktop run
-   keeps working.
-7. The screen: `app/screens/settings_menu.gd` shows it, `app/screens/screen_flow.gd` reads it at start and saves it.
-8. Tests: `SettingsTest` and `CartouchePluginTest` (written and read back, INV-15), `settings_test.gd`.
+A setting is declared once in the core (`Setting.kt`); `saveSetting` stores any declared one, checked against its
+declaration, and `Settings.toWire` sends them all. The steps: [../adding-a-setting.md](../adding-a-setting.md).
 
 ## Neighbours
 

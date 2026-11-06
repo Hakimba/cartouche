@@ -11,10 +11,48 @@ cartridge it came on. It finds the games in the folders the user picks, identifi
 hold, downloads their real label scans in the background, and starts them in the emulators already installed.
 It emulates nothing itself.
 
+## Your first contribution
+
+**The code in five lines.**
+
+1. `kotlin/core/` is the domain: what a game, a scan, a launch and a label are, as pure Kotlin functions.
+2. `kotlin/android/` is the Android plugin: files, threads, network and launches, around the core.
+3. `app/` is the Godot project: it draws, reads the pad and the fingers, and plays sounds. It holds no domain rule.
+4. GDScript reaches the plugin through one file, `AndroidServices`; on a desktop, `DesktopPlugin` stands in for it.
+5. Consoles and media are folders of data and models; platforms and emulators are JSON files in `app/data/`.
+
+**The one command.** `scripts/build.sh` checks the docs, lints, runs every test and builds the debug APK
+([Build, run and test](#build-run-and-test)). `$GODOT --path app` runs the app on your computer with a demo
+library. [CONTRIBUTING.md](../CONTRIBUTING.md) says what a pull request needs.
+
+**Which page for which task.**
+
+| Task | Page |
+|---|---|
+| Add a console, or a model of one | [adding-a-console.md](adding-a-console.md) |
+| Add a disc or cartridge | [adding-a-medium.md](adding-a-medium.md) |
+| Give a console its launch animation | [adding-a-console.md](adding-a-console.md) |
+| Add a platform, fix an emulator or its extensions | [adding-a-platform.md](adding-a-platform.md) |
+| Add a setting | [adding-a-setting.md](adding-a-setting.md) |
+| Add a background | [adding-a-background.md](adding-a-background.md) |
+| Add or change a screen or a gesture | [adding-a-screen.md](adding-a-screen.md) |
+| Add or fix a text, or a language | [translating.md](translating.md) |
+| Add a sound to a gesture | [sounds.md](sounds.md) |
+| Try a build on a device | [device-testing.md](device-testing.md) |
+| Find why something fails | [When something fails](#when-something-fails) |
+| Publish a version (maintainers) | [releasing.md](releasing.md) |
+
+**How tests are written.** Four kinds, each described in [testing.md](testing.md): an example (one concrete case),
+a property (a law checked over generated cases, Kotest's `checkAll`), an invariant test (a guarantee of
+[INVARIANTS.md](INVARIANTS.md), named after its id), and a walk (a seeded run of presses through the real screens).
+Kotlin tests run on the JVM, the plugin's under Robolectric; GDScript tests run headless in Godot with GdUnit4.
+Copy the closest existing test.
+
 ## The map
 
 ```text
 README.md                      you are here: the entry, the commands, the "I want to…" index
+├── ../CONTRIBUTING.md         licence, clean-room, style, what a pull request needs
 ├── GLOSSARY.md                every domain word, as the code spells it
 ├── INVARIANTS.md              the guarantees no change may break, and their tests
 ├── architecture/core.md       kotlin/core: the domain rules, pure Kotlin
@@ -23,6 +61,12 @@ README.md                      you are here: the entry, the commands, the "I wan
 ├── architecture/studio.md     app/studio: the look every screen shares
 ├── adding-a-console.md        a console's folder, its model, its launch, its tests
 ├── adding-a-medium.md         a disc or cartridge's folder, its model, its tests
+├── adding-a-platform.md       a platform's definition, players, profile, titles and art data
+├── adding-a-setting.md        a setting: its declaration in the core, its row on the card
+├── adding-a-background.md     a background: its scheme, its key in three lists, its name
+├── adding-a-screen.md         a screen or a gesture, its guards, hints, sounds and tests
+├── device-testing.md          a debug build on a device, beside your own, its traces, benchmarks
+├── releasing.md               publishing a version (maintainers)
 ├── testing.md                 the kinds of tests, their helpers, how to run each
 ├── sounds.md                  the gesture-to-sound table and how a sound plays
 └── debug-bridge.md            the remote control of a running debug build
@@ -161,6 +205,29 @@ ScreenScraper's developer key reaches a build from `kotlin/local.properties` (`s
 `screenscraper.sspassword`) or from the matching `SCREENSCRAPER_*` environment variables. It is never in the
 repository. A build without a key gets no ScreenScraper image. Tests never use real credentials.
 
+## When something fails
+
+Read the log before guessing. `scripts/build.sh` stops at its first failure, in the order given in
+[Build, run and test](#build-run-and-test): fix that one, then run only that step again.
+
+| What failed | Where to look |
+|---|---|
+| `scripts/check_docs.py` | the `file:line` it prints. It reads only tracked files: `git add` a new file first. |
+| `gdlint` | `build/gdlint.log`: the file, the line and the rule (`gdlintrc`) |
+| Kotlin lint or tests | Gradle's output, then the reports under each module's `build/reports/` in `kotlin/` |
+| GDScript tests | `build/test-godot.log`, each file's own log in `build/test-godot/` |
+| The short headless run | `build/run.log`: a script that does not compile |
+| The export | `build/export.log` |
+| The app on a device | `scripts/logs.sh` ([device-testing.md](device-testing.md#traces)) |
+
+- **A test hangs.** The last test a log starts without ending is the one: an `await` on a signal that never comes,
+  or a loop with no end. Fix why the signal never fires; raising the time limit hides the bug.
+- **Works in the JVM tests, wrong on the device.** Only some values cross Godot's JNI bridge (INV-23): a new
+  shape of answer needs a case in `WireTest`.
+- **A shader error.** Headless runs never compile shaders: run the app and look for `"SHADER ERROR"` in its output.
+- **Was it already broken?** Check out `main` in a separate worktree (`git worktree add`), run the same command
+  there, then remove it.
+
 ## I want to…
 
 Find your task, open the page, then the files in the order given.
@@ -201,11 +268,12 @@ Find your task, open the page, then the files in the order given.
 
 | I want to add… | Page | Open first |
 |---|---|---|
-| a console | [adding-a-console.md](adding-a-console.md) | `app/carousel/consoles/ps2_slim/`, `console_model.gd`, `ConsoleVariant.kt` |
+| a console | [adding-a-console.md](adding-a-console.md) | `scripts/new_console.py`, `app/carousel/consoles/gba_sp/`, `glb_console.gd` |
 | a disc or cartridge | [adding-a-medium.md](adding-a-medium.md) | `app/carousel/media/ps2_dvd/`, `medium_manifest.gd` |
-| a platform (data only) | [architecture/core.md](architecture/core.md#adding-a-platform) | `app/data/platforms/profiles.json`, `scripts/dat_titles.py` |
-| a screen in front of the carousel | [architecture/godot.md](architecture/godot.md#adding-a-screen) | `screen_flow.gd`, `hint_row.gd`, `app/test/screens/fixtures.gd` |
-| a setting | [architecture/android.md](architecture/android.md#adding-a-setting) | `Settings.kt`, `CartouchePlugin.kt`, `settings_menu.gd` |
+| a platform (data only) | [adding-a-platform.md](adding-a-platform.md) | `app/data/platforms/profiles.json`, `scripts/dat_titles.py` |
+| a screen in front of the carousel, or a gesture | [adding-a-screen.md](adding-a-screen.md) | `screen_flow.gd`, `hint_row.gd`, `app/test/screens/fixtures.gd` |
+| a setting | [adding-a-setting.md](adding-a-setting.md) | `Setting.kt`, `settings_menu.gd` |
+| a background | [adding-a-background.md](adding-a-background.md) | `backdrop.gd`, `Settings.kt`, `studio_tokens.gd` |
 | a language | [translating.md](translating.md#add-a-language) | `app/locale/locale.gd`, `Settings.kt` |
 | a sound, or a sound to a gesture | [sounds.md](sounds.md) | `scripts/audio/sounds.json`, `sound_effects.gd` |
 | a test | [testing.md](testing.md) | the closest existing test |
@@ -218,7 +286,8 @@ Find your task, open the page, then the files in the order given.
 | drive a running build from a script | [debug-bridge.md](debug-bridge.md) | `app/dev/bridge/commands.gd` |
 | run without a device | [architecture/godot.md](architecture/godot.md#the-adapter) | `desktop_plugin.gd`, `app/dev/demo/desktop.json` |
 | prove a change keeps every pixel | [testing.md](testing.md#pictures-and-benchmarks) | `frame_shots.gd` |
-| measure on a device | [testing.md](testing.md#pictures-and-benchmarks) | `scripts/bench.sh`, `carousel_bench.gd` |
+| try a build on a device without touching my own library | [device-testing.md](device-testing.md) | `app/export_presets.cfg`, `scripts/logs.sh` |
+| measure on a device | [device-testing.md](device-testing.md#benchmarks) | `scripts/bench.sh`, `carousel_bench.gd` |
 | look at a model beside photos | [adding-a-console.md](adding-a-console.md#tools) | `scripts/render_console.sh`, `scripts/export_console.sh` |
 
 ## Five words to know first

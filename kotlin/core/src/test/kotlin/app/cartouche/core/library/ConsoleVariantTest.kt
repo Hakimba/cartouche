@@ -10,7 +10,7 @@ import org.junit.Test
 
 class ConsoleVariantTest {
     /** The models whose console folder is still to be made: each folder made takes its model off. */
-    private val awaiting = setOf(ConsoleVariant.MEGADRIVE2)
+    private val awaiting = emptySet<ConsoleVariant>()
 
     @Test
     fun `every console model plays a shipped platform and is found back by the id it is stored and sent under`() {

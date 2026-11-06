@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 @tool
 class_name GbcShape
-extends GlbShape
+extends GlbConsoleShape
 ## What the launch reads of the Game Boy Color (its glb, `gbc.glb`), a handheld standing as it is held,
 ## in millimetres, in the model's axes: X to the right, Y up, Z out of the face, from the middle of the
 ## outline and of the shell's depth. A cartridge goes down the pocket at the top of the back, label to

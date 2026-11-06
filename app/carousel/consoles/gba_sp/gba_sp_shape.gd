@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 @tool
 class_name GbaSpShape
-extends GlbShape
+extends GlbConsoleShape
 ## Where a cartridge sits in the front slot, in millimetres in the model's frame: label down, going in towards the hinge.
 
 @export var cartridge_centre := Vector3(0.0, -2.815, 24.4):

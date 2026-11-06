@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DiscShape" format=3]
+
+[ext_resource type="Script" path="res://carousel/models/disc_shape.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+radius = 60.0
+hole = 7.5
+ring = 17.0
+label_inner = 19.0
+mirror_inner = 19.0
+label_outer = 59.0
+mirror_outer = 58.5
+data_inner = 23.0
+data_outer = 58.0
+data_gap = Vector2(26.5, 35.0)

@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="SwitchShape" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SeatShape" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/switch/switch_shape.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/seat_shape.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+seat_centre = Vector3(62, 40, -2)

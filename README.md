@@ -22,7 +22,7 @@ Switch's and the Sega consoles', which show on a stand-in disc or cartridge.
 |---|---|
 | Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Switch (neon or grey) · Game Boy · Game Boy Color · Game Boy Advance (original or SP) |
 | Sony | PlayStation · PlayStation 2 (slim or fat) · PSP |
-| Sega | Master System · Mega Drive · Dreamcast |
+| Sega | Master System · Mega Drive (model 1 or 2) · Dreamcast |
 | Microsoft | Xbox · Xbox 360 |
 
 ## Languages
@@ -55,7 +55,7 @@ is one file, and [docs/translating.md](docs/translating.md) says how to fix one 
 </tr>
 </table>
 
-- **Speaks your language:** seven languages, following your device's until you pick one ([Languages](#languages)).
+- **Speaks your language:** eight languages, following your device's until you pick one ([Languages](#languages)).
 - **Uses your emulators:** Cartouche emulates nothing. It finds the emulators you already installed and starts each
   game in the right one.
 - **Light:** at rest it draws nothing, and it stays smooth with thousands of games.
@@ -63,6 +63,7 @@ is one file, and [docs/translating.md](docs/translating.md) says how to fix one 
 ## Contributing
 
 Ideas, feedback and pull requests are welcome: open an issue to talk about a bigger change first.
+[CONTRIBUTING.md](CONTRIBUTING.md) says how to build, test and send a change.
 
 ### What I'd love help with
 
@@ -81,7 +82,11 @@ Ideas, feedback and pull requests are welcome: open an issue to talk about a big
 - [docs/GLOSSARY.md](docs/GLOSSARY.md): every word of the domain, as the code spells it.
 - [docs/INVARIANTS.md](docs/INVARIANTS.md): the guarantees every change must keep, each enforced by tests.
 - [docs/adding-a-console.md](docs/adding-a-console.md) and [docs/adding-a-medium.md](docs/adding-a-medium.md): a
-  new console or a new disc or cartridge, step by step.
+  new console or a new disc or cartridge, step by step; [docs/adding-a-platform.md](docs/adding-a-platform.md): its
+  emulators and data.
+- [docs/adding-a-screen.md](docs/adding-a-screen.md), [docs/adding-a-setting.md](docs/adding-a-setting.md) and
+  [docs/adding-a-background.md](docs/adding-a-background.md): a screen or gesture, a setting, a background.
+- [docs/device-testing.md](docs/device-testing.md): a build on your device, beside your own Cartouche.
 - [docs/testing.md](docs/testing.md): the kinds of tests and how to run each.
 
 ## How a label is found
@@ -179,6 +184,7 @@ The consoles' 3D models are adapted from these downloads (CC-BY-4.0, licence tex
 - This work is based on "Sega Dreamcast" (https://sketchfab.com/3d-models/sega-dreamcast-f82d99e4739e42f4abfc37cb97918cfc) by Zerescas (https://sketchfab.com/zerescas) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Sega_Genesis" (https://sketchfab.com/3d-models/sega-genesis-d1487aa8b216490ba7c414b95531479e) by kaveshkoli3 (https://sketchfab.com/kaveshkoli3) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Sega Master System" (https://sketchfab.com/3d-models/sega-master-system-0ec998c9b9de4e7f956cab56bbca3c0f) by dark_igorek (https://sketchfab.com/dark_igorek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Sega Genesis Model 2 / Sega Mega Drive" (https://sketchfab.com/3d-models/sega-genesis-model-2-sega-mega-drive-d8feaa413cc847a599e6a484cc4ed2b6) by Zerescas (https://sketchfab.com/zerescas) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 ### 3D logos
 

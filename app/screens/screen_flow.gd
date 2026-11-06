@@ -46,7 +46,8 @@ var arrived := false
 ## Whether the settings open now left no console with games at some point.
 var _emptied := false
 var _holding_presses := false
-var _games_float := false
+## The settings' switches as stored, by their key ([method SettingsMenu.switches]).
+var _switched: Dictionary[StringName, bool] = {}
 ## Counts the switches' saves: an answer that comes once the settings closed is let go.
 var _switch_save := 0
 ## The region labels' images prefer, as stored (empty for none), and those the plugin takes.
@@ -82,7 +83,8 @@ func _ready() -> void:
 ## Goes on until the library can be used, completing setup on first launch, the welcome first.
 func run(settings: AndroidServices.SettingsAnswer) -> void:
 	arrived = false
-	_games_float = settings.games_float
+	for key in SettingsMenu.switches():
+		_switched[key] = settings.get(key)
 	Sounds.level = settings.sound_level
 	_preferred_region = settings.preferred_region
 	_preferred_regions = settings.preferred_regions
@@ -204,7 +206,7 @@ func _choose_button_style(can_go_back := false, keep := true) -> void:
 
 ## Button style marks setup complete, so first launch saves it after the region choice.
 func _save_button_style(style: StringName) -> void:
-	var saved := await android.save_button_style(style)
+	var saved := await android.save_setting(&"button_style", style)
 	if not saved.ok:
 		Diagnostics.trace("screens", "button style not saved (%s): %s" % [saved.code, saved.detail])
 
@@ -217,7 +219,7 @@ func _choose_edge_smoothing() -> void:
 	if smoothing.is_empty():
 		return
 	get_viewport().msaa_3d = EdgeSmoothingScreen.MSAA[smoothing]
-	var saved := await android.save_edge_smoothing(smoothing)
+	var saved := await android.save_setting(&"edge_smoothing", smoothing)
 	if not saved.ok:
 		Diagnostics.trace("screens", "edge smoothing not saved (%s): %s" % [saved.code, saved.detail])
 
@@ -232,7 +234,7 @@ func _choose_backdrop() -> void:
 		var shown := Backdrop.choice
 		Diagnostics.trace("backdrop", Backdrop.show(choice, Backdrop.veil))
 		_holding_presses = true
-		var saved := await android.save_backdrop(choice)
+		var saved := await android.save_setting(&"backdrop", choice)
 		_holding_presses = false
 		if not saved.ok:
 			Diagnostics.trace("screens", "backdrop not saved (%s): %s" % [saved.code, saved.detail])
@@ -251,7 +253,7 @@ func _choose_preferred_region(first_launch := false) -> void:
 	if region == _preferred_region and not first_launch:
 		return
 	_holding_presses = true
-	var saved := await android.save_preferred_region(region)
+	var saved := await android.save_setting(&"preferred_region", region)
 	_holding_presses = false
 	if saved.ok or first_launch:
 		_preferred_region = region
@@ -281,20 +283,23 @@ func _add_first_console() -> void:
 
 ## "Settings" until B.
 func _settings_menu() -> void:
-	_settings.snap_switch(&"games_float", _games_float)
-	_settings.snap_switch(&"pixel_veil", Backdrop.veil)
+	for key in _switched:
+		_settings.snap_switch(key, _switched[key])
 	_settings.sound_level = Sounds.level
 	var focus := &"button_style"
 	while true:
-		if focus not in SettingsMenu.SWITCHES:
+		if focus not in _switched:
 			_show(_settings)
 			_settings.open(focus, _preferred_region, _language)
 		focus = await _settings.chosen
+		if focus in _switched:
+			_turn_switch(focus)
+			continue
 		match focus:
 			&"close":
 				_switch_save += 1
-				_settings.slide_switch(&"games_float", _games_float)
-				_settings.slide_switch(&"pixel_veil", Backdrop.veil)
+				for key in _switched:
+					_settings.slide_switch(key, _switched[key])
 				_settings.saving = false
 				return
 			&"button_style":
@@ -303,17 +308,10 @@ func _settings_menu() -> void:
 				await _choose_edge_smoothing()
 			&"backdrop":
 				await _choose_backdrop()
-			&"pixel_veil":
-				_turn_switch(focus, android.save_pixel_veil, func(on: bool) -> void:
-					Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, on)),
-					func() -> bool: return Backdrop.veil)
 			&"region":
 				await _choose_preferred_region()
 			&"language":
 				await _choose_language()
-			&"games_float":
-				_turn_switch(focus, android.save_games_float, func(on: bool) -> void: _games_float = on,
-					func() -> bool: return _games_float)
 
 
 ## The language the app's text is written in, chosen from its own page: applied once saved.
@@ -325,7 +323,7 @@ func _choose_language() -> void:
 	if language == _language:
 		return
 	_holding_presses = true
-	var saved := await android.save_language(language)
+	var saved := await android.save_setting(&"language", language)
 	_holding_presses = false
 	if not saved.ok:
 		Diagnostics.trace("screens", "language not saved (%s): %s" % [saved.code, saved.detail])
@@ -338,31 +336,32 @@ func _choose_language() -> void:
 func _change_sound_level(steps: int) -> void:
 	Sounds.level = steps
 	Sounds.play(SoundEffects.Cue.VOLUME)
-	var saved := await android.save_sound_level(steps)
+	var saved := await android.save_setting(&"sound_level", steps)
 	if not saved.ok:
 		Diagnostics.trace("settings", "sound level not saved (%s): %s" % [saved.code, saved.detail])
 
 
-## Turns the settings' switch [param switch] over from what [param stored] says: slid there at once, saved
-## ([param save]), then taken ([param keep]) once saved; slid back to what is stored when not. An answer that comes
-## once the settings closed is let go.
-func _turn_switch(switch: StringName, save: Callable, keep: Callable, stored: Callable) -> void:
+## Turns the settings' switch [param switch] (a setting's key) over from what is stored: slid there at once, saved,
+## then kept once saved, the pixel veil shown so at once (the others are read as the settings close); slid back to
+## what is stored when not. An answer that comes once the settings closed is let go.
+func _turn_switch(switch: StringName) -> void:
 	_switch_save += 1
 	var request := _switch_save
-	var target: bool = not stored.call()
+	var target := not _switched[switch]
 	Sounds.play(SoundEffects.Cue.TOGGLE if target else SoundEffects.Cue.UNTOGGLE)
 	_settings.saving = true
 	_settings.slide_switch(switch, target)
-	var saved: AndroidServices.Result = await save.call(target)
+	var saved := await android.save_setting(switch, target)
 	if request != _switch_save:
 		return
 	if saved.ok:
-		keep.call(target)
+		_switched[switch] = target
+		if switch == &"pixel_veil":
+			Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, target))
 		Diagnostics.trace("settings", "%s=%s" % [switch, str(target)])
 	else:
 		Diagnostics.trace("settings", "%s not saved (%s): %s" % [switch, saved.code, saved.detail])
-	var kept: bool = stored.call()
-	_settings.slide_switch(switch, kept)
+	_settings.slide_switch(switch, _switched[switch])
 	_settings.saving = false
 
 

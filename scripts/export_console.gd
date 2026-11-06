@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-extends SceneTree
+extends Node
 ## Exports a console or a medium for a three.js viewer, where a console's launch steps are tuned
 ## (run by scripts/export_console.sh): its model as `<folder>.glb`, every moving part a named node turning
 ## or sliding about its own origin, our shaders drawn as plain PBR materials there; and
@@ -19,10 +19,10 @@ const _PBR: Dictionary[StringName, StringName] = {
 }
 
 
-func _initialize() -> void:
-	var arguments := OS.get_cmdline_user_args()
+func _ready() -> void:
+	var arguments := OS.get_cmdline_user_args().slice(1)
 	if arguments.size() != 2:
-		_fail("usage: export_console.gd -- <folder> <out_dir>")
+		_fail("usage (as scripts/export_console.sh runs it): godot_tool.gd -- export_console.gd <folder> <out_dir>")
 		return
 	var folder := arguments[0]
 	var out_dir := arguments[1]
@@ -32,9 +32,9 @@ func _initialize() -> void:
 		_fail("no console nor medium folder %s" % folder)
 		return
 	var model: Node3D = (load(console.scene if console else medium.scene) as PackedScene).instantiate()
-	root.add_child(model)
+	get_tree().root.add_child(model)
 	# Ready once the tree has run a frame: its parts move only then.
-	await process_frame
+	await get_tree().process_frame
 	var description := {"id": folder, "mm_per_unit": 1.0 / MeshBuilder.UNITS_PER_MM}
 	if model is ConsoleModel:
 		var shown: ConsoleModel = model
@@ -73,7 +73,7 @@ func _initialize() -> void:
 	json.close()
 	print("%s and %s.model.json written" % [glb, folder])
 	model.free()
-	quit()
+	get_tree().quit()
 
 
 ## Each part of [param model] that moves, the others at rest: its role, its values and its unit
@@ -117,8 +117,8 @@ static func _state(model: ConsoleModel) -> Dictionary[Array, Variant]:
 		for surface in geometry.mesh.get_surface_count() if geometry and geometry.mesh else 0:
 			var shaded := geometry.get_active_material(surface) as ShaderMaterial
 			for uniform: Dictionary in shaded.shader.get_shader_uniform_list() if shaded and shaded.shader else []:
-				var name: StringName = uniform["name"]
-				found[[path, surface, name]] = _json(shaded.get_shader_parameter(name))
+				var parameter: StringName = uniform["name"]
+				found[[path, surface, parameter]] = _json(shaded.get_shader_parameter(parameter))
 	return found
 
 
@@ -198,4 +198,4 @@ static func _standard(shaded: ShaderMaterial) -> StandardMaterial3D:
 
 func _fail(message: String) -> void:
 	printerr(message)
-	quit(1)
+	get_tree().quit(1)

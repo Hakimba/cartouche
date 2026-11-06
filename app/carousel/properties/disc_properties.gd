@@ -253,7 +253,7 @@ func is_open() -> bool:
 func open() -> void:
 	_refresh_profiles()
 	_game = row.selected_game()
-	_kind = LabelZone.Shape.RECTANGLE if _game.medium.ends_with("_cart") else LabelZone.Shape.DISC
+	_kind = LabelZone.Shape.RECTANGLE if MediumManifest.is_cartridge(row.selected_medium()) else LabelZone.Shape.DISC
 	var focus := get_theme_stylebox(&"focus", &"Button") as SatinStyle
 	_gel = focus.gel if focus else StudioTokens.NEUTRAL
 	_show_name(_name, _game.title)

@@ -26,8 +26,9 @@ import app.cartouche.core.library.VariantError
 import app.cartouche.core.platforms.Candidate
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.LaunchError
-import app.cartouche.core.regions.PreferredRegion
-import app.cartouche.core.settings.Language
+import app.cartouche.core.serialName
+import app.cartouche.core.settings.Setting
+import app.cartouche.core.settings.SettingValue
 import app.cartouche.core.settings.Settings
 import arrow.core.Either
 import arrow.core.None
@@ -37,7 +38,6 @@ import arrow.core.filterIsInstance
 import arrow.core.getOrElse
 import arrow.core.toOption
 import kotlinx.serialization.json.put
-import kotlinx.serialization.serializer
 import org.godotengine.godot.Dictionary
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -100,8 +100,8 @@ internal enum class ErrorCode(val wire: String) {
     UNEXPECTED("unexpected"),
 }
 
-/** The enum's name in the stored format (`@SerialName`), so the two cannot drift; `WireTest` pins the strings. */
-internal inline val <reified E : Enum<E>> E.wire: String get() = serializer<E>().descriptor.getElementName(ordinal)
+/** The enum's name on the wire, the one the stored format writes ([serialName]); `WireTest` pins the strings. */
+internal inline val <reified E : Enum<E>> E.wire: String get() = serialName
 
 internal val Enum<*>.plainWire: String get() = name.lowercase()
 
@@ -210,24 +210,29 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
 internal fun BatteryState.toWire(): Dictionary = dictionary("plugged" to plugged).putSome("level_percent", levelPercent)
 
 /**
- * `{"first_launch", "button_style"?, "edge_smoothing", "games_float", "sound_level", "preferred_region"?, "preferred_regions",
- * "language"?, "languages"}`: the style, the region and the language are absent until one is chosen; the regions are
- * those a preference can name, as [PreferredRegion.region] names them, the only ones `savePreferredRegion` takes; the
- * languages are those the app's text is written in, the only ones `saveLanguage` takes.
+ * `{"first_launch"}` and each setting of [Setting.all] under its key: a choice by its name (absent until one is made, for
+ * the button style, the region and the language), a switch as a bool, a level as an int; and each choice's names
+ * under its key and `s` (`"languages"`), the only ones `saveSetting` takes.
  */
-internal fun Settings.toWire(firstLaunch: Boolean): Dictionary = dictionary(
-    "first_launch" to firstLaunch,
-    "edge_smoothing" to edgeSmoothing.wire,
-    "games_float" to gamesFloat,
-    "sound_level" to soundLevel.steps,
-    "preferred_regions" to PreferredRegion.entries.map { it.region }.toTypedArray(),
-    "languages" to Language.entries.map { it.wire }.toTypedArray(),
-).putSome("button_style", buttonStyle.map { it.wire })
-    .putSome("preferred_region", preferredRegion.map { it.region })
-    .putSome("language", language.map { it.wire })
+internal fun Settings.toWire(firstLaunch: Boolean): Dictionary =
+    Setting.all.fold(dictionary("first_launch" to firstLaunch)) { wire, setting ->
+        wire.putSetting(this, setting).apply { if (setting.names.isNotEmpty()) put("${setting.key}s", setting.names.toTypedArray()) }
+    }
 
 /** `{"backdrop", "pixel_veil"}`: the backdrop behind every screen and whether its pixel veil moves. */
-internal fun Settings.backdropToWire(): Dictionary = dictionary("backdrop" to backdrop.wire, "pixel_veil" to pixelVeil)
+internal fun Settings.backdropToWire(): Dictionary =
+    listOf(Setting.BACKDROP, Setting.PIXEL_VEIL).fold(Dictionary()) { wire, setting -> wire.putSetting(this, setting) }
+
+private fun Dictionary.putSetting(settings: Settings, setting: Setting): Dictionary = putSome(
+    setting.key,
+    setting.valueIn(settings).map {
+        when (it) {
+            is SettingValue.Name -> it.name
+            is SettingValue.Switch -> it.on
+            is SettingValue.Steps -> it.steps
+        }
+    },
+)
 
 /**
  * What the `art_changed` signal carries: a scraping run's progress, `{"done", "total", "stall"?}`, and what it just

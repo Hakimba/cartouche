@@ -26,7 +26,7 @@ The user chooses the background behind every screen in the settings: Light (the 
 Anthracite, or Like the device (Light or Dark as the system's theme is). Each one is a scheme of the tokens
 (`StudioTokens.Scheme`, `StudioTokens.SCHEMES`), generated like every other value: its colours, its materials, the
 project theme's items it changes, its wall and the properties' operating light. `Palette` (`palette.gd`) reads one
-scheme into typed fields.
+scheme into typed fields. Adding one: [../adding-a-background.md](../adding-a-background.md).
 
 `Backdrop` (`backdrop.gd`) holds the one palette shown (`Backdrop.palette`), the choice, and whether the pixel veil
 moves. `Backdrop.show(choice, veil)` changes the project theme's items the scheme names, then emits the theme's

@@ -40,12 +40,14 @@ carousel, and returns once the carousel can be used. Each screen is a scene of i
 | `model_field.gd`, `model_swatches.gd` | The form's Model line, and the swatches it opens: one picture of each model of the console, rendered once per opening, the console beside them changing as the focus moves. |
 | `ring_view.gd` | The form's left zone: the console alone, standing as on the ring, seen by a copy of the carousel's camera. |
 | `add_ball.gd` | The "+" above the consoles. Holding up turns it into the button adding one more console. |
-| `settings_menu.gd` | The settings card: the choices, the background and its animated veil, games floating, the sound level and the language. Six lines show; the focus scrolls the others in, an arrow showing lines are hidden. |
+| `settings_menu.gd` | The settings card: the choices, the background and its animated veil, games floating, the sound level and the language, each row built from its entry in `ROWS` ([../adding-a-setting.md](../adding-a-setting.md)). Six lines show; the focus scrolls the others in, an arrow showing lines are hidden. |
 | `settings_transition.gd` | The move between the screen under the settings and the settings card, on one reversible clock. |
 | `confirm_removal.gd` | The confirmation of a console's removal. |
 | `controls.gd` | The button style the user chose. `ButtonGlyph`, `ButtonMark`, `ButtonHint` and `GlyphButton` draw buttons in that style. |
 
 ### Adding a screen
+
+The whole guide, gestures and tests included, is [../adding-a-screen.md](../adding-a-screen.md). In short:
 
 1. Make the scene and its script under `app/screens/`. Put its hints in a `HintRow` and draw it with the
    Studio pieces ([studio.md](studio.md)).
@@ -89,6 +91,7 @@ Under `app/carousel/consoles/`. One folder per console model, plus the code they
 | File | Responsibility |
 |---|---|
 | `console_manifest.gd`, `console_model.gd`, `moving_part.gd` | What a console folder tells the app, and the contract every console model meets. [../adding-a-console.md](../adding-a-console.md) describes them. |
+| `glb_console.gd`, `console_part.gd`, `glb_console_shape.gd`, `seat_shape.gd` | A console drawn from a glb, declared as data in its scene: its seat, way in, pose and moving parts. |
 | `console_row.gd` | `ConsoleRow`: the consoles screen. The selected console stands alone in its pose, and moves in and out as the selection changes. |
 | `launch_animation.gd` | `LaunchAnimation`: turns a console's steps (`launch.json`) into a Godot `Animation`. A console without steps plays a placeholder made from its moving parts. |
 | `console_sequence.gd` | `ConsoleSequence`: plays that animation into and out of the games screen. |

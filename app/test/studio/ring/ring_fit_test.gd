@@ -1,16 +1,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
 
-const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gc", "wii", "xbox", "xbox360", "gb", "gbc", "gba"]
-## The twelve silhouette boxes of the design's table (x0, y0, x1, y1 as fractions of a 4:3 picture), in its order.
-const _EDGES: Array[Vector4] = [Vector4(.256, .298, .808, .674), Vector4(.224, .283, .840, .802),
-	Vector4(.224, .314, .834, .698), Vector4(.259, .275, .826, .729), Vector4(.256, .302, .837, .744),
-	Vector4(.323, .240, .706, .775), Vector4(.334, .217, .640, .779), Vector4(.250, .225, .840, .760),
-	Vector4(.401, .213, .605, .806), Vector4(.390, .271, .648, .760), Vector4(.392, .275, .642, .725),
-	Vector4(.241, .295, .785, .702)]
-## The weights of the same table.
-const _WEIGHTS: Array[float] = [1.0, 1.065, 1.090, 0.996, 1.016, 1.142, 1.278, 1.373, 1.663, 0.880, 0.822, 0.566]
-
+## The design's table, a snapshot of twelve consoles measured on it: each folder's silhouette box (x0, y0, x1, y1 as
+## fractions of a 4:3 picture) and its weight, in its order. The code's weights ([method RingFit.weight_of]) must agree.
+const _DESIGN: Dictionary[String, Array] = {
+	"ps2_slim": [Vector4(.256, .298, .808, .674), 1.0], "psx": [Vector4(.224, .283, .840, .802), 1.065],
+	"nes": [Vector4(.224, .314, .834, .698), 1.090], "snes": [Vector4(.259, .275, .826, .729), 0.996],
+	"n64": [Vector4(.256, .302, .837, .744), 1.016], "gc": [Vector4(.323, .240, .706, .775), 1.142],
+	"wii": [Vector4(.334, .217, .640, .779), 1.278], "xbox": [Vector4(.250, .225, .840, .760), 1.373],
+	"xbox360": [Vector4(.401, .213, .605, .806), 1.663], "gb": [Vector4(.390, .271, .648, .760), 0.880],
+	"gbc": [Vector4(.392, .275, .642, .725), 0.822], "gba": [Vector4(.241, .295, .785, .702), 0.566],
+}
+var _folders: Array[String] = Array(_DESIGN.keys(), TYPE_STRING, &"", null)
 ## The window the suites share is put back as it was: some tests of other folders measure in its size.
 var _window := Vector2i.ZERO
 
@@ -24,7 +25,7 @@ func after_test() -> void:
 
 
 func _box(shape: int) -> Rect2:
-	var edges := _EDGES[shape]
+	var edges: Vector4 = _DESIGN[_folders[shape]][0]
 	return Rect2(edges.x, edges.y, edges.z - edges.x, edges.w - edges.y)
 
 
@@ -35,7 +36,7 @@ func _fit(shapes: Array[int]) -> float:
 	var angles := PackedFloat64Array()
 	for k in shapes.size():
 		boxes.append(_box(shapes[k]))
-		weights.append(RingFit.weight_of(FOLDERS[shapes[k]]))
+		weights.append(RingFit.weight_of(_folders[shapes[k]]))
 		angles.append(k * TAU / shapes.size())
 	return RingFit.scale(boxes, weights, angles, RingFit.WIDEST / _box(0).size.x)
 
@@ -53,7 +54,8 @@ func _on_screen(shapes: Array[int], size: float) -> Array[Rect2]:
 	for k in shapes.size():
 		var angle := k * TAU / shapes.size()
 		var at := Vector2(640.0 + 390.4 * sin(angle), 471.04 + 325.12 * cos(angle))
-		var across := size * _WEIGHTS[shapes[k]] * (1.0 + 0.045 * cos(angle)) * 12.8 * 1.06
+		var weight: float = _DESIGN[_folders[shapes[k]]][1]
+		var across := size * weight * (1.0 + 0.045 * cos(angle)) * 12.8 * 1.06
 		var box := _box(shapes[k])
 		var half := Vector2(box.size.x * across, box.size.y * across * 0.75) / 2.0
 		var low := camera.unproject_position(camera.project_position(at - half, 4.0))
@@ -79,10 +81,10 @@ func test_no_two_boxes_overlap_and_the_room_is_kept_for_any_count_and_order() ->
 	var tight := 0
 	for draw in 60:
 		var shapes: Array[int] = []
-		shapes.assign(range(12))
-		for i in range(11, 0, -1):
+		shapes.assign(range(_DESIGN.size()))
+		for i in range(_DESIGN.size() - 1, 0, -1):
 			shapes.insert(random.randi_range(0, i), shapes.pop_back())
-		shapes = shapes.slice(0, random.randi_range(2, 12))
+		shapes = shapes.slice(0, random.randi_range(2, _DESIGN.size()))
 		var size := _fit(shapes)
 		var gap := _least_gap(_on_screen(shapes, size))
 		# The room is kept, as the box grows by the pointed growth: grown boxes stand 15.36 px apart.

@@ -4,8 +4,10 @@ package app.cartouche.core.settings
 import app.cartouche.core.regions.PreferredRegion
 import arrow.core.None
 import arrow.core.Some
+import arrow.core.getOrElse
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.int
@@ -49,6 +51,26 @@ class SettingsFormatTest {
         SettingsFormat.encode(Settings(preferredRegion = Some(PreferredRegion.UNITED_KINGDOM))) shouldContain
             """"preferredRegion":"United Kingdom""""
         SettingsFormat.encode(Settings(language = Some(Language.BRAZILIAN_PORTUGUESE))) shouldContain """"language":"pt_BR""""
+    }
+
+    @Test
+    fun `INV-15 a settings file written by 0_3_0 reads back with every choice and is written again byte for byte`() {
+        val stored =
+            """{"version":2,"settings":{"buttonStyle":"nintendo","edgeSmoothing":"2x","preferredRegion":"Japan","gamesFloat":true,""" +
+                """"soundLevel":4,"language":"pt_BR","backdrop":"anthracite","pixelVeil":false}}"""
+        val settings =
+            Settings(
+                Some(ButtonStyle.NINTENDO),
+                EdgeSmoothing.TWICE,
+                Some(PreferredRegion.JAPAN),
+                gamesFloat = true,
+                soundLevel = SoundLevel.of(4).getOrElse { SoundLevel.FULL },
+                language = Some(Language.BRAZILIAN_PORTUGUESE),
+                backdrop = Backdrop.ANTHRACITE,
+                pixelVeil = false,
+            )
+        SettingsFormat.decode(stored).shouldBeRight(settings)
+        SettingsFormat.encode(settings) shouldBe stored
     }
 
     @Test

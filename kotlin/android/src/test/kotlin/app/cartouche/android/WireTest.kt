@@ -57,24 +57,29 @@ import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.search.Group
 import app.cartouche.core.search.Mark
 import app.cartouche.core.search.View
-import app.cartouche.core.settings.Backdrop
 import app.cartouche.core.settings.ButtonStyle
 import app.cartouche.core.settings.EdgeSmoothing
 import app.cartouche.core.settings.Language
+import app.cartouche.core.settings.Setting
 import app.cartouche.core.settings.SoundLevel
+import app.cartouche.core.settings.settings
 import app.cartouche.core.shelves.Selection
 import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.storage.DocumentId
 import app.cartouche.core.storage.FolderPlace
 import app.cartouche.core.storage.Volume
 import app.cartouche.core.uri
+import arrow.core.Either
 import arrow.core.None
 import arrow.core.Some
 import arrow.core.getOrElse
 import arrow.core.nonEmptyListOf
+import arrow.core.toOption
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
+import io.kotest.property.checkAll
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
@@ -157,8 +162,6 @@ class WireTest {
             Scraping.NONE.toWire(Some(AbsentArt(listOf(GameId("ps2/b"))))),
             LabelDownload.Running(Some(0.5)).toWire(GameId("ps2/b")),
             success("library" to library.toWireJson(None, ps2), "art" to listOf(found).artWireJson(), "absent" to arrayOf("ps2/b")),
-            AppSettings(Some(ButtonStyle.NINTENDO), gamesFloat = true).toWire(false),
-            AppSettings(backdrop = Backdrop.ANTHRACITE).backdropToWire(),
             success("order" to arrayOf("ps2", "gba")),
             failure(ErrorCode.GAP_OUT_OF_RANGE, "x"),
             failure(ErrorCode.NOT_IN_LIBRARY, "x"),
@@ -177,24 +180,39 @@ class WireTest {
     private val placed = Folder(uri("content://p/tree/t"), "ps2", None, Some(FolderPlace(Volume.CARD, listOf("ROMs", "ps2"))))
 
     @Test
-    fun `the settings and a folder's place reach Godot with the keys the GDScript adapter reads`() {
-        AppSettings().toWire(true) - "preferred_regions" - "languages" shouldBe
-            dictionary("first_launch" to true, "edge_smoothing" to "4x", "games_float" to false, "sound_level" to 10)
-        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false) - "preferred_regions" - "languages" shouldBe
+    fun `INV-23 every setting reaches Godot under its key as a value its bridge converts, and is taken back as Godot sends it`() =
+        runBlocking<Unit> {
+            checkAll(settings) { settings ->
+                val wire = settings.toWire(false)
+                wire.isGodotValue() shouldBe true
+                Setting.all.forEach { setting ->
+                    // GDScript sends a value back as `str()` writes it.
+                    wire[setting.key].toOption().onSome { sent ->
+                        Setting.change(AppSettings(), setting.key, sent.toString()).map { setting.valueIn(it) } shouldBe
+                            Either.Right(setting.valueIn(settings))
+                    }
+                    if (setting.names.isNotEmpty()) (wire["${setting.key}s"] as Array<*>).toList() shouldBe setting.names
+                }
+                settings.backdropToWire().toMap() shouldBe wire.filterKeys { it == "backdrop" || it == "pixel_veil" }
+            }
+        }
+
+    @Test
+    fun `the settings and a folder's place reach Godot with the keys and names the GDScript adapter reads`() {
+        val names = listOf("button_styles", "edge_smoothings", "preferred_regions", "languages", "backdrops")
+        AppSettings().toWire(true) - names shouldBe
             dictionary(
-                "first_launch" to false,
-                "button_style" to "playstation",
-                "edge_smoothing" to "2x",
+                "first_launch" to true,
+                "edge_smoothing" to "4x",
                 "games_float" to false,
                 "sound_level" to 10,
+                "backdrop" to "light",
+                "pixel_veil" to true,
             )
-        AppSettings(gamesFloat = true).toWire(false)["games_float"] shouldBe true
+        AppSettings(Some(ButtonStyle.PLAYSTATION), EdgeSmoothing.TWICE).toWire(false)["button_style"] shouldBe "playstation"
         AppSettings(soundLevel = SoundLevel.of(3).getOrElse { SoundLevel.FULL }).toWire(false)["sound_level"] shouldBe 3
-        AppSettings(edgeSmoothing = EdgeSmoothing.OFF).toWire(false)["edge_smoothing"] shouldBe "off"
         AppSettings(preferredRegion = Some(PreferredRegion.NORTH_AMERICA)).toWire(false)["preferred_region"] shouldBe "North America"
-        (AppSettings().toWire(false)["preferred_regions"] as Array<*>).toList() shouldBe PreferredRegion.entries.map { it.region }
         AppSettings(language = Some(Language.BRAZILIAN_PORTUGUESE)).toWire(false)["language"] shouldBe "pt_BR"
-        (AppSettings().toWire(false)["languages"] as Array<*>).toList() shouldBe listOf("en", "fr", "de", "es", "it", "pt", "pt_BR", "ja")
         val place = placed.toWire()["place"] as Dictionary
         place["volume"] shouldBe "card"
         (place["folders"] as Array<*>).toList() shouldBe listOf("ROMs", "ps2")
@@ -346,9 +364,9 @@ class WireTest {
 
     @Test
     fun `every enum reaches Godot as the word GDScript reads`() {
-        ButtonStyle.entries.map { it.wire } shouldBe listOf("xbox", "nintendo", "playstation")
-        EdgeSmoothing.entries.map { it.wire } shouldBe listOf("4x", "2x", "off")
-        Backdrop.entries.map { it.wire } shouldBe listOf("light", "dark", "light_grey", "anthracite", "device")
+        Setting.BUTTON_STYLE.names shouldBe listOf("xbox", "nintendo", "playstation")
+        Setting.EDGE_SMOOTHING.names shouldBe listOf("4x", "2x", "off")
+        Setting.BACKDROP.names shouldBe listOf("light", "dark", "light_grey", "anthracite", "device")
         DiscGrouping.entries.map { it.wire } shouldBe listOf("grouped", "separate")
         FolderDepth.entries.map { it.wire } shouldBe listOf("top_level", "subfolders")
         SkipReason.entries.map { it.wire } shouldBe listOf("hidden", "emulator_data", "too_deep", "unreadable")

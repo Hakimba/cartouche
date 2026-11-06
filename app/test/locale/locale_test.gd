@@ -27,9 +27,11 @@ func test_every_text_the_app_writes_is_translated() -> void:
 	# A `tr` call's second argument is its context; a `tr_n` call's, its plural.
 	var calls := RegEx.create_from_string("\\b(tr|tr_n|translate)\\(\"((?:[^\"\\\\]|\\\\.)*)\"(?:, &?\"(\\w*)\")?")
 	var fields := RegEx.create_from_string("(?m)^(text|label|title|note) = \"((?:[^\"\\\\]|\\\\.)*)\"$")
+	# A row declared in a script (`SettingsMenu.ROWS`): its name and note.
+	var declared := RegEx.create_from_string("&\"(label|note)\": \"((?:[^\"\\\\]|\\\\.)*)\"")
 	for path in _sources("res://"):
 		var source := FileAccess.get_file_as_string(path)
-		for found in calls.search_all(source) + (fields.search_all(source) if path.ends_with(".tscn") else []):
+		for found in calls.search_all(source) + (fields if path.ends_with(".tscn") else declared).search_all(source):
 			var text := found.get_string(2).c_unescape()
 			if found.get_string(1) == "tr" and found.get_string(3):
 				text = found.get_string(3) + "|" + text

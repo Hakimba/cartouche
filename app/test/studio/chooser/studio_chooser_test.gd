@@ -54,11 +54,11 @@ func _open_types(chooser: StudioChooser, offered: Array[AndroidServices.OfferedC
 func test_the_type_list_shows_the_given_consoles_in_order_with_maker_name_and_number() -> void:
 	var chooser := _chooser()
 	await _open_types(chooser, _offered())
-	assert_int(chooser.rows().size()).is_equal(17)
+	assert_int(chooser.rows().size()).is_equal(_TYPES.size())
 	assert_array(Array(chooser.ids())).is_equal(_TYPES.map(func(row: Array) -> String: return row[0]))
 	assert_array(chooser.rows().map(func(row: Button) -> String: return row.text)).is_equal(
 		_TYPES.map(func(row: Array) -> String: return row[2]))
-	assert_str(chooser.counter()).is_equal("01 / 17")
+	assert_str(chooser.counter()).is_equal("01 / %d" % _TYPES.size())
 	assert_int(chooser.focused()).is_equal(0)
 
 
@@ -67,7 +67,7 @@ func test_the_list_opens_on_the_current_choice_or_the_first_row() -> void:
 	await _open_types(chooser, _offered(), 7)
 	assert_int(chooser.focused()).is_equal(7)
 	assert_bool(chooser.rows()[7].has_focus()).is_true()
-	assert_str(chooser.counter()).is_equal("08 / 17")
+	assert_str(chooser.counter()).is_equal("08 / %d" % _TYPES.size())
 	chooser._answer(-1)
 	await _open_types(chooser, _offered(), -1)
 	assert_int(chooser.focused()).is_equal(0)
@@ -75,10 +75,11 @@ func test_the_list_opens_on_the_current_choice_or_the_first_row() -> void:
 
 func test_up_stops_on_the_first_row_and_down_on_the_last() -> void:
 	var chooser := _chooser()
-	await _open_types(chooser, _offered(), 16)
+	var last := _TYPES.size() - 1
+	await _open_types(chooser, _offered(), last)
 	await Fixtures.action(self, &"ui_down")
-	assert_int(chooser.focused()).is_equal(16)
-	assert_bool(chooser.rows()[16].has_focus()).is_true()
+	assert_int(chooser.focused()).is_equal(last)
+	assert_bool(chooser.rows()[last].has_focus()).is_true()
 	chooser.rows()[0].grab_focus()
 	await Fixtures.action(self, &"ui_up")
 	assert_int(chooser.focused()).is_equal(0)
@@ -128,7 +129,7 @@ func test_a_random_walk_of_up_down_a_and_b_keeps_the_cursor_and_the_answer_in_st
 				at = maxi(at - 1, 0)
 			1:
 				await Fixtures.action(self, &"ui_down")
-				at = mini(at + 1, 16)
+				at = mini(at + 1, _TYPES.size() - 1)
 			2:
 				await Fixtures.joypad(self, JOY_BUTTON_A)
 				assert_int(answers.back()).is_equal(at)
@@ -139,7 +140,7 @@ func test_a_random_walk_of_up_down_a_and_b_keeps_the_cursor_and_the_answer_in_st
 				await _open_types(chooser, _offered(), at)
 		assert_int(chooser.focused()).override_failure_message("step %d" % step).is_equal(at)
 		assert_bool(chooser.rows()[at].has_focus()).is_true()
-		assert_str(chooser.counter()).is_equal("%02d / 17" % (at + 1))
+		assert_str(chooser.counter()).is_equal("%02d / %d" % [at + 1, _TYPES.size()])
 	assert_bool(chooser.visible).is_true()
 
 

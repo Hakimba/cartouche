@@ -14,5 +14,5 @@ cd "$(dirname "$0")/.."
 GODOT="${GODOT:-godot}"
 # A clean clone has no import cache yet; the import's errors show, its progress does not.
 timeout 300 "$GODOT" --headless --path app --import > /dev/null
-timeout 120 "$GODOT" --headless --path app -s "$PWD/scripts/export_console.gd" -- "$1" "$out_dir" 2>&1 \
+timeout 120 "$GODOT" --headless --path app -s "$PWD/scripts/godot_tool.gd" -- "$PWD/scripts/export_console.gd" "$1" "$out_dir" 2>&1 \
   | grep -v '^Cartouche '

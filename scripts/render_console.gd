@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-extends SceneTree
+extends Node
 ## Renders the console of a folder under app/carousel/consoles, or the medium of one under
 ## app/carousel/media, as the carousel lights it, from six points of view, into one contact sheet (run
 ## by scripts/render_console.sh): front, three quarters, side, back, top, and three quarters with every
@@ -33,10 +33,10 @@ static func _views(console: bool) -> Array[View]:
 	]
 
 
-func _initialize() -> void:
-	var arguments := OS.get_cmdline_user_args()
+func _ready() -> void:
+	var arguments := OS.get_cmdline_user_args().slice(1)
 	if arguments.size() not in [2, 3]:
-		_fail("usage: render_console.gd -- <folder> <png> [label image]")
+		_fail("usage (as scripts/render_console.sh runs it): godot_tool.gd -- render_console.gd <folder> <png> [label image]")
 		return
 	var console := ConsoleManifest.of(arguments[0])
 	var medium: MediumManifest = MediumManifest.found().get(arguments[0])
@@ -49,13 +49,13 @@ func _initialize() -> void:
 		label.set_shader_parameter(&"label_texture", ImageTexture.create_from_image(Image.load_from_file(arguments[2])))
 		label.set_shader_parameter(&"scanned", true)
 		label.set_shader_parameter(&"has_label", true)
-	root.size = _VIEW
-	root.add_child(_studio())
-	root.add_child(model)
+	get_tree().root.size = _VIEW
+	get_tree().root.add_child(_studio())
+	get_tree().root.add_child(model)
 	var camera := Camera3D.new()
 	camera.fov = 32.0
-	root.add_child(camera)
-	await process_frame
+	get_tree().root.add_child(camera)
+	await get_tree().process_frame
 	var views := _views(console != null)
 	var sheet := Image.create(_VIEW.x * _COLUMNS, _VIEW.y * ceili(views.size() / float(_COLUMNS)), false,
 		Image.FORMAT_RGBA8)
@@ -65,11 +65,11 @@ func _initialize() -> void:
 			var moving: ConsoleModel = model
 			for part in moving.moving_parts():
 				moving.set(part.property, part.open if view.moved else part.rest)
-		await process_frame
+		await get_tree().process_frame
 		_aim(camera, _bounds(model), view.from)
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
-		var shot := root.get_texture().get_image()
+		var shot := get_tree().root.get_texture().get_image()
 		shot.convert(Image.FORMAT_RGBA8)
 		sheet.blit_rect(shot, Rect2i(Vector2i.ZERO, _VIEW),
 			Vector2i(index % _COLUMNS, floori(index / float(_COLUMNS))) * _VIEW)
@@ -78,7 +78,7 @@ func _initialize() -> void:
 		_fail("%s: %s" % [arguments[1], error_string(saved)])
 		return
 	print("%s written (%s)" % [arguments[1], ", ".join(views.map(func(v: View) -> String: return v.name))])
-	quit()
+	get_tree().quit()
 
 
 ## The carousel's light, as carousel.tscn has it: its environment, here against its studio sky, and
@@ -123,4 +123,4 @@ static func _aim(camera: Camera3D, box: AABB, from: Vector3) -> void:
 
 func _fail(message: String) -> void:
 	printerr(message)
-	quit(1)
+	get_tree().quit(1)

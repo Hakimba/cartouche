@@ -8,7 +8,9 @@ extends RefCounted
 ## something made from it ([SatinPanel.Backing], a material, a texture) makes it again then.
 
 ## Each backdrop the settings offer, by the name the plugin stores it under, and its name on screen. `device` is
-## Light or Dark as the system's theme is, followed while the app runs.
+## Light or Dark as the system's theme is, followed while the app runs; every other one draws the scheme of its name
+## ([method scheme_of]). The core's `Backdrop` enum and [enum StudioTokens.Scheme] list the same, in this order
+## (`backdrop_test.gd`).
 const NAMES: Dictionary[StringName, String] = {&"light": "Light", &"dark": "Dark", &"light_grey": "Light grey",
 	&"anthracite": "Anthracite", &"device": "Like the device"}
 

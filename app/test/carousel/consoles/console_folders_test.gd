@@ -23,12 +23,14 @@ const HOUSINGS: Dictionary[String, Array] = {
 	"nes": [&"Upper", &"Lower", &"Throat"], "wii": [&"Front", &"Body", &"Light"],
 	"gbc": [&"body"], "snes": [&"body"], "gba_sp": [&"body"], "ps2_fat": [&"body", &"tray"], "psp": [&"body"],
 	"switch": [&"body"], "switch_grey": [&"body"], "dreamcast": [&"body", &"lid"],
-	"megadrive": [&"body", &"flap_front", &"flap_back"], "mastersystem": [&"body"],
+	"megadrive": [&"body", &"flap_front", &"flap_back"], "megadrive2": [&"body", &"flap_front", &"flap_back"],
+	"mastersystem": [&"body"],
 }
 ## The open edges of each glb's body as shipped: the shells have openings (undersides, hidden faces), welded by
 ## position. The closed-mesh promise does not hold for them; these hold.
 const OPEN_EDGES: Dictionary[String, int] = {"nes": 80, "gbc": 2475, "snes": 2210, "ps2_fat": 998, "gba_sp": 1359,
-	"psp": 449, "switch": 5638, "switch_grey": 5638, "dreamcast": 5423, "megadrive": 998, "mastersystem": 7081}
+	"psp": 449, "switch": 5638, "switch_grey": 5638, "dreamcast": 5423, "megadrive": 998, "megadrive2": 688,
+	"mastersystem": 7081}
 ## The two bench models' rest poses: the SP's screen stands open and the PS2 tray's bezel stands proud.
 ## These exact boxes preserve their supplied geometry without changing the other consoles' rest envelopes.
 const BENCH_RESTS: Dictionary[String, AABB] = {
@@ -38,8 +40,9 @@ const BENCH_RESTS: Dictionary[String, AABB] = {
 ## At least this share of a glb mesh's triangles face the way the vertex normals say.
 const WINDING_AGREES := 0.98
 ## The edges of more than two faces of a glb's meshes, by `console: mesh`: none, but ten on the Super Nintendo's
-## body where its shell was cut, and those the Switch's body has as downloaded.
-const FOLDED_EDGES: Dictionary[String, int] = {"snes: body": 10, "switch: body": 67, "switch_grey: body": 67}
+## body where its shell was cut, and those the Switch's and the Mega Drive model 2's bodies have as downloaded.
+const FOLDED_EDGES: Dictionary[String, int] = {"snes: body": 10, "switch: body": 67, "switch_grey: body": 67,
+	"megadrive2: body": 11}
 ## The side of the grid's squares a medium's way in is checked by, in millimetres.
 const _CELL_MM := 4.0
 
@@ -222,8 +225,9 @@ func test_a_glb_console_s_meshes_never_fold_nor_degenerate_and_their_winding_agr
 			assert_float(agreeing / (corners.size() / 3.0)).override_failure_message(
 				"%s: its winding disagrees with its normals" % label).is_greater_equal(WINDING_AGREES)
 			if geometry.name == &"body":
-				assert_int(Fixtures.open_edges(meshes).size()).override_failure_message(label).is_equal(
-					OPEN_EDGES[ConsoleManifest.folder_of(manifest)])
+				var open := Fixtures.open_edges(meshes).size()
+				assert_int(open).override_failure_message("%s: %d open edges" % [label, open]).is_equal(
+					OPEN_EDGES.get(ConsoleManifest.folder_of(manifest), 0))
 				var volume := 0.0
 				for piece in Fixtures.volumes(meshes):
 					volume += piece

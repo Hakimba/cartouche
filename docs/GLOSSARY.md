@@ -69,7 +69,8 @@ page that explains it. Start from [README.md](README.md) if you have not.
 - **Model variant**: one of several models of a platform (the slim and the original PS2). The user's choice is kept
   per platform (`ConsoleVariant`, `Library.withVariant`).
 - **Moving part**: a part of a console that moves (a lid, a tray, a light), a float property of its model with a
-  role and its values at rest and fully moved (`MovingPart`).
+  role and its values at rest and fully moved (`MovingPart`); declared as data in a glb console's scene
+  (`ConsolePart`).
 - **Pace**: how fast what moves by itself goes, from 1 awake down to 0 at rest. Nodes that move by themselves join
   the group `paced` (`Resting`).
 - **Place**: one of the games row's recycled slots (`ShelfRow`).

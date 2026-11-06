@@ -1,11 +1,52 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/snes/snes_model.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/glb_console.gd" id="1"]
 [ext_resource type="Resource" path="res://carousel/consoles/snes/snes_shape.tres" id="2"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/snes/snes.glb" id="3"]
+[ext_resource type="Script" path="res://carousel/consoles/console_part.gd" id="part"]
+
+[sub_resource type="Resource" id="back_flap"]
+script = ExtResource("part")
+property = &"flaps_degrees"
+node = NodePath("Model/snes/back_flap")
+role = 5
+open = 90.0
+
+[sub_resource type="Resource" id="front_flap"]
+script = ExtResource("part")
+property = &"flaps_degrees"
+node = NodePath("Model/snes/front_flap")
+axis = Vector3(-1, 0, 0)
+role = 5
+open = 90.0
+
+[sub_resource type="Resource" id="eject"]
+script = ExtResource("part")
+property = &"eject_degrees"
+node = NodePath("Model/snes/eject")
+open = 4.78
+
+[sub_resource type="Resource" id="power"]
+script = ExtResource("part")
+property = &"power_mm"
+node = NodePath("Model/snes/knob")
+motion = 1
+axis = Vector3(0, 0, -1)
+role = 1
+open_from = &"power_travel"
+
+[sub_resource type="Resource" id="reset"]
+script = ExtResource("part")
+property = &"reset_mm"
+node = NodePath("Model/snes/reset")
+motion = 1
+axis = Vector3(0, -1, 0)
+open = 0.45
 
 [node name="Snes" type="Node3D"]
 script = ExtResource("1")
 shape = ExtResource("2")
+parts = Array[ExtResource("part")]([SubResource("back_flap"), SubResource("front_flap"), SubResource("eject"), SubResource("power"), SubResource("reset")])
+way_in = Vector3(0, 1, 0)
 
 [node name="Model" parent="." instance=ExtResource("3")]

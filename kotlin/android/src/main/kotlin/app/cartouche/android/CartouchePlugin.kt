@@ -58,15 +58,10 @@ import app.cartouche.core.platforms.Platform
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.Player
 import app.cartouche.core.platforms.PlayerId
-import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.search.Finders
 import app.cartouche.core.search.Order
 import app.cartouche.core.search.View
-import app.cartouche.core.settings.Backdrop
-import app.cartouche.core.settings.ButtonStyle
-import app.cartouche.core.settings.EdgeSmoothing
-import app.cartouche.core.settings.Language
-import app.cartouche.core.settings.SoundLevel
+import app.cartouche.core.settings.Setting
 import app.cartouche.core.storage.DocumentId
 import arrow.core.Either
 import arrow.core.Option
@@ -498,70 +493,18 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         success().apply { putAll(settings.toWire(settings.isFirstLaunch(library.value.library()))) }
     }
 
+    /**
+     * Stores the setting [key] (one of [Setting.all]) as [value] writes it: a choice's name, `true` or `false`, a
+     * number; a key or a value its declaration does not take is refused and the settings kept. A preferred region
+     * changed looks again for the automatic labels whose first image it changes.
+     */
     @UsedByGodot
-    public fun saveButtonStyle(requestId: Int, style: String): Unit = onLibrary(requestId) {
-        val chosen = code("button_style", Some(style), ButtonStyle.entries) { it.wire }
-        save("button style: $style") { it.copy(buttonStyle = Some(chosen)) }
-        success()
-    }
-
-    @UsedByGodot
-    public fun saveEdgeSmoothing(requestId: Int, smoothing: String): Unit = onLibrary(requestId) {
-        val chosen = code("edge_smoothing", Some(smoothing), EdgeSmoothing.entries) { it.wire }
-        save("edge smoothing: $smoothing") { it.copy(edgeSmoothing = chosen) }
-        success()
-    }
-
-    /** Stores whether the selected game sways and bobs ([floating]); the consoles never do. */
-    @UsedByGodot
-    public fun saveGamesFloat(requestId: Int, floating: Boolean): Unit = onLibrary(requestId) {
-        save("games_float=$floating") { it.copy(gamesFloat = floating) }
-        success()
-    }
-
-    /** Stores the backdrop behind every screen, [backdrop] as `backdrop` names it. */
-    @UsedByGodot
-    public fun saveBackdrop(requestId: Int, backdrop: String): Unit = onLibrary(requestId) {
-        val chosen = code("backdrop", Some(backdrop), Backdrop.entries) { it.wire }
-        save("backdrop: $backdrop") { it.copy(backdrop = chosen) }
-        success()
-    }
-
-    /** Stores whether the pixel veil animates over the backdrop ([on]). */
-    @UsedByGodot
-    public fun savePixelVeil(requestId: Int, on: Boolean): Unit = onLibrary(requestId) {
-        save("pixel_veil=$on") { it.copy(pixelVeil = on) }
-        success()
-    }
-
-    /** Stores how loud the sounds play, [steps] from 0 (silenced) to [SoundLevel.MAX]. */
-    @UsedByGodot
-    public fun saveSoundLevel(requestId: Int, steps: Int): Unit = onLibrary(requestId) {
-        val level = SoundLevel.of(steps).getOrElse { raise(invalid("sound_level is out of 0 to ${SoundLevel.MAX}")) }
-        save("sound_level=$steps") { it.copy(soundLevel = level) }
-        success()
-    }
-
-    /** Stores the language the app's text is written in, [language] as `languages` names it; empty follows the device's. */
-    @UsedByGodot
-    public fun saveLanguage(requestId: Int, language: String): Unit = onLibrary(requestId) {
-        val chosen =
-            language.takeIf(String::isNotEmpty).toOption().map {
-                code("language", Some(it), Language.entries) { l -> l.wire }
-            }
-        save("language: ${language.ifEmpty { "device" }}") { it.copy(language = chosen) }
-        success()
-    }
-
-    /** [region] as named in `preferred_regions`, empty for none; the automatic labels whose first image it changes are looked up again. */
-    @UsedByGodot
-    public fun savePreferredRegion(requestId: Int, region: String): Unit = onLibrary(requestId) {
-        val chosen =
-            region.takeIf(String::isNotEmpty).toOption().map {
-                code("preferred_region", Some(it), PreferredRegion.entries) { r -> r.region }
-            }
-        val before = save("preferred region: ${region.ifEmpty { "none" }}") { it.copy(preferredRegion = chosen) }
-        art.preferredRegionChanged(before.preferredRegion, chosen)
+    public fun saveSetting(requestId: Int, key: String, value: String): Unit = onLibrary(requestId) {
+        val before = storedSettings()
+        val after = Setting.change(before, key, value).mapLeft { invalid(it.detail) }.bind()
+        settingsStore.save(after).mapLeft { it.toWire() }.bind()
+        trace("settings") { "$key=$value" }
+        art.preferredRegionChanged(before.preferredRegion, after.preferredRegion)
         success()
     }
 
@@ -868,13 +811,6 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     private fun storedSettings(): AppSettings = settingsStore.load().getOrElse { problem ->
         trace("settings") { "not read, starting without: ${problem.detail}" }
         AppSettings()
-    }
-
-    private fun Raise<Dictionary>.save(note: String, change: (AppSettings) -> AppSettings): AppSettings {
-        val before = storedSettings()
-        settingsStore.save(change(before)).mapLeft { it.toWire() }.bind()
-        trace("settings") { note }
-        return before
     }
 
     private fun Raise<Dictionary>.game(id: GameId): Game =

@@ -3,8 +3,6 @@ extends GdUnitTestSuite
 
 const Screens := preload("res://test/screens/fixtures.gd")
 const Fixtures := preload("res://test/carousel/fixtures.gd")
-const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gc", "wii", "xbox", "xbox360", "gb", "gbc", "gba",
-	"psp", "switch", "dreamcast", "megadrive", "mastersystem"]
 
 var _window := Vector2i.ZERO
 
@@ -21,7 +19,7 @@ func after_test() -> void:
 
 func _carousel() -> Carousel:
 	var counts: Dictionary[String, int] = {}
-	for folder in FOLDERS:
+	for folder in Fixtures.console_folders():
 		counts[ConsoleManifest.of(folder).platform] = 5
 	var carousel := Screens.fresh_carousel(self, Screens.past_first_launch(self, counts))
 	assert_bool(await Screens.until(self, func() -> bool: return carousel._shown)).is_true()

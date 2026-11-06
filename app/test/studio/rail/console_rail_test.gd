@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
 
-const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gc", "wii", "xbox", "xbox360", "gb", "gbc", "gba",
-	"psp", "switch", "dreamcast", "megadrive", "mastersystem"]
+const Fixtures := preload("res://test/carousel/fixtures.gd")
+
+var _folders := Fixtures.console_folders()
 
 
 ## The slots of tile [param index] a rail at [param along] shows it at, among every way round the ring: the
@@ -20,7 +21,7 @@ func _rail(count: int, selected := 0) -> ConsoleRail:
 	var rail: ConsoleRail = auto_free((load("res://studio/rail/console_rail.tscn") as PackedScene).instantiate())
 	add_child(rail)
 	var folders: Array[String] = []
-	folders.assign(FOLDERS.slice(0, count))
+	folders.assign(_folders.slice(0, count))
 	rail.show_consoles(folders, selected)
 	return rail
 
@@ -98,7 +99,7 @@ func _stood(rail: ConsoleRail) -> Array[Vector2]:
 	var all: Array[Vector2] = []
 	for tile in rail.tiles():
 		if tile.visible:
-			all.append(Vector2(FOLDERS.find(tile.console()), tile.position.x))
+			all.append(Vector2(_folders.find(tile.console()), tile.position.x))
 	all.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x or (a.x == b.x and a.y < b.y))
 	return all
 

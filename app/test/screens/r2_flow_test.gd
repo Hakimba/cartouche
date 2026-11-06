@@ -16,14 +16,14 @@ func test_first_launch_saves_the_chosen_region_before_no_console_and_never_shows
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.choose_initial_region(self, carousel, "Japan")
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	assert_array(device.saved_regions).is_equal(["Japan"])
+	assert_array(device.saves(&"preferred_region")).is_equal(["Japan"])
 	assert_str(carousel._screens._preferred_region).is_equal("Japan")
 	assert_bool(carousel._screens.get_node_or_null("Discovery") == null).is_true()
 	device.first_launch = false
 	var next := Fixtures.fresh_carousel(self, device)
 	assert_bool(await Fixtures.on(self, next, "NoConsole")).is_true()
 	assert_bool(next._screens._region_screen.visible).is_false()
-	assert_array(device.saved_regions).is_equal(["Japan"])
+	assert_array(device.saves(&"preferred_region")).is_equal(["Japan"])
 
 
 func test_a_failed_initial_region_save_keeps_the_choice_for_this_run_and_continues() -> void:
@@ -35,9 +35,9 @@ func test_a_failed_initial_region_save_keeps_the_choice_for_this_run_and_continu
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.choose_initial_region(self, carousel, "Europe")
 	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	assert_array(device.saved_regions).is_equal(["Europe"])
+	assert_array(device.saves(&"preferred_region")).is_equal(["Europe"])
 	assert_str(carousel._screens._preferred_region).is_equal("Europe")
-	assert_array(device.saved_styles).is_equal([&"xbox"])
+	assert_array(device.saves(&"button_style")).is_equal([&"xbox"])
 
 
 func test_adding_responds_before_a_slow_scan_and_the_first_console_arrives_without_a_ring() -> void:

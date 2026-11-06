@@ -36,22 +36,15 @@ Packages `platforms` and `launch`.
 | `StartDeadline.kt` | How long after a start was asked it may still begin: past it the start is refused, as the carousel has stopped waiting for it (INV-21). |
 
 Definition files come in two sets, in the same format: `app/data/platforms/daijishou/` (third-party) and
-`app/data/platforms/cartouche/` (platforms the first set lacks). Each platform also needs a profile in
+`app/data/platforms/cartouche/` (Cartouche's own: platforms the first set lacks, and fixes of its platforms, a file
+named like one of the first set replacing it). Each platform also needs a profile in
 `app/data/platforms/profiles.json`: its media, the size under which an unknown file is not a game, its `art`, and
 its ScreenScraper system. `CatalogTest` loads every shipped file (INV-14).
 
 ### Adding a platform
 
-A platform takes data only, unless it needs a new medium ([../adding-a-medium.md](../adding-a-medium.md)) or a
-console model ([../adding-a-console.md](../adding-a-console.md)):
-
-1. A definition in `app/data/platforms/cartouche/`, unless the Daijishō set has one.
-2. A profile in `app/data/platforms/profiles.json`.
-3. A reference list `app/data/titles/<platform>.tsv`, made with `scripts/dat_titles.py` from a libretro-database DAT.
-   A cartridge platform also gets its prints, `app/data/prints/<platform>.tsv` (`scripts/dat_titles.py --prints`).
-4. For art, an extract `app/data/art/<platform>.tsv` made with `scripts/launchbox_art.py`, and a texture table in
-   `app/data/screenscraper/` (its README says how the project builds one). A platform without `art` in its profile
-   gets no art.
+A platform takes data only: a definition and its players, a profile, a reference list, prints for cartridges, and
+art data. [../adding-a-platform.md](../adding-a-platform.md) goes through each, with its tests.
 
 ## Library, scan and identification
 
@@ -126,7 +119,7 @@ Packages `settings` and `storage`.
 
 | File | Responsibility |
 |---|---|
-| `Settings.kt` | The app's choices apart from the library: button style, edge smoothing, preferred region, games floating, sound level, language, and whether the first launch is still to do. |
+| `Settings.kt` | The app's choices apart from the library: button style, edge smoothing, preferred region, games floating, sound level, language, background, pixel veil, and whether the first launch is still to do. |
 | `SettingsFormat.kt` | Their stored format. |
 | `DocumentPaths.kt` | Maps a document id (`1A2B-3C4D:ROMs/ps2`) to a path and to a place the user reads. |
 

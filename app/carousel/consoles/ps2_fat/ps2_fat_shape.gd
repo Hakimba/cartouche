@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 @tool
 class_name Ps2FatShape
-extends GlbShape
+extends GlbConsoleShape
 ## The tray's pivot and the disc's recess, in millimetres in the model's frame.
 
 @export var tray_pivot := Vector3(58.8519, 58.43225, 0.0):
@@ -18,6 +18,7 @@ extends GlbShape
 		emit_changed()
 
 
-func seat(travel: float) -> Transform3D:
+## Where a seated disc stands, the tray slid [param travel] millimetres out.
+func seat(travel := 0.0) -> Transform3D:
 	return Transform3D(Basis(Vector3.RIGHT, -PI / 2.0),
 		(tray_pivot + recess + Vector3.BACK * travel) * MeshBuilder.UNITS_PER_MM)

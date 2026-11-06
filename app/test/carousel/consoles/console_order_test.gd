@@ -301,8 +301,12 @@ func test_whatever_is_pressed_the_ring_shows_every_console_once_where_the_order_
 
 
 func test_a_platform_without_a_model_has_no_place_on_the_ring_and_keeps_its_place_in_the_order() -> void:
-	var unmodelled_device := Fixtures.past_first_launch(self, {"ps2": 1, "saturn": 1, "gc": 1, "segacd": 1, "gba": 1})
-	for id: String in ["saturn", "segacd"]:
+	# Two platforms of the profiles no console folder models, between modelled ones.
+	var modelled := Appearance.defaults(ConsoleManifest.found())
+	var profiles: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/platforms/profiles.json"))
+	var without: Array = profiles.keys().filter(func(id: String) -> bool: return id not in modelled).slice(0, 2)
+	var unmodelled_device := Fixtures.past_first_launch(self, {"ps2": 1, without[0]: 1, "gc": 1, without[1]: 1, "gba": 1})
+	for id: String in without:
 		unmodelled_device.catalog.platforms.append(AndroidServices.Platform.new({"id": id, "name": id, "media": "dvd"}))
 	var setup := await _on_consoles(unmodelled_device)
 	var carousel: Carousel = setup[0]

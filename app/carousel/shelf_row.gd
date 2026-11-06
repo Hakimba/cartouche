@@ -251,6 +251,11 @@ func selected_game() -> AndroidServices.Game:
 	return _games[selected_index()]
 
 
+## The medium the selected game is shown as: its own, or its kind's when it has no folder.
+func selected_medium() -> String:
+	return ConsoleManifest.folder_of(_models[selected_game().medium])
+
+
 ## The selected game's position on the endless row: its index, plus the laps made.
 func selected_position() -> int:
 	return _position

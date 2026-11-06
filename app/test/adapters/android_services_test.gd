@@ -222,9 +222,19 @@ func test_the_catalog_summary_reads_the_consoles_a_person_may_add_in_their_order
 	assert_array(AndroidServices.CatalogSummary.new({}).offered).is_empty()
 
 
-func test_inv_15_the_settings_answer_tells_whether_games_float_off_when_the_plugin_says_nothing() -> void:
-	assert_bool(AndroidServices.SettingsAnswer.new({"ok": true, "games_float": true}).games_float).is_true()
-	assert_bool(AndroidServices.SettingsAnswer.new({"ok": true}).games_float).is_false()
+func test_inv_15_a_settings_answer_without_a_value_reads_a_fresh_install_s_as_the_plugin_sends_it() -> void:
+	var fresh := DesktopPlugin.settings_of(DesktopPlugin.demo("settings"))
+	assert_dict(fresh).is_not_empty()
+	var sent := AndroidServices.SettingsAnswer.new({"ok": true}.merged(fresh))
+	var unsaid := AndroidServices.SettingsAnswer.new({"ok": true})
+	var started := AndroidServices.BackdropAnswer.new({})
+	for key: String in fresh:
+		# The lists of names are the plugin's to tell: none is known without it.
+		if fresh[key] is not PackedStringArray:
+			var answer: Object = started if key in started else unsaid
+			assert_bool(answer.get(key) == fresh[key]).override_failure_message("%s: %s, sent %s" % [key, answer.get(key),
+				fresh[key]]).is_true()
+	assert_bool(sent.games_float).is_false()
 
 
 func test_a_console_placed_is_read_with_the_order_the_plugin_answers_and_none_when_it_failed() -> void:
@@ -351,12 +361,12 @@ func test_desktop_settings_save_every_choice_with_the_same_success_and_read_them
 	assert_bool((await services.settings()).has_button_style).is_false()
 	assert_str(services.backdrop().backdrop).is_equal("light")
 	assert_bool(services.backdrop().pixel_veil).is_true()
-	assert_bool((await services.save_backdrop(&"anthracite")).ok).is_true()
-	assert_bool((await services.save_pixel_veil(false)).ok).is_true()
-	assert_bool((await services.save_games_float(true)).ok).is_true()
-	assert_bool((await services.save_button_style(&"nintendo")).ok).is_true()
-	assert_bool((await services.save_edge_smoothing(&"2x")).ok).is_true()
-	assert_bool((await services.save_preferred_region("Japan")).ok).is_true()
+	assert_bool((await services.save_setting(&"backdrop", &"anthracite")).ok).is_true()
+	assert_bool((await services.save_setting(&"pixel_veil", false)).ok).is_true()
+	assert_bool((await services.save_setting(&"games_float", true)).ok).is_true()
+	assert_bool((await services.save_setting(&"button_style", &"nintendo")).ok).is_true()
+	assert_bool((await services.save_setting(&"edge_smoothing", &"2x")).ok).is_true()
+	assert_bool((await services.save_setting(&"preferred_region", "Japan")).ok).is_true()
 	var stored := await services.settings()
 	assert_bool(stored.games_float).is_true()
 	assert_str(stored.button_style).is_equal("nintendo")
@@ -364,7 +374,7 @@ func test_desktop_settings_save_every_choice_with_the_same_success_and_read_them
 	assert_str(stored.preferred_region).is_equal("Japan")
 	assert_str(services.backdrop().backdrop).is_equal("anthracite")
 	assert_bool(services.backdrop().pixel_veil).is_false()
-	assert_bool((await services.save_games_float(false)).ok).is_true()
+	assert_bool((await services.save_setting(&"games_float", false)).ok).is_true()
 	assert_bool((await services.settings()).games_float).is_false()
 
 

@@ -1,8 +1,7 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://studio/palette_rect.gd" id="palette_rect"]
 [ext_resource type="Script" path="res://screens/settings_menu.gd" id="1"]
-[ext_resource type="PackedScene" path="res://screens/settings_row.tscn" id="2"]
 [ext_resource type="Script" path="res://screens/button_hint.gd" id="3"]
 [ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 
@@ -45,46 +44,6 @@ mouse_filter = 2
 [node name="Title" type="Label" parent="Panel/Items"]
 visible = false
 text = "Settings"
-
-[node name="ButtonStyle" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Button style"
-
-[node name="Graphics" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Graphics"
-
-[node name="Backdrop" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Background"
-
-[node name="Veil" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Animated background"
-
-[node name="GamesFloat" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Games float"
-
-[node name="Region" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Preferred region of images"
-
-[node name="Sounds" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Sounds"
-
-[node name="Language" parent="Panel/Items" instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 0
-label = "Language"
 
 [node name="Hints" parent="." instance=ExtResource("hint_row")]
 

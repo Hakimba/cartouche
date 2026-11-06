@@ -81,7 +81,7 @@ func test_left_and_right_on_the_sounds_line_turn_them_down_and_up_heard_at_their
 	Fixtures.press(carousel, &"open_settings")
 	var settings: SettingsMenu = carousel.get_node("%Screens/Settings")
 	assert_bool(await ScreenFixtures.until(self, func() -> bool: return settings.state == SettingsMenu.State.OPEN)).is_true()
-	settings._sounds.grab_focus()
+	settings.row_of(&"sounds").grab_focus()
 	var bus := AudioServer.get_bus_index(SoundEffects.BUS)
 	for step in SoundEffects.LEVELS + 2:
 		_hush()
@@ -94,5 +94,5 @@ func test_left_and_right_on_the_sounds_line_turn_them_down_and_up_heard_at_their
 	assert_array(_heard()).is_equal([Cue.VOLUME])
 	assert_int(Sounds.level).is_equal(1)
 	assert_bool(AudioServer.is_bus_mute(bus)).is_false()
-	assert_object(ScreenFixtures.focus(self)).is_same(settings._sounds)
+	assert_object(ScreenFixtures.focus(self)).is_same(settings.row_of(&"sounds"))
 	Sounds.level = SoundEffects.LEVELS

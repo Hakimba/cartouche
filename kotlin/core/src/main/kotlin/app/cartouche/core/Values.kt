@@ -12,10 +12,17 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.serializer
 
 public fun String.intOrNone(): Option<Int> = toIntOrNull().toOption()
 
 public fun String.longOrNone(): Option<Long> = toLongOrNull().toOption()
+
+/**
+ * The entry's name as the stored format writes it (its `@SerialName`), so the file and the wire cannot drift; an
+ * enum's serializer names every entry in order, so each has one.
+ */
+public inline val <reified E : Enum<E>> E.serialName: String get() = serializer<E>().descriptor.getElementName(ordinal)
 
 /** An Android application id, such as `org.dolphinemu.dolphinemu`. */
 @JvmInline public value class PackageName private constructor(public val value: String) {

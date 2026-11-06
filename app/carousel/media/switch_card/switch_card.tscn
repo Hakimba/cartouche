@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/models/shaped_mesh.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/media/switch_card/switch_card_shape.tres" id="2"]
+[ext_resource type="Shader" path="res://carousel/models/label.gdshader" id="3"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="4"]
+
+[sub_resource type="PrimitiveMesh" id="label_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"label"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="label_material"]
+shader = ExtResource("3")
+shader_parameter/roughness = 0.5
+shader_parameter/varnish = 0.3
+
+[sub_resource type="PrimitiveMesh" id="shell_mesh"]
+script = ExtResource("1")
+shape = ExtResource("2")
+part = &"shell"
+detail = 64
+
+[sub_resource type="ShaderMaterial" id="shell_material"]
+shader = ExtResource("4")
+shader_parameter/albedo = Color(0.169, 0.169, 0.176, 1)
+shader_parameter/roughness = 0.6
+
+[node name="SwitchCard" type="Node3D"]
+
+[node name="Label" type="MeshInstance3D" parent="."]
+mesh = SubResource("label_mesh")
+surface_material_override/0 = SubResource("label_material")
+
+[node name="Shell" type="MeshInstance3D" parent="."]
+mesh = SubResource("shell_mesh")
+surface_material_override/0 = SubResource("shell_material")

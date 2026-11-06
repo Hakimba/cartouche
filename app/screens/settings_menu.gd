@@ -12,6 +12,10 @@ signal transition_frame(subject: float, rail: float, chrome: float)
 signal sound_level_changed(steps: int)
 
 enum State { OPENING, OPEN, CLOSING, CLOSED }
+## How a row changes: [code]CHOICE[/code] opens its own page, its value right of its name ([code]CHOICE_BELOW[/code]:
+## under it, for long values); [code]SWITCH[/code] slides on its row; [code]LEVEL[/code], the sounds' bar, is turned
+## with left and right.
+enum Kind { CHOICE, CHOICE_BELOW, SWITCH, LEVEL }
 
 const _PITCH := 89.6 # Row height plus the 7.68 px gap.
 const _SHOWN := 6
@@ -27,9 +31,19 @@ const SAVE_ESCAPE_MS := 2000
 ## The sounds' level drawn as this many steps, right on the line, each this size and this far from the next.
 const _STEP_SIZE := Vector2(10.24, 23.04)
 const _STEP_GAP := 6.4
-## The choices made with a switch on their row, each with the note under its row's name.
-const SWITCHES: Dictionary[StringName, String] = {&"pixel_veil": "A veil of pixels drifts behind the screens",
-	&"games_float": "The selected game gently rises and falls"}
+## The card's rows, top to bottom, by the choice a press on one emits (a switch's is its setting's key; its node is
+## named after it in PascalCase): its name and how it changes ([enum Kind]), with a switch's note under its name.
+const ROWS: Dictionary[StringName, Dictionary] = {
+	&"button_style": {&"label": "Button style", &"kind": Kind.CHOICE},
+	&"graphics": {&"label": "Graphics", &"kind": Kind.CHOICE},
+	&"backdrop": {&"label": "Background", &"kind": Kind.CHOICE},
+	&"pixel_veil": {&"label": "Animated background", &"kind": Kind.SWITCH, &"note": "A veil of pixels drifts behind the screens"},
+	&"games_float": {&"label": "Games float", &"kind": Kind.SWITCH, &"note": "The selected game gently rises and falls"},
+	&"region": {&"label": "Preferred region of images", &"kind": Kind.CHOICE_BELOW},
+	&"sounds": {&"label": "Sounds", &"kind": Kind.LEVEL},
+	&"language": {&"label": "Language", &"kind": Kind.CHOICE_BELOW},
+}
+const _ROW := preload("res://screens/settings_row.tscn")
 
 static var DURATION_S: float:
 	get: return maxf(StudioTokens.TR_SETTINGS_OPEN_S, StudioTokens.TR_SETTINGS_CARD_AT_S + StudioTokens.TR_SETTINGS_CARD_S)
@@ -58,37 +72,36 @@ var _closing := false
 var _cursor_y := 0.0
 var _cursor_tween: Tween
 var _rows: Array[FieldButton] = []
+## The rows by their key in [constant ROWS].
+var _rows_of: Dictionary[StringName, FieldButton] = {}
 ## The row on the card's first line.
 var _first := 0
 var _card: SatinPanel.Backing
 var _cursor: SatinPanel.Backing
 var _switches: Dictionary[StringName, Switch] = {}
-## The switches' rows, each with the note under its name.
-var _notes: Dictionary[FieldButton, String] = {}
 var _ink: Control
 
 @onready var _panel: Control = $Panel
 @onready var _items: Control = $Panel/Items
-@onready var _button_style: FieldButton = %ButtonStyle
-@onready var _graphics: FieldButton = %Graphics
-@onready var _backdrop: FieldButton = %Backdrop
-@onready var _veil: FieldButton = %Veil
-@onready var _floating: FieldButton = %GamesFloat
-@onready var _region: FieldButton = %Region
-@onready var _sounds: FieldButton = %Sounds
-@onready var _language: FieldButton = %Language
-## The rows whose press emits a choice, by it.
-@onready var _rows_of: Dictionary[StringName, FieldButton] = {&"button_style": _button_style,
-	&"graphics": _graphics, &"backdrop": _backdrop, &"pixel_veil": _veil,
-	&"games_float": _floating, &"region": _region, &"language": _language}
 
 
 func _ready() -> void:
 	add_to_group(SoundEffects.MOVES)
 	_panel.pivot_offset = _panel.size / 2.0
-	_rows.assign([_button_style, _graphics, _backdrop, _veil, _floating, _region, _sounds, _language])
-	_sounds.focus_neighbor_left = _sounds.get_path_to(_sounds)
-	_sounds.focus_neighbor_right = _sounds.get_path_to(_sounds)
+	for key: StringName in ROWS:
+		var row: FieldButton = _ROW.instantiate()
+		row.name = key.to_pascal_case()
+		row.label = ROWS[key][&"label"]
+		_items.add_child(row)
+		_rows_of[key] = row
+		if kind_of(key) == Kind.LEVEL:
+			row.focus_neighbor_left = row.get_path_to(row)
+			row.focus_neighbor_right = row.get_path_to(row)
+			continue
+		row.pressed.connect(_on_row_pressed.bind(key))
+		if kind_of(key) == Kind.SWITCH:
+			_switches[key] = Switch.new(row)
+	_rows.assign(_rows_of.values())
 	_card = SatinPanel.Backing.new(_panel, StudioTokens.Look.SATIN)
 	_card.place(Rect2(Vector2.ZERO, _panel.size), 28.16)
 	_cursor = SatinPanel.Backing.new(_items, StudioTokens.Look.FOCUS)
@@ -108,11 +121,6 @@ func _ready() -> void:
 	_panel.add_child(_ink)
 	_ink.draw.connect(_draw_card)
 	_place_rows()
-	for choice: StringName in _rows_of:
-		_rows_of[choice].pressed.connect(_on_row_pressed.bind(choice))
-	for choice: StringName in SWITCHES:
-		_switches[choice] = Switch.new(_rows_of[choice])
-		_notes[_rows_of[choice]] = SWITCHES[choice]
 	visibility_changed.connect(func() -> void:
 		if not visible:
 			set_process(false))
@@ -136,7 +144,7 @@ func _input(event: InputEvent) -> void:
 	if state == State.OPEN:
 		if event is InputEventMouseButton and event.is_pressed() and _tapped_arrow(event as InputEventMouseButton):
 			return
-		if _sounds.has_focus() and (event.is_action_pressed(&"ui_left", true) or event.is_action_pressed(&"ui_right", true)):
+		if _rows_of[&"sounds"].has_focus() and (event.is_action_pressed(&"ui_left", true) or event.is_action_pressed(&"ui_right", true)):
 			get_viewport().set_input_as_handled()
 			var steps := clampi(sound_level + (1 if event.is_action_pressed(&"ui_right", true) else -1), 0, SoundEffects.LEVELS)
 			if steps != sound_level:
@@ -274,19 +282,23 @@ func _place_cursor(y: float) -> void:
 func _draw_card() -> void:
 	StudioText.new(tr("Settings"), StudioTokens.Face.JAKARTA_800, 53.76, -0.04).draw(_ink, _HEADING_INSET, Backdrop.palette.ink)
 	var last := mini(_first + _SHOWN, _rows.size()) - 1
+	var keys := _rows_of.keys()
 	for i in range(_first, last + 1):
 		var row := _rows[i]
-		var name_line := _row_name(row)
+		var key: StringName = keys[i]
+		var kind := kind_of(key)
+		var name_line := _row_name(row, kind)
 		var y := _ITEMS_TOP + (i - _first) * _PITCH
-		var switched := row in _notes
-		var has_note := switched or row == _region or row == _language
+		var switched := kind == Kind.SWITCH
+		var has_note := switched or kind == Kind.CHOICE_BELOW
 		name_line.draw(_ink, Vector2(61.44, y + (2.08 if has_note else 18.4)), Backdrop.palette.ink)
 		if has_note:
-			var note := tr(_notes[row]) if switched else row.shown_value()
+			var note: String = ROWS[key].get(&"note", "")
+			note = tr(note) if switched else row.shown_value()
 			# The switch stands right of the note.
 			_fitted(note, StudioTokens.Face.JAKARTA_500, 21.76, 460.0 if switched else 512.0).draw(_ink,
 				Vector2(61.44, y + 47.2), Backdrop.palette.mute)
-		elif row == _sounds:
+		elif kind == Kind.LEVEL:
 			_draw_sound_level(y)
 		else:
 			var value := _fitted(row.shown_value(), StudioTokens.Face.JAKARTA_700, 26.88, 240.0)
@@ -310,12 +322,12 @@ func _draw_sound_level(y: float) -> void:
 		_ink.draw_rect(Rect2(at, _STEP_SIZE), gel if i < sound_level else Backdrop.palette.line)
 
 
-func _row_name(row: FieldButton) -> StudioText:
+func _row_name(row: FieldButton, kind: Kind) -> StudioText:
 	var face := StudioTokens.Face.JAKARTA_800 if row.has_focus() else StudioTokens.Face.JAKARTA_700
-	if row == _region or row == _language:
+	if kind == Kind.CHOICE_BELOW:
 		return _fitted(tr(row.label), face, 30.08, 560.0)
 	var line := StudioText.new(tr(row.label), face, 30.08)
-	line.fit(450.0 if row in _notes else 380.0)
+	line.fit(450.0 if kind == Kind.SWITCH else 380.0)
 	return line
 
 
@@ -325,7 +337,22 @@ static func _fitted(text: String, face: StudioTokens.Face, px: float, room: floa
 	return line if line.width <= room else StudioText.new(text, face, px * room / line.width)
 
 
-## Whether the switch of [param choice] (a key of [constant SWITCHES]) shows on.
+## How the row of [param key] (a key of [constant ROWS]) changes.
+static func kind_of(key: StringName) -> Kind:
+	return ROWS[key][&"kind"]
+
+
+## The keys of the rows that are switches, top to bottom: each a setting's key.
+static func switches() -> Array[StringName]:
+	return ROWS.keys().filter(func(key: StringName) -> bool: return kind_of(key) == Kind.SWITCH)
+
+
+## The row of [param key] (a key of [constant ROWS]).
+func row_of(key: StringName) -> FieldButton:
+	return _rows_of[key]
+
+
+## Whether the switch of [param choice] (a key of [method switches]) shows on.
 func switch_on(choice: StringName) -> bool:
 	return _switches[choice].on
 
@@ -354,15 +381,15 @@ func open(focus: StringName, region: String, language: String) -> void:
 		_closing = false
 		_time = DURATION_S
 		_sample()
-	_button_style.show_value(Controls.style_name())
-	_graphics.show_value(tr(EdgeSmoothingScreen.NAMES[EdgeSmoothingScreen.of(get_viewport())]))
-	_backdrop.show_value(tr(Backdrop.NAMES[Backdrop.choice]))
-	_region.show_value(region_name(region))
-	_language.show_value(Locale.name_of(language))
+	_rows_of[&"button_style"].show_value(Controls.style_name())
+	_rows_of[&"graphics"].show_value(tr(EdgeSmoothingScreen.NAMES[EdgeSmoothingScreen.of(get_viewport())]))
+	_rows_of[&"backdrop"].show_value(tr(Backdrop.NAMES[Backdrop.choice]))
+	_rows_of[&"region"].show_value(region_name(region))
+	_rows_of[&"language"].show_value(Locale.name_of(language))
 	_first = 0
 	_place_rows()
-	var row: FieldButton = _rows_of.get(focus, _button_style)
-	row.grab_focus()
+	var focused: FieldButton = _rows_of.get(focus, _rows[0])
+	focused.grab_focus()
 	# The line already focused takes no focus_entered: its place on the card is set here.
 	_focus_row(maxi(_rows.find(get_viewport().gui_get_focus_owner() as FieldButton), 0))
 	if state == State.OPENING:
@@ -376,7 +403,7 @@ static func region_name(region: String) -> String:
 
 
 func _on_row_pressed(choice: StringName) -> void:
-	if choice not in SWITCHES:
+	if kind_of(choice) != Kind.SWITCH:
 		Sounds.play(SoundEffects.Cue.SELECT)
 	# A switch's press from a mouse, or synthesized, bypasses _input: none while a save is pending or the card moves.
 	elif saving or state != State.OPEN:

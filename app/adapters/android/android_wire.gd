@@ -563,6 +563,8 @@ class SettingsAnswer extends Result:
 	var edge_smoothing: StringName
 	## Whether the selected game sways and bobs; the consoles never do.
 	var games_float: bool
+	## Whether a veil of pixels animates over the backdrop, as [BackdropAnswer] tells it at start.
+	var pixel_veil: bool
 	## How loud the sounds play, from 0 (silenced) to [constant SoundEffects.LEVELS].
 	var sound_level: int
 	## The region labels' images prefer, one of [member preferred_regions]; empty for none.
@@ -581,6 +583,7 @@ class SettingsAnswer extends Result:
 		button_style = payload.get("button_style", &"")
 		edge_smoothing = payload.get("edge_smoothing", &"4x")
 		games_float = payload.get("games_float", false)
+		pixel_veil = payload.get("pixel_veil", true)
 		sound_level = payload.get("sound_level", SoundEffects.LEVELS)
 		preferred_region = payload.get("preferred_region", "")
 		preferred_regions = payload.get("preferred_regions", PackedStringArray())

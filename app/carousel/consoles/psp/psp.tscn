@@ -1,11 +1,13 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://carousel/consoles/psp/psp_model.gd" id="1"]
+[ext_resource type="Script" path="res://carousel/consoles/glb_console.gd" id="1"]
 [ext_resource type="Resource" path="res://carousel/consoles/psp/psp_shape.tres" id="2"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/psp/psp.glb" id="3"]
 
 [node name="Psp" type="Node3D"]
 script = ExtResource("1")
 shape = ExtResource("2")
+way_in = Vector3(0, 1, 0)
+pose = 1
 
 [node name="Model" parent="." instance=ExtResource("3")]

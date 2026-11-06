@@ -13,9 +13,8 @@ const DEMO := "res://dev/demo/desktop.json"
 const _VARIANTS := "user://console-variants.json"
 
 var _snapshot := {}
-var _settings := {"ok": true, "first_launch": false, "games_float": false, "sound_level": 10,
-	"language": "", "languages": Locale.NAMES.keys()}
-var _backdrop := {"backdrop": "light", "pixel_veil": true}
+## The settings as the plugin sends them, a fresh install's ([method settings_of] the demo's) until changed.
+var _settings := {"ok": true}.merged(settings_of(demo("settings")))
 ## The library as the choices made since the app started left it; empty until one is made.
 var _current := {}
 var _story := {}
@@ -55,6 +54,22 @@ static func story_of(parsed: Dictionary) -> Dictionary:
 	return story
 
 
+## The settings [param parsed] holds as the plugin sends them: their numbers ints and their lists of names
+## PackedStringArrays, where JSON has floats and Arrays.
+static func settings_of(parsed: Dictionary) -> Dictionary:
+	var sent := {}
+	for key: String in parsed:
+		var value: Variant = parsed[key]
+		if value is float:
+			var number: float = value
+			value = int(number)
+		elif value is Array:
+			var names: Array = value
+			value = PackedStringArray(names)
+		sent[key] = value
+	return sent
+
+
 ## Whether a snapshot of a device's data is loaded.
 func has_snapshot() -> bool:
 	return not _snapshot.is_empty()
@@ -84,7 +99,7 @@ func load_snapshot(folder: String) -> void:
 	_current = JSON.parse_string(library_text)
 	_current["console_variants"] = _snapshot.get("variants", {})
 	var snapshot_settings: Dictionary = _snapshot["settings"]
-	_settings = snapshot_settings.duplicate(true)
+	_settings.merge(settings_of(snapshot_settings), true)
 	var locale: String = _snapshot.get("locale", "")
 	if locale:
 		TranslationServer.set_locale(locale)
@@ -95,12 +110,12 @@ func load_snapshot(folder: String) -> void:
 ## traced and left aside.
 func start_with_backdrop(chosen: String, veil: String) -> void:
 	if StringName(chosen) in Backdrop.NAMES:
-		_backdrop["backdrop"] = chosen
+		_settings["backdrop"] = chosen
 	elif chosen:
 		Diagnostics.trace("backdrop", "--backdrop=%s refused, not one of %s" % [chosen,
 			", ".join(PackedStringArray(Backdrop.NAMES.keys()))])
 	if veil:
-		_backdrop["pixel_veil"] = veil != "off"
+		_settings["pixel_veil"] = veil != "off"
 
 
 ## Debug builds: the consoles of [param asked] (`gba:2,ps2:3`) are set up with a folder, and their next re-read
@@ -187,42 +202,21 @@ func settings(_id: int) -> Dictionary:
 	return _settings
 
 
-func saveButtonStyle(_id: int, style: StringName) -> Dictionary:
-	return _save("button_style", style)
-
-
-func saveEdgeSmoothing(_id: int, smoothing: StringName) -> Dictionary:
-	return _save("edge_smoothing", smoothing)
-
-
-func saveGamesFloat(_id: int, floating: bool) -> Dictionary:
-	return _save("games_float", floating)
+## Takes any key, its value read back from its text as the type it is sent as: the plugin checks both against the
+## settings it declares.
+func saveSetting(_id: int, key: String, value: String) -> Dictionary:
+	match typeof(_settings.get(key)):
+		TYPE_BOOL:
+			_settings[key] = value == "true"
+		TYPE_INT:
+			_settings[key] = value.to_int()
+		_:
+			_settings[key] = value
+	return {"ok": true}
 
 
 func backdrop() -> Dictionary:
-	return _backdrop
-
-
-func saveBackdrop(_id: int, chosen: StringName) -> Dictionary:
-	_backdrop["backdrop"] = chosen
-	return {"ok": true}
-
-
-func savePixelVeil(_id: int, on: bool) -> Dictionary:
-	_backdrop["pixel_veil"] = on
-	return {"ok": true}
-
-
-func saveSoundLevel(_id: int, steps: int) -> Dictionary:
-	return _save("sound_level", steps)
-
-
-func saveLanguage(_id: int, language: String) -> Dictionary:
-	return _save("language", language)
-
-
-func savePreferredRegion(_id: int, region: String) -> Dictionary:
-	return _save("preferred_region", region)
+	return {"backdrop": _settings["backdrop"], "pixel_veil": _settings["pixel_veil"]}
 
 
 func scanPlatform(_id: int, _platform_id: String) -> Dictionary:
@@ -340,11 +334,6 @@ func form() -> Dictionary:
 		_story = story_of(parsed)
 	_story_read = true
 	return _story
-
-
-func _save(key: String, value: Variant) -> Dictionary:
-	_settings[key] = value
-	return {"ok": true}
 
 
 ## Keeps the model beside the user's other files (in the snapshot when one is loaded).

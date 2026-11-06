@@ -1,4 +1,4 @@
-# gdlint (gdtoolkit 4) settings for dev/build.sh: the Godot style guide's member order and names, lines up to
+# gdlint (gdtoolkit 4) settings for scripts/build.sh: the Godot style guide's member order and names, lines up to
 # 140 characters as in Kotlin. Allowed besides: the desktop stand-in's camelCase methods (the Kotlin plugin's
 # names), upper-case static variables (timings the debug bridge retunes), PascalCase constants (aliases of
 # classes) and private signals.

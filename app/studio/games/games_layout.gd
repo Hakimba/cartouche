@@ -32,7 +32,7 @@ func _init(medium: String) -> void:
 	if _poses.is_empty():
 		var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(FILE))
 		_poses = data["media"]
-	var cart := medium.ends_with("_cart")
+	var cart := MediumManifest.is_cartridge(medium)
 	var pose: Dictionary = _poses.get(medium, _poses["ps2_dvd"])
 	var size: float = pose["scale"]
 	var angles: Array = pose["rotation"]

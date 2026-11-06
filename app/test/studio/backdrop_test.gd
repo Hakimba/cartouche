@@ -16,6 +16,18 @@ func test_every_value_of_every_scheme_is_a_field_of_its_palette() -> void:
 			assert_bool(palette.get(key) == values[key]).override_failure_message("%s.%s" % [scheme, key]).is_true()
 
 
+func test_the_backgrounds_offered_are_those_the_plugin_stores_each_drawing_its_scheme_and_device_following_the_system() -> void:
+	var stored: PackedStringArray = DesktopPlugin.settings_of(DesktopPlugin.demo("settings"))["backdrops"]
+	var offered := PackedStringArray(Backdrop.NAMES.keys())
+	assert_array(offered).is_equal(stored)
+	for key in offered:
+		if key != "device":
+			assert_str(StudioTokens.Scheme.find_key(Backdrop.scheme_of(key))).is_equal(key.to_upper())
+	var drawn := PackedStringArray(StudioTokens.Scheme.keys()).duplicate()
+	drawn.append("DEVICE")
+	assert_array(drawn).is_equal(PackedStringArray(Array(offered).map(func(key: String) -> String: return key.to_upper())))
+
+
 func test_a_backdrop_shown_tells_every_control_once_and_light_again_gives_the_theme_back_as_made() -> void:
 	var theme := ThemeDB.get_project_theme()
 	Backdrop.show(&"light", false)
