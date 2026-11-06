@@ -76,6 +76,7 @@
   "atari2600": {"media": "cartridge", "medium": {"default": "atari2600_cart"}, "minimumGameBytes": 1024},
   "psx": {"media": "dvd", "medium": {"default": "ps1_cd"}, "minimumGameBytes": 0, "screenScraperSystem": 57, "art": {"kind": "disc"}},
   "psp": {"media": "dvd", "medium": {"default": "psp_umd"}, "minimumGameBytes": 1048576, "screenScraperSystem": 61},
+  "psvita": {"media": "cartridge", "medium": {"default": "psvita_card"}, "minimumGameBytes": 1, "screenScraperSystem": 62},
   "wii": {"media": "dvd", "medium": {"default": "wii_dvd"}, "minimumGameBytes": 16000000, "screenScraperSystem": 16, "art": {"kind": "disc"}},
   "saturn": {"media": "dvd", "medium": {"default": "saturn_cd"}, "minimumGameBytes": 0},
   "dreamcast": {"media": "dvd", "medium": {"default": "dreamcast_gd"}, "minimumGameBytes": 0, "screenScraperSystem": 23},

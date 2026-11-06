@@ -13,6 +13,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
 - **Add a console** lists the consoles on their way, greyed, with a note: "Coming soon: not fully supported yet". They
   cannot be added until they are.
 - The Mega Drive's model 2 is offered beside model 1, greyed like the consoles on their way until its launch is made.
+- The PS Vita and the Nintendo DS Lite are modelled, with their logos and colours, and listed greyed as coming soon
+  until their launch and their game cards are made.
 - Contributors get `CONTRIBUTING.md`, a first-contribution page and a guide for each kind of addition (console,
   medium, launch animation, platform, setting, background, screen), with `scripts/new_console.py` and
   `scripts/new_medium.py` to set one up: a console without moving parts, a disc or a plain cartridge needs no code.

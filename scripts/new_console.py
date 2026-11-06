@@ -133,8 +133,8 @@ def add_variant_entry(folder: str, platform: str) -> str:
     text = VARIANTS.read_text()
     if f'@SerialName("{folder}")' in text:
         return "already listed"
-    entry = f'    @SerialName("{folder}")\n    {folder.upper()}(PlatformId("{platform}"), "{folder}"),\n'
-    same = list(re.finditer(rf'    @SerialName\("[^"]+"\)\n    \w+\(PlatformId\("{platform}"\), "[^"]+"\),\n', text))
+    entry = f'    @SerialName("{folder}")\n    {folder.upper()}(PlatformId("{platform}")),\n'
+    same = list(re.finditer(rf'    @SerialName\("[^"]+"\)\n    \w+\(PlatformId\("{platform}"\)\),\n', text))
     at = same[-1].end() if same else text.index("    ;\n")
     VARIANTS.write_text(text[:at] + "\n" + entry + text[at:])
     return "added"

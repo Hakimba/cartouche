@@ -7,7 +7,7 @@ const APPEARANCE := "res://data/carousel/appearance.json"
 const PROFILES := "res://data/platforms/profiles.json"
 ## The media a console's platform declares whose folder is still to be made: each folder made takes
 ## its medium off.
-const AWAITING: Array[String] = ["psp_umd"]
+const AWAITING: Array[String] = ["psp_umd", "psvita_card", "nds_card"]
 ## The media made for a later stage, which shows a console's regional cartridges: no platform's games
 ## come in them yet, though the fronts of their scans may be declared already.
 const LATER: Array[String] = ["famicom_cart", "sfc_cart", "snes_us_cart"]

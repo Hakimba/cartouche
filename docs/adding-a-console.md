@@ -83,7 +83,8 @@ The scene's root (`ConsoleModel`, `app/carousel/consoles/console_model.gd`) hold
 - `way_in`: the way the medium comes down to the seat, a unit vector in the seat's frame (`(0, 1, 0)` for a
   cartridge going down into a slot on top; `(0, 0, 1)` by default, for a disc coming in face first);
 - `pose_degrees`: how the console faces the camera, in degrees (Godot's Euler order). Left at zero, it turns about X,
-  its way in towards the camera; `(15, 0, 0)` stands a handheld as it is held, leant back; `(25, 20, 0)` shows a home
+  its way in towards the camera; `(15, 0, 0)` stands a handheld as it is held, leant back; `(-30, 0, 0)` tips an open
+  clamshell's base back so both its screens face the camera (`ds_lite`); `(25, 20, 0)` shows a home
   console from above its front and to its left;
 - `spindle`: the disc drive's `Spindle` (`app/carousel/models/spindle.tscn`), if a seated disc turns on one.
 

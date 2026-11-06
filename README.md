@@ -15,13 +15,13 @@ it and make it theirs; I tried to keep the codebase easy to get into.
 
 ## Consoles
 
-Seventeen consoles, each a 3D model of the real one. Their games show on their real medium, except the PSP's, the
-Switch's and the Sega consoles', which show on a stand-in disc or cartridge.
+Nineteen consoles, each a 3D model of the real one. Twelve are ready to play; the PSP, PS Vita, DS Lite, Switch, Master
+System, Mega Drive and Dreamcast are shown greyed as coming soon until their launch is made.
 
 | Maker | Consoles |
 |---|---|
-| Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Switch (neon or grey) · Game Boy · Game Boy Color · Game Boy Advance (original or SP) |
-| Sony | PlayStation · PlayStation 2 (slim or fat) · PSP |
+| Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Switch (neon or grey) · Game Boy · Game Boy Color · Game Boy Advance (original or SP) · DS Lite |
+| Sony | PlayStation · PlayStation 2 (slim or fat) · PSP · PS Vita |
 | Sega | Master System · Mega Drive (model 1 or 2) · Dreamcast |
 | Microsoft | Xbox · Xbox 360 |
 
@@ -185,6 +185,8 @@ The consoles' 3D models are adapted from these downloads (CC-BY-4.0, licence tex
 - This work is based on "Sega_Genesis" (https://sketchfab.com/3d-models/sega-genesis-d1487aa8b216490ba7c414b95531479e) by kaveshkoli3 (https://sketchfab.com/kaveshkoli3) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Sega Master System" (https://sketchfab.com/3d-models/sega-master-system-0ec998c9b9de4e7f956cab56bbca3c0f) by dark_igorek (https://sketchfab.com/dark_igorek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Sega Genesis Model 2 / Sega Mega Drive" (https://sketchfab.com/3d-models/sega-genesis-model-2-sega-mega-drive-d8feaa413cc847a599e6a484cc4ed2b6) by Zerescas (https://sketchfab.com/zerescas) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "PS Vita" (https://sketchfab.com/3d-models/ps-vita-d0241d08cee04a169148c275cecc1a5b) by mxiv (https://sketchfab.com/mxiv) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Nintendo DS Lite" (https://sketchfab.com/3d-models/nintendo-ds-lite-ca529eb7208746e89b7a28fd2246659d) by Cianon (https://sketchfab.com/Cianon) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 ### 3D logos
 

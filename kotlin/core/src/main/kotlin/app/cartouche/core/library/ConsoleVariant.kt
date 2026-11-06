@@ -77,6 +77,12 @@ public enum class ConsoleVariant(public val platform: PlatformId) {
 
     @SerialName("mastersystem")
     MASTERSYSTEM(PlatformId("master")),
+
+    @SerialName("psvita")
+    PSVITA(PlatformId("psvita")),
+
+    @SerialName("ds_lite")
+    DS_LITE(PlatformId("nds")),
     ;
 
     public companion object {

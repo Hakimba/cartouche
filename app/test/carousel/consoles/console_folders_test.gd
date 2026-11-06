@@ -18,7 +18,8 @@ const MIN_AREA_MM2 := 1.0e-6
 const HOUSINGS: Dictionary[String, Array] = {
 	"nes": [&"Upper", &"Lower", &"Throat"], "wii": [&"Front", &"Body", &"Light"],
 	"gbc": [&"body"], "snes": [&"body"], "gba_sp": [&"body"], "ps2_fat": [&"body", &"tray"], "psp": [&"body"],
-	"switch": [&"body"], "switch_grey": [&"body"], "dreamcast": [&"body", &"lid"],
+	"switch": [&"body"], "switch_grey": [&"body"], "dreamcast": [&"body", &"lid"], "psvita": [&"body"],
+	"ds_lite": [&"body"],
 	"megadrive": [&"body", &"flap_front", &"flap_back"], "megadrive2": [&"body", &"flap_front", &"flap_back"],
 	"mastersystem": [&"body"],
 }

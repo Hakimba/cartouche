@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "nds"
+version = &"usg-001"
+is_default = true
+name = "Nintendo DS"
+model_name = "DS Lite"
+scene = "res://carousel/consoles/ds_lite/ds_lite.tscn"
+triangle_budget = 2000

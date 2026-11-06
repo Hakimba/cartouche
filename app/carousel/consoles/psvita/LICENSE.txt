@@ -1,0 +1,13 @@
+Model Information:
+* title:	PS Vita
+* source:	https://sketchfab.com/3d-models/ps-vita-d0241d08cee04a169148c275cecc1a5b
+* author:	mxiv (https://sketchfab.com/mxiv)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "PS Vita" (https://sketchfab.com/3d-models/ps-vita-d0241d08cee04a169148c275cecc1a5b) by mxiv (https://sketchfab.com/mxiv) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: Fitted to the real console's size, its seven materials baked into one atlas, every plastic one colour with a faint grain, the screen switched off, the face buttons made opaque with their symbols drawn on them.

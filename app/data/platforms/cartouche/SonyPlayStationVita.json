@@ -1,0 +1,21 @@
+{
+  "databaseVersion": 14,
+  "revisionNumber": 1,
+  "platform": {
+    "name": "Sony PS Vita",
+    "uniqueId": "psvita",
+    "shortname": "psvita",
+    "description": null,
+    "acceptedFilenameRegex": "^(.*)\\.(?:psvita)$",
+    "scraperSourceList": [],
+    "boxArtAspectRatioId": 5,
+    "useCustomBoxArtAspectRatio": true,
+    "customBoxArtAspectRatio": "3:5",
+    "screenAspectRatioId": 1,
+    "useCustomScreenAspectRatio": false,
+    "customScreenAspectRatio": null,
+    "retroAchievementsConsoleIdList": [],
+    "extra": ""
+  },
+  "playerList": []
+}

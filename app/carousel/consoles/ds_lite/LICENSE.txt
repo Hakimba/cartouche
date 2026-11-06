@@ -1,0 +1,13 @@
+Model Information:
+* title:	Nintendo DS Lite
+* source:	https://sketchfab.com/3d-models/nintendo-ds-lite-ca529eb7208746e89b7a28fd2246659d
+* author:	Cianon (https://sketchfab.com/Cianon)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Nintendo DS Lite" (https://sketchfab.com/3d-models/nintendo-ds-lite-ca529eb7208746e89b7a28fd2246659d) by Cianon (https://sketchfab.com/Cianon) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: Scaled to the real console's width, its lid cut on its hinge, the glass over the top screen dropped, the texture and material kept as photographed, both screens and the lights switched off, the game card in its slot taken out.
