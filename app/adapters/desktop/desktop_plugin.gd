@@ -35,6 +35,11 @@ static func demo(key: String) -> Dictionary:
 	return parsed.get(key, {})
 
 
+## The demo's library: on its ring the consoles ready, and with `--coming-consoles` those not fully supported yet too.
+static func demo_library() -> Dictionary:
+	return demo("library_with_coming" if Diagnostics.flag("coming-consoles") else "library")
+
+
 ## The form story of [param parsed], its lists of texts as the plugin sends them (PackedStringArrays, where JSON
 ## has Arrays).
 static func story_of(parsed: Dictionary) -> Dictionary:
@@ -115,8 +120,13 @@ func start_with_arrivals(asked: String) -> void:
 			"folder_depth": "top_level"}
 
 
+## The demo's catalog; every console ready with `--coming-consoles`, as the app then tells the plugin.
 func loadCatalog(..._data: Array) -> Dictionary:
-	return demo("catalog")
+	var catalog := demo("catalog")
+	if Diagnostics.flag("coming-consoles"):
+		for console: Dictionary in catalog.get("offered", []):
+			console["coming"] = false
+	return catalog
 
 
 ## Those of the form story, for its type.
@@ -148,7 +158,7 @@ func pickFolder(_id: int) -> Dictionary:
 ## The snapshot's answer with the library as it now stands, or the library as it now stands, or the demo's.
 func library(_id: int) -> Dictionary:
 	if _snapshot.is_empty():
-		return {"ok": true, "library": JSON.stringify(_current if _current else demo("library"))}
+		return {"ok": true, "library": JSON.stringify(_current if _current else demo_library())}
 	var original: Dictionary = _snapshot["library"]
 	var answer := original.duplicate(true)
 	answer["library"] = JSON.stringify(_current)
@@ -156,12 +166,15 @@ func library(_id: int) -> Dictionary:
 
 
 func setUpPlatform(id: int, platform_id: String, setup: Dictionary) -> Dictionary:
+	var variant: String = setup.get("variant", "")
+	# A model chosen in Edit is kept on the library as it stands: no form story needed.
+	if variant and form().is_empty():
+		return _keep_variant(id, platform_id, variant)
 	var answer := _form_answer({"library": form().get("library", "{}")})
 	if not answer.get("ok", false):
 		return answer
 	var story: String = form().get("library", "{}")
 	_current = JSON.parse_string(story)
-	var variant: String = setup.get("variant", "")
 	return _keep_variant(id, platform_id, variant) if variant else answer
 
 
@@ -261,19 +274,35 @@ func leaveGame(_id: int, game_id: String) -> Dictionary:
 	return {"ok": true, "arrivals": _arrivals}
 
 
-## The library as it now stands, whatever the number of games asked for.
-func useDemoLibrary(id: int, _games: int, _platform_id: String) -> Dictionary:
+## The library as it now stands, whatever the number of games asked for; at first the demo's, every game on
+## [param platform_id] when one is given, as on the device.
+func useDemoLibrary(id: int, _games: int, platform_id: String) -> Dictionary:
 	if not _snapshot.is_empty():
 		return library(id)
-	var made := _current.duplicate(true) if not _current.is_empty() else demo("library")
+	var made := _current.duplicate(true) if not _current.is_empty() else _on_one_shelf(demo_library(), platform_id)
 	made["console_variants"] = _variants()
 	_current = made
 	return {"ok": true, "library": JSON.stringify(made)}
 
 
+## [param made] with all its games on [param platform_id] and its medium; as it is without a game of that console.
+static func _on_one_shelf(made: Dictionary, platform_id: String) -> Dictionary:
+	var games: Array = made.get("games", [])
+	var at := games.find_custom(func(game: Dictionary) -> bool: return game["platform_id"] == platform_id)
+	if at < 0:
+		return made
+	var medium: String = games[at]["medium"]
+	for game: Dictionary in games:
+		game["platform_id"] = platform_id
+		game["medium"] = medium
+	made["shelves"] = {"shelves": [{"platform": platform_id, "games": range(games.size()), "selected": 0}],
+		"selected": 0}
+	return made
+
+
 ## The demo's library, none of whose games has a label.
 func rescrape(_id: int) -> Dictionary:
-	var made := demo("library")
+	var made := demo_library()
 	var games: Array = made.get("games", [])
 	return {"ok": true, "library": JSON.stringify(made), "games": games.size(), "labels": 0}
 
@@ -326,7 +355,7 @@ func _keep_variant(id: int, platform_id: String, variant: String) -> Dictionary:
 		_snapshot["variants"] = kept
 		_current["console_variants"] = kept
 		return library(id)
-	var library_data := _current.duplicate(true) if not _current.is_empty() else demo("library")
+	var library_data := _current.duplicate(true) if not _current.is_empty() else demo_library()
 	var file := FileAccess.open(_VARIANTS, FileAccess.WRITE)
 	if file == null:
 		return {"ok": false, "code": "permission_denied"}

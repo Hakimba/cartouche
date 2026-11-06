@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "switch"
+version = &"hac-001"
+is_default = false
+name = "Nintendo Switch"
+model_name = "Grey"
+scene = "res://carousel/consoles/switch_grey/switch_grey.tscn"
+triangle_budget = 11000
+ring_size = Vector2(1.818, 0.0)

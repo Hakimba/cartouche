@@ -14,11 +14,14 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
+import io.kotest.property.arbitrary.set
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -32,6 +35,26 @@ class LibraryTest {
             library.withVariant(ps2.id, "unknown-$suffix").shouldBeLeft(VariantError.Unknown(ps2.id, "unknown-$suffix"))
             library.withVariant(ps2.id, "gba_sp").shouldBeLeft(VariantError.Unknown(ps2.id, "gba_sp"))
             Library().withVariant(ps2.id, "ps2_fat").shouldBeLeft(VariantError.NotInLibrary(ps2.id))
+        }
+    }
+
+    @Test
+    fun `a coming console is never added nor a coming model chosen, and a console already held keeps its setup`() = runBlocking<Unit> {
+        checkAll(Arb.set(Arb.enum<ConsoleVariant>(), 0..6), setups) { models, setup ->
+            val coming = Coming(models)
+            ConsoleVariant.entries.forEach { variant ->
+                val platform = variant.platform
+                val base = ConsoleVariant.base(platform).shouldBeSome()
+                val added = Library().setUp(platform, setup, Some(variant.wire), coming)
+                if (base in models || variant in models) {
+                    added.shouldBeLeft().shouldBeInstanceOf<VariantError.Coming>()
+                } else {
+                    added.shouldBeRight().variantOf(platform) shouldBe Some(variant)
+                }
+                val held = Library().withSetup(platform, PlatformSetup())
+                held.setUp(platform, setup, None, coming).shouldBeRight().setup(platform) shouldBe setup
+                held.setUp(platform, setup, Some(variant.wire), coming).isLeft() shouldBe (variant != base && variant in models)
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android
 
+import app.cartouche.core.library.Coming
 import app.cartouche.core.library.DemoLibrary
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.DefinitionSource
@@ -29,10 +30,13 @@ class DesktopDemoTest {
     @Test
     fun `_5-01 the desktop demo is the catalog and the demo library as the plugin sends them`() {
         val data = File(app, "data/platforms")
+        // By file name, as the app sends them: one of Cartouche's replaces Daijishō's of its name.
         val files =
             listOf("daijishou", "cartouche")
                 .flatMap { data.resolve(it).listFiles { file -> file.extension == "json" }.orEmpty().toList() }
-                .sortedBy { it.name }
+                .associateBy { it.name }
+                .toSortedMap()
+                .values
         val definitions = files.map { DefinitionSource(it.name, it.readText()) }
         val catalog =
             Catalog.parse(
@@ -40,13 +44,18 @@ class DesktopDemoTest {
                 DefinitionSource("profiles.json", data.resolve("profiles.json").readText()),
                 supportedPlatforms(),
             )
-        val platforms = catalog.offered.map { it.platform }
+        // A model without a launch animation of its own is coming (`ConsoleManifest.is_coming`).
+        val coming = Coming.of(consoleFolders().filterNot { LAUNCH.containsMatchIn(it.resolve("console.tres").readText()) }.map { it.name })
         val desktopCatalog = catalog.copy(platforms = catalog.platforms.filter { it.id in catalog.supported })
-        val library = DemoLibrary.of(DESKTOP_GAMES, platforms)
+
+        fun library(platforms: List<PlatformId>): JsonElement = DemoLibrary.of(DESKTOP_GAMES, platforms).let {
+            Json.parseToJsonElement(it.toWireJson(Shelves.of(it, platforms, Selection()), catalog))
+        }
         val expected =
             buildJsonObject {
-                put("catalog", desktopCatalog.toWire().toJson())
-                put("library", Json.parseToJsonElement(library.toWireJson(Shelves.of(library, platforms, Selection()), catalog)))
+                put("catalog", desktopCatalog.toWire(coming).toJson())
+                put("library", library(catalog.offered.map { it.platform }.filter { it !in coming }))
+                put("library_with_coming", library(catalog.offered.map { it.platform }))
                 put(
                     "battery",
                     buildJsonObject {
@@ -62,10 +71,11 @@ class DesktopDemoTest {
         withClue("Out of date: copy $update to app/dev/demo/desktop.json") { found shouldBe expected }
     }
 
+    private fun consoleFolders(): List<File> =
+        File(app, "carousel/consoles").listFiles { file -> file.resolve("console.tres").exists() }.orEmpty().toList()
+
     /** The platforms of the console manifests, as the app passes them at catalog load. */
-    private fun supportedPlatforms(): Set<PlatformId> = File(app, "carousel/consoles")
-        .listFiles { file -> file.resolve("console.tres").exists() }
-        .orEmpty()
+    private fun supportedPlatforms(): Set<PlatformId> = consoleFolders()
         .map { folder ->
             val manifest = folder.resolve("console.tres").readText()
             PlatformId(checkNotNull(Regex("""^platform = "(.*)"$""", RegexOption.MULTILINE).find(manifest)).groupValues[1])
@@ -83,6 +93,7 @@ class DesktopDemoTest {
     private companion object {
         /** Enough games for every shelf of a few of the supported consoles to be an endless row. */
         const val DESKTOP_GAMES = 30
+        val LAUNCH = Regex("""^launch = ".+"$""", RegexOption.MULTILINE)
         val PRETTY = Json { prettyPrint = true }
     }
 }

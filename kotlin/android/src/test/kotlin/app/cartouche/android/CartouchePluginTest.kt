@@ -37,7 +37,7 @@ import java.util.concurrent.Executor
 class CartouchePluginTest {
     private val context = RuntimeEnvironment.getApplication()
 
-    private inner class Plugin {
+    private inner class Plugin(coming: Array<String> = arrayOf()) {
         val scope = TestScope(StandardTestDispatcher())
 
         // Godot's instance, made once, keeps the context of the first test: the plugin's files are there.
@@ -63,6 +63,7 @@ class CartouchePluginTest {
                 Dictionary(),
                 Dictionary(),
                 arrayOf("ps2"),
+                coming,
             )
         }
 
@@ -124,6 +125,23 @@ class CartouchePluginTest {
         h.scope.runCurrent()
         h.settings().language shouldBe None
         h.done()
+    }
+
+    @Test
+    fun `a console whose model the app names coming is not added, and one ready is`() {
+        val setup =
+            Dictionary().apply {
+                put("disc_grouping", "grouped")
+                put("folder_depth", "subfolders")
+            }
+        for ((coming, added) in listOf(arrayOf("ps2_slim") to false, arrayOf("ps2_fat") to true)) {
+            val h = Plugin(coming)
+            h.plugin.setUpPlatform(1, "ps2", setup)
+            h.scope.runCurrent()
+            val store = LibraryStore(File(h.files, "library.json"))
+            (PlatformId("ps2") in store.load().shouldBeRight().library.setups) shouldBe added
+            h.done()
+        }
     }
 
     @Test

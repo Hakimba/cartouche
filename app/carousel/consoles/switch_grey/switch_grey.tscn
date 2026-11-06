@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/switch/switch_model.gd" id="1"]
+[ext_resource type="Resource" path="res://carousel/consoles/switch/switch_shape.tres" id="2"]
+[ext_resource type="PackedScene" path="res://carousel/consoles/switch_grey/switch_grey.glb" id="3"]
+
+[node name="SwitchGrey" type="Node3D"]
+script = ExtResource("1")
+shape = ExtResource("2")
+
+[node name="Model" parent="." instance=ExtResource("3")]

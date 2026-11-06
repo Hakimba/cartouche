@@ -3,8 +3,9 @@ class_name StudioChooser
 extends Control
 ## The Console and emulator choosers of the add-console form: the chosen console's still picture on its plinth at the
 ## left, the list at the right, a satin card on the focused row. Up and down move (no wrap), A chooses, B
-## gives up. The Console chooser shows each console's picture as the cursor moves; the emulator chooser keeps the
-## form's console and shows the focused player's name, variant and files on the plate.
+## gives up. The Console chooser shows each console's picture as the cursor moves, a console not fully supported yet
+## greyed, a note under it and A refused; the emulator chooser keeps the form's console and shows the focused player's
+## name, variant and files on the plate.
 
 ## Answered once per choice: the index chosen, or -1 when given up.
 signal chosen(index: int)
@@ -19,6 +20,8 @@ class Entry:
 	var folder := ""
 	var files := PackedStringArray()
 	var id := ""
+	## Not fully supported yet: shown greyed, never chosen.
+	var coming := false
 
 	func _init(shown: String, kick := "") -> void:
 		name = shown
@@ -39,6 +42,7 @@ class Row:
 			rim = value
 			if on:
 				queue_redraw()
+	var _coming: bool
 	var _kick: StudioText
 	var _name: StudioText
 	var _name_on: StudioText
@@ -56,6 +60,7 @@ class Row:
 		custom_minimum_size = _ROW
 		size = _ROW
 		text = entry.name
+		_coming = entry.coming
 		# The row draws its own text: the button's stays for the tests and the screen readers.
 		for colour: StringName in [&"font_color", &"font_focus_color", &"font_hover_color", &"font_pressed_color",
 				&"font_hover_pressed_color", &"font_disabled_color"]:
@@ -79,10 +84,12 @@ class Row:
 		var number := _number_on if on else _number
 		var room := size.x - _PAD_LEFT - _PAD_RIGHT - _GAP - number.width
 		var top := (size.y - _KICK_LINE - _NAME_LINE) / 2.0
-		_kick.draw(self, Vector2(_PAD_LEFT, top + _KICK_ASCENT - _kick.baseline - _KICK_RAISE), Backdrop.palette.mute)
+		var greyed := _COMING_INK if _coming else 1.0
+		_kick.draw(self, Vector2(_PAD_LEFT, top + _KICK_ASCENT - _kick.baseline - _KICK_RAISE),
+			Color(Backdrop.palette.mute, greyed))
 		var name_text := _name_on if on else _name
 		name_text.fit(room)
-		var ink := Color(Backdrop.palette.ink, 1.0 if on else 0.82)
+		var ink := Color(Backdrop.palette.mute, greyed) if _coming else Color(Backdrop.palette.ink, 1.0 if on else 0.82)
 		name_text.draw(self, Vector2(_PAD_LEFT, top + _KICK_LINE + _NAME_ASCENT - name_text.baseline), ink)
 		var number_top := (size.y - _NUMBER_LINE) / 2.0 + _NUMBER_ASCENT - number.baseline
 		number.draw(self, Vector2(size.x - _PAD_RIGHT - number.width, number_top), rim if on else Backdrop.palette.mute)
@@ -128,6 +135,11 @@ const _CURSOR_S := 0.24
 const _SCROLL_S := 0.3
 const _PLATE_S := 0.22
 const _TYPE_PLATE_RISE := 0.6 * _CQW
+## How much of its ink a console not fully supported yet keeps in the list.
+const _COMING_INK := 0.5
+## Where the note under a console not fully supported yet stands, below the plinth.
+const _NOTE_Y := StudioTokens.PLINTH.end.y + 2.4 * _CQW
+const _NOTE_PX := 1.35 * _CQW
 const _PLAYER_PLATE_RISE := 0.8 * _CQW
 
 static var _variant := RegEx.create_from_string("^(.*?) \\((.*)\\)$")
@@ -146,6 +158,8 @@ var _plinth: Plinth
 var _files: Array[StudioText] = []
 var _plate_name: StudioText
 var _plate_kick: StudioText
+## The note shown under a console not fully supported yet; none for one that is.
+var _note: StudioText
 var _title: StudioText
 var _opening: Tween
 var _return_tween: Tween
@@ -254,6 +268,7 @@ func choose_console(offered: Array[AndroidServices.OfferedConsole], current: int
 		var entry := Entry.new(console.model, console.maker)
 		entry.id = console.id
 		entry.folder = folders[console.id]
+		entry.coming = console.coming
 		entries.append(entry)
 	return await _choose(true, tr("Console"), entries, current, "")
 
@@ -364,7 +379,6 @@ func _present_plinth(still_folder: String) -> void:
 		_plinth.size = StudioTokens.PLINTH.size
 		add_child(_plinth)
 		move_child(_plinth, _backdrop.get_index() + 1)
-	_plate_node.visible = not _is_type
 	(_plinth.get_node("Plate") as Control).visible = _is_type
 	if not _is_type:
 		_plinth.show_console(still_folder)
@@ -507,6 +521,9 @@ func _tap(at: Vector2) -> void:
 func _answer(picked: int, turn_back := false) -> void:
 	if not visible or _returning:
 		return
+	if picked >= 0 and _entries[picked].coming:
+		_refuse(picked)
+		return
 	if turn_back and picked < 0 and _opening and _opening.is_running() and StudioTokens.TR_REVERSE:
 		_returning = true
 		var seconds := _open_clock
@@ -533,6 +550,8 @@ func _answer(picked: int, turn_back := false) -> void:
 	for line: Control in _rests:
 		line.position = _rests[line]
 		line.modulate.a = 1.0
+	_plate_ink.position.y = 0.0
+	_plate_ink.modulate.a = 1.0
 	_pressing = false
 	_dragging = false
 	_choosing = false
@@ -541,8 +560,21 @@ func _answer(picked: int, turn_back := false) -> void:
 	chosen.emit(picked)
 
 
+## A console not fully supported yet stays unchosen: the cursor goes to it and its note rises again.
+func _refuse(picked: int) -> void:
+	Diagnostics.trace("console form", "type %s refused: not fully supported yet" % _entries[picked].id)
+	Sounds.play(SoundEffects.Cue.ERROR)
+	_rows[picked].grab_focus()
+	Motion.animate(self, _motions, &"note", _PLATE_S, Motion.Easing.EASE_OUT, func(p: float) -> void:
+		_plate_ink.modulate.a = clampf(p, 0.0, 1.0)
+		_plate_ink.position.y = _PLAYER_PLATE_RISE * (1.0 - p))
+
+
 func _rebuild_plate() -> void:
 	if _is_type:
+		_note = StudioText.new(tr("Coming soon: not fully supported yet"), StudioTokens.Face.JAKARTA_700, _NOTE_PX) \
+			if _entries[_index].coming else null
+		_plate_ink.queue_redraw()
 		return
 	var entry := _entries[_index]
 	_plate_name = StudioText.new(entry.name, StudioTokens.Face.JAKARTA_800, _PLATE_NAME_PX, -0.02)
@@ -572,6 +604,12 @@ func _draw_count() -> void:
 
 
 func _draw_plate() -> void:
+	if _is_type:
+		if _note:
+			_note.fit(StudioTokens.PLINTH.size.x)
+			var centre := StudioTokens.PLINTH.get_center().x
+			_note.draw(_plate_ink, Vector2(centre - _note.width / 2.0, _NOTE_Y), Backdrop.palette.mute)
+		return
 	if _plate_name == null:
 		return
 	var plate := StudioTokens.PLINTH.position + StudioTokens.PLINTH_PLATE.position

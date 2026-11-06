@@ -1442,6 +1442,10 @@
      "select"
     ],
     [
+     "A sur un modèle grisé, pas encore pris en charge",
+     "error"
+    ],
+    [
      "B : revenir",
      "back"
     ]
@@ -1502,6 +1506,10 @@
     [
      "choisir dans la liste",
      "select"
+    ],
+    [
+     "A sur une console grisée, pas encore prise en charge",
+     "error"
     ],
     [
      "B : quitter la liste",

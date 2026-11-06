@@ -176,6 +176,7 @@ func test_art_focus_sends_the_ordered_ids_as_a_packed_string_array_to_the_plugin
 class FakePlugin extends Object:
 	var focus_calls: Array[PackedStringArray] = []
 	var loaded_supported := PackedStringArray()
+	var loaded_coming := PackedStringArray()
 	var launch_requests: Array[Dictionary] = []
 
 	func launchGame(_id: int, request: Dictionary) -> Dictionary:
@@ -189,8 +190,10 @@ class FakePlugin extends Object:
 		return """{"count": 3, "games": [2, 0], "groups": [], "keys": {}}"""
 
 	func loadCatalog(_definitions: Dictionary, _profiles: String, _titles: Dictionary, _data_folders: String, _curtains: String,
-			_art: Dictionary, _prints: Dictionary, _textures: Dictionary, supported: PackedStringArray) -> Dictionary:
+			_art: Dictionary, _prints: Dictionary, _textures: Dictionary, supported: PackedStringArray,
+			coming: PackedStringArray) -> Dictionary:
 		loaded_supported = supported
+		loaded_coming = coming
 		return {"platforms": []}
 
 	func titleMarks(_platform_id: String, _position: int, _typed: String) -> String:
@@ -237,6 +240,31 @@ func test_without_the_plugin_and_without_a_form_story_the_form_s_operations_are_
 	assert_array(Android.installed_players("ps2")).is_empty()
 	assert_str((await Android.pick_folder()).code).is_equal("unavailable")
 	assert_str((await Android.place_console("ps2", 0)).code).is_equal("unavailable")
+
+
+func test_without_the_plugin_and_without_a_form_story_a_model_chosen_in_edit_is_saved() -> void:
+	var path := DesktopPlugin._VARIANTS
+	var kept := FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""
+	var services: AndroidServices = auto_free(AndroidServices.new())
+	var choices := AndroidServices.PlatformSetup.new()
+	choices.variant_id = "switch_grey"
+	var saved := await services.set_up_platform("switch", choices)
+	if kept:
+		FileAccess.open(path, FileAccess.WRITE).store_string(kept)
+	else:
+		DirAccess.remove_absolute(path)
+	assert_bool(saved.ok).is_true()
+	assert_str(saved.library.console_variants.get("switch", "")).is_equal("switch_grey")
+	var shelves: Array = DesktopPlugin.demo("library")["shelves"]["shelves"]
+	assert_int(saved.library.on_ring().size()).is_equal(shelves.size())
+
+
+func test_without_the_plugin_the_demo_on_one_shelf_has_every_game_on_that_console_alone() -> void:
+	var services: AndroidServices = auto_free(AndroidServices.new())
+	var answer := await services.use_demo_library(0, "ps2")
+	var games: Array = DesktopPlugin.demo("library")["games"]
+	assert_array(answer.library.on_ring()).is_equal(PackedStringArray(["ps2"]))
+	assert_int(answer.library.games_of("ps2").size()).is_equal(games.size())
 
 
 func test_without_the_plugin_a_form_story_in_the_demo_answers_the_form_in_the_wire_shape() -> void:
@@ -298,6 +326,9 @@ func test_the_catalog_is_loaded_with_the_platforms_of_the_console_manifests() ->
 	var sent := Array(plugin.loaded_supported)
 	sent.sort()
 	assert_array(sent).is_equal(expected)
+	# The models without a launch animation of their own are named coming, and only they.
+	for model in ConsoleManifest.found():
+		assert_bool(ConsoleManifest.folder_of(model) in plugin.loaded_coming).is_equal(model.launch.is_empty())
 
 
 func test_the_fake_device_places_as_the_plugin_does_refusing_a_console_set_up_without_games() -> void:
@@ -342,3 +373,11 @@ func test_desktop_detection_means_no_real_bridge_even_when_operations_are_faked(
 	assert_bool(services.is_available()).is_true()
 	assert_bool(services._plugin is DesktopPlugin).is_true()
 	assert_dict(services._query(&"battery", [], {})).is_equal(DesktopPlugin.demo("battery"))
+
+
+func test_inv_14_each_of_cartouche_s_own_definitions_is_sent_in_place_of_daijishou_s_of_its_name() -> void:
+	var sent := AndroidServices.platform_definitions()
+	var own := "res://data/platforms/cartouche"
+	for file_name: String in DirAccess.get_files_at(own):
+		if file_name.ends_with(".json"):
+			assert_str(sent[file_name]).is_equal(FileAccess.get_file_as_string(own.path_join(file_name)))

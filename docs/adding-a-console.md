@@ -51,7 +51,7 @@ far as `ConsoleModel.press_travel` allows.
 | `<folder>_model.gd` | `<Name>Model extends ConsoleModel`: the moving parts, seat and approach |
 | `<folder>_shape.gd`, `<folder>_shape.tres` | `<Name>Shape extends ModelShape`: the rules refusing dimensions that cannot be built, and the measured dimensions |
 | `<folder>_geometry.gd` | the parts as pure functions, built from `ShapeGeometry` and `MeshBuilder` pieces |
-| `launch.json` | the launch steps, once animated; without it the console plays the placeholder |
+| `launch.json` | the launch steps, once animated; without it the console is not fully supported yet (`ConsoleManifest.is_coming`): offered greyed in "Add a console", refused by the core (`Coming`), and it plays the placeholder only with `--coming-consoles` |
 | `*.svg` | its logos and printed marks |
 
 Every part, the smallest detail included, is built from the shape where it stands. No node is placed by hand
@@ -72,6 +72,8 @@ credit. Its scene instances the glb as `Model`, and its model moves the glb's no
 `GlbShape`: it builds no mesh and holds only what the launch reads (the seat, the parts' travel). The model
 overrides `_lights()` to name the glowing meshes. Import the glb at `nodes/root_scale=10` (the app's unit is
 10 cm), with no LODs, no shadow meshes and no embedded images.
+A variant drawn from another glb of the same model (`app/carousel/consoles/switch_grey/`) keeps only its glb, its own textures, its
+scene and its manifest: its scene uses its base's model and shape, and its glb points at the base's textures it shares.
 
 ### Logos
 

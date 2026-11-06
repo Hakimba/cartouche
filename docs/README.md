@@ -138,6 +138,7 @@ Debug builds read arguments after `--` on a desktop (`$GODOT --path app -- --she
 | `--shelf=gba` | opens with that platform's console selected on the consoles screen | `Carousel` |
 | `--demo-games=N` | a made-up library of N games, kept apart from the user's | `Carousel`, `DemoLibrary.kt` |
 | `--demo-shelf=ps2` | puts every demo game on one console | `Carousel` |
+| `--coming-consoles` | counts the consoles not fully supported yet as ready: on the demo ring, and addable | `ConsoleManifest`, `DesktopPlugin` |
 | `--turntable=T` | turns the selected game at T turns a second | `Carousel` |
 | `--bench=scroll` | runs one measured scenario (`scroll`, `enter`, `turn`, `launch`, others) | `CarouselBench` |
 | `--msaa=N` | the 3D's antialiasing for a bench run | `CarouselBench` |

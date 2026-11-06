@@ -15,6 +15,7 @@ import app.cartouche.core.ContentUri
 import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.FileReading
 import app.cartouche.core.library.Arrivals
+import app.cartouche.core.library.Coming
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DisplayName
 import app.cartouche.core.library.FolderPath
@@ -81,6 +82,7 @@ internal sealed interface LibraryFailure {
                     when (error) {
                         is VariantError.Unknown -> "Unknown variant ${error.id} of ${error.platform.value}"
                         is VariantError.NotInLibrary -> "No console ${error.platform.value} in the library"
+                        is VariantError.Coming -> "${error.id} of ${error.platform.value} is not fully supported yet"
                     }
                 is Storage -> failure.message
                 is TooManyEntries -> {
@@ -220,10 +222,17 @@ internal class LibraryService(
         remember(selection().with(game)).bind()
     }
 
-    /** Stores [setup] for [platform]; the access to a folder no platform uses any more is given up. */
-    fun setUp(platform: PlatformId, setup: PlatformSetup, variant: Option<String> = None): Either<LibraryFailure, Library> = either {
-        val changed = library().withSetup(platform, setup)
-        val chosen = variant.fold({ changed }) { changed.withVariant(platform, it).mapLeft(LibraryFailure::Variant).bind() }
+    /**
+     * Stores [setup] for [platform], unless it is a [coming] console not yet in the library ([Library.setUp]); the access to a
+     * folder no platform uses any more is given up.
+     */
+    fun setUp(
+        platform: PlatformId,
+        setup: PlatformSetup,
+        variant: Option<String> = None,
+        coming: Coming = Coming.NONE,
+    ): Either<LibraryFailure, Library> = either {
+        val chosen = library().setUp(platform, setup, variant, coming).mapLeft(LibraryFailure::Variant).bind()
         save(chosen).bind().also(::keepFoldersOf)
     }
 

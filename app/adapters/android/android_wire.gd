@@ -155,16 +155,18 @@ class CatalogSummary:
 
 
 ## A platform of the Type chooser: its maker, shown small above its model (empty when the name has no
-## maker in it), and its model name.
+## maker in it), its model name, and whether it is not fully supported yet: shown greyed, never added.
 class OfferedConsole:
 	var id: String
 	var maker: String
 	var model: String
+	var coming: bool
 
 	func _init(item: Dictionary) -> void:
 		id = item["id"]
 		maker = item.get("maker", "")
 		model = item["model"]
+		coming = item.get("coming", false)
 
 
 class Placed extends Result:

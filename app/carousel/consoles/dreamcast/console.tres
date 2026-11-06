@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "dreamcast"
+version = &"hkt-3030"
+is_default = true
+name = "Dreamcast"
+model_name = "HKT-3030"
+scene = "res://carousel/consoles/dreamcast/dreamcast.tscn"
+triangle_budget = 12000
+ring_size = Vector2(1.818, 0.089)

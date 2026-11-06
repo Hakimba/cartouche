@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ConsoleManifest" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://carousel/consoles/console_manifest.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+platform = "genesis"
+version = &"mk-1601"
+is_default = true
+name = "Mega Drive"
+model_name = "Model 1"
+scene = "res://carousel/consoles/megadrive/megadrive.tscn"
+triangle_budget = 10000
+ring_size = Vector2(1.818, 0.067)

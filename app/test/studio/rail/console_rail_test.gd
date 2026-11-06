@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
 
-const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gc", "wii", "xbox", "xbox360", "gb", "gbc", "gba"]
+const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gc", "wii", "xbox", "xbox360", "gb", "gbc", "gba",
+	"psp", "switch", "dreamcast", "megadrive", "mastersystem"]
 
 
 ## The slots of tile [param index] a rail at [param along] shows it at, among every way round the ring: the

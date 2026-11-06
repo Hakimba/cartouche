@@ -39,6 +39,7 @@ import app.cartouche.core.PackageName
 import app.cartouche.core.art.LabelFraming
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.launch.StartDeadline
+import app.cartouche.core.library.Coming
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.DemoLibrary
 import app.cartouche.core.library.DiscGrouping
@@ -193,7 +194,8 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     /**
      * Loads Daijishō definitions given as `{file name: JSON text}` (read in file name order), the profiles file's text, the emulator
      * data folder names (`data_folders.json`), the curtain times (`curtains.json`), and the reference lists, art extracts, cartridge
-     * prints and ScreenScraper texture tables, each as `{platform id: text}`; [supported] names the platforms with a console model.
+     * prints and ScreenScraper texture tables, each as `{platform id: text}`; [supported] names the platforms with a console model,
+     * [coming] the console folders not fully supported yet ([Coming]).
      * Returns the catalog summary, with the platforms a person may add under `offered` (see [Catalog.offered]).
      */
     @UsedByGodot
@@ -207,6 +209,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         prints: Dictionary,
         textures: Dictionary,
         supported: Array<String>,
+        coming: Array<String>,
     ): Dictionary {
         val (notText, sources) =
             definitions.keys.sorted().separateEither { name ->
@@ -218,9 +221,11 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
             Catalog.parse(sources, DefinitionSource("profiles.json", profiles), supported.map(::PlatformId).toSet()).let {
                 it.copy(rejected = notText + folderNames.swap().getOrNone().toList() + times.swap().getOrNone().toList() + it.rejected)
             }
+        val notReady = Coming.of(coming.toList())
         reference =
             Reference(
                 parsed,
+                notReady,
                 titles.textsByPlatform(),
                 prints.textsByPlatform(),
                 folderNames.getOrElse { DataFolders.NONE },
@@ -231,7 +236,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
                 // missing, and stay so once a build with the key is installed over it.
                 Credentials.fromBuild().fold({ emptyMap() }) { textures.textsByPlatform() },
             )
-        return parsed.toWire()
+        return parsed.toWire(notReady)
     }
 
     /** Moves the art requests of [gameIds] (the game on screen and its neighbours) to the front of the run. */
@@ -466,7 +471,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     public fun setUpPlatform(requestId: Int, platformId: String, setup: Dictionary): Unit = onLibrary(requestId) {
         val platform = platform(PlatformId(platformId))
         val choices = setupOf(setup)
-        inLibrary { setUp(platform.id, choices, setup.text("variant")) }
+        inLibrary { setUp(platform.id, choices, setup.text("variant"), reference.coming) }
         success("library" to wire(library.value))
     }
 
@@ -632,7 +637,14 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         ensure(BuildConfig.DEBUG) { invalid("The demo library only exists in debug builds") }
         val loaded = reference
         val platforms =
-            if (platformId.isEmpty()) loaded.catalog.offered.map { it.platform } else listOf(platform(PlatformId(platformId), loaded).id)
+            if (platformId.isEmpty()) {
+                loaded.catalog.offered
+                    .map {
+                        it.platform
+                    }.filter { it !in loaded.coming }
+            } else {
+                listOf(platform(PlatformId(platformId), loaded).id)
+            }
         // Named after the library format: a library saved by an older build is never measured again.
         val name = "demo-${LibraryFormat.VERSION}-$games" + if (platformId.isEmpty()) "" else "-$platformId"
         val folder = File(context.filesDir, name).apply { mkdirs() }

@@ -7,9 +7,6 @@ extends ConsoleModel
 
 ## How bright the power light is once on, as its material's emission energy.
 const _LIT := 2.5
-## A handheld is presented standing, its face to the camera, its top leant back towards it this far,
-## in degrees, so that the slot shows as the cartridge comes down into it.
-const _LEAN_DEGREES := 15.0
 
 var power_mm := 0.0:
 	set(value):
@@ -42,7 +39,7 @@ func approach() -> Vector3:
 
 
 func presented() -> Basis:
-	return Basis(Vector3.RIGHT, deg_to_rad(_LEAN_DEGREES))
+	return standing()
 
 
 func _lights() -> Array[MeshInstance3D]:

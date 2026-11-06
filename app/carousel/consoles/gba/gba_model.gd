@@ -9,8 +9,7 @@ extends ConsoleModel
 ## How far the shoulder buttons press, in degrees; how bright the power light is once on, as its emission energy.
 const _PRESS_DEGREES := 3.5
 const _LIT := 2.5
-## A handheld is presented standing, its face to the camera, its top leant back towards it this far,
-## in degrees, so that the slot shows as the cartridge comes down into it.
+## How far its top leans back, in degrees ([method ConsoleModel.standing]): further than the other handhelds'.
 const _LEAN_DEGREES := 18.0
 
 var power_mm := 0.0:
@@ -57,7 +56,7 @@ func approach() -> Vector3:
 
 
 func presented() -> Basis:
-	return Basis(Vector3.RIGHT, deg_to_rad(_LEAN_DEGREES))
+	return standing(_LEAN_DEGREES)
 
 
 func _slide(mm: float) -> void:

@@ -44,6 +44,20 @@ static func press_travel(raise: float, travel: float) -> float:
 	return minf(travel, raise - PRESSED_SHOWS_MM)
 
 
+## A handheld's [method presented]: standing, its face to the camera, its top leant back towards it
+## [param degrees], so that the slot shows as the medium comes down into it.
+static func standing(degrees := 15.0) -> Basis:
+	return Basis(Vector3.RIGHT, deg_to_rad(degrees))
+
+
+## A home console's [method presented], as on a shelf: seen from above its front and to its left, so that its top,
+## where the medium goes in, shows, and its front with it. Leant 25° about X towards the camera, then turned 20° about
+## the vertical (Godot's default Euler order, YXZ, not [method ConsoleRow._three_euler]'s XYZ; the placeholder reads
+## it back in XYZ).
+static func three_quarter() -> Basis:
+	return Basis.from_euler(Vector3(25.0, 20.0, 0.0) * PI / 180.0)
+
+
 # Every class of a model gets its notifications, whatever its own _ready does.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_READY:

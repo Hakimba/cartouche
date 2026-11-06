@@ -7,6 +7,7 @@ import arrow.core.Option
 import arrow.core.firstOrNone
 import arrow.core.getOrElse
 import arrow.core.raise.either
+import arrow.core.raise.ensure
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -54,6 +55,27 @@ public enum class ConsoleVariant(public val platform: PlatformId, public val wir
 
     @SerialName("xbox360")
     XBOX360(PlatformId("xbox360"), "xbox360"),
+
+    @SerialName("psp")
+    PSP(PlatformId("psp"), "psp"),
+
+    @SerialName("switch")
+    SWITCH(PlatformId("switch"), "switch"),
+
+    @SerialName("switch_grey")
+    SWITCH_GREY(PlatformId("switch"), "switch_grey"),
+
+    @SerialName("dreamcast")
+    DREAMCAST(PlatformId("dreamcast"), "dreamcast"),
+
+    @SerialName("megadrive")
+    MEGADRIVE(PlatformId("genesis"), "megadrive"),
+
+    @SerialName("megadrive2")
+    MEGADRIVE2(PlatformId("genesis"), "megadrive2"),
+
+    @SerialName("mastersystem")
+    MASTERSYSTEM(PlatformId("master"), "mastersystem"),
     ;
 
     public companion object {
@@ -64,5 +86,27 @@ public enum class ConsoleVariant(public val platform: PlatformId, public val wir
                 .firstOrNone { it.platform == platform && it.wire == id }
                 .getOrElse { raise(VariantError.Unknown(platform, id)) }
         }
+    }
+}
+
+/**
+ * The console models shown but not fully supported yet (their launch not designed, their medium not modelled): offered
+ * greyed, never added nor chosen. A console is coming when its base model is.
+ */
+@JvmInline
+public value class Coming(public val models: Set<ConsoleVariant>) {
+    public operator fun contains(platform: PlatformId): Boolean = ConsoleVariant.base(platform).isSome { it in models }
+
+    /** [variant] unless it is coming. */
+    public fun ready(variant: ConsoleVariant): Either<VariantError, ConsoleVariant> = either {
+        ensure(variant !in models) { VariantError.Coming(variant.platform, variant.wire) }
+        variant
+    }
+
+    public companion object {
+        public val NONE: Coming = Coming(emptySet())
+
+        /** The models of the console folders named [folders]; a folder of no model is left out. */
+        public fun of(folders: Collection<String>): Coming = Coming(ConsoleVariant.entries.filter { it.wire in folders }.toSet())
     }
 }

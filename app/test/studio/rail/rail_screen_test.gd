@@ -3,7 +3,8 @@ extends GdUnitTestSuite
 
 const Screens := preload("res://test/screens/fixtures.gd")
 const Fixtures := preload("res://test/carousel/fixtures.gd")
-const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gc", "wii", "xbox", "xbox360", "gb", "gbc", "gba"]
+const FOLDERS: Array[String] = ["ps2_slim", "psx", "nes", "snes", "n64", "gc", "wii", "xbox", "xbox360", "gb", "gbc", "gba",
+	"psp", "switch", "dreamcast", "megadrive", "mastersystem"]
 
 var _window := Vector2i.ZERO
 

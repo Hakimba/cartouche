@@ -18,14 +18,17 @@ const EPSILON := 0.0001
 ## The least area, in square millimetres, of a face that is one.
 const MIN_AREA_MM2 := 1.0e-6
 ## The parts of each console a seated medium lies in, drawn solid: its way in is open through the
-## others.
+## others; and, on a console without moving parts yet, the parts its stand-in medium passes through.
 const HOUSINGS: Dictionary[String, Array] = {
 	"nes": [&"Upper", &"Lower", &"Throat"], "wii": [&"Front", &"Body", &"Light"],
-	"gbc": [&"body"], "snes": [&"body"], "gba_sp": [&"body"], "ps2_fat": [&"body", &"tray"],
+	"gbc": [&"body"], "snes": [&"body"], "gba_sp": [&"body"], "ps2_fat": [&"body", &"tray"], "psp": [&"body"],
+	"switch": [&"body"], "switch_grey": [&"body"], "dreamcast": [&"body", &"lid"],
+	"megadrive": [&"body", &"flap_front", &"flap_back"], "mastersystem": [&"body"],
 }
 ## The open edges of each glb's body as shipped: the shells have openings (undersides, hidden faces), welded by
 ## position. The closed-mesh promise does not hold for them; these hold.
-const OPEN_EDGES: Dictionary[String, int] = {"nes": 80, "gbc": 2475, "snes": 2210, "ps2_fat": 998, "gba_sp": 1359}
+const OPEN_EDGES: Dictionary[String, int] = {"nes": 80, "gbc": 2475, "snes": 2210, "ps2_fat": 998, "gba_sp": 1359,
+	"psp": 449, "switch": 5638, "switch_grey": 5638, "dreamcast": 5423, "megadrive": 998, "mastersystem": 7081}
 ## The two bench models' rest poses: the SP's screen stands open and the PS2 tray's bezel stands proud.
 ## These exact boxes preserve their supplied geometry without changing the other consoles' rest envelopes.
 const BENCH_RESTS: Dictionary[String, AABB] = {
@@ -35,8 +38,8 @@ const BENCH_RESTS: Dictionary[String, AABB] = {
 ## At least this share of a glb mesh's triangles face the way the vertex normals say.
 const WINDING_AGREES := 0.98
 ## The edges of more than two faces of a glb's meshes, by `console: mesh`: none, but ten on the Super Nintendo's
-## body where its shell was cut.
-const FOLDED_EDGES: Dictionary[String, int] = {"snes: body": 10}
+## body where its shell was cut, and those the Switch's body has as downloaded.
+const FOLDED_EDGES: Dictionary[String, int] = {"snes: body": 10, "switch: body": 67, "switch_grey: body": 67}
 ## The side of the grid's squares a medium's way in is checked by, in millimetres.
 const _CELL_MM := 4.0
 
@@ -240,6 +243,16 @@ func test_a_console_without_steps_of_its_own_plays_the_placeholder() -> void:
 	var lid := animation.find_track(^"Consoles/ps2:lid_degrees", Animation.TYPE_VALUE)
 	assert_int(lid).is_greater_equal(0)
 	assert_float(animation.value_track_interpolate(lid, LaunchAnimation.moment(animation, &"games"))).is_equal(88.0)
+
+
+func test_every_console_stands_still_at_rest_on_the_consoles_screen_whether_its_steps_are_its_own_or_the_placeholder() -> void:
+	for manifest in ConsoleManifest.found():
+		var model: ConsoleModel = auto_free(Fixtures.new_console(manifest.scene))
+		var steps := LaunchAnimation.read(manifest.launch, model) if manifest.launch \
+			else LaunchAnimation.placeholder(model, AABB())
+		var rest := ConsoleRow.Rest.of(steps)
+		assert_bool(rest.sway_degrees == 0.0 and rest.bob_height == 0.0).override_failure_message(
+			"%s floats" % ConsoleManifest.folder_of(manifest)).is_true()
 
 
 func test_only_the_consoles_of_the_library_are_loaded() -> void:

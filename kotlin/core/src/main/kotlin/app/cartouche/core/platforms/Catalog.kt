@@ -127,8 +127,8 @@ public data class PlatformProfile(
 /**
  * A platform of the Type chooser: its maker, shown small above, when its name holds one of the
  * makers', and its model name, the platform's name without the maker unless that would leave a bare
- * number or a name the maker is part of (`Nintendo 64`, `Nintendo Entertainment System`). Split from the
- * Daijishō name, which is the one place the names live; `CatalogTest` pins the split of all twelve consoles.
+ * number or a name the maker is part of (`Nintendo 64`, `Nintendo Entertainment System`); an all-capitals
+ * model name stays one (`Sony PSP` is `PSP`). Split from the Daijishō name, which is the one place the names live.
  */
 public data class OfferedConsole(public val platform: PlatformId, public val maker: Option<String>, public val model: String) {
     public companion object {
@@ -137,7 +137,7 @@ public data class OfferedConsole(public val platform: PlatformId, public val mak
         internal fun of(platform: Platform): OfferedConsole {
             val maker = MAKERS.firstOrNone { platform.name.contains(it) }
             val rest = maker.map { platform.name.removePrefix("$it - ").removePrefix("$it ") }
-            val model = rest.filter { it != platform.name && it.any(Char::isLowerCase) && !it.startsWith("Entertainment") }
+            val model = rest.filter { it != platform.name && it.any(Char::isLetter) && !it.startsWith("Entertainment") }
             return OfferedConsole(platform.id, maker, model.getOrElse { platform.name })
         }
     }

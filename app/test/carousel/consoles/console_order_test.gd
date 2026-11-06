@@ -301,8 +301,8 @@ func test_whatever_is_pressed_the_ring_shows_every_console_once_where_the_order_
 
 
 func test_a_platform_without_a_model_has_no_place_on_the_ring_and_keeps_its_place_in_the_order() -> void:
-	var unmodelled_device := Fixtures.past_first_launch(self, {"ps2": 1, "psp": 1, "gc": 1, "dreamcast": 1, "gba": 1})
-	for id: String in ["psp", "dreamcast"]:
+	var unmodelled_device := Fixtures.past_first_launch(self, {"ps2": 1, "saturn": 1, "gc": 1, "segacd": 1, "gba": 1})
+	for id: String in ["saturn", "segacd"]:
 		unmodelled_device.catalog.platforms.append(AndroidServices.Platform.new({"id": id, "name": id, "media": "dvd"}))
 	var setup := await _on_consoles(unmodelled_device)
 	var carousel: Carousel = setup[0]

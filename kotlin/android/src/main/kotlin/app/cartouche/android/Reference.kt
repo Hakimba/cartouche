@@ -3,6 +3,7 @@ package app.cartouche.android
 
 import app.cartouche.core.art.ArtSources
 import app.cartouche.core.art.ArtVersion
+import app.cartouche.core.library.Coming
 import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.TitleIndex
 import app.cartouche.core.platforms.Catalog
@@ -17,6 +18,8 @@ import java.util.concurrent.ConcurrentHashMap
 /** Everything `loadCatalog` loads, as one immutable value: a call sees one load, never new lists with old indexes. */
 internal class Reference(
     val catalog: Catalog = Catalog(),
+    /** The console models offered but not added yet. */
+    val coming: Coming = Coming.NONE,
     private val titleLists: Map<PlatformId, String> = emptyMap(),
     private val printLists: Map<PlatformId, String> = emptyMap(),
     val dataFolders: DataFolders = DataFolders.NONE,

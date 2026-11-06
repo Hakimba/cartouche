@@ -1,0 +1,12 @@
+Model Information:
+* title: Sega Master System
+* source: https://sketchfab.com/3d-models/sega-master-system-0ec998c9b9de4e7f956cab56bbca3c0f
+* author: dark_igorek (https://sketchfab.com/dark_igorek)
+
+Model License:
+* license type: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements: Author must be credited. Commercial use is allowed.
+
+This work is based on "Sega Master System" (https://sketchfab.com/3d-models/sega-master-system-0ec998c9b9de4e7f956cab56bbca3c0f) by dark_igorek (https://sketchfab.com/dark_igorek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: console isolated (controllers, cartridge, cards, cables and floor set aside), geometry reduced, textures cleaned and rebaked.

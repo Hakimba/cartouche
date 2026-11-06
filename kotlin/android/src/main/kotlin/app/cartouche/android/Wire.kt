@@ -18,6 +18,7 @@ import app.cartouche.android.storage.Folder
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.library.Arrivals
+import app.cartouche.core.library.Coming
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.PlacementError
@@ -85,6 +86,7 @@ internal enum class ErrorCode(val wire: String) {
     TOO_LATE("too_late"),
     UNKNOWN_PLATFORM("unknown_platform"),
     UNKNOWN_VARIANT("unknown_variant"),
+    COMING_CONSOLE("coming_console"),
     NOT_IN_LIBRARY("not_in_library"),
     GAP_OUT_OF_RANGE("gap_out_of_range"),
     UNKNOWN_GAME("unknown_game"),
@@ -197,6 +199,7 @@ internal fun LibraryFailure.toWire(): Dictionary = when (this) {
             when (error) {
                 is VariantError.Unknown -> ErrorCode.UNKNOWN_VARIANT
                 is VariantError.NotInLibrary -> ErrorCode.NOT_IN_LIBRARY
+                is VariantError.Coming -> ErrorCode.COMING_CONSOLE
             },
             message,
         )
@@ -285,13 +288,15 @@ internal data class Rescraped(val games: Int, val labels: Int, val failures: Lis
 
 internal fun Rescraped.toWire(): Dictionary = dictionary("games" to games, "labels" to labels, "failures" to failures.toTypedArray())
 
-internal fun Catalog.offeredToWire(): Array<Any> =
-    offered.toWireArray { dictionary("id" to it.platform.value, "model" to it.model).putSome("maker", it.maker) }
+/** The consoles a person may add, `{"id", "model", "maker"?, "coming"}`: a [coming] one is shown, never added. */
+internal fun Catalog.offeredToWire(coming: Coming): Array<Any> = offered.toWireArray {
+    dictionary("id" to it.platform.value, "model" to it.model, "coming" to (it.platform in coming)).putSome("maker", it.maker)
+}
 
-internal fun Catalog.toWire(): Dictionary = dictionary(
+internal fun Catalog.toWire(coming: Coming): Dictionary = dictionary(
     "platforms" to platforms.toWireArray { dictionary("id" to it.id.value, "name" to it.name, "media" to it.profile.media.wire) },
     "rejected" to rejected.toWireArray { dictionary("source" to it.source, "detail" to it.message) },
-    "offered" to offeredToWire(),
+    "offered" to offeredToWire(coming),
 )
 
 internal fun Candidate.toWire(): Dictionary =

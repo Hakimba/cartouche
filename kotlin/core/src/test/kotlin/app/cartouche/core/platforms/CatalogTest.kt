@@ -19,6 +19,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldBeUnique
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
@@ -36,9 +37,13 @@ class CatalogTest {
 
     @Test
     fun `INV-14 every shipped definition parses without rejection, and every player can launch`() {
-        // The app reads both folders into one map by file name: a repeated name would hide a file.
-        shipped.map { it.name }.shouldBeUnique().shouldContainAll("SonyPlayStation2.json", "MicrosoftXbox.json")
+        shipped.map { it.name }.shouldContainAll("SonyPlayStation2.json", "MicrosoftXbox.json", "NintendoSwitch.json")
         shippedCatalog.rejected.shouldBeEmpty()
+        // A Cartouche file replacing Daijishō's of its name renames the platform only: its id and every player stay.
+        Shipped.replaced.shouldNotBeEmpty().forEach { source ->
+            val original = Catalog.parse(listOf(source), Shipped.profiles).platforms.single()
+            shippedCatalog.platform(original.id).shouldBeSome().copy(name = original.name) shouldBe original
+        }
         val game = GameFile(FileName("Game.chd"), uri("content://x"), Some(FilePath("/storage/x/Game.chd")))
         shippedCatalog.platforms.flatMap { it.players }.forEach { it.template.resolve(game).shouldBeRight() }
     }
@@ -67,6 +72,33 @@ class CatalogTest {
                 setOf(PlatformId("test")),
             )
         catalog.offered shouldBe listOf(OfferedConsole(PlatformId("test"), None, "test"))
+    }
+
+    @Test
+    fun `every console with a model is offered under its maker and its model name`() {
+        val split =
+            mapOf(
+                "xbox" to ("Microsoft" to "Xbox"),
+                "xbox360" to ("Microsoft" to "Xbox 360"),
+                "gb" to ("Nintendo" to "Game Boy"),
+                "gbc" to ("Nintendo" to "Game Boy Color"),
+                "gba" to ("Nintendo" to "Game Boy Advance"),
+                "gc" to ("Nintendo" to "GameCube"),
+                "n64" to ("Nintendo" to "Nintendo 64"),
+                "nes" to ("Nintendo" to "Nintendo Entertainment System"),
+                "snes" to ("Nintendo" to "Super Nintendo Entertainment System"),
+                "switch" to ("Nintendo" to "Switch"),
+                "wii" to ("Nintendo" to "Wii"),
+                "dreamcast" to ("Sega" to "Dreamcast"),
+                "genesis" to ("Sega" to "Mega Drive"),
+                "master" to ("Sega" to "Master System"),
+                "psx" to ("Sony" to "PlayStation"),
+                "ps2" to ("Sony" to "PlayStation 2"),
+                "psp" to ("Sony" to "PSP"),
+            )
+        val offered = Catalog.parse(shipped, Shipped.profiles, split.keys.map(::PlatformId).toSet()).offered
+        offered.associate { it.platform.value to (it.maker to it.model) } shouldBe
+            split.mapValues { (_, named) -> Some(named.first) to named.second }
     }
 
     @Test

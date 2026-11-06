@@ -1,0 +1,12 @@
+Model Information:
+* title: Nintendo Switch
+* source: https://sketchfab.com/3d-models/nintendo-switch-c73fadccfdc547f9958fd8a1cdbe4811
+* author: HarrisonHag1 (https://sketchfab.com/HarrisonHag1)
+
+Model License:
+* license type: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements: Author must be credited. Commercial use is allowed.
+
+This work is based on "Nintendo Switch" (https://sketchfab.com/3d-models/nintendo-switch-c73fadccfdc547f9958fd8a1cdbe4811) by HarrisonHag1 (https://sketchfab.com/HarrisonHag1) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: geometry reduced, textures cleaned and rebaked, screen switched off, Joy-Con recoloured neon blue and red.

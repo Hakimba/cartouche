@@ -89,6 +89,12 @@ static func of(folder: String) -> ConsoleManifest:
 	return _read[folder]
 
 
+## Whether this model is not fully supported yet, without a launch animation of its own: offered greyed, never added
+## nor chosen. Debug builds count every model ready with `--coming-consoles`.
+func is_coming() -> bool:
+	return launch.is_empty() and not Diagnostics.flag("coming-consoles")
+
+
 ## The rules this manifest breaks, by name; none when the console can be shown.
 func problems() -> Array[StringName]:
 	return ModelShape.broken({

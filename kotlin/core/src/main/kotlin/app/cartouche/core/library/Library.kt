@@ -19,11 +19,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
-/** A variant belongs to its console and can only change once that console is set up. */
+/** A variant belongs to its console and can only change once that console is set up, to a model that is not [Coming]. */
 public sealed interface VariantError {
     public data class Unknown(public val platform: PlatformId, public val id: String) : VariantError
 
     public data class NotInLibrary(public val platform: PlatformId) : VariantError
+
+    /** Model [id] of [platform] is not fully supported yet: it is neither added nor chosen. */
+    public data class Coming(public val platform: PlatformId, public val id: String) : VariantError
 }
 
 /**
@@ -82,12 +85,27 @@ public data class Library(
     public fun variantOf(platform: PlatformId): Option<ConsoleVariant> =
         consoleVariants.getOrNone(platform).fold({ ConsoleVariant.base(platform) }, ::Some)
 
-    /** Changes only the model of a console already set up; unknown or foreign ids leave it unchanged. */
-    public fun withVariant(platform: PlatformId, id: String): Either<VariantError, Library> = either {
+    /**
+     * Changes only the model of a console already set up; unknown or foreign ids leave it unchanged, and so does a
+     * [coming] model other than the one it has.
+     */
+    public fun withVariant(platform: PlatformId, id: String, coming: Coming = Coming.NONE): Either<VariantError, Library> = either {
         ensure(platform in setups) { VariantError.NotInLibrary(platform) }
         val variant = ConsoleVariant.of(platform, id).bind()
+        if (variantOf(platform) != Some(variant)) coming.ready(variant).bind()
         copy(consoleVariants = consoleVariants + (platform to variant))
     }
+
+    /**
+     * Stores [setup] for [platform], as its model [variant] when one is given. A [coming] console is not added: one the
+     * library already holds keeps its setup.
+     */
+    public fun setUp(platform: PlatformId, setup: PlatformSetup, variant: Option<String>, coming: Coming): Either<VariantError, Library> =
+        either {
+            if (platform !in setups) ConsoleVariant.base(platform).onSome { coming.ready(it).bind() }
+            val changed = withSetup(platform, setup)
+            variant.fold({ changed }) { changed.withVariant(platform, it, coming).bind() }
+        }
 
     public fun game(id: GameId): Option<Game> = games.firstOrNone { it.id == id }
 

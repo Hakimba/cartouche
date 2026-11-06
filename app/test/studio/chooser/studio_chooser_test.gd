@@ -8,8 +8,9 @@ const _TYPES: Array = [
 	["xbox", "Microsoft", "Xbox"], ["xbox360", "Microsoft", "Xbox 360"], ["gb", "Nintendo", "Game Boy"],
 	["gba", "Nintendo", "Game Boy Advance"], ["gbc", "Nintendo", "Game Boy Color"], ["gc", "Nintendo", "GameCube"],
 	["n64", "Nintendo", "Nintendo 64"], ["nes", "Nintendo", "Nintendo Entertainment System"],
-	["wii", "Nintendo", "Wii"], ["psx", "Sony", "PlayStation"], ["ps2", "Sony", "PlayStation 2"],
-	["snes", "Nintendo", "Super Nintendo Entertainment System"]]
+	["switch", "Nintendo", "Switch"], ["wii", "Nintendo", "Wii"], ["dreamcast", "Sega", "Dreamcast"],
+	["master", "Sega", "Master System"], ["genesis", "Sega", "Mega Drive"], ["psx", "Sony", "PlayStation"],
+	["ps2", "Sony", "PlayStation 2"], ["psp", "Sony", "PSP"], ["snes", "Nintendo", "Super Nintendo Entertainment System"]]
 
 
 var _opened: StudioChooser
@@ -28,11 +29,12 @@ func after_test() -> void:
 	await await_idle_frame()
 
 
-func _offered(taken: Array[String] = []) -> Array[AndroidServices.OfferedConsole]:
+func _offered(taken: Array[String] = [], coming: Array[String] = []) -> Array[AndroidServices.OfferedConsole]:
 	var offered: Array[AndroidServices.OfferedConsole] = []
 	for row: Array in _TYPES:
 		if row[0] not in taken:
-			offered.append(AndroidServices.OfferedConsole.new({"id": row[0], "maker": row[1], "model": row[2]}))
+			offered.append(AndroidServices.OfferedConsole.new({"id": row[0], "maker": row[1], "model": row[2],
+				"coming": row[0] in coming}))
 	return offered
 
 
@@ -52,11 +54,11 @@ func _open_types(chooser: StudioChooser, offered: Array[AndroidServices.OfferedC
 func test_the_type_list_shows_the_given_consoles_in_order_with_maker_name_and_number() -> void:
 	var chooser := _chooser()
 	await _open_types(chooser, _offered())
-	assert_int(chooser.rows().size()).is_equal(12)
+	assert_int(chooser.rows().size()).is_equal(17)
 	assert_array(Array(chooser.ids())).is_equal(_TYPES.map(func(row: Array) -> String: return row[0]))
 	assert_array(chooser.rows().map(func(row: Button) -> String: return row.text)).is_equal(
 		_TYPES.map(func(row: Array) -> String: return row[2]))
-	assert_str(chooser.counter()).is_equal("01 / 12")
+	assert_str(chooser.counter()).is_equal("01 / 17")
 	assert_int(chooser.focused()).is_equal(0)
 
 
@@ -65,7 +67,7 @@ func test_the_list_opens_on_the_current_choice_or_the_first_row() -> void:
 	await _open_types(chooser, _offered(), 7)
 	assert_int(chooser.focused()).is_equal(7)
 	assert_bool(chooser.rows()[7].has_focus()).is_true()
-	assert_str(chooser.counter()).is_equal("08 / 12")
+	assert_str(chooser.counter()).is_equal("08 / 17")
 	chooser._answer(-1)
 	await _open_types(chooser, _offered(), -1)
 	assert_int(chooser.focused()).is_equal(0)
@@ -73,10 +75,10 @@ func test_the_list_opens_on_the_current_choice_or_the_first_row() -> void:
 
 func test_up_stops_on_the_first_row_and_down_on_the_last() -> void:
 	var chooser := _chooser()
-	await _open_types(chooser, _offered(), 11)
+	await _open_types(chooser, _offered(), 16)
 	await Fixtures.action(self, &"ui_down")
-	assert_int(chooser.focused()).is_equal(11)
-	assert_bool(chooser.rows()[11].has_focus()).is_true()
+	assert_int(chooser.focused()).is_equal(16)
+	assert_bool(chooser.rows()[16].has_focus()).is_true()
 	chooser.rows()[0].grab_focus()
 	await Fixtures.action(self, &"ui_up")
 	assert_int(chooser.focused()).is_equal(0)
@@ -126,7 +128,7 @@ func test_a_random_walk_of_up_down_a_and_b_keeps_the_cursor_and_the_answer_in_st
 				at = maxi(at - 1, 0)
 			1:
 				await Fixtures.action(self, &"ui_down")
-				at = mini(at + 1, 11)
+				at = mini(at + 1, 16)
 			2:
 				await Fixtures.joypad(self, JOY_BUTTON_A)
 				assert_int(answers.back()).is_equal(at)
@@ -137,8 +139,31 @@ func test_a_random_walk_of_up_down_a_and_b_keeps_the_cursor_and_the_answer_in_st
 				await _open_types(chooser, _offered(), at)
 		assert_int(chooser.focused()).override_failure_message("step %d" % step).is_equal(at)
 		assert_bool(chooser.rows()[at].has_focus()).is_true()
-		assert_str(chooser.counter()).is_equal("%02d / 12" % (at + 1))
+		assert_str(chooser.counter()).is_equal("%02d / 17" % (at + 1))
 	assert_bool(chooser.visible).is_true()
+
+
+func test_a_console_not_fully_supported_yet_is_shown_with_its_note_and_never_chosen_by_a_or_a_finger() -> void:
+	var chooser := _chooser()
+	var answers: Array[int] = []
+	chooser.chosen.connect(answers.append)
+	var coming: Array[String] = ["switch", "psp"]
+	await _open_types(chooser, _offered([], coming))
+	for at in chooser.ids().size():
+		chooser.rows()[at].grab_focus()
+		await await_idle_frame()
+		var is_coming := chooser.ids()[at] in coming
+		assert_bool(chooser._note != null).override_failure_message(chooser.ids()[at]).is_equal(is_coming)
+		await Fixtures.joypad(self, JOY_BUTTON_A)
+		if not is_coming:
+			assert_array(answers).is_equal([at])
+			answers.clear()
+			await _open_types(chooser, _offered([], coming), at)
+		else:
+			chooser._tap(chooser.rows()[at].get_global_rect().get_center())
+			assert_array(answers).is_empty()
+			assert_bool(chooser.visible).is_true()
+			assert_int(chooser.focused()).is_equal(at)
 
 
 func test_back_during_opening_cancels_immediately_when_rewind_is_disabled() -> void:

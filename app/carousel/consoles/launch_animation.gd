@@ -43,10 +43,11 @@ const _ROW_HEIGHT_CM := 1.8
 const _OVERSHOOT := 1.70158
 const _REBOUND := "outBack"
 ## The placeholder's steps (see [method placeholder]), each changing the previous one's state: the
-## consoles screen, the console come forward, open, the games screen, the medium out of the row over
-## the seat, down onto it, the console closed and on, the black.
+## consoles screen, the console standing still there as every console's own steps stand it, come forward,
+## open, the games screen, the medium out of the row over the seat, down onto it, the console closed and
+## on, the black.
 const _PLACEHOLDER: Array[Dictionary] = [
-	{"hold": 0.5, "console": {"py": 1.8, "scale": 0.55, "sway": 3.5, "bob": 0.25},
+	{"hold": 0.5, "console": {"py": 1.8, "scale": 0.55, "sway": 0.0, "bob": 0.0},
 		"disc": {"visible": 0.0}, "row": {"show": 0.0}, "ui": {"pill": 0.0, "tabs": 0.0, "art": 1.0}},
 	{"dur": 0.7, "console": {"px": 3.9, "py": 1.0, "scale": 1.0, "pose": 0.0}, "consoles": {"show": 0.0},
 		"ui": {"art": 0.0}},

@@ -22,6 +22,7 @@ import app.cartouche.core.art.Stall
 import app.cartouche.core.art.web
 import app.cartouche.core.library.Arrivals
 import app.cartouche.core.library.ArtSource
+import app.cartouche.core.library.Coming
 import app.cartouche.core.library.ConsoleVariant
 import app.cartouche.core.library.CountedReason
 import app.cartouche.core.library.Disc
@@ -100,6 +101,7 @@ class WireTest {
             mapOf("ps2" to "ps2_fat", "gba" to "gba")
         LibraryFailure.Variant(VariantError.Unknown(ps2Id, "gba_sp")).toWire()["code"] shouldBe "unknown_variant"
         LibraryFailure.Variant(VariantError.NotInLibrary(ps2Id)).toWire()["code"] shouldBe "not_in_library"
+        LibraryFailure.Variant(VariantError.Coming(ps2Id, "ps2_slim")).toWire()["code"] shouldBe "coming_console"
     }
 
     /** The `ps2` platform, whose games are all one medium. */
@@ -149,7 +151,7 @@ class WireTest {
             ScanReport(1, 1, 0, 1, 1, 12).toWire(),
             success("folders" to listOf(folder).toWireArray { it.toWire() }),
             success("entries" to listOf(entry).toWireArray { it.toWire() }),
-            broken.toWire(),
+            broken.toWire(Coming.NONE),
             failure(ErrorCode.CANCELLED, "x"),
             Scraping.NONE.toWire(Some(found)),
             Scraping.NONE.toWire(Some(AbsentArt(listOf(GameId("ps2/b"))))),
@@ -160,7 +162,7 @@ class WireTest {
             success("order" to arrayOf("ps2", "gba")),
             failure(ErrorCode.GAP_OUT_OF_RANGE, "x"),
             failure(ErrorCode.NOT_IN_LIBRARY, "x"),
-            dictionary("offered" to ps2.copy(supported = ps2.platforms.map { it.id }.toSet()).offeredToWire()),
+            dictionary("offered" to ps2.copy(supported = ps2.platforms.map { it.id }.toSet()).offeredToWire(Coming.NONE)),
             success("folder" to placed.toWire()),
             BatteryState(Some(57), plugged = true).toWire(),
             BatteryState.NONE.toWire(),

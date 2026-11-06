@@ -1,0 +1,12 @@
+Model Information:
+* title: Sega_Genesis
+* source: https://sketchfab.com/3d-models/sega-genesis-d1487aa8b216490ba7c414b95531479e
+* author: kaveshkoli3 (https://sketchfab.com/kaveshkoli3)
+
+Model License:
+* license type: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements: Author must be credited. Commercial use is allowed.
+
+This work is based on "Sega_Genesis" (https://sketchfab.com/3d-models/sega-genesis-d1487aa8b216490ba7c414b95531479e) by kaveshkoli3 (https://sketchfab.com/kaveshkoli3) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: geometry reduced, textures cleaned and rebaked, power light switched off, buttons, knob and dust flaps separated.

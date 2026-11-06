@@ -15,12 +15,14 @@ it and make it theirs; I tried to keep the codebase easy to get into.
 
 ## Consoles
 
-Twelve consoles, each a 3D model of the real one, with its games on their real medium.
+Seventeen consoles, each a 3D model of the real one. Their games show on their real medium, except the PSP's, the
+Switch's and the Sega consoles', which show on a stand-in disc or cartridge.
 
 | Maker | Consoles |
 |---|---|
-| Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Game Boy · Game Boy Color · Game Boy Advance (original or SP) |
-| Sony | PlayStation · PlayStation 2 (slim or fat) |
+| Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Switch (neon or grey) · Game Boy · Game Boy Color · Game Boy Advance (original or SP) |
+| Sony | PlayStation · PlayStation 2 (slim or fat) · PSP |
+| Sega | Master System · Mega Drive · Dreamcast |
 | Microsoft | Xbox · Xbox 360 |
 
 ## Languages
@@ -172,6 +174,11 @@ The consoles' 3D models are adapted from these downloads (CC-BY-4.0, licence tex
 - This work is based on "Super Retro Game Console" (https://sketchfab.com/3d-models/super-retro-game-console-d672d0ac1d6a4d238314d6675f8f92b2) by ELIZION (https://sketchfab.com/ELIZION) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Sony PlayStation 2" (https://sketchfab.com/3d-models/sony-playstation-2-b53f858aa1584229a7f906239fc158a2) by Dolgov (https://sketchfab.com/Dolgov12) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Gameboy Advance SP" (https://sketchfab.com/3d-models/gameboy-advance-sp-18c9688eaa8f4903a940c105242df15f) by thegraphicsgeek (https://sketchfab.com/thegraphicsgeek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Sony PSP" (https://sketchfab.com/3d-models/sony-psp-dca89d10ec304d0cab76837750df7761) by Ilya Ostrovsky (https://sketchfab.com/strov) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Nintendo Switch" (https://sketchfab.com/3d-models/nintendo-switch-c73fadccfdc547f9958fd8a1cdbe4811) by HarrisonHag1 (https://sketchfab.com/HarrisonHag1) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Sega Dreamcast" (https://sketchfab.com/3d-models/sega-dreamcast-f82d99e4739e42f4abfc37cb97918cfc) by Zerescas (https://sketchfab.com/zerescas) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Sega_Genesis" (https://sketchfab.com/3d-models/sega-genesis-d1487aa8b216490ba7c414b95531479e) by kaveshkoli3 (https://sketchfab.com/kaveshkoli3) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- This work is based on "Sega Master System" (https://sketchfab.com/3d-models/sega-master-system-0ec998c9b9de4e7f956cab56bbca3c0f) by dark_igorek (https://sketchfab.com/dark_igorek) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
 ### 3D logos
 

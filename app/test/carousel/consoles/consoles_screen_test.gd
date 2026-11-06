@@ -133,7 +133,9 @@ func test_every_console_of_the_demo_takes_its_medium_onto_its_seat_and_turns_it_
 				.override_failure_message("%s holds its disc still" % console.name).is_true()
 			spindles += 1
 		launched += 1
-	assert_int(launched).is_equal(Appearance.defaults(ConsoleManifest.found()).size())
+	# The demo's ring holds every console ready to be added.
+	assert_int(launched).is_equal(Appearance.defaults(ConsoleManifest.found()).values().filter(
+		func(manifest: ConsoleManifest) -> bool: return not manifest.is_coming()).size())
 	assert_int(spindles).is_equal(3)
 
 

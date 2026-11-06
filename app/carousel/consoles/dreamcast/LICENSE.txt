@@ -1,0 +1,12 @@
+Model Information:
+* title: Sega Dreamcast
+* source: https://sketchfab.com/3d-models/sega-dreamcast-f82d99e4739e42f4abfc37cb97918cfc
+* author: Zerescas (https://sketchfab.com/zerescas)
+
+Model License:
+* license type: CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements: Author must be credited. Commercial use is allowed.
+
+This work is based on "Sega Dreamcast" (https://sketchfab.com/3d-models/sega-dreamcast-f82d99e4739e42f4abfc37cb97918cfc) by Zerescas (https://sketchfab.com/zerescas) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+
+Changes: console isolated (the disc set aside), geometry reduced, textures cleaned and rebaked, shell made white, swirl recoloured blue, lid and buttons separated.

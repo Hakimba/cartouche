@@ -10,6 +10,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
   it reads the folders again, adds the new games and takes away the ones deleted. A console that got new games carries
   a "+N" badge on the consoles screen until you go into it, and each new game a small glowing dot until you move past
   it. Adding or editing a console marks nothing as new.
+- **Add a console** lists the consoles on their way, greyed, with a note: "Coming soon: not fully supported yet". They
+  cannot be added until they are.
 
 ### Fixed
 - The hints at the bottom of the games screen and the console's logo now leave with the rest while a game is launched.

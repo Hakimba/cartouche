@@ -20,13 +20,32 @@ object Shipped {
         .orEmpty()
         .associate { PlatformId(it.nameWithoutExtension) to it.readText() }
 
-    /** Daijishō's definitions and Cartouche's own, read together as the app does. */
-    val definitions: List<DefinitionSource> =
-        listOf("daijishou", "cartouche")
-            .flatMap { File(data, "platforms/$it").listFiles { file -> file.extension == "json" }.orEmpty().toList() }
-            .map { DefinitionSource(it.name, it.readText()) }
+    private fun definitionsIn(folder: String): Map<String, DefinitionSource> = File(data, "platforms/$folder")
+        .listFiles { file -> file.extension == "json" }
+        .orEmpty()
+        .associate { it.name to DefinitionSource(it.name, it.readText()) }
+
+    private val daijishou = definitionsIn("daijishou")
+    private val own = definitionsIn("cartouche")
+
+    /** Daijishō's definitions and Cartouche's own, read together as the app does: one of Cartouche's replaces Daijishō's of its name. */
+    val definitions: List<DefinitionSource> = (daijishou + own).values.toList()
+
+    /** The Daijishō definitions that Cartouche's own replace. */
+    val replaced: List<DefinitionSource> = daijishou.filterKeys(own::containsKey).values.toList()
 
     val profiles = DefinitionSource("profiles.json", text("platforms/profiles.json"))
+
+    /** The app's console folders (`app/carousel/consoles/<folder>/console.tres`), each with the platform it plays. */
+    val consoleFolders: Map<String, PlatformId> =
+        File(data.parentFile, "carousel/consoles")
+            .listFiles { folder -> folder.resolve("console.tres").exists() }
+            .orEmpty()
+            .associate { folder ->
+                val manifest = folder.resolve("console.tres").readText()
+                folder.name to
+                    PlatformId(checkNotNull(Regex("""^platform = "(.*)"$""", RegexOption.MULTILINE).find(manifest)).groupValues[1])
+            }
 
     val catalog: Catalog = Catalog.parse(definitions, profiles)
 

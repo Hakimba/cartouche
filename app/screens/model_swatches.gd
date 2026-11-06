@@ -5,7 +5,8 @@ extends Control
 ## row, each the model's picture posed as on the ring ([RingView], drawn once each time the chooser opens) over its
 ## name, the one the console has marked. ← → go through them in order, ↑ ↓ to the row above or below; a held
 ## direction repeats as on the shelves, and each model in focus shows at once on the console ([signal looked]). A
-## keeps it; B, which the form takes, puts back the one it had ([method cancel]). A grid taller than
+## keeps it, unless it is not fully supported yet ([method ConsoleManifest.is_coming], greyed); B, which the form
+## takes, puts back the one it had ([method cancel]). A grid taller than
 ## [constant ROOM_Y] scrolls, the focus' row in view.
 
 ## The console is shown as model [param index], for a look.
@@ -24,6 +25,8 @@ const _NAME_Y := 126.0
 const _NAME_PX := 1.45 * FormPaint.CQW
 const _BADGE := 0.75 * FormPaint.CQW
 const _CARD_INSET := 4.0
+## How much of its ink a model not fully supported yet keeps.
+const _COMING_INK := 0.5
 ## How fast the focus card and the scroll close on where they go, per second.
 const _CLOSING := 18.0
 
@@ -36,6 +39,8 @@ var rim := StudioTokens.NEUTRAL
 ## The carousel's consoles and sun, which the pictures are drawn as ([RingView]).
 var ring: ConsoleRow
 var sun: DirectionalLight3D
+## Whether each model is not fully supported yet, read as the chooser opens.
+var _coming: Array[bool] = []
 var _card: FormPaint.Layer
 var _card_at := Vector2.ZERO
 var _scroll := 0.0
@@ -77,6 +82,7 @@ func is_open() -> bool:
 ## has.
 func open(platform_id: String, shown: Array[ConsoleManifest], kept: int) -> void:
 	models = shown
+	_coming.assign(shown.map(func(model: ConsoleManifest) -> bool: return model.is_coming()))
 	had = kept
 	focused = kept
 	size.y = minf(ROOM_Y, ceilf(models.size() / float(COLUMNS)) * _CELL_H)
@@ -135,16 +141,17 @@ func _draw() -> void:
 		var folder := ConsoleManifest.folder_of(models[i])
 		var box := _picture_box(i)
 		box.position.y -= _scroll
+		var greyed := _COMING_INK if _coming[i] else 1.0
 		if folder in _pictures:
 			var picture := _pictures[folder]
 			var fitted := picture.get_size() * minf(box.size.x / picture.get_size().x, box.size.y / picture.get_size().y)
-			draw_texture_rect(picture, Rect2(box.get_center() - fitted / 2.0, fitted), false)
+			draw_texture_rect(picture, Rect2(box.get_center() - fitted / 2.0, fitted), false, Color(1.0, 1.0, 1.0, greyed))
 		var chosen := i == focused
 		var named := FormPaint.line(models[i].model_name,
 			StudioTokens.Face.JAKARTA_800 if chosen else StudioTokens.Face.JAKARTA_700, _NAME_PX)
 		named.fit(cell.size.x - 8.0)
 		named.draw(self, Vector2(cell.get_center().x - named.width / 2.0, cell.position.y + _NAME_Y - named.height / 2.0),
-			Backdrop.palette.ink if chosen else Backdrop.palette.mute)
+			Color(Backdrop.palette.ink if chosen and greyed == 1.0 else Backdrop.palette.mute, greyed))
 		if i == had:
 			var badge := box.position + Vector2(box.size.x - _BADGE, _BADGE)
 			draw_circle(badge, _BADGE, Backdrop.palette.gel(rim))
@@ -187,7 +194,12 @@ func _go(index: int) -> void:
 	queue_redraw()
 
 
+## Model [param index] kept, unless it is not fully supported yet and not the one the console has.
 func _keep(index: int) -> void:
+	if _coming[index] and index != had:
+		Diagnostics.trace("console form", "model %s refused: not fully supported yet" % ConsoleManifest.folder_of(models[index]))
+		Sounds.play(SoundEffects.Cue.ERROR)
+		return
 	Sounds.play(SoundEffects.Cue.SELECT)
 	_close(index)
 

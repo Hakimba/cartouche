@@ -476,3 +476,6 @@ msgstr "Fundo animado"
 
 msgid "A veil of pixels drifts behind the screens"
 msgstr "Um véu de pixels ondula atrás das telas"
+
+msgid "Coming soon: not fully supported yet"
+msgstr "Em breve: ainda não é totalmente compatível"

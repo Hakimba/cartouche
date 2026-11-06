@@ -473,3 +473,6 @@ msgstr "動く背景"
 
 msgid "A veil of pixels drifts behind the screens"
 msgstr "画面の後ろでピクセルのベールが揺れます"
+
+msgid "Coming soon: not fully supported yet"
+msgstr "近日対応予定：まだ完全には対応していません"

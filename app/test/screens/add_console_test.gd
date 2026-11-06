@@ -267,7 +267,6 @@ func test_the_type_list_is_exactly_the_supported_consoles_not_yet_set_up() -> vo
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_bool(await Fixtures.until(self, func() -> bool: return _chooser(carousel).visible)).is_true()
 	assert_array(_listed_sorted(carousel)).is_equal(_supported_platforms())
-	assert_int(_chooser(carousel).rows().size()).is_equal(12)
 
 
 func test_a_console_set_up_is_not_offered_again_and_the_others_keep_the_catalog_order() -> void:
@@ -283,7 +282,7 @@ func test_a_console_set_up_is_not_offered_again_and_the_others_keep_the_catalog_
 	var in_order := device.catalog.offered.map(func(console: AndroidServices.OfferedConsole) -> String: return console.id) \
 		.filter(func(id: String) -> bool: return id in expected)
 	assert_array(Array(_chooser(more).ids())).is_equal(in_order)
-	assert_str(_chooser(more).counter()).is_equal("01 / 9")
+	assert_str(_chooser(more).counter()).is_equal("01 / %d" % expected.size())
 
 
 func _the_form(carousel: Carousel) -> AddConsole:

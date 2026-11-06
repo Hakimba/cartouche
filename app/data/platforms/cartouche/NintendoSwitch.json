@@ -1,0 +1,42 @@
+{
+  "databaseVersion": 14,
+  "revisionNumber": 1,
+  "platform": {
+    "name": "Nintendo Switch",
+    "uniqueId": "switch",
+    "shortname": "switch",
+    "description": null,
+    "acceptedFilenameRegex": "^(?!(?:\\._|\\.).*).*$",
+    "scraperSourceList": [],
+    "boxArtAspectRatioId": 2,
+    "useCustomBoxArtAspectRatio": true,
+    "customBoxArtAspectRatio": "3:5",
+    "screenAspectRatioId": 1,
+    "useCustomScreenAspectRatio": false,
+    "customScreenAspectRatio": null,
+    "retroAchievementsConsoleIdList": [],
+    "extra": ""
+  },
+  "playerList": [
+    {
+      "name": "switch - Eden",
+      "uniqueId": "switch.dev.eden.eden_emulator",
+      "description": "Supported extensions: nro, nsp, xci.",
+      "acceptedFilenameRegex": "^(.*)\\.(?:nro|nsp|xci)$",
+      "amStartArguments": "-n dev.eden.eden_emulator/org.yuzu.yuzu_emu.activities.EmulationActivity\n -a android.nfc.action.TECH_DISCOVERED\n -d {file.uri}",
+      "killPackageProcesses": false,
+      "killPackageProcessesWarning": true,
+      "extra": ""
+    },
+    {
+      "name": "switch - Eden Nightly",
+      "uniqueId": "switch.dev.eden.eden_emulator.nightly",
+      "description": "Supported extensions: nro, nsp, xci.",
+      "acceptedFilenameRegex": "^(.*)\\.(?:nro|nsp|xci)$",
+      "amStartArguments": "-n dev.eden.eden_emulator.nightly/org.yuzu.yuzu_emu.activities.EmulationActivity\n -a android.nfc.action.TECH_DISCOVERED\n -d {file.uri}",
+      "killPackageProcesses": false,
+      "killPackageProcessesWarning": true,
+      "extra": ""
+    }
+  ]
+}

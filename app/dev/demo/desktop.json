@@ -5,62 +5,104 @@
             {
                 "maker": "Microsoft",
                 "model": "Xbox",
-                "id": "xbox"
+                "id": "xbox",
+                "coming": false
             },
             {
                 "maker": "Microsoft",
                 "model": "Xbox 360",
-                "id": "xbox360"
+                "id": "xbox360",
+                "coming": false
             },
             {
                 "maker": "Nintendo",
                 "model": "Game Boy",
-                "id": "gb"
+                "id": "gb",
+                "coming": false
             },
             {
                 "maker": "Nintendo",
                 "model": "Game Boy Advance",
-                "id": "gba"
+                "id": "gba",
+                "coming": false
             },
             {
                 "maker": "Nintendo",
                 "model": "Game Boy Color",
-                "id": "gbc"
+                "id": "gbc",
+                "coming": false
             },
             {
                 "maker": "Nintendo",
                 "model": "GameCube",
-                "id": "gc"
+                "id": "gc",
+                "coming": false
             },
             {
                 "maker": "Nintendo",
                 "model": "Nintendo 64",
-                "id": "n64"
+                "id": "n64",
+                "coming": false
             },
             {
                 "maker": "Nintendo",
                 "model": "Nintendo Entertainment System",
-                "id": "nes"
+                "id": "nes",
+                "coming": false
+            },
+            {
+                "maker": "Nintendo",
+                "model": "Switch",
+                "id": "switch",
+                "coming": true
             },
             {
                 "maker": "Nintendo",
                 "model": "Wii",
-                "id": "wii"
+                "id": "wii",
+                "coming": false
+            },
+            {
+                "maker": "Sega",
+                "model": "Dreamcast",
+                "id": "dreamcast",
+                "coming": true
+            },
+            {
+                "maker": "Sega",
+                "model": "Master System",
+                "id": "master",
+                "coming": true
+            },
+            {
+                "maker": "Sega",
+                "model": "Mega Drive",
+                "id": "genesis",
+                "coming": true
             },
             {
                 "maker": "Sony",
                 "model": "PlayStation",
-                "id": "psx"
+                "id": "psx",
+                "coming": false
             },
             {
                 "maker": "Sony",
                 "model": "PlayStation 2",
-                "id": "ps2"
+                "id": "ps2",
+                "coming": false
+            },
+            {
+                "maker": "Sony",
+                "model": "PSP",
+                "id": "psp",
+                "coming": true
             },
             {
                 "maker": "Nintendo",
                 "model": "Super Nintendo Entertainment System",
-                "id": "snes"
+                "id": "snes",
+                "coming": false
             }
         ],
         "platforms": [
@@ -105,8 +147,33 @@
                 "media": "minidisc"
             },
             {
+                "name": "Nintendo Switch",
+                "id": "switch",
+                "media": "cartridge"
+            },
+            {
                 "name": "Nintendo Wii",
                 "id": "wii",
+                "media": "dvd"
+            },
+            {
+                "name": "Sega Dreamcast",
+                "id": "dreamcast",
+                "media": "dvd"
+            },
+            {
+                "name": "Sega Mega Drive",
+                "id": "genesis",
+                "media": "cartridge"
+            },
+            {
+                "name": "Sega Master System",
+                "id": "master",
+                "media": "cartridge"
+            },
+            {
+                "name": "Sony PSP",
+                "id": "psp",
                 "media": "dvd"
             },
             {
@@ -715,6 +782,632 @@
                     "games": [
                         23,
                         11
+                    ],
+                    "selected": 0
+                }
+            ],
+            "selected": 0
+        }
+    },
+    "library_with_coming": {
+        "setups": {},
+        "games": [
+            {
+                "id": "demo/0",
+                "platform_id": "xbox",
+                "title": "Crystal Knights 0",
+                "regions": [],
+                "medium": "xbox_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Crystal Knights 0.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/1",
+                "platform_id": "xbox360",
+                "title": "Shadow Knights II 1",
+                "regions": [],
+                "medium": "xbox360_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Shadow Knights II 1.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/2",
+                "platform_id": "gb",
+                "title": "Neon Knights: Director's Cut 2",
+                "regions": [],
+                "medium": "gb_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Neon Knights: Director's Cut 2.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/3",
+                "platform_id": "gba",
+                "title": "Iron Knights 3 3",
+                "regions": [],
+                "medium": "gba_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Iron Knights 3 3.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/4",
+                "platform_id": "gbc",
+                "title": "Silent Knights 4",
+                "regions": [],
+                "medium": "gbc_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Silent Knights 4.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/5",
+                "platform_id": "gc",
+                "title": "Solar Knights 5",
+                "regions": [],
+                "medium": "gc_mini_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Solar Knights 5.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/6",
+                "platform_id": "n64",
+                "title": "Wild Knights II 6",
+                "regions": [],
+                "medium": "n64_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Wild Knights II 6.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/7",
+                "platform_id": "nes",
+                "title": "Ōkami no Knights: Director's Cut 7",
+                "regions": [],
+                "medium": "nes_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Ōkami no Knights: Director's Cut 7.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/8",
+                "platform_id": "switch",
+                "title": "Étoile Knights 3 8",
+                "regions": [],
+                "medium": "switch_card",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Étoile Knights 3 8.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/9",
+                "platform_id": "wii",
+                "title": "Last Knights 9",
+                "regions": [],
+                "medium": "wii_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Last Knights 9.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/10",
+                "platform_id": "dreamcast",
+                "title": "Crystal Racer 10",
+                "regions": [],
+                "medium": "dreamcast_gd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Crystal Racer 10.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/11",
+                "platform_id": "master",
+                "title": "Shadow Racer II 11",
+                "regions": [],
+                "medium": "master_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Shadow Racer II 11.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/12",
+                "platform_id": "genesis",
+                "title": "Neon Racer: Director's Cut 12",
+                "regions": [],
+                "medium": "genesis_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Neon Racer: Director's Cut 12.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/13",
+                "platform_id": "psx",
+                "title": "Iron Racer 3 13",
+                "regions": [],
+                "medium": "ps1_cd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Iron Racer 3 13.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/14",
+                "platform_id": "ps2",
+                "title": "Silent Racer 14",
+                "regions": [],
+                "medium": "ps2_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Silent Racer 14.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/15",
+                "platform_id": "psp",
+                "title": "Solar Racer 15",
+                "regions": [],
+                "medium": "psp_umd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Solar Racer 15.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/16",
+                "platform_id": "snes",
+                "title": "Wild Racer II 16",
+                "regions": [],
+                "medium": "snes_pal_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Wild Racer II 16.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/17",
+                "platform_id": "xbox",
+                "title": "Ōkami no Racer: Director's Cut 17",
+                "regions": [],
+                "medium": "xbox_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Ōkami no Racer: Director's Cut 17.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/18",
+                "platform_id": "xbox360",
+                "title": "Étoile Racer 3 18",
+                "regions": [],
+                "medium": "xbox360_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Étoile Racer 3 18.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/19",
+                "platform_id": "gb",
+                "title": "Last Racer 19",
+                "regions": [],
+                "medium": "gb_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Last Racer 19.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/20",
+                "platform_id": "gba",
+                "title": "Crystal Tactics 20",
+                "regions": [],
+                "medium": "gba_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Crystal Tactics 20.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/21",
+                "platform_id": "gbc",
+                "title": "Shadow Tactics II 21",
+                "regions": [],
+                "medium": "gbc_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Shadow Tactics II 21.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/22",
+                "platform_id": "gc",
+                "title": "Neon Tactics: Director's Cut 22",
+                "regions": [],
+                "medium": "gc_mini_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Neon Tactics: Director's Cut 22.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/23",
+                "platform_id": "n64",
+                "title": "Iron Tactics 3 23",
+                "regions": [],
+                "medium": "n64_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Iron Tactics 3 23.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/24",
+                "platform_id": "nes",
+                "title": "Silent Tactics 24",
+                "regions": [],
+                "medium": "nes_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Silent Tactics 24.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/25",
+                "platform_id": "switch",
+                "title": "Solar Tactics 25",
+                "regions": [],
+                "medium": "switch_card",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Solar Tactics 25.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/26",
+                "platform_id": "wii",
+                "title": "Wild Tactics II 26",
+                "regions": [],
+                "medium": "wii_dvd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Wild Tactics II 26.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/27",
+                "platform_id": "dreamcast",
+                "title": "Ōkami no Tactics: Director's Cut 27",
+                "regions": [],
+                "medium": "dreamcast_gd",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Ōkami no Tactics: Director's Cut 27.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/28",
+                "platform_id": "master",
+                "title": "Étoile Tactics 3 28",
+                "regions": [],
+                "medium": "master_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Étoile Tactics 3 28.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            },
+            {
+                "id": "demo/29",
+                "platform_id": "genesis",
+                "title": "Last Tactics 29",
+                "regions": [],
+                "medium": "genesis_cart",
+                "languages": [],
+                "serials": [],
+                "discs": [
+                    {
+                        "name": "Last Tactics 29.iso"
+                    }
+                ],
+                "last_disc": 0,
+                "identified": false
+            }
+        ],
+        "not_games": {},
+        "ignored_counts": {},
+        "skipped_folders": {},
+        "console_variants": {},
+        "shelves": {
+            "shelves": [
+                {
+                    "platform": "xbox",
+                    "games": [
+                        0,
+                        17
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "xbox360",
+                    "games": [
+                        18,
+                        1
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "gb",
+                    "games": [
+                        19,
+                        2
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "gba",
+                    "games": [
+                        20,
+                        3
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "gbc",
+                    "games": [
+                        21,
+                        4
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "gc",
+                    "games": [
+                        22,
+                        5
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "n64",
+                    "games": [
+                        23,
+                        6
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "nes",
+                    "games": [
+                        7,
+                        24
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "switch",
+                    "games": [
+                        8,
+                        25
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "wii",
+                    "games": [
+                        9,
+                        26
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "dreamcast",
+                    "games": [
+                        10,
+                        27
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "master",
+                    "games": [
+                        28,
+                        11
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "genesis",
+                    "games": [
+                        29,
+                        12
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "psx",
+                    "games": [
+                        13
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "ps2",
+                    "games": [
+                        14
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "psp",
+                    "games": [
+                        15
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform": "snes",
+                    "games": [
+                        16
                     ],
                     "selected": 0
                 }

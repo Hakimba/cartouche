@@ -26,7 +26,7 @@ signal _answered(payload: Dictionary)
 
 const _SINGLETON := &"CartoucheAndroid"
 const _PLATFORM_DEFINITIONS := "res://data/platforms/daijishou"
-## Cartouche's own definitions, for platforms Daijishō has none of.
+## Cartouche's own definitions, for platforms Daijishō has none of or names otherwise.
 const _OWN_PLATFORM_DEFINITIONS := "res://data/platforms/cartouche"
 const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
 ## One reference list per platform, named after its id (`ps2.tsv`).
@@ -142,10 +142,12 @@ func _load_catalog() -> void:
 	var cartridge_prints := _files_in(_PRINTS, ".tsv", true)
 	var textures := _files_in(_SCREENSCRAPER, ".tsv", true)
 	var read := Time.get_ticks_usec()
-	# The platforms with a console model, the one source of what a person may add.
+	# The platforms with a console model, the one source of what a person may add, and the models not ready yet.
 	var supported := PackedStringArray(Appearance.defaults(ConsoleManifest.found()).keys())
+	var coming := PackedStringArray(ConsoleManifest.found().filter(func(model: ConsoleManifest) -> bool:
+		return model.is_coming()).map(ConsoleManifest.folder_of))
 	var summary: Dictionary = _query(&"loadCatalog",
-		[definitions, profiles, titles, data_folders, curtains, art, cartridge_prints, textures, supported], {})
+		[definitions, profiles, titles, data_folders, curtains, art, cartridge_prints, textures, supported, coming], {})
 	catalog = CatalogSummary.new(summary)
 	if Diagnostics.enabled:
 		Diagnostics.trace("plugin", "catalog read in %.1f ms, loaded in %.1f ms" % [(read - started) / 1000.0,
@@ -475,9 +477,10 @@ func _rehearsing() -> bool:
 	return Diagnostics.argument("launch") == "rehearse"
 
 
-## The definition files sent to the plugin, Daijishō's and Cartouche's own, by file name.
+## The definition files sent to the plugin, Daijishō's and Cartouche's own, by file name: one of Cartouche's
+## replaces Daijishō's of the same name.
 static func platform_definitions() -> Dictionary:
-	return _files_in(_PLATFORM_DEFINITIONS, ".json").merged(_files_in(_OWN_PLATFORM_DEFINITIONS, ".json"))
+	return _files_in(_PLATFORM_DEFINITIONS, ".json").merged(_files_in(_OWN_PLATFORM_DEFINITIONS, ".json"), true)
 
 
 ## `{file name or base name: text}` for the files of [param folder] ending with [param extension].

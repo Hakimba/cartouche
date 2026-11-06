@@ -54,7 +54,10 @@ func show_console(platform_id: String, folder: String, framed: bool) -> void:
 	var model: ConsoleModel = (load(manifest.scene) as PackedScene).instantiate()
 	# Its launch animation moves its parts by this name.
 	model.name = platform_id
-	var item := ConsoleRow.Item.new(model, ConsoleRow.Rest.of(LaunchAnimation.read(manifest.launch, model)), folder)
+	# The rest is the first step, which no medium moves: the placeholder's is the same for any.
+	var steps := LaunchAnimation.read(manifest.launch, model) if manifest.launch \
+		else LaunchAnimation.placeholder(model, AABB())
+	var item := ConsoleRow.Item.new(model, ConsoleRow.Rest.of(steps), folder)
 	_row.show_consoles([item], 0)
 	for property in _POSE:
 		_row.set(property, item.rest.get(property))
