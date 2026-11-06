@@ -30,6 +30,17 @@ static func shown(carousel: Carousel) -> Dictionary:
 	}
 
 
+## The screen [param carousel] shows: its own, or the page of the screens flow over it.
+static func screen_name(carousel: Carousel) -> String:
+	var own: String = Carousel.Screen.keys()[carousel._screen]
+	var page := own.to_lower()
+	if carousel._screens.is_visible_in_tree():
+		for child in carousel._screens.get_children():
+			if child is Control and (child as Control).is_visible_in_tree():
+				page = str(child.name).to_snake_case()
+	return page
+
+
 ## What [param carousel] shows that its screen does not have, empty when they agree or while it does not stand still.
 static func disagreement(carousel: Carousel) -> String:
 	var parts := shown(carousel)

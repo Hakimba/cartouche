@@ -9,16 +9,20 @@ import kotlinx.coroutines.SupervisorJob
 
 /**
  * [library] runs every library call one at a time, [planning] plans the art looks one at a time in order,
- * [variants] downloads a label chooser's images a few at a time.
+ * [variants] downloads a label chooser's images a few at a time, [fileReads] reads a scan's game files a few at a time.
  */
 internal class Threads(
     val scope: CoroutineScope,
     val library: CoroutineDispatcher,
     val planning: CoroutineDispatcher,
     val variants: CoroutineDispatcher,
+    val fileReads: CoroutineDispatcher,
 ) {
     companion object {
         private const val VARIANT_DOWNLOADS = 3
+
+        /** An SD card answers sooner with a few reads waiting than with one. */
+        const val FILE_READS = 3
 
         fun create(): Threads = Threads(
             // A failure no operation stops is logged, and ends only its own coroutine.
@@ -26,6 +30,7 @@ internal class Threads(
             Dispatchers.IO.limitedParallelism(1),
             Dispatchers.IO.limitedParallelism(1),
             Dispatchers.IO.limitedParallelism(VARIANT_DOWNLOADS),
+            Dispatchers.IO.limitedParallelism(FILE_READS),
         )
     }
 }

@@ -17,8 +17,10 @@ var pose := ShelfRow.Pose.new()
 var _media: Dictionary[String, MediumManifest] = {}
 var _kind_media: Dictionary[String, String] = {}
 var _models: Dictionary[String, PackedScene] = {}
-## The media whose models load in the background ([method load_models_of]).
+## The media whose models load in the background ([method load_model]).
 var _loading: Dictionary[String, bool] = {}
+## The medium loaded ahead for the console the form may add ([method load_ahead]); none.
+var _ahead := ""
 var _consoles: Dictionary[String, ConsoleManifest] = {}
 var _scenes: Dictionary[String, PackedScene] = {}
 var _animations: Dictionary[String, Animation] = {}
@@ -132,10 +134,50 @@ func models_of(platform: AndroidServices.Platform, games: Array[AndroidServices.
 ## then takes them, waiting for the end of their load if it has to.
 func load_models_of(platform: AndroidServices.Platform, games: Array[AndroidServices.Game]) -> void:
 	for game in games:
-		var shown := _shown(game.medium, platform.media)
-		if shown not in _models and shown not in _loading:
-			ResourceLoader.load_threaded_request(_media[shown].scene)
-			_loading[shown] = true
+		load_model(game.medium, platform.media)
+
+
+## Loads the model of [param medium] of the kind [param media] (see [method model_of]) in the background, unless
+## it is loaded or loading.
+func load_model(medium: String, media: String) -> void:
+	var shown := _shown(medium, media)
+	if shown not in _models and shown not in _loading:
+		ResourceLoader.load_threaded_request(_media[shown].scene)
+		_loading[shown] = true
+		Diagnostics.trace("appearance", "%s model loading in the background" % shown)
+
+
+## Loads ahead the model of [param medium] of the kind [param media], for the console the form may add, so that its
+## shelf shows at once; the one loaded ahead for another type is let go of ([method let_go_ahead]).
+func load_ahead(medium: String, media: String) -> void:
+	var shown := _shown(medium, media)
+	if shown != _ahead:
+		let_go_ahead()
+	_ahead = shown
+	load_model(medium, media)
+
+
+## The console the form added takes the model loaded ahead: its shelf claims it.
+func keep_ahead() -> void:
+	_ahead = ""
+
+
+## Lets go of the model loaded ahead, unless claimed meanwhile: its console was not added. The loader keeps a
+## background load's resource until it is taken: it is taken as soon as it ends, and dropped.
+func let_go_ahead() -> void:
+	var shown := _ahead
+	_ahead = ""
+	if shown not in _loading:
+		return
+	var path := _media[shown].scene
+	while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		await (Engine.get_main_loop() as SceneTree).process_frame
+		# Claimed by a shelf, or asked ahead again.
+		if shown not in _loading or shown == _ahead:
+			return
+	_loading.erase(shown)
+	ResourceLoader.load_threaded_get(path)
+	Diagnostics.trace("appearance", "%s model loaded ahead, let go of" % shown)
 
 
 ## Applies the library's model choices; omitted choices restore the base models.

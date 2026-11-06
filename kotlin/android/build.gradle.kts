@@ -31,8 +31,8 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        // Android 11 is the first version with "All files access", which ROM scanning relies on;
-        // every supported handheld runs 11 or newer.
+        // Android 11 is the first version to give a storage volume's directory, which turns a picked folder
+        // into the path an emulator is given; every supported handheld runs 11 or newer.
         minSdk = 30
         ndk { abiFilters += "arm64-v8a" }
         manifestPlaceholders["godotPluginName"] = godotPluginName

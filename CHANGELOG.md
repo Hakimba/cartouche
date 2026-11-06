@@ -22,6 +22,15 @@ follows [Keep a Changelog](https://keepachangelog.com).
   ready-made models, and each console's game lists (titles, cartridge prints, label sources) are read only when that
   console needs them, off the screen's thread. They look and move exactly as before.
 - A hidden diagnostics screen (Select held for two seconds) is gone.
+- Adding a disc console is several times faster: a first scan reads a few kilobytes of each CHD instead of megabytes,
+  three files at a time (59 PlayStation 2 games: about 0.6 s instead of 3 s).
+- Cartouche asks less of the graphics card for the same picture: the games screen at rest about half as much,
+  scrolling with fewer stutters, and **Add a console** draws a console's stand only where a fast scroll stops.
+- While a game runs, Cartouche keeps on the graphics card only the labels of the games on screen, and a label drawn
+  by Cartouche holds its picture only while it is shown, leaving more memory to the emulator. Coming back shows the
+  same labels.
+- Cartouche no longer declares the "All files access" permission, which it never used: games are read through the
+  folders picked when a console is added.
 
 ### Fixed
 - The hints at the bottom of the games screen and the console's logo now leave with the rest while a game is launched.

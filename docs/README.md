@@ -184,7 +184,7 @@ Debug builds read arguments after `--` on a desktop (`$GODOT --path app -- --she
 | `--demo-shelf=ps2` | puts every demo game on one console | `Carousel` |
 | `--coming-consoles` | counts the consoles not fully supported yet as ready: on the demo ring, and addable | `ConsoleManifest`, `DesktopPlugin` |
 | `--turntable=T` | turns the selected game at T turns a second | `Carousel` |
-| `--bench=scroll` | runs one measured scenario (`scroll`, `enter`, `turn`, `launch`, others) | `CarouselBench` |
+| `--bench=scroll` | runs one measured scenario (`scroll`, `enter`, `turn`, `launch`, `session`, others) | `CarouselBench` |
 | `--msaa=N` | the 3D's antialiasing for a bench run | `CarouselBench` |
 | `--shots=DIR` | saves pictures at set frames (run with `--fixed-fps 60`) | `FrameShots` |
 | `--launch=rehearse` | every launch check passes and no emulator starts: the insertion plays, then the carousel returns | `AndroidServices` |

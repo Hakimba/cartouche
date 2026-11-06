@@ -69,12 +69,12 @@ screen, going from one to the other, launching, the properties, and remembering 
 | `held_direction.gd` | `HeldDirection`: which way the carousel is held, from input events; also whether up is held, so that a stick held up tosses once. |
 | `finger.gd` | `Finger`: the first finger read as a tap, a long press, a drag or a flick. A swipe moves exactly one game or console. |
 | `stick_turn.gd` | `StickTurn`: the right stick or a finger turning the selected console or game. |
-| `shelf_row.gd` | `ShelfRow`: the games row. It recycles a fixed pool of places, so its cost does not grow with the library. It keeps a pick drawn ahead, another game of the list shown; the labels it lands among, its own and its neighbours', are read as the row comes to rest on the games screen and again as a toss starts, so that they are among the textures `GameArt` keeps when it lands. |
+| `shelf_row.gd` | `ShelfRow`: the games row. It recycles a fixed pool of places, so its cost does not grow with the library. It keeps a pick drawn ahead, another game of the list shown; the labels it lands among, its own and its neighbours', are read as the row comes to rest on the games screen and again as a toss starts, so that they are among the textures `GameArt` keeps when it lands. A label's own viewport (`LabelledModel`) is sized only while its blank is shown; as the app leaves the screen, only the labels in view and the pick's keep their texture. |
 | `game_toss.gd` | `GameToss`: up, or a flick up from the game, tosses it like a coin to land as the pick; its steps are one table. No press nor finger acts while it is in the air. |
 | `game_art.gd`, `image_reader.gd` | `GameArt` reads the stored label images on a worker thread, one texture sent to the GPU per frame (`ImageReader`). |
 | `progress_ring.gd` | The ring filling on a blank label while its image downloads. |
 | `art_bar.gd`, `battery_chip.gd` | The scraping progress beside the hints, and the battery in the top bar. |
-| `appearance.gd` | `Appearance`: reads `app/data/carousel/appearance.json` and finds the console and medium folders. Loads a model only when a library needs it. |
+| `appearance.gd` | `Appearance`: reads `app/data/carousel/appearance.json` and finds the console and medium folders. Loads a model only when a library needs it, or in the background once the add form's console is chosen, let go of if the form leaves without adding it. |
 | `resting.gd` | `Resting`: see [Resting](#resting). |
 
 ### Search
@@ -157,6 +157,11 @@ once still and names the nodes still writing; the bench's `idle` scenarios repor
 redraws a viewport whole). Only the backdrop in front moves: the carousel's stops under a screen that draws its own
 (adding a console, the consoles set up, the model chooser), and none moves while hidden. With the veil off, rest
 draws nothing.
+
+A frame drawn again redraws only what changed below the screen: each `MediaView` keeps its medium softened in a
+picture of its own, made only when the medium is drawn again; the form's `RingView` draws its console only when it
+moved; and the carousel's own 3D is not drawn while nothing in it shows (`Carousel.shows_3d`: the games screen, its
+consoles drawn apart behind it), the INV-20 walk checking that nothing its camera would see is left out.
 
 ## Developer tools in the app
 

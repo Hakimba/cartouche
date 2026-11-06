@@ -4,6 +4,7 @@ package app.cartouche.core.files
 import app.cartouche.core.FileName
 import app.cartouche.core.platforms.PlatformId
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.getOrElse
 import arrow.core.raise.Raise
 import arrow.core.raise.either
@@ -46,11 +47,14 @@ fun facts(platform: String, name: String, bytes: ByteArray): FileFacts = readabl
 /** What [read] gives of files held in memory, which never fail to be read. */
 fun <A> readable(read: Raise<ReadFailure>.() -> A): A = either(read).getOrElse { error("Read failed: $it") }
 
-/** The sector [n] of a CHD: none past the image or when it cannot be decoded. */
-internal fun ChdImage.sectorOf(n: Int): Option<ByteArray> = readable { sector(n) }
+/**
+ * What [read] gives, in one reading of the CHD [source] holds, of its sectors (each none past the image or when it
+ * cannot be decoded); none when it does not open.
+ */
+internal fun <T> chdOf(source: ByteSource, read: ((Int) -> Option<ByteArray>) -> T): Option<T> =
+    readable { chdSectors(source) { sector -> Some(read(sector)) } }
 
-/** The CHD [bytes] hold, if any. */
-internal fun chdOf(bytes: ByteArray): Option<ChdImage> = readable { chdImage(InMemoryBytes(bytes)) }
+internal fun <T> chdOf(bytes: ByteArray, read: ((Int) -> Option<ByteArray>) -> T): Option<T> = chdOf(InMemoryBytes(bytes), read)
 
 /**
  * The sectors `dvd-runs.chd` holds, as `scripts/file_fixtures.py` writes them: the disc padded with zeros to 32 sectors,

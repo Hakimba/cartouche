@@ -93,6 +93,14 @@ scripts/build.sh --install
 scripts/bench.sh --record build/bench.jsonl --label before 150 1000      # sizes: numbers of made-up games, or real
 ```
 
+`--scenarios session` keeps only the scenarios named (the starts stay; `--starts 0` leaves them out). The `session`
+scenario plays about five minutes of use (games scrolled, consoles entered and stepped along, properties, settings,
+search, the "+" chooser, the ordering ring, then a rest) and reports its frames and Godot's memory as a whole and part
+by part (recorded as scenarios session/scroll, session/enter and so on), so that hitches and memory over time show. After it, the app is left for the system
+settings as a game's launch leaves it, and its memory read again (`paused`). The app's memory (`memory_pss`,
+`memory_java_kb`, `memory_native_kb`, `memory_graphics_kb`, and `memory_gpu_kb` where the device lets the GPU's count
+be read without root) is read after `scroll`, after `session` and while paused.
+
 Run it once before your change and once after, with the same sizes, and compare. More than 10 % slower is a
 regression to fix or explain in the pull request. With the size `real`, it uses the library on the device: it sets
 the label pictures aside while it measures their download, and puts them back after.

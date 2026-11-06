@@ -22,6 +22,8 @@ signal leaving
 signal saving(pending: bool)
 ## The console edited is shown as the model in [param folder] on the ring: for a look while choosing, or back.
 signal model_shown(folder: String)
+## The type [param platform_id] is chosen: its shelf's model may load while the rest of the form is filled.
+signal platform_chosen(platform_id: String)
 
 ## How the form closed.
 enum Outcome {
@@ -364,6 +366,7 @@ func _on_type_pressed() -> void:
 		platform_id = offered[index].id
 		_use_variants(_folders[platform_id])
 		Diagnostics.trace("console form", "platform %s" % platform_id)
+		platform_chosen.emit(platform_id)
 		_show_type()
 		_show_console(true)
 		_show_gel(true)

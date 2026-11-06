@@ -6,6 +6,7 @@ import app.cartouche.core.platforms.PlatformId
 import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
+import arrow.core.flatten
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.withClue
@@ -132,7 +133,7 @@ class FileReadingTest {
         checkAll(2000, Arb.choice(damaged, damaged, hostile, any)) { (platform, extension, source, fixture) ->
             FileReading.facts(platform, FileName("game.$extension"), source).shouldBeRight()
             if (source.requests.size > 1) decoded++
-            fixture.onSome { bytes -> if (extension == "chd" && chdOf(bytes).isSome { it.sectorOf(16).isSome() }) damagedHunks++ }
+            fixture.onSome { bytes -> if (extension == "chd" && chdOf(bytes) { sector -> sector(16) }.flatten().isSome()) damagedHunks++ }
             source.withinFile shouldBe true
         }
         // Enough damaged images went past their header into the decoders, and enough CHDs as far as a hunk.

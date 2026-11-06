@@ -135,10 +135,11 @@ func _state() -> Dictionary:
 	var result := {"route": route.duplicate(true), "screen": scene.scene_file_path if scene else "",
 		"focus": str(focus.get_path()) if focus else "", "console": "", "game": "",
 		"fps": Engine.get_frames_per_second(), "frame_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+		"video_mb": Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1e6,
 		"paused": paused, "rig": _views.light_rig(scene)}
 	if scene is Carousel:
 		var carousel := scene as Carousel
-		result["screen"] = _carousel_screen(carousel)
+		result["screen"] = ScreenAgreement.screen_name(carousel)
 		if carousel._shown and not carousel._shelves.is_empty():
 			result["console"] = carousel._consoles.selected().folder
 		if carousel._row.has_games():
@@ -168,20 +169,9 @@ func _lifecycle(message: Dictionary) -> Dictionary:
 	return {"reading": carousel != null and carousel._new_games._reading}
 
 
-## The screen the carousel shows: its own, or the page of the screens flow over it.
-func _carousel_screen(carousel: Carousel) -> String:
-	var own: String = Carousel.Screen.keys()[carousel._screen]
-	var shown := own.to_lower()
-	if carousel._screens.is_visible_in_tree():
-		for child in carousel._screens.get_children():
-			if child is Control and (child as Control).is_visible_in_tree():
-				shown = str(child.name).to_snake_case()
-	return shown
-
-
 func _screen_name() -> String:
 	var scene := _scene()
-	return _carousel_screen(scene as Carousel) if scene is Carousel else ""
+	return ScreenAgreement.screen_name(scene as Carousel) if scene is Carousel else ""
 
 
 func _shot(message: Dictionary) -> Dictionary:

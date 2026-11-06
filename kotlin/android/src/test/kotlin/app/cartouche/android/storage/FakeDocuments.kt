@@ -21,6 +21,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import java.io.File
 import java.io.FileNotFoundException
+import java.util.Collections
 
 /**
  * A documents provider whose folders' children are the rows [answer] gives for a folder's id, and
@@ -36,8 +37,10 @@ internal class FakeDocuments : DocumentsProvider() {
     var answer: (folderId: String) -> Cursor? = { rows() }
     var document: (documentId: String) -> Cursor? = { rows() }
     var open: (documentId: String, mode: String) -> ParcelFileDescriptor = { id, _ -> throw FileNotFoundException(id) }
-    val opened: MutableList<String> = mutableListOf()
-    val descriptors: MutableList<ParcelFileDescriptor> = mutableListOf()
+
+    // A scan opens a few files at once.
+    val opened: MutableList<String> = Collections.synchronizedList(mutableListOf())
+    val descriptors: MutableList<ParcelFileDescriptor> = Collections.synchronizedList(mutableListOf())
 
     override fun onCreate(): Boolean = true
 

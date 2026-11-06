@@ -54,11 +54,13 @@ class Platform:
 	var id: String
 	var name: String
 	var media: StringName
+	var medium: String
 
 	func _init(item: Dictionary = {}) -> void:
 		id = item.get("id", "")
 		name = item.get("name", "")
 		media = item.get("media", &"")
+		medium = item.get("medium", "")
 
 
 class OfferedConsole:

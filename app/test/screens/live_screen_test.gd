@@ -115,10 +115,65 @@ func _walk(consoles: Dictionary[String, int], test_seed: int, count := 150) -> v
 		if not await Fixtures.until(self, func() -> bool: return Fixtures.ScreenAgreement.disagreement(carousel).is_empty()):
 			fail("after press %d (%d), %s" % [press, drawn, Fixtures.ScreenAgreement.disagreement(carousel)])
 			return
+		var unseen := _unseen_3d(carousel)
+		if unseen:
+			fail("after press %d (%d), the carousel's 3D is not drawn but %s shows in it" % [press, drawn, unseen])
+			return
 		var screen := Fixtures.shown_screen(carousel)
 		seen[screen.name if screen else Carousel.Screen.keys()[carousel.screen()]] = true
 	# Against an empty walk: it went back to the form after the console added.
 	assert_dict(seen).contains_keys(["AddConsole"])
+
+
+## The carousel's own 3D is drawn on every frame something of its world shows, not only once a press settled: checked
+## at each frame as it is drawn (when the next one starts: headless, the renderer gives no frame_pre_draw), into the
+## games and out, through a game's properties, a launch and a toss.
+func test_the_carousel_s_3d_is_drawn_on_every_frame_its_world_shows_something() -> void:
+	var shown := await _shown({"ps2": 6})
+	var device: Fixtures.NewDevice = shown[0]
+	var carousel: Carousel = shown[1]
+	var unseen: Array[String] = []
+	var frames: Array[int] = [0]
+	var check := func() -> void:
+		frames[0] += 1
+		var part := _unseen_3d(carousel)
+		if part and unseen.is_empty():
+			unseen.append("%s on screen %s" % [part, Carousel.Screen.keys()[carousel.screen()]])
+	get_tree().process_frame.connect(check)
+	await Fixtures.press_to(self, carousel, JOY_BUTTON_A, Carousel.Screen.GAMES)
+	await Fixtures.action(self, &"open_properties")
+	await Fixtures.on_screen(self, carousel, Carousel.Screen.PROPERTIES)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.press_to(self, carousel, JOY_BUTTON_B, Carousel.Screen.GAMES)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.action(self, &"ui_up")
+	await Fixtures.wait(self, func() -> bool: return not carousel._toss.is_busy())
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.wait(self, func() -> bool: return device.launches == 1)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.press_to(self, carousel, JOY_BUTTON_B, Carousel.Screen.CONSOLES)
+	await Fixtures.settled(self, carousel)
+	get_tree().process_frame.disconnect(check)
+	assert_array(unseen).is_empty()
+	assert_int(frames[0]).is_greater(60)
+
+
+## A part of the carousel's own world its camera would show while [method Carousel.shows_3d] says nothing shows (its
+## 3D is then not drawn), empty when none: what a new 3D part of the carousel must be added to.
+func _unseen_3d(carousel: Carousel) -> String:
+	if carousel.shows_3d():
+		return ""
+	var camera := carousel.get_viewport().get_camera_3d()
+	var parts: Array[Node] = [carousel]
+	while not parts.is_empty():
+		var part: Node = parts.pop_back()
+		if part is SubViewport and (part as SubViewport).own_world_3d:
+			continue
+		var shown := part as GeometryInstance3D
+		if shown and shown.is_visible_in_tree() and shown.layers & camera.cull_mask:
+			return str(carousel.get_path_to(shown))
+		parts.append_array(part.get_children())
+	return ""
 
 
 ## The app put aside and brought back, its consoles' folders read again; with [param random], one console drawn by it,

@@ -74,7 +74,7 @@ Package `files`. What a game file's bytes say about which game it is.
 | `ByteSource.kt` | The port every decoder reads through: a size and positional reads, no way to write. A failing read is a `ReadFailure`. |
 | `FileReading.kt` | Picks the decoder by platform and extension (`FileReading.facts`), and says which files a scan reads (`reads`). |
 | `Iso9660.kt` | Finds `SYSTEM.CNF` on a PlayStation or PlayStation 2 disc and the serial it boots, and a GameCube or Wii disc's game code. |
-| `ChdImage.kt` | Decodes CHD version 5 images on demand: only the sectors asked for. What the file claims is bounded, so a hostile CHD reads nothing rather than everything. |
+| `ChdImage.kt` | Decodes CHD version 5 images on demand: only the sectors asked for, and only the part of the hunk map they need: its first 16 KiB, which hold the codes and first entries of many discs, else the whole map, read at once. What the file claims is bounded, so a hostile CHD reads nothing rather than everything. |
 | `Cartridges.kt` | Counts a ROM's CRC32 as No-Intro does (headers left out, a zip entry as the archive records it), and reads a Game Boy cartridge's shell. |
 
 The disc images these tests decode live in `kotlin/core/src/test/resources/files`, made by

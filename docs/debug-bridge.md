@@ -34,7 +34,7 @@ order, including the ones that wait for frames. `app/dev/bridge/commands.gd` dis
 
 | Command | What it does |
 |---|---|
-| `state` | the route, screen, focus, selected console and game, frame timing, pause state, and the lights shown (`rig`); on the carousel, what it shows (below) |
+| `state` | the route, screen, focus, selected console and game, frame timing, the video memory the engine holds (`video_mb`), pause state, and the lights shown (`rig`); on the carousel, what it shows (below) |
 | `shot` | a picture of the screen |
 | `go {route}` | reloads the scene and plays the route's steps (`press`, `push`, `release`, `wait` in frames), faster than recorded except while a direction is held. A last step marked `hold` pauses on the first frame of what it started. A last `push` with `keep` holds its action. Fails if the scene does not settle. |
 | `step {frames}` | while paused, advances processes, animation players and tweens one frame at a time |

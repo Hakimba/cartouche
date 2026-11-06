@@ -16,6 +16,8 @@ const BEHIND := 1 << 1
 const STICKER := 1 << 2
 ## The view is drawn at this fraction of the window's size: the blur hides the difference.
 const _RESOLUTION := 0.5
+## The blur's taps, as many as `console_layer.gdshader` has room for.
+const _TAPS := 16
 
 ## The carousel's camera, whose view this one copies.
 @export var watched: Camera3D
@@ -26,6 +28,7 @@ const _RESOLUTION := 0.5
 
 
 func _ready() -> void:
+	_material.set_shader_parameter(&"taps", MediaView.spiral(_TAPS))
 	texture = view.get_texture()
 	get_window().size_changed.connect(_fit)
 	look(false, 0.0, 1.0, 1.0)

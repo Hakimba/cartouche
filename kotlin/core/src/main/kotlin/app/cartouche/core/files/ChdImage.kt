@@ -35,14 +35,19 @@ internal const val FRAME: Int = 2448
  * What a reading holds is bounded whatever the file claims: the map's codes (a byte per hunk, at most [MAX_HUNKS]),
  * the map itself (at most 9 bytes per hunk), one hunk and its compressed bytes (at most [MAX_HUNK] each), and a
  * metadata entry's text (at most [MAX_METADATA_TEXT]); a hunk repeating another is resolved once, never in a chain.
+ * Only the part of the map the sectors asked for need is read (see [MapBits]). What a reading keeps between sectors
+ * (that part of the map, the hunk decoded last) lives only as long as it: see [chdSectors].
  */
-internal class ChdImage(
+private class ChdImage(
     private val source: ByteSource,
     private val codecs: List<Codec>,
     private val hunkBytes: Int,
     private val map: HunkMap,
     private val layout: Layout,
 ) {
+    /** The hunk decoded last and its number: a disc's volume, root directory and SYSTEM.CNF often share one. */
+    private var last: Option<Pair<Int, ByteArray>> = None
+
     /** Sector [n]'s 2048 bytes of data; none past the image or when its hunk cannot be decoded. */
     fun Raise<ReadFailure>.sector(n: Int): Option<ByteArray> = option {
         val perHunk = hunkBytes / layout.stride
@@ -50,13 +55,18 @@ internal class ChdImage(
         layout.data(hunk(n / perHunk).bind(), n % perHunk * layout.stride).bind()
     }
 
+    private fun Raise<ReadFailure>.hunk(n: Int): Option<ByteArray> {
+        last.filter { it.first == n }.onSome { return Some(it.second) }
+        return decoded(n).onSome { last = Some(n to it) }
+    }
+
     /**
      * MAME's writer makes a hunk repeat the first copy of its bytes, which is held in the file, never another
      * repetition.
      */
-    private fun Raise<ReadFailure>.hunk(n: Int): Option<ByteArray> = option {
-        val entry = map.entry(n).bind()
-        when (val held = if (entry is Hunk.Self) map.entry(entry.hunk).bind() else entry) {
+    private fun Raise<ReadFailure>.decoded(n: Int): Option<ByteArray> = option {
+        val entry = with(map) { entry(n) }.bind()
+        when (val held = if (entry is Hunk.Self) with(map) { entry(entry.hunk) }.bind() else entry) {
             is Hunk.Compressed -> codecs[held.codec].decode(bytes(source, held.offset, held.length).bind(), hunkBytes).bind()
             is Hunk.Stored -> bytes(source, held.offset, hunkBytes).bind()
             is Hunk.Self, Hunk.Parent -> raise(None)
@@ -73,8 +83,15 @@ internal const val MAX_HUNKS = 1 shl 22
 /** Far above the few dozen characters of a track's description. */
 internal const val MAX_METADATA_TEXT = 4096
 
+/**
+ * [read]'s answer, given the sectors of the CHD [source] holds as [ChdImage.sector] reads them; none for another file,
+ * an image this reader does not decode or a damaged one. The image read is [read]'s alone, and is dropped with it.
+ */
+internal fun <T> Raise<ReadFailure>.chdSectors(source: ByteSource, read: ((Int) -> Option<ByteArray>) -> Option<T>): Option<T> =
+    chdImage(source).flatMap { chd -> read { n -> with(chd) { sector(n) } } }
+
 /** The CHD [source] holds; none for another file, an image this reader does not decode or a damaged one. */
-internal fun Raise<ReadFailure>.chdImage(source: ByteSource): Option<ChdImage> = option {
+private fun Raise<ReadFailure>.chdImage(source: ByteSource): Option<ChdImage> = option {
     val header = bytes(source, 0, 124).bind()
     ensure(header.text(0, 8) == "MComprHD" && header.bigEndian(12, 4) == 5L)
     // An uncompressed image names no codec and keeps another map, four bytes per hunk; chdman writes one only when asked.
@@ -96,7 +113,39 @@ private fun Raise<ReadFailure>.hunkMap(source: ByteSource, at: Long, hunks: Int,
     val head = bytes(source, at, 16).bind()
     // A hunk takes at most an 8-bit code and a 63-bit entry; the Huffman tree a few bytes more.
     ensure(head.bigEndian(0, 4) <= hunks * 9L + 64)
-    HunkMap.decode(head, bytes(source, at + 16, head.bigEndian(0, 4).toInt()).bind(), hunks, hunkBytes).bind()
+    with(HunkMap) { decode(head, MapBits(source, at + 16, head.bigEndian(0, 4).toInt()), hunks, hunkBytes) }.bind()
+}
+
+/**
+ * The bits of a map of [length] bytes at [at], read from the file only as far as the walks over them go: the codes
+ * of every hunk and the entries of the first ones are a small part of the map of a disc of a million hunks.
+ */
+private class MapBits(private val source: ByteSource, private val at: Long, private val length: Int) {
+    /** The map's first bytes, as many as read so far. */
+    private var held = ByteArray(0)
+
+    /**
+     * [walk]'s answer over the bits from [from] on, once it stayed within the bytes held: the first walk over the
+     * first [FIRST_READ] bytes, and if it went past them, a second over the whole map. Past its end, bits read as
+     * zeros.
+     */
+    tailrec fun <T> Raise<ReadFailure>.walked(from: Long, walk: (BitReader) -> Option<T>): Option<T> {
+        if (held.isEmpty()) held = bytes(source, at, minOf(length, FIRST_READ)).getOrElse { return None }
+        val reader = BitReader(held, from)
+        val answer = walk(reader)
+        if (!reader.past || held.size == length) return answer
+        held += bytes(source, at + held.size, length - held.size).getOrElse { return None }
+        return walked(from, walk)
+    }
+
+    private companion object {
+        /**
+         * Run-length coded, a disc's codes take well under a bit a hunk: this holds them and the first entries of many
+         * discs' maps. A disc whose SYSTEM.CNF lies far in needs entries much further on, often the whole map: past
+         * this, the rest is read at once, so that no map is read or walked more than twice.
+         */
+        const val FIRST_READ = 16 * 1024
+    }
 }
 
 /**
@@ -175,9 +224,9 @@ internal sealed interface Hunk {
  * the map's header gives. The codes are decoded once, a byte per hunk; a hunk's entry is read by walking the second
  * part up to it, a pass over the hunks before it for each of the few an image is asked for.
  */
-internal class HunkMap(
+private class HunkMap(
     private val kinds: ByteArray,
-    private val bits: ByteArray,
+    private val bits: MapBits,
     private val entriesAt: Long,
     private val firstOffset: Long,
     private val lengthBits: Int,
@@ -185,9 +234,10 @@ internal class HunkMap(
     private val parentBits: Int,
     private val hunkBytes: Int,
 ) {
-    fun entry(n: Int): Option<Hunk> = option {
-        ensure(n in kinds.indices)
-        val reader = BitReader(bits, entriesAt)
+    fun Raise<ReadFailure>.entry(n: Int): Option<Hunk> =
+        if (n in kinds.indices) with(bits) { walked(entriesAt) { reader -> walk(reader, n) } } else None
+
+    private fun walk(reader: BitReader, n: Int): Option<Hunk> = option {
         // Local to the walk: the offset the next stored or compressed hunk starts at, and the hunk last repeated.
         var offset = firstOffset
         var lastSelf = 0L
@@ -234,18 +284,25 @@ internal class HunkMap(
         private const val CRC_BITS = 16
 
         /** The map from its 16-byte [head] and its [bits]. */
-        fun decode(head: ByteArray, bits: ByteArray, hunks: Int, hunkBytes: Int): Option<HunkMap> = option {
+        fun Raise<ReadFailure>.decode(head: ByteArray, bits: MapBits, hunks: Int, hunkBytes: Int): Option<HunkMap> = option {
             val lengthBits = head.unsignedByte(12)
             val selfBits = head.unsignedByte(13)
             val parentBits = head.unsignedByte(14)
             ensure(lengthBits < 32 && selfBits < 32 && parentBits < 64)
-            val reader = BitReader(bits, 0)
+            val (kinds, entriesAt) = with(bits) { walked(0) { reader -> kinds(reader, hunks) } }.bind()
+            HunkMap(kinds, bits, entriesAt, head.bigEndian(4, 6), lengthBits, selfBits, parentBits, hunkBytes)
+        }
+
+        /** Each hunk's code, and where the entries after them start. */
+        private fun kinds(reader: BitReader, hunks: Int): Option<Pair<ByteArray, Long>> = option {
             val tree = Huffman.read(reader).bind()
             val kinds = ByteArray(hunks)
             // Local to the decoding: the code last given and how many more hunks repeat it.
             var last = 0
             var repeat = 0
             for (hunk in 0 until hunks) {
+                // Past the bytes held, a walk over more of them starts again: this one stops here.
+                ensure(!reader.past)
                 if (repeat > 0) {
                     kinds[hunk] = last.toByte()
                     repeat--
@@ -263,13 +320,16 @@ internal class HunkMap(
                     }
                 }
             }
-            HunkMap(kinds, bits, reader.position, head.bigEndian(4, 6), lengthBits, selfBits, parentBits, hunkBytes)
+            kinds to reader.position
         }
     }
 }
 
 /** Bits read most significant first from [data], zeros past its end; [position] counts them. */
 private class BitReader(private val data: ByteArray, var position: Long) {
+    /** Whether more bits were read than [data] holds. */
+    val past: Boolean get() = position > data.size * 8L
+
     fun read(count: Int): Long {
         var value = 0L
         var left = count

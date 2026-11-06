@@ -6,7 +6,7 @@ extends RefCounted
 
 static func install() -> void:
 	if DisplayServer.get_name() == "headless":
-		Plinth._drawer = func(_folder: String) -> ImageTexture:
+		Plinth._drawer = func(_folder: String) -> Texture2D:
 			await (Engine.get_main_loop() as SceneTree).process_frame
 			return ImageTexture.create_from_image(Image.create_empty(4, 4, false, Image.FORMAT_RGBA8))
 

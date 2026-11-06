@@ -7,6 +7,10 @@ const StillStandIn := preload("res://test/studio/views/still_stand_in.gd")
 
 func before_test() -> void:
 	Plinth._stills.clear()
+	Plinth._waiting.clear()
+	Plinth._drawing = false
+	# Each test starts as the cursor rests: its first picture is drawn at once.
+	Plinth._quiet = null
 	StillStandIn.install()
 
 
@@ -71,6 +75,44 @@ func test_a_cleared_plinth_shows_no_picture_and_a_cached_one_is_shown_at_once() 
 	assert_str(plinth.console()).is_empty()
 	plinth.show_console("gb")
 	assert_object(turntable.texture).is_same(Plinth.still_of("gb"))
+
+
+func test_a_fast_scroll_draws_the_console_it_rests_on_not_those_it_passes() -> void:
+	var drawn: Array[String] = []
+	var draw := Plinth._drawer
+	Plinth._drawer = func(folder: String) -> Texture2D:
+		drawn.append(folder)
+		return await draw.call(folder)
+	var plinth := _plinth("nes")
+	for passed: String in ["snes", "gb", "gba", "gbc"]:
+		await get_tree().create_timer(0.02).timeout
+		plinth.show_console(passed)
+	await Fixtures.wait(self, func() -> bool: return Plinth.still_of("gbc") != null)
+	assert_array(drawn).is_equal(["nes", "gbc"])
+
+
+func test_the_kept_pictures_are_dropped_as_the_app_is_put_aside_and_the_shown_one_stays() -> void:
+	var plinth := _plinth("gb")
+	var turntable: TextureRect = plinth.get_node("Turntable")
+	await Fixtures.wait(self, func() -> bool: return turntable.texture != null)
+	var shown := turntable.texture
+	plinth.notification(NOTIFICATION_APPLICATION_PAUSED)
+	assert_object(Plinth.still_of("gb")).is_null()
+	assert_object(turntable.texture).is_same(shown)
+
+
+## Where the renderer has no device of its own (the Compatibility renderer, or none at all), a view's still picture is
+## read back from it, and a still freed asks no device to free anything.
+func test_a_still_is_taken_and_freed_where_the_renderer_has_no_device_of_its_own() -> void:
+	if RenderingServer.get_rendering_device():
+		return
+	var view: SubViewport = auto_free(SubViewport.new())
+	view.size = Vector2i(8, 8)
+	add_child(view)
+	await await_idle_frame()
+	var picture := Still.of(view)
+	assert_bool(picture == null or picture is ImageTexture).is_true()
+	Still.new().notification(NOTIFICATION_PREDELETE)
 
 
 ## A plinth showing [param folder] where the Console chooser has it, on the frame it appears.

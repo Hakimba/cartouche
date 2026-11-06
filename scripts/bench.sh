@@ -8,7 +8,14 @@
 # the ring that puts them in order, swiping the games by touch, and staying still on the games
 # screen and on the consoles screen, for 30 s each (frame times, draw calls, and what each costs
 # in energy: the app's processor time a second and, where the GPU tells it, how busy it is and at
-# which clock), the app's memory and the save of the selection. With the user's own library, it also
+# which clock), the app's memory and the save of the selection. Then a session of about five
+# minutes played as a user would (`session`: the games scrolled, consoles entered and stepped
+# along, properties, settings, search, the "+" chooser and the ordering ring, then a rest), its
+# frame times and Godot's memory as a whole and part by part (`session/PART`), the app's memory at
+# its end; then the app is left for the system settings, as a game's launch leaves it, and its
+# memory read again a few seconds later (`paused`: what it leaves an emulator), before it comes
+# back. The app's memory: Android's total PSS, Java and native heaps and graphics, and the GPU's
+# own count for the app where the device lets it be read (left out otherwise). With the user's own library, it also
 # launches the selected game once (insertion frames, times to check it and to start its emulator,
 # time for the emulator to show), then comes back and stops that emulator, just started: nothing
 # of the user's is running in it. First, with the user's own library, its art is set aside and the
@@ -23,8 +30,9 @@
 # record: {"date", "commit", "build", "device", "android", "scenario", "games", "metric",
 # "value", "unit", "run", "label"}, the label naming the run (--label, empty by default).
 #
-# Usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [SIZE...]   (sizes: real or a number;
-#        default: real 150 1000)
+# Usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [--scenarios A,B] [SIZE...]
+#        (sizes: real or a number; default: real 150 1000; --scenarios keeps only those of the measured
+#        scenarios, e.g. --scenarios session; the starts are kept, --starts 0 leaves them out)
 set -euo pipefail
 # Decimal points, whatever the machine's language.
 export LC_ALL=C
@@ -35,14 +43,16 @@ package="${CARTOUCHE_PACKAGE:-app.cartouche}"
 record=""
 label=""
 starts=3
+scenarios=(scroll enter step turn properties order swipe idle idle_consoles session)
 sizes=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --record) record="$2"; shift 2 ;;
     --label) label="$2"; shift 2 ;;
     --starts) starts="$2"; shift 2 ;;
+    --scenarios) IFS=, read -ra scenarios <<< "$2"; shift 2 ;;
     real | [0-9]*) sizes+=("$1"); shift ;;
-    *) echo "usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [real|N...]" >&2; exit 2 ;;
+    *) echo "usage: scripts/bench.sh [--record FILE] [--label TEXT] [--starts N] [--scenarios A,B] [real|N...]" >&2; exit 2 ;;
   esac
 done
 [ ${#sizes[@]} -gt 0 ] || sizes=(real 150 1000)
@@ -79,16 +89,17 @@ wait_for() {
 
 # sampled SCENARIO SIZE: from the scenario's start to its `bench:` line, the app's processor time
 # a second and, each second, how busy the GPU is and its clock (Adreno's kgsl files; left out
-# where the GPU does not tell). A scenario without its line within 120 s fails the run.
+# where the GPU does not tell). A scenario without its line within 120 s (the session: 480 s) fails the run.
 gpu=/sys/class/kgsl/kgsl-3d0
 sampled() {
   wait_for "bench: $1 started" 60
-  local pid ticks started busy=0 clock=0 samples=0 reading deadline=$((SECONDS + 120))
+  local pid ticks started busy=0 clock=0 samples=0 reading limit=$([ "$1" = session ] && echo 480 || echo 120)
+  local deadline=$((SECONDS + limit))
   pid=$("$adb" shell pidof "$package" | tr -d '\r')
   ticks=$("$adb" shell cat "/proc/$pid/stat" | awk '{ print $14 + $15 }')
   started=$(date +%s.%N)
   until "$adb" logcat -d | grep -qE "bench: $1:"; do
-    [ "$SECONDS" -lt "$deadline" ] || { echo "error: no \"bench: $1:\" within 120 s" >&2; exit 1; }
+    [ "$SECONDS" -lt "$deadline" ] || { echo "error: no \"bench: $1:\" within $limit s" >&2; exit 1; }
     reading=$("$adb" shell "cat $gpu/gpu_busy_percentage $gpu/clock_mhz 2> /dev/null" | tr -d '\r %' | paste -sd ' ')
     if [ -n "$reading" ]; then
       busy=$(echo "$busy ${reading% *}" | awk '{ print $1 + $2 }')
@@ -109,9 +120,29 @@ emit_bench() {
   local line
   line=$("$adb" logcat -d | grep -oE "bench: $1: .*" | head -1)
   for key in "${@:3}"; do
-    emit "$1" "$2" "$key" "$(echo "$line" | grep -oE "$key=[0-9.]+" | cut -d= -f2)" \
-      "$(case "$key" in fps) echo fps ;; *_ms) echo ms ;; *_per_s) echo per_s ;; *) echo count ;; esac)" 1
+    emit "$1" "$2" "$key" "$(echo "$line" | grep -oE " $key=[0-9.]+" | head -1 | cut -d= -f2)" \
+      "$(case "$key" in fps) echo fps ;; *_ms) echo ms ;; *_mb) echo MB ;; *_per_s) echo per_s ;; *) echo count ;; esac)" 1
   done
+}
+
+# app_memory SCENARIO SIZE: the app's memory as Android counts it (total PSS, Java and native heaps, graphics, from
+# `dumpsys meminfo`'s summary) and the GPU memory the app holds, by the first count readable without root: the GPU
+# service's per-process total (Android 12 and later), then Adreno's kgsl files; left out when none is.
+app_memory() {
+  local pid summary gpu_kb
+  pid=$("$adb" shell pidof "$package" | tr -d '\r')
+  summary=$("$adb" shell dumpsys meminfo "$package" | tr -d '\r')
+  emit "$1" "$2" memory_pss "$(echo "$summary" | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
+  emit "$1" "$2" memory_java_kb "$(echo "$summary" | awk '/Java Heap:/ { print $3; exit }')" kB 1
+  emit "$1" "$2" memory_native_kb "$(echo "$summary" | awk '/Native Heap:/ { print $3; exit }')" kB 1
+  emit "$1" "$2" memory_graphics_kb "$(echo "$summary" | awk '/Graphics:/ { print $2; exit }')" kB 1
+  gpu_kb=$("$adb" shell dumpsys gpu --gpumem 2> /dev/null | tr -d '\r' |
+    awk -v pid="$pid" '$1 == "Proc" && $2 == pid && $3 == "total:" { printf "%d", $4 / 1024; exit }')
+  [ -n "$gpu_kb" ] || gpu_kb=$("$adb" shell "cat /sys/class/kgsl/kgsl/proc/$pid/gpumem_mapped /sys/class/kgsl/kgsl/proc/$pid/gpumem_unmapped" \
+    2> /dev/null | tr -d '\r' | awk '/^[0-9]+$/ { b += $1; n++ } END { if (n) printf "%d", b / 1024 }')
+  [ -n "$gpu_kb" ] || gpu_kb=$("$adb" shell cat "/sys/class/kgsl/kgsl/proc/$pid/mem" 2> /dev/null | tr -d '\r' |
+    awk '$3 ~ /^[0-9]+$/ { b += $3; n++ } END { if (n) printf "%d", b / 1024 }')
+  [ -z "$gpu_kb" ] || emit "$1" "$2" memory_gpu_kb "$gpu_kb" kB 1
 }
 
 # first NUMBER-PATTERN: the first number the log shows in a line matching the extended regex.
@@ -183,20 +214,35 @@ for size in "${sizes[@]}"; do
     read_worst=$("$adb" logcat -d | grep -oE "art: .* read in [0-9.]+" | grep -oE "[0-9.]+$" | sort -n | tail -1 || true)
     [ -z "$read_worst" ] || emit art "$size" label_read_worst "$read_worst" ms "$run"
   done
-  for scenario in scroll enter step turn properties order swipe idle idle_consoles; do
+  for scenario in "${scenarios[@]}"; do
     start "${args}--bench=$scenario"
     sampled "$scenario" "$size"
     # At rest the app draws only when something changes, its loop running 30 times a second: its frame times say
     # nothing, the frames it draws (about none) say whether something keeps changing.
     case "$scenario" in
       idle*) emit_bench "$scenario" "$size" steps draw_calls process_ms draw_cpu_ms drawn_per_s ;;
+      session)
+        emit_bench session "$size" fps worst_ms p95_ms slow_frames steps draw_calls process_ms draw_cpu_ms
+        # Each part's line, in the order played: the memory before (start), hitches and memory over time.
+        for part in $("$adb" logcat -d | grep -oE "bench: session/[a-z_]+:" | cut -d/ -f2 | tr -d :); do
+          emit_bench "session/$part" "$size" fps worst_ms p95_ms slow_frames drawn_per_s static_mb video_mb texture_mb
+        done ;;
       *) emit_bench "$scenario" "$size" fps worst_ms p95_ms slow_frames steps draw_calls process_ms draw_cpu_ms ;;
     esac
     # Each slow frame (its processing, drawing, GPU time and the pipelines compiled) between the steps it fell among,
     # to tell what a hitch was.
     "$adb" logcat -d | grep -E "frame: slow frame|carousel: (step|jump|platform) " > "build/bench/$scenario-$size.log" || true
+    if [ "$scenario" = session ]; then
+      app_memory session "$size"
+      # Left as a game's launch leaves it: what stays held while an emulator runs.
+      "$adb" shell am start -a android.settings.SETTINGS > /dev/null
+      sleep 5
+      app_memory paused "$size"
+      "$adb" shell am start -n "$package"/com.godot.game.GodotAppLauncher > /dev/null
+      sleep 2
+    fi
     if [ "$scenario" = scroll ]; then
-      emit memory "$size" memory_pss "$("$adb" shell dumpsys meminfo "$package" | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
+      app_memory memory "$size"
       # Leaving the app (here for the system settings) saves the selection.
       "$adb" shell am start -a android.settings.SETTINGS > /dev/null
       wait_for "selection: saved" 10

@@ -23,6 +23,13 @@ extends Node
 ## `--media=N` (5) softened discs ([MediaView]) one place every [constant _STEP_EVERY_S]. `placing` places the last console
 ## of the row on the ring of the others every [constant _PLACING_EVERY_S], A after [constant _ARRIVED_S] (the first gap, the end,
 ## where it already stands: the order saved is the one it had), and traces the time from A to the consoles screen.
+## `session` plays a route of about five minutes as a user would, from the games screen: the games scrolled both ways,
+## the console entered and left, the consoles stepped along, the properties and the settings opened and closed, the
+## search typed in, the "+" form's Type chooser scrolled fast, a console moved round the ordering ring, then a rest of
+## [constant _REST_S] on the games screen. Each part traces its own `bench: session/PART:` line as it ends (its frame
+## statistics, the frames it drew a second and the memory then; `session/start` the memory before), so that hitches and
+## memory over time show; the `bench: session:` line counts the moving parts only. A press that would launch a game or
+## choose a console is never sent: each is sent only on the screen it is meant for.
 ## Each but `scrape` starts once the app's start has settled,
 ## which is measured on its own. `--msaa=N` sets the 3D's antialiasing (0 to 2, the settings'
 ## choices) for the run.
@@ -33,6 +40,8 @@ const _ENTER_EVERY_S := 3.0
 const _STEP_EVERY_S := 0.6
 const _PLACING_EVERY_S := 4.0
 const _ARRIVED_S := 0.6
+const _REST_S := 40.0
+const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
 ## The presses `order` goes round: take, move right twice, back left twice, let go.
 const _ORDER_PRESSES: Array[StringName] = [&"ui_accept", &"carousel_right", &"carousel_right",
 	&"carousel_left", &"carousel_left", &"screen_back"]
@@ -131,6 +140,8 @@ func _ready() -> void:
 	RenderingServer.frame_post_draw.connect(func() -> void:
 		_gpu_ms += RenderingServer.viewport_get_measured_render_time_gpu(get_viewport().get_viewport_rid()))
 	Diagnostics.trace("bench", "%s started" % _scenario)
+	if _scenario == "session":
+		_session()
 
 
 func _process(delta: float) -> void:
@@ -174,11 +185,178 @@ func _process(delta: float) -> void:
 	elif _scenario == "swipe" and _elapsed_s >= _next_action_s:
 		_next_action_s += _ENTER_EVERY_S
 		_swipe()
-	if _elapsed_s >= _DURATION_S:
+	if _elapsed_s >= _DURATION_S and _scenario != "session":
 		if _scenario in _HELD:
 			act(_HELD[_scenario], false)
 		_report()
 		queue_free()
+
+
+## The `session` route, each part traced as it ends; the rest last, its frames out of the moving parts' statistics.
+func _session() -> void:
+	Diagnostics.trace("bench", "session/start: %s" % Diagnostics.memory())
+	await _part("scroll", _session_scroll)
+	await _part("enter", _session_enter)
+	await _part("step", _session_step)
+	await _part("properties", _session_properties)
+	await _part("settings", _session_settings)
+	await _part("search", _session_search)
+	await _part("plus", _session_plus)
+	await _part("order", _session_order)
+	await _to(Carousel.Screen.GAMES)
+	set_process(false)
+	_carousel._resting.stays_awake = false
+	await _part("rest", _wait.bind(_REST_S))
+	_report()
+	queue_free()
+
+
+## [param route] played, then its `bench: session/PART:` line: its frames, those drawn a second, the memory.
+func _part(part: String, route: Callable) -> void:
+	var first := _frames_ms.size()
+	var started_ms := Time.get_ticks_msec()
+	var drawn := Engine.get_frames_drawn()
+	await route.call()
+	var seconds := (Time.get_ticks_msec() - started_ms) / 1000.0
+	Diagnostics.trace("bench", "session/%s: %s drawn_per_s=%.1f %s" % [part,
+		Diagnostics.frame_statistics(_frames_ms.slice(first), seconds), (Engine.get_frames_drawn() - drawn) / seconds,
+		Diagnostics.memory()])
+
+
+func _wait(seconds: float) -> void:
+	await get_tree().create_timer(seconds).timeout
+
+
+## [param action] pressed only on the carousel's [param screen], no page over it: never an A where it would launch.
+func _press_on(action: StringName, screen: Carousel.Screen) -> void:
+	if _carousel.screen() == screen and not _carousel._screens.is_visible_in_tree():
+		press(action)
+
+
+## Back to the consoles screen or into the console's games, a search closed and cleared first.
+func _to(screen: Carousel.Screen) -> void:
+	if _carousel.screen() == Carousel.Screen.GAMES and _carousel._search.is_open():
+		_carousel._search.close(false)
+	if screen == Carousel.Screen.CONSOLES:
+		if _carousel._search.is_filtered():
+			_press_on(&"screen_back", Carousel.Screen.GAMES)
+			await _wait(1.0)
+		_press_on(&"screen_back", Carousel.Screen.GAMES)
+	else:
+		_press_on(&"ui_accept", Carousel.Screen.CONSOLES)
+	await _until(func() -> bool: return _carousel.screen() == screen)
+	await _wait(1.0)
+
+
+func _session_scroll() -> void:
+	for held: StringName in [&"carousel_right", &"carousel_left"]:
+		act(held, true)
+		await _wait(18.0)
+		act(held, false)
+		await _wait(2.0)
+
+
+func _session_enter() -> void:
+	await _to(Carousel.Screen.CONSOLES)
+	for i in 5:
+		_press_on(&"ui_accept", Carousel.Screen.CONSOLES)
+		await _wait(_ENTER_EVERY_S)
+		_press_on(&"screen_back", Carousel.Screen.GAMES)
+		await _wait(_ENTER_EVERY_S)
+
+
+## Along the consoles at a walk then fast, as far right as back left.
+func _session_step() -> void:
+	for every_s: float in [_STEP_EVERY_S, 0.25]:
+		for direction: StringName in [&"carousel_right", &"carousel_left"]:
+			for i in 10:
+				_press_on(direction, Carousel.Screen.CONSOLES)
+				await _wait(every_s)
+		await _wait(1.0)
+
+
+func _session_properties() -> void:
+	await _to(Carousel.Screen.GAMES)
+	for i in 5:
+		_press_on(&"open_properties", Carousel.Screen.GAMES)
+		await _wait(_ENTER_EVERY_S)
+		_press_on(&"screen_back", Carousel.Screen.PROPERTIES)
+		await _wait(_ENTER_EVERY_S)
+
+
+## The settings card opened, scrolled down and up its rows, closed; no row pressed.
+func _session_settings() -> void:
+	for i in 2:
+		_press_on(&"open_settings", Carousel.Screen.GAMES)
+		await _wait(2.0)
+		for j in 12:
+			if ScreenAgreement.screen_name(_carousel) != "settings":
+				break
+			press(&"ui_down" if j < 6 else &"ui_up")
+			await _wait(0.5)
+		if ScreenAgreement.screen_name(_carousel) == "settings":
+			press(&"screen_back")
+		await _wait(2.5)
+
+
+## Keys typed, leapt over and erased in the search ribbon, which closes; each press only while it is open.
+func _session_search() -> void:
+	const KEYS: Array[StringName] = [&"carousel_right", &"carousel_right", &"carousel_right", &"ui_accept",
+		&"carousel_right", &"carousel_right", &"ui_accept", &"next_letter", &"next_letter", &"previous_letter",
+		&"screen_back", &"screen_back", &"screen_back"]
+	for i in 2:
+		_press_on(&"ui_down", Carousel.Screen.GAMES)
+		await _wait(1.5)
+		for key in KEYS:
+			if not _carousel._search.is_open():
+				break
+			press(key)
+			await _wait(0.6)
+		await _wait(1.5)
+		if _carousel._search.is_filtered():
+			_press_on(&"screen_back", Carousel.Screen.GAMES)
+		await _wait(1.5)
+
+
+## "+" held open, A for its form, A on Type for the chooser, scrolled fast down and up, then B out of both: no
+## console is chosen.
+func _session_plus() -> void:
+	await _to(Carousel.Screen.CONSOLES)
+	for i in 2:
+		act(&"ui_up", true)
+		await _wait(0.8)
+		_press_on(&"ui_accept", Carousel.Screen.CONSOLES)
+		await _wait(2.5)
+		act(&"ui_up", false)
+		if ScreenAgreement.screen_name(_carousel) != "add_console":
+			await _to(Carousel.Screen.CONSOLES)
+			continue
+		press(&"ui_accept")
+		await _wait(1.5)
+		for j in 24:
+			press(&"ui_down" if j < 12 else &"ui_up")
+			await _wait(0.08)
+		await _wait(1.0)
+		press(&"screen_back")
+		await _wait(1.5)
+		if ScreenAgreement.screen_name(_carousel) == "add_console":
+			press(&"screen_back")
+		await _wait(2.5)
+
+
+## A console taken round the ordering ring and put back where it was, five times, then the ring closed.
+func _session_order() -> void:
+	_press_on(&"ui_down", Carousel.Screen.CONSOLES)
+	if not await _until(_ring_still):
+		return
+	for i in _ORDER_PRESSES.size() * 5:
+		if not await _until(_ring_still):
+			return
+		press(_ORDER_PRESSES[i % _ORDER_PRESSES.size()])
+		await _wait(_STEP_EVERY_S)
+	if await _until(_ring_still):
+		press(&"screen_back")
+	await _until(func() -> bool: return _carousel.screen() == Carousel.Screen.CONSOLES)
 
 
 ## From the screen shown, back to the consoles screen, then the ring opened and still: whether it is (traced when not).

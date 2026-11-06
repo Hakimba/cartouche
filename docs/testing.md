@@ -119,7 +119,7 @@ Some changes must keep every pixel or every frame time. Two tools measure that.
 too. With Godot's fixed frame time, two runs of the same code give the same pictures:
 
 ```sh
-$GODOT --path app --fixed-fps 60 --resolution 1280x960 -- --welcome=skip --shelf=ps2 --shots="$PWD/build/shots/before"
+$GODOT --path app --fixed-fps 60 --resolution 1280x960 -- --welcome=skip --shelf=ps2 --launch=rehearse --shots="$PWD/build/shots/before"
 ```
 
 Run it before and after a change and compare the pictures. An optimisation must leave all of them identical.

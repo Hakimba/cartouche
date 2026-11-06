@@ -6,7 +6,8 @@ extends TextureRect
 ## ([ConsoleRow]), seen through a frustum narrowed round its silhouette. The silhouette is measured when a console is
 ## shown framed ([method show_console]) and kept, so that another model of the same console shows at its own size
 ## against the first, as on the ring. Live, or drawn once as a picture ([method still]). Nothing is written to the
-## renderer but what moves: the console, until the app rests.
+## renderer but what moves: the console, until the app rests. Its view is drawn only when the console moved, was
+## shown or framed again, not at every frame the screen is drawn.
 
 const _FILL := 0.9
 ## What a console's launch animation starts it at, as the ring's selected console stands.
@@ -21,6 +22,14 @@ var _camera := Camera3D.new()
 var _row: ConsoleRow
 ## The console's silhouette as measured, in px of the carousel's view; none before.
 var _silhouette := Rect2()
+## Where the console stood when its view was last drawn.
+var _drawn_at := Transform3D()
+var _moving := false
+
+
+func _enter_tree() -> void:
+	# Once everything moved this frame, before it is drawn.
+	RenderingServer.frame_pre_draw.connect(_follow)
 
 
 func _ready() -> void:
@@ -28,13 +37,17 @@ func _ready() -> void:
 	expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_view.own_world_3d = true
 	_view.transparent_bg = true
-	_view.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
+	_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	_camera.cull_mask = ConsoleLayer.FRONT | ConsoleRow.HERO
 	_camera.projection = Camera3D.PROJECTION_FRUSTUM
 	_view.add_child(_camera)
 	add_child(_view)
 	texture = _view.get_texture()
 	get_viewport().size_changed.connect(_frame)
+
+
+func _exit_tree() -> void:
+	RenderingServer.frame_pre_draw.disconnect(_follow)
 
 
 func _notification(what: int) -> void:
@@ -62,6 +75,7 @@ func show_console(platform_id: String, folder: String, framed: bool) -> void:
 	for property in _POSE:
 		_row.set(property, item.rest.get(property))
 	_row.arrange()
+	_render()
 	if framed:
 		_measure()
 		_frame()
@@ -71,8 +85,25 @@ func show_console(platform_id: String, folder: String, framed: bool) -> void:
 func still() -> Texture2D:
 	_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	await RenderingServer.frame_post_draw
-	var image := _view.get_texture().get_image()
-	return ImageTexture.create_from_image(image) if image and not image.is_empty() else null
+	return Still.of(_view)
+
+
+## The view drawn again when the console moved, while shown.
+func _follow() -> void:
+	if not _row or not is_visible_in_tree():
+		return
+	var stands := _row.selected().model.global_transform
+	if stands != _drawn_at:
+		_drawn_at = stands
+		_render()
+		_moving = true
+	elif _moving:
+		_moving = false
+		Diagnostics.trace("ring view", "console still: its view is not drawn again")
+
+
+func _render() -> void:
+	_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 ## The world the console stands in: the carousel's room and sun, and a row of its own posed as the ring.
@@ -114,6 +145,7 @@ func _measure() -> void:
 func _frame() -> void:
 	_view.size = Vector2i((size * StudioTokens.window_scale(get_window())).ceil())
 	_view.msaa_3d = get_viewport().msaa_3d
+	_render()
 	if not _silhouette.has_area():
 		return
 	var watched := ring.get_viewport().get_camera_3d()
@@ -124,3 +156,4 @@ func _frame() -> void:
 	var zoom := minf(_FILL * size.x / _silhouette.size.x, _FILL * size.y / _silhouette.size.y)
 	var centre := _silhouette.get_center() - view / 2.0
 	_camera.set_frustum(size.y / zoom * near_px, Vector2(centre.x, -centre.y) * near_px, watched.near, watched.far)
+	_render()

@@ -4,87 +4,104 @@
             {
                 "id": "xbox",
                 "name": "Microsoft Xbox",
-                "media": "dvd"
+                "media": "dvd",
+                "medium": "xbox_dvd"
             },
             {
                 "id": "xbox360",
                 "name": "Microsoft Xbox 360",
-                "media": "dvd"
+                "media": "dvd",
+                "medium": "xbox360_dvd"
             },
             {
                 "id": "n64",
                 "name": "Nintendo 64",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "n64_cart"
             },
             {
                 "id": "nes",
                 "name": "Nintendo Entertainment System",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "nes_cart"
             },
             {
                 "id": "gb",
                 "name": "Nintendo - Game Boy",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "gb_cart"
             },
             {
                 "id": "gba",
                 "name": "Nintendo - Game Boy Advance",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "gba_cart"
             },
             {
                 "id": "gbc",
                 "name": "Nintendo - Game Boy Color",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "gbc_cart"
             },
             {
                 "id": "gc",
                 "name": "Nintendo - GameCube",
-                "media": "minidisc"
+                "media": "minidisc",
+                "medium": "gc_mini_dvd"
             },
             {
                 "id": "switch",
                 "name": "Nintendo Switch",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "switch_card"
             },
             {
                 "id": "wii",
                 "name": "Nintendo Wii",
-                "media": "dvd"
+                "media": "dvd",
+                "medium": "wii_dvd"
             },
             {
                 "id": "dreamcast",
                 "name": "Sega Dreamcast",
-                "media": "dvd"
+                "media": "dvd",
+                "medium": "dreamcast_gd"
             },
             {
                 "id": "genesis",
                 "name": "Sega Mega Drive",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "genesis_cart"
             },
             {
                 "id": "master",
                 "name": "Sega Master System",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "master_cart"
             },
             {
                 "id": "psp",
                 "name": "Sony PSP",
-                "media": "dvd"
+                "media": "dvd",
+                "medium": "psp_umd"
             },
             {
                 "id": "psx",
                 "name": "Sony PlayStation",
-                "media": "dvd"
+                "media": "dvd",
+                "medium": "ps1_cd"
             },
             {
                 "id": "ps2",
                 "name": "Sony PlayStation 2",
-                "media": "dvd"
+                "media": "dvd",
+                "medium": "ps2_dvd"
             },
             {
                 "id": "snes",
                 "name": "Super Nintendo Entertainment System",
-                "media": "cartridge"
+                "media": "cartridge",
+                "medium": "snes_pal_cart"
             }
         ],
         "offered": [

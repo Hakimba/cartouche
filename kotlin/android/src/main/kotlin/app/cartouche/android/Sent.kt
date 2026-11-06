@@ -66,8 +66,9 @@ internal object Sent {
     @Serializable
     class CatalogSummary(val platforms: List<Platform>, val offered: List<OfferedConsole>, val rejected: List<String>)
 
+    /** [medium] is the platform's default medium: the shelf's model can load before its games are known. */
     @Serializable
-    class Platform(val id: String, val name: String, val media: MediaType)
+    class Platform(val id: String, val name: String, val media: MediaType, val medium: String)
 
     /** A platform of the Type chooser; a [coming] one is shown greyed, never added. */
     @Serializable
@@ -320,7 +321,7 @@ internal object Sent {
 }
 
 internal fun Catalog.sent(coming: Coming): Sent.CatalogSummary = Sent.CatalogSummary(
-    platforms.map { Sent.Platform(it.id.value, it.name, it.profile.media) },
+    platforms.map { Sent.Platform(it.id.value, it.name, it.profile.media, it.profile.medium.default.value) },
     offered.map { Sent.OfferedConsole(it.platform.value, it.model, it.maker, it.platform in coming) },
     rejected.map { "${it.source}: ${it.message}" },
 )

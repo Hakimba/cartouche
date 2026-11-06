@@ -59,6 +59,17 @@ val hostileChds: Arb<HostileChd> =
 fun selfChain(hunks: Int, sector: Int = 0): HostileChd =
     chd(hunks.toLong(), listOf(NONE, SELF) + runLength(SELF_1, hunks - 2), listOf(0L to 16, 0L to 16), sector)
 
+/**
+ * A CHD of [hunks] hunks of 2048 bytes in a file of a terabyte, each stored as it is (the first bytes 0, 1, 2… 255,
+ * 0…, the others zeros); with [alternating], every other one repeats a hunk instead, so that no code is run-length
+ * coded. Its map is tens of kilobytes for tens of thousands of hunks: an even hunk's entry lies far into it.
+ */
+fun storedHunks(hunks: Int, alternating: Boolean = false): HostileChd {
+    val codes = if (alternating) List(hunks) { if (it % 2 == 0) NONE else SELF_1 } else runLength(NONE, hunks)
+    val stored = if (alternating) (hunks + 1) / 2 else hunks
+    return chd(hunks.toLong(), codes, List(stored) { 0L to 16 }, 0, size = TERABYTE)
+}
+
 private const val NONE = 4
 private const val SELF = 5
 private const val RLE_SMALL = 7

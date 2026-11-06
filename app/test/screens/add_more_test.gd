@@ -95,6 +95,23 @@ func test_the_form_given_up_leaves_the_consoles_as_they_were() -> void:
 	assert_bool((carousel.get_node("%Consoles") as Node3D).visible).is_true()
 
 
+func test_the_models_loaded_ahead_for_types_changed_or_given_up_are_let_go_of() -> void:
+	var carousel: Carousel = (await _shown({"ps2": 3}))[1]
+	var appearance := carousel._appearance
+	await Fixtures.open_add_console(self, carousel)
+	await Fixtures.choose_type(self, carousel, "gba")
+	await Fixtures.choose_type(self, carousel, "psx")
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await Fixtures.wait(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel._shown)
+	await Fixtures.wait(self, func() -> bool: return appearance._loading.is_empty())
+	assert_array(appearance._models.keys()).contains_exactly(["ps2_dvd"])
+	for platform_id: String in ["gba", "psx"]:
+		var platform := carousel._platforms[platform_id]
+		var scene := appearance._media[appearance._shown(platform.medium, platform.media)].scene
+		assert_int(ResourceLoader.load_threaded_get_status(scene)).override_failure_message(platform_id) \
+			.is_equal(ResourceLoader.THREAD_LOAD_INVALID_RESOURCE)
+
+
 func test_the_form_offers_again_a_console_set_up_whose_games_are_all_gone() -> void:
 	var shown := await _shown_with_no_games()
 	var carousel: Carousel = shown[1]

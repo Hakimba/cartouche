@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.library
 
+import app.cartouche.android.Threads
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.FileStamp
 import app.cartouche.android.storage.FolderListing
@@ -48,6 +49,10 @@ import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.recover
 import arrow.core.right
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.time.TimeSource
 
@@ -120,6 +125,8 @@ internal class LibraryService(
     arrivalsFile: File,
     private val folders: Folders,
     private val facts: FactsStore,
+    /** Where a scan reads its game files, [Threads.FILE_READS] at a time ([Threads.fileReads]). */
+    private val fileReads: CoroutineDispatcher,
     /** Given new [finders] to make, as soon as possible but not on the caller's thread. */
     private val prepare: (Finders) -> Unit = {},
 ) {
@@ -365,17 +372,36 @@ internal class LibraryService(
     /** A file that cannot be opened or read tells nothing, and is read again at the next scan. */
     private fun factsOf(platform: PlatformId, listing: FolderListing): Map<ContentUri, FileFacts> {
         val kept = facts.load(platform)
-        val known =
+        val stamps =
             listing.contents.files
                 .filter { !it.name.isHidden && FileReading.reads(platform, it.name) }
-                .flatMap { file ->
-                    val stamp = FileStamp(file.sizeBytes, listing.modified.getOrNone(file.uri))
-                    val unchanged = kept.getOrNone(file.uri).filter { it.stamp == stamp }
-                    val told = unchanged.map { it.facts }.recover { read(platform, file).bind() }
+                .associateWith { FileStamp(it.sizeBytes, listing.modified.getOrNone(it.uri)) }
+        val unchanged = stamps.mapValues { (file, stamp) -> kept.getOrNone(file.uri).filter { it.stamp == stamp }.map { it.facts } }
+        val read = readAll(platform, unchanged.filterValues { it.isNone() }.keys.toList())
+        val known =
+            stamps.entries
+                .flatMap { (file, stamp) ->
+                    val told = unchanged.getValue(file).recover { read.getValue(file).bind() }
                     told.map { file.uri to KnownFacts(stamp, it) }.toList()
                 }.toMap()
         if (known != kept) facts.save(platform, known).onLeft { trace("files") { "what the files told not kept: ${it.message}" } }
         return known.mapValues { it.value.facts }
+    }
+
+    /**
+     * [files] read [Threads.FILE_READS] at a time. A library call runs on the library's own thread, which waits for
+     * them: every call of this class is blocking, as its callers expect.
+     */
+    private fun readAll(platform: PlatformId, files: List<ListedFile>): Map<ListedFile, Option<FileFacts>> {
+        if (files.isEmpty()) return emptyMap()
+        val before = folders.bytesRead.get()
+        val started = TimeSource.Monotonic.markNow()
+        val read = runBlocking(fileReads) { files.map { file -> async { file to read(platform, file) } }.awaitAll() }.toMap()
+        trace("files") {
+            "${files.size} files read, up to ${Threads.FILE_READS} at a time: ${(folders.bytesRead.get() - before) / 1024} kB in " +
+                "${started.elapsedNow().inWholeMilliseconds} ms"
+        }
+        return read
     }
 
     private fun read(platform: PlatformId, file: ListedFile): Option<FileFacts> =

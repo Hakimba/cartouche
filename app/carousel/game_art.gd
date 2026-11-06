@@ -47,6 +47,24 @@ func keep_only(games: Array[AndroidServices.Game]) -> void:
 				_reader.cancel(game_id)
 
 
+## Drops the textures of the games not in [param games], read again when asked: while a game runs, only the labels
+## the row needs keep their picture on the graphics card.
+func keep_textures(games: Array[AndroidServices.Game]) -> void:
+	var kept: Dictionary[String, bool] = {}
+	for game in games:
+		kept[game.id] = true
+	var pixels := 0
+	var dropped := 0
+	for game_id: String in _textures.keys():
+		if game_id not in kept:
+			pixels += _textures[game_id].get_width() * _textures[game_id].get_height()
+			_textures.erase(game_id)
+			dropped += 1
+	# Four bytes a pixel, a third more for the mipmaps (see ImageReader).
+	Diagnostics.trace("memory", "label pictures: %d released (%.1f MB), %d kept" % [dropped, pixels * 16.0 / 3.0 / 1e6,
+		_textures.size()])
+
+
 ## No source has an image of [param game_id], looked for: what it had is dropped.
 func mark_absent(game_id: String) -> void:
 	_forget(game_id)

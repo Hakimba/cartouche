@@ -21,6 +21,8 @@ signal form_leaving
 signal edit_leaving
 ## The console edited is shown as the model in [param folder] on the ring, for a look or back.
 signal model_shown(folder: String)
+## The form adding a console has its type chosen.
+signal platform_chosen(platform_id: String)
 
 ## Whether the first launch's welcome waits for a button; off to measure starts.
 @export var welcome_waits := true
@@ -69,6 +71,7 @@ func _ready() -> void:
 	_settings.sound_level_changed.connect(_change_sound_level)
 	_add_console.leaving.connect(func() -> void: (edit_leaving if _add_console.is_editing() else form_leaving).emit())
 	_add_console.model_shown.connect(model_shown.emit)
+	_add_console.platform_chosen.connect(platform_chosen.emit)
 	_add_console.saving.connect(func(pending: bool) -> void:
 		_pending.visible = pending
 		_holding_presses = pending)

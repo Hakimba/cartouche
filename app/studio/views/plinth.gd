@@ -5,8 +5,9 @@ extends Control
 ## console's own model, upright and facing front at its start pose (`data/turntable.json`), lit by the light
 ## designed for it there ([StudioLights], screen `plinth`); it is rendered once per model folder, in a
 ## transparent view of its own world that is freed right after, and kept while the edge smoothing and the
-## window scale it was drawn with hold. Nothing is
-## shown until the picture exists; it then rises into place.
+## window scale it was drawn with hold, until the plinth leaves the tree or the app is paused for any reason (a game
+## started, the system's folder picker, the home screen). Nothing is shown until the picture exists; it then rises
+## into place.
 
 const TURNTABLE_FILE := "res://data/turntable.json"
 ## The model fits a circle of this diameter and stays under this height, in world units.
@@ -18,13 +19,18 @@ const _CAMERA_TARGET := Vector3(0.0, 0.644, 0.0)
 ## The rise of a new picture: from this far down (px), in this time, by the curve `rise`.
 const _RISE_PX := 20.48
 const _RISE_S := 0.3
+## A picture asked for less than this after the one before (s), while the cursor runs down the list, is drawn
+## only once nothing else was asked for this long: a fast scroll draws where it stops, not each console it passes.
+const _REST_S := 0.12
 
 static var _starts: Dictionary = {}
 ## Keyed by [method _key]: the smoothing and the window scale change the picture.
-static var _stills: Dictionary[String, ImageTexture] = {}
+static var _stills: Dictionary[String, Texture2D] = {}
 ## The folders waiting for their picture, each with those asking for it (called with the picture).
 static var _waiting: Dictionary[String, Array] = {}
 static var _drawing := false
+## Running from the last request for [constant _REST_S].
+static var _quiet: SceneTreeTimer
 static var _generation := 0
 ## Draws the picture of a folder; the tests put a stand-in where there is no renderer.
 static var _drawer := _render
@@ -109,11 +115,14 @@ static func _key(folder: String) -> String:
 
 
 ## Calls [param done] with the picture of the console in [param folder], now when it exists, else once it
-## is rendered. One picture is rendered at a time, the most recently asked first; a [param done] whose
-## object was freed meanwhile is skipped.
+## is rendered. One picture is rendered at a time, the most recently asked first, and while the asks follow each
+## other within [constant _REST_S], only once they stop; a [param done] whose object was freed meanwhile is skipped.
 static func request_still(folder: String, done: Callable) -> void:
+	var rested := _quiet == null or _quiet.time_left <= 0.0
+	_quiet = (Engine.get_main_loop() as SceneTree).create_timer(_REST_S)
 	var drawn := still_of(folder)
 	if drawn:
+		Diagnostics.trace("plinth", "still of %s cached" % folder)
 		done.call(drawn)
 		return
 	# Asked again, a folder moves to the front: the last key is the one drawn next.
@@ -122,7 +131,7 @@ static func request_still(folder: String, done: Callable) -> void:
 	askers.append(done)
 	_waiting[folder] = askers
 	if not _drawing:
-		_draw_waiting()
+		_draw_waiting(rested)
 
 
 ## [param done] no longer waits for the picture of [param folder]; one nobody waits for is not drawn.
@@ -133,21 +142,39 @@ static func withdraw(folder: String, done: Callable) -> void:
 		_waiting.erase(folder)
 
 
-static func _draw_waiting() -> void:
+## Drops the pictures kept, about a megabyte each, as the app is paused (a game, the folder picker, the home
+## screen); a picture shown lives on with what shows it.
+static func drop_stills() -> void:
+	if not _stills.is_empty():
+		Diagnostics.trace("plinth", "%d stills dropped" % _stills.size())
+	_stills.clear()
+
+
+## Draws the pictures asked for, the first one [param at_once], the others once the cursor rests.
+static func _draw_waiting(at_once: bool) -> void:
 	_drawing = true
 	while not _waiting.is_empty():
+		while not at_once and _quiet.time_left > 0.0:
+			await _quiet.timeout
+		at_once = false
+		# Withdrawn while the cursor moved.
+		if _waiting.is_empty():
+			break
 		var folder: String = _waiting.keys()[-1]
 		var askers: Array = _waiting[folder]
 		_waiting.erase(folder)
 		var live := askers.filter(func(ask: Callable) -> bool: return ask.is_valid())
 		if live.is_empty():
+			Diagnostics.trace("plinth", "still of %s skipped: no longer shown" % folder)
 			continue
 		var generation := _generation
-		var picture: ImageTexture = await _drawer.call(folder)
+		var started := Time.get_ticks_msec()
+		var picture: Texture2D = await _drawer.call(folder)
 		if generation != _generation:
 			continue
 		if picture:
 			_stills[_key(folder)] = picture
+			Diagnostics.trace("plinth", "still of %s rendered in %d ms" % [folder, Time.get_ticks_msec() - started])
 		for ask: Callable in live:
 			if ask.is_valid():
 				ask.call(picture)
@@ -156,7 +183,7 @@ static func _draw_waiting() -> void:
 
 ## The console in [param folder] drawn once in a view of its own, at the size the plinth shows it, then
 ## the view freed; none where there is no renderer or it gives no picture.
-static func _render(folder: String) -> ImageTexture:
+static func _render(folder: String) -> Texture2D:
 	if DisplayServer.get_name() == "headless":
 		return null
 	var scene := ConsoleManifest.of(folder).scene
@@ -176,6 +203,8 @@ static func _render(folder: String) -> ImageTexture:
 	view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	var environment := WorldEnvironment.new()
 	environment.environment = StudioLights.environment_of(root)
+	# The view's canvas is empty: clearing to nothing gives the same picture without copying it in.
+	environment.environment.background_mode = Environment.BG_CLEAR_COLOR
 	view.add_child(environment)
 	var camera := Camera3D.new()
 	camera.fov = 29.5
@@ -193,9 +222,9 @@ static func _render(folder: String) -> ImageTexture:
 	root.add_child(view)
 	camera.look_at_from_position(_CAMERA, _CAMERA_TARGET)
 	await RenderingServer.frame_post_draw
-	var image := view.get_texture().get_image()
+	var picture := Still.of(view)
 	view.queue_free()
-	return null if image == null or image.is_empty() else ImageTexture.create_from_image(image)
+	return picture
 
 
 func _ready() -> void:
@@ -212,6 +241,9 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_THEME_CHANGED:
 		var shade := (($TopShadow as TextureRect).texture as GradientTexture2D).gradient
 		shade.colors = PackedColorArray([Backdrop.palette.plinth_top_shade, Color(Backdrop.palette.plinth_top_shade, 0.0)])
+	# Leaving the tree, at the latest as the app quits: the GPU's pictures are freed while the renderer still runs.
+	elif what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_EXIT_TREE:
+		drop_stills()
 
 
 ## Shows the logo of the console in [param folder] (under res://carousel/consoles) on the plate and its

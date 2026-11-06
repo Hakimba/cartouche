@@ -172,11 +172,17 @@ var _middle: AndroidServices.Game
 
 func _enter_tree() -> void:
 	DisplayServer.set_system_theme_change_callback(_follow_system_theme)
+	# Once everything moved this frame, before it is drawn.
+	RenderingServer.frame_pre_draw.connect(_follow_3d)
 
 
 func _exit_tree() -> void:
 	# The system holds the callback past this carousel: one gone must not be called.
 	DisplayServer.set_system_theme_change_callback(Callable())
+	RenderingServer.frame_pre_draw.disconnect(_follow_3d)
+	# The scene's room is shared with the next carousel (a reload).
+	get_viewport().disable_3d = false
+	_room.environment.background_mode = Environment.BG_CANVAS
 
 
 func _ready() -> void:
@@ -187,6 +193,9 @@ func _ready() -> void:
 	_screens.form_leaving.connect(_on_screens_form_leaving)
 	_screens.edit_leaving.connect(_stop_editing)
 	_screens.model_shown.connect(_show_variant)
+	_screens.platform_chosen.connect(func(platform_id: String) -> void:
+		var platform := _platforms[platform_id]
+		_appearance.load_ahead(platform.medium, platform.media))
 	var form: AddConsole = _screens.get_node("%AddConsole")
 	form.ring = _consoles
 	form.sun = $Sun
@@ -332,6 +341,28 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		Diagnostics.trace("touch", "back requested")
 		_press_back.call_deferred()
+
+
+## Whether the carousel's own world shows anything through its camera: the consoles in front, a game out of the row's
+## views or the spindle a game goes onto.
+func shows_3d() -> bool:
+	return (_consoles.is_visible_in_tree() and not _consoles.behind) or _row.stands_outside() \
+		or _game_launch.spindle.is_visible_in_tree()
+
+
+## The carousel's own 3D is drawn only while it shows something: the consoles in front, a game out of the row's
+## views (launched, its properties, inserted) or the spindle it goes onto. Otherwise (the games screen, the consoles
+## behind it drawn apart) the screen is its backdrop and controls alone: no 3D pass copies the backdrop into an
+## empty scene. The room's background is the backdrop only when drawn with the 3D: it is never seen otherwise.
+func _follow_3d() -> void:
+	if not is_node_ready():
+		return
+	var seen := shows_3d()
+	if seen != get_viewport().disable_3d:
+		return
+	get_viewport().disable_3d = not seen
+	_room.environment.background_mode = Environment.BG_CANVAS if seen else Environment.BG_CLEAR_COLOR
+	Diagnostics.trace("carousel", "own 3D %s" % ("drawn" if seen else "not drawn: nothing in it shows"))
 
 
 func _follow_system_theme() -> void:
@@ -686,8 +717,8 @@ func _show_shelf() -> void:
 	_row.show_shelf(shelf.games, _positions[shelf.platform_id], models, _appearance.look(platform, _demo))
 	_search.use_shelf(shelf.platform_id, shelf.games)
 	if Diagnostics.enabled:
-		Diagnostics.trace("carousel", "shelf %s prepared in %.1f ms, %d label viewports alive" % [shelf.platform_id,
-			(Time.get_ticks_usec() - started) / 1000.0, ShelfRow.LabelledModel.alive])
+		Diagnostics.trace("carousel", "shelf %s prepared in %.1f ms, %d label viewports alive, %d holding a blank" % [shelf.platform_id,
+			(Time.get_ticks_usec() - started) / 1000.0, ShelfRow.LabelledModel.alive, ShelfRow.LabelledModel.held_views])
 
 
 ## The shelf of the console stepped to, once the row stands still on it or as soon as something needs it,
@@ -1057,6 +1088,7 @@ func _add_console() -> void:
 
 
 func _on_screens_form_leaving() -> void:
+	_appearance.let_go_ahead()
 	if _holder not in _FORM:
 		return
 	_holder = Holder.FORM_GIVEN_UP
@@ -1120,6 +1152,7 @@ func _uncover(coming_in := false) -> void:
 ## The added console glides to the middle with up to two shelves; otherwise the ring places it.
 ## True once landed; false on cancellation, including a row removed during the flight.
 func _place_console(library: AndroidServices.Library, platform_id: String) -> bool:
+	_appearance.keep_ahead()
 	_demo = false
 	_show_library(library, platform_id)
 	_remember()

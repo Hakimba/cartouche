@@ -108,6 +108,8 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree():
 		for place in _places:
 			place.hide_view()
+	elif what == NOTIFICATION_APPLICATION_PAUSED and label_images:
+		_keep_needed_labels()
 
 
 func _process(delta: float) -> void:
@@ -237,6 +239,13 @@ func games_around(reach: int) -> Array[AndroidServices.Game]:
 			if game not in around:
 				around.append(game)
 	return around
+
+
+## Whether a game of the row stands in the carousel's own world, out of its view (launched, its properties), where
+## the carousel's camera draws it.
+func stands_outside() -> bool:
+	return is_visible_in_tree() and _places.any(func(place: Place) -> bool:
+		return place.visible and place.shown != null and place.shown.get_parent() == place)
 
 
 ## Whether the shelf has games; the other methods need one.
@@ -385,6 +394,26 @@ func refresh_label(game_id: String) -> void:
 			_draw_blank(place, game)
 
 
+## As the app leaves the screen, a game running: only the labels in view, and those the pick lands among, keep their
+## picture; the places' other labels let theirs go, and so do the views of the places not drawn. Each is read or drawn
+## again once the row comes to it.
+func _keep_needed_labels() -> void:
+	var needed: Array[AndroidServices.Game] = []
+	for game: int in _placed:
+		needed.append(_games[game])
+	if has_pick():
+		for side: int in [0, -1, 1]:
+			needed.append(_games[posmod(_pick + side, _games.size())])
+	for place in _places:
+		if place.game < 0 or not is_visible_in_tree():
+			place.hide_view()
+		if place.game < 0 and place.shown:
+			place.shown.clear_label()
+	label_images.keep_textures(needed)
+	Diagnostics.trace("memory", "label views: %d alive, %d holding a blank; media views: %d holding pictures" % [
+		LabelledModel.alive, LabelledModel.held_views, MediaView.holding])
+
+
 ## Shows its game's image on [param place], or its blank until the image is read.
 func _label(place: Place) -> void:
 	var game := _games[place.game]
@@ -474,10 +503,12 @@ func _arrange() -> void:
 		room_energy = lerpf(focused.lit.room, focused.blank.room, blank_weight)
 	var gone := selected_presence <= 0.0 and neighbours <= 0.0 and stage <= 0.0 and not _launched
 	var order := 0
+	# A free place keeps its view's pictures for the game coming in only while the row moves: at rest, none comes.
+	var moving := _held != 0 or not _spring.is_still()
 	for place in _places:
 		place.visible = place.game >= 0
 		if not place.visible:
-			place.hide_view()
+			place.hide_view(moving)
 	for game: int in shown:
 		var place := _placed[game]
 		if gone:
@@ -637,15 +668,18 @@ class Place extends Node3D:
 		shown = _models[model]
 		for made: LabelledModel in _models.values():
 			made.visible = made == shown
+			if not made.visible:
+				made.clear_label()
 		var medium := ConsoleManifest.folder_of(model)
 		layout = GamesLayout.new(medium)
 		lit = StudioLights.rig_of(medium, &"games")
 		blank = StudioLights.rig_of(medium, &"games", true)
 
-	## Told at every frame the place is not drawn: only a view still drawn is sent to the renderer.
-	func hide_view() -> void:
+	## Told at every frame the place is not drawn: only a view still drawn is sent to the renderer. [param keep], a
+	## free place keeps its view's pictures for the game coming in next ([method MediaView.put_away]).
+	func hide_view(keep := false) -> void:
 		if media_view:
-			media_view.hide()
+			media_view.put_away(keep)
 			media_view.set_process(false)
 			if media_view.view().render_target_update_mode != SubViewport.UPDATE_DISABLED:
 				media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
@@ -701,8 +735,10 @@ class LabelledModel extends Node3D:
 	## How far above the platform's name the band starts, as a fraction of the label.
 	const _BAND_ABOVE := 0.02
 
-	## How many are alive, each with its label's viewport, for the traces.
+	## How many are alive, each with its label's viewport, and how many of those views hold a picture (a blank drawn):
+	## for the traces.
 	static var alive := 0
+	static var held_views := 0
 
 	## The width of the model's label face over its height.
 	var label_proportion := 1.0
@@ -712,6 +748,8 @@ class LabelledModel extends Node3D:
 	var dirty := true
 
 	var _fade: ModelFade
+	## The size of its view while it holds a blank; it holds nothing otherwise.
+	var _drawn_size := Vector2i.ZERO
 	var _label_mesh: MeshInstance3D
 	var _view: SubViewport = _LABEL_VIEW.instantiate()
 	var _background: ColorRect = _view.get_node("Background")
@@ -738,7 +776,8 @@ class LabelledModel extends Node3D:
 		var face := label.get_aabb().size
 		# To a ten-thousandth: a disc's face, built round, is square.
 		label_proportion = snappedf(face.x / face.y, 0.0001)
-		_view.size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH / label_proportion))
+		_drawn_size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH / label_proportion))
+		_view.size = Vector2i.ZERO
 		# Where the title and the platform go is the medium's manifest's, or its shape's when built from one: round a
 		# disc's hub, for one.
 		var manifest := MediumManifest.of_scene(model)
@@ -749,7 +788,7 @@ class LabelledModel extends Node3D:
 			title = shape.title_area()
 			platform = shape.platform_area()
 			_ring.radius = shape.progress_ring_radius()
-		var size := Vector2(_view.size)
+		var size := Vector2(_drawn_size)
 		_title.position = size * title.position
 		_title.size = size * title.size
 		var font_size := ThemeDB.get_project_theme().get_font_size(&"font_size", &"LabelTitle")
@@ -768,13 +807,17 @@ class LabelledModel extends Node3D:
 	func _notification(what: int) -> void:
 		if what == NOTIFICATION_PREDELETE:
 			alive -= 1
+			_hold_view(false)
 
 	func is_blank() -> bool:
 		return _blank
 
+	## Shows no label, and lets go of what it showed: its picture, its view's.
 	func clear_label() -> void:
 		_label(&"has_label", false)
+		_label(&"label_texture", null)
 		_blank = false
+		_hold_view(false)
 
 	## Draws a blank of [param look] with [param title] and the platform's name; plain, with
 	## neither, nor the band holding it, when [param title] is empty.
@@ -798,6 +841,7 @@ class LabelledModel extends Node3D:
 		_title.text = title
 		_platform.text = "" if title.is_empty() else look.band_text if _band.visible else look.platform_name
 		_ring.color = look.band if banded else ink
+		_hold_view(true)
 		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 		show_label(_view.get_texture(), false)
 
@@ -835,6 +879,8 @@ class LabelledModel extends Node3D:
 		_label(&"scanned", scanned)
 		_label(&"has_label", true)
 		_blank = not scanned
+		if scanned:
+			_hold_view(false)
 
 	## Turns the model [param angle] radians about its own axis, its label blurred over
 	## [param blur] radians as when it spins fast.
@@ -851,6 +897,12 @@ class LabelledModel extends Node3D:
 	func fade(amount: float) -> void:
 		dirty = dirty or _fade.amount != amount
 		_fade.apply(amount)
+
+	# A view sized holds its picture on the graphics card, drawn or not: only a blank shown needs it.
+	func _hold_view(held: bool) -> void:
+		if held != (_view.size == _drawn_size):
+			held_views += 1 if held else -1
+			_view.size = _drawn_size if held else Vector2i.ZERO
 
 	func _label(parameter: StringName, value: Variant) -> void:
 		dirty = true

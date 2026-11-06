@@ -5,6 +5,8 @@ import io.kotest.assertions.arrow.core.shouldBeNone
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.assertions.withClue
 import io.kotest.matchers.ints.shouldBeGreaterThan
+import io.kotest.matchers.ints.shouldBeLessThan
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.property.checkAll
@@ -21,38 +23,41 @@ class ChdImageTest {
     @Test
     fun `every sector of a CD CHD in each codec and track type, and of a DVD CHD in each codec, is the disc's`() {
         READABLE_CHDS.forEach { name ->
-            val chd = chdOf(image(name)).shouldBeSome()
-            (0 until sectors).forEach { n -> withClue("$name sector $n") { chd.sectorOf(n).shouldBeSome() shouldBe expected(n) } }
-            chd.sectorOf(sectors).shouldBeNone()
+            chdOf(image(name)) { sector ->
+                (0 until sectors).forEach { n -> withClue("$name sector $n") { sector(n).shouldBeSome() shouldBe expected(n) } }
+                sector(sectors).shouldBeNone()
+            }.shouldBeSome()
         }
     }
 
     @Test
     fun `hunks of a long run of one codec, stored as they are or repeating others, read as the disc wrote them`() {
-        val chd = chdOf(image("dvd-runs.chd")).shouldBeSome()
-        (0 until runsDisc.size / SECTOR).forEach { n ->
-            withClue("sector $n") { chd.sectorOf(n).shouldBeSome() shouldBe runsDisc.copyOfRange(n * SECTOR, (n + 1) * SECTOR) }
-        }
-        chd.sectorOf(runsDisc.size / SECTOR).shouldBeNone()
+        chdOf(image("dvd-runs.chd")) { sector ->
+            (0 until runsDisc.size / SECTOR).forEach { n ->
+                withClue("sector $n") { sector(n).shouldBeSome() shouldBe runsDisc.copyOfRange(n * SECTOR, (n + 1) * SECTOR) }
+            }
+            sector(runsDisc.size / SECTOR).shouldBeNone()
+        }.shouldBeSome()
     }
 
     @Test
     fun `an image that is not a CHD version 5, cut short, or uncompressed does not open`() {
         val chd = image("dvd-lzma.chd")
-        chdOf(disc).shouldBeNone()
-        chdOf(chd.copyOf(100)).shouldBeNone()
-        chdOf(chd.copyOf().also { it[15] = 4 }).shouldBeNone()
+        chdOf(disc) {}.shouldBeNone()
+        chdOf(chd.copyOf(100)) {}.shouldBeNone()
+        chdOf(chd.copyOf().also { it[15] = 4 }) {}.shouldBeNone()
         // An uncompressed image names no codec.
-        chdOf(chd.copyOf().also { ByteArray(16).copyInto(it, 16) }).shouldBeNone()
+        chdOf(chd.copyOf().also { ByteArray(16).copyInto(it, 16) }) {}.shouldBeNone()
     }
 
     @Test
     fun `a hunk repeating a stored one reads as it, and one repeating a repetition reads nothing`() {
-        val chd = chdOf(selfChain(hunks = 4).bytes).shouldBeSome()
-        chd.sectorOf(0).shouldBeSome() shouldBe ByteArray(SECTOR) { it.toByte() }
-        chd.sectorOf(1).shouldBeSome() shouldBe ByteArray(SECTOR) { it.toByte() }
-        chd.sectorOf(2).shouldBeNone()
-        chd.sectorOf(3).shouldBeNone()
+        chdOf(selfChain(hunks = 4).bytes) { sector ->
+            sector(0).shouldBeSome() shouldBe ByteArray(SECTOR) { it.toByte() }
+            sector(1).shouldBeSome() shouldBe ByteArray(SECTOR) { it.toByte() }
+            sector(2).shouldBeNone()
+            sector(3).shouldBeNone()
+        }.shouldBeSome()
     }
 
     @Test
@@ -68,9 +73,29 @@ class ChdImageTest {
     @Test
     fun `a CHD is read where its header says, and only within the file`() {
         val source = InMemoryBytes(image("dvd-zlib.chd"))
-        readable { chdImage(source).shouldBeSome().run { sector(16) } }.shouldBeSome()
+        chdOf(source) { sector -> sector(16).shouldBeSome() }.shouldBeSome()
         source.requests.first() shouldBe (0L to 124)
         source.withinFile shouldBe true
+    }
+
+    @Test
+    fun `a sector is read from the part of the map it needs, as from the whole map, however long the codes before the entries`() {
+        listOf(storedHunks(40_000), storedHunks(40_001, alternating = true), storedHunks(400_001, alternating = true), storedHunks(3))
+            .forEach { image ->
+                val source = InMemoryBytes(image.bytes, size = image.size)
+                val map = image.bytes.copyOfRange(124, 128).fold(0) { value, byte -> (value shl 8) or (byte.toInt() and 0xFF) }
+                val mapReads = { source.requests.count { (offset, _) -> offset >= 124 + 16 && offset < 124 + 16 + map } }
+                withClue(image) {
+                    chdOf(source) { sector ->
+                        sector(0).shouldBeSome() shouldBe ByteArray(SECTOR) { it.toByte() }
+                        // Run-length coded, the codes of tens of thousands of hunks take a few bytes.
+                        if (image.hunks == 40_000L) source.requests.sumOf { it.second } shouldBeLessThan map
+                        sector(image.hunks.toInt() - 1).shouldBeSome() shouldBe ByteArray(SECTOR)
+                        // However long the map, it is read at most twice: a hostile one is walked at most twice per sector.
+                        mapReads() shouldBeLessThanOrEqual 2
+                    }.shouldBeSome()
+                }
+            }
     }
 
     @Test
@@ -79,7 +104,10 @@ class ChdImageTest {
             var opened = 0
             checkAll(500, hostileChds) { chd ->
                 val source = InMemoryBytes(chd.bytes, size = chd.size)
-                readable { chdImage(source).onSome { opened++ }.flatMap { with(it) { sector(chd.sector) } } }
+                chdOf(source) { sector ->
+                    opened++
+                    sector(chd.sector)
+                }
                 source.withinFile shouldBe true
                 // A hunk, the map (9 bytes a hunk at most), a header, or a metadata entry's text.
                 val bound =

@@ -17,6 +17,7 @@ import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Test
@@ -41,6 +42,7 @@ class LabelChoicesTest {
         File(context.filesDir, "arrivals.json"),
         Folders(context),
         FactsStore(File(context.filesDir, "facts")),
+        Dispatchers.IO,
     )
 
     private fun label() = library().library().game(okage.id).shouldBeSome().label

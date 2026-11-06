@@ -4,7 +4,9 @@ extends TextureRect
 ## One medium of the games row drawn alone and softened by its distance from the row's centre: it stands
 ## in a small transparent view of its own world, seen through the app's [member camera] over exactly the
 ## part of the screen it covers and the reach of its blur and shadow, lit by its light shared by place
-## ([method StudioLights.shared]), and shown here through `media_soft.gdshader`. The row places each of
+## ([method StudioLights.shared]), softened by `media_soft.gdshader` into a picture of its own each time it
+## is drawn, and shown here as that picture, so that a frame drawn while it stands still (a veil frame, a
+## neighbour moving) does not soften it again. The row places each of
 ## its games with [method standing], draws those [method drawn_at] in [method drawing_order], and calls
 ## [method place] at every frame of a move and once more at rest.
 
@@ -13,6 +15,18 @@ const DRAWN_WITHIN := 2.2
 ## The view's size goes by steps of this many pixels: a medium moving across the row does not resize it
 ## at each frame; it takes its own size again once it settles.
 const _STEP_PX := 32
+## The taps of the softening's two Gaussians, as many as `media_soft.gdshader` has room for: few for the medium's
+## pixel of blur, many for its shadow, so that no edge shows its copies.
+const _MEDIUM_TAPS := 16
+const _SHADOW_TAPS := 48
+## The taps spread over this many standard deviations.
+const _REACH := 2.5
+## Each tap of a blur turned this far (radians) from the last: they spread evenly over a disc ([method spiral]).
+const _GOLDEN_ANGLE := 2.39996
+
+## How many views hold their pictures (sized), for the traces.
+static var holding := 0
+static var _taps_of: Dictionary[int, PackedVector3Array] = {}
 
 ## The app's camera, whose view of the medium this one copies.
 var camera: Camera3D
@@ -26,7 +40,10 @@ var _lights: StudioLights
 var _holder := Node3D.new()
 ## The medium's box, in its holder's space.
 var _box := AABB()
+## The medium's own 3D view, drawn just before its softened picture is, and that picture, drawn on request.
 var _view := SubViewport.new()
+var _soft_view := SubViewport.new()
+var _soft := TextureRect.new()
 var _camera := Camera3D.new()
 var _environment := WorldEnvironment.new()
 var _framed := false
@@ -35,8 +52,10 @@ var _canvas_size := Vector2.ZERO
 var _pixel_scale := 0.0
 var _at := Transform3D()
 var _softness := 0.0
-## The view's size while it is hidden, its pictures freed.
+## The view's size while it is put away, its pictures freed.
 var _hidden_size := Vector2i.ZERO
+## Whether its views are sized: they hold their pictures on the graphics card, drawn or not.
+var _holds := false
 
 
 ## The look of a medium of softness [param s]: its blur and shadow (px at 1280) and saturation.
@@ -101,6 +120,34 @@ static func look(s: float) -> Look:
 	return out
 
 
+## [param count] points spread evenly over the unit disc, each turned from the last by the golden angle: where the
+## blurs of `media_soft.gdshader` and `console_layer.gdshader` take their taps.
+static func spiral(count: int) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in count:
+		var angle := i * _GOLDEN_ANGLE
+		out.append(Vector2(cos(angle), sin(angle)) * sqrt((i + 0.5) / count))
+	return out
+
+
+## The [param count] taps of a Gaussian, on the [method spiral] over a disc of [constant _REACH] standard deviations:
+## each one's offset in standard deviations, and its share of the weights.
+static func taps(count: int) -> PackedVector3Array:
+	if count in _taps_of:
+		return _taps_of[count]
+	var out := PackedVector3Array()
+	var weights := 0.0
+	for at in spiral(count):
+		var tap := at * _REACH
+		var weight := exp(-0.5 * tap.dot(tap))
+		out.append(Vector3(tap.x, tap.y, weight))
+		weights += weight
+	for i in count:
+		out[i] = Vector3(out[i].x, out[i].y, out[i].z / weights)
+	_taps_of[count] = out
+	return out
+
+
 ## How far past the medium's box its look reaches (px at 1280: left, top, right, bottom), the most over
 ## every softness: three standard deviations of its blur, and of its shadow's past its offset.
 static func reach() -> Vector4:
@@ -118,43 +165,63 @@ func _init() -> void:
 	expand_mode = EXPAND_IGNORE_SIZE
 	_view.own_world_3d = true
 	_view.transparent_bg = true
-	_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	# No pictures until it is framed.
+	_view.size = Vector2i.ZERO
+	_soft_view.size = Vector2i.ZERO
+	# Inside the softened picture's view, it is drawn exactly when that one is, and before it.
+	_view.render_target_update_mode = SubViewport.UPDATE_WHEN_PARENT_VISIBLE
 	_camera.projection = Camera3D.PROJECTION_FRUSTUM
 	_view.add_child(_camera)
 	_view.add_child(_environment)
 	_view.add_child(_holder)
-	add_child(_view)
+	_soft_view.disable_3d = true
+	_soft_view.transparent_bg = true
+	_soft_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_soft.set_anchors_preset(PRESET_FULL_RECT)
+	_soft.expand_mode = EXPAND_IGNORE_SIZE
 	var soft := ShaderMaterial.new()
 	soft.shader = preload("res://studio/views/media_soft.gdshader")
-	material = soft
+	soft.set_shader_parameter(&"medium_taps", taps(_MEDIUM_TAPS))
+	soft.set_shader_parameter(&"shadow_taps", taps(_SHADOW_TAPS))
+	_soft.material = soft
+	_soft_view.add_child(_soft)
+	_soft_view.add_child(_view)
+	add_child(_soft_view)
+	# The softened picture is premultiplied.
+	var shown := CanvasItemMaterial.new()
+	shown.blend_mode = CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA
+	material = shown
 
 
 func _ready() -> void:
 	# It watches the edge smoothing once it shows a medium.
 	set_process(_shown)
 	_environment.environment = StudioLights.environment_of(self)
-	texture = _view.get_texture()
+	# Its world has no canvas: cleared, not copied from an empty one.
+	_environment.environment.background_mode = Environment.BG_CLEAR_COLOR
+	_soft.texture = _view.get_texture()
+	texture = _soft_view.get_texture()
 
 
 func _notification(what: int) -> void:
-	# Hidden, the view frees its pictures (tens of MB for the five of a row) and, shown, draws itself
-	# again at the size it had: a medium is drawn exactly as if it had kept them.
-	if what == NOTIFICATION_VISIBILITY_CHANGED and _framed and visible == (_hidden_size != Vector2i.ZERO):
-		if visible:
-			_view.size = _hidden_size
-			_hidden_size = Vector2i.ZERO
-			redraw()
-		else:
-			_hidden_size = _view.size
-			_view.size = Vector2i.ZERO
+	# Put away without its pictures, shown again it draws itself at the size it had: a medium is drawn exactly as
+	# if it had kept them.
+	if what == NOTIFICATION_VISIBILITY_CHANGED and visible and _hidden_size != Vector2i.ZERO:
+		_resize(_hidden_size)
+		_hidden_size = Vector2i.ZERO
+		Diagnostics.trace("media", "view pictures made again: %s, %d views hold theirs" % [_view.size, holding])
+		redraw()
 	elif what == NOTIFICATION_THEME_CHANGED and _framed:
 		_shade()
+		redraw()
+	elif what == NOTIFICATION_PREDELETE and _holds:
+		holding -= 1
 
 
 func _process(_delta: float) -> void:
 	if _view.msaa_3d != get_viewport().msaa_3d:
 		_view.msaa_3d = get_viewport().msaa_3d
-		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+		_soft_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 ## Shows [param model] (a medium's scene, made for this view) in a view of its own world, lit by
@@ -188,7 +255,20 @@ func crossfade(blank_weight: float) -> void:
 ## Draws the medium again where it stands: what it looks like changed (its light, its label), not its place.
 func redraw() -> void:
 	if _shown:
-		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+		_soft_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+## Hides the view. [param keep], its pictures are kept for the next medium its place shows: a scrolling row puts
+## a place away and shows it again for the game coming in, a step later. Otherwise they are freed (tens of MB for
+## the five of a row) until it is shown again.
+func put_away(keep: bool) -> void:
+	if keep and visible and _framed:
+		Diagnostics.trace("media", "view put away, pictures kept: %s, %d views hold theirs" % [_view.size, holding])
+	hide()
+	if not keep and _framed and _hidden_size == Vector2i.ZERO:
+		_hidden_size = _view.size
+		_resize(Vector2i.ZERO)
+		Diagnostics.trace("media", "view pictures freed: %s, %d views hold theirs" % [_hidden_size, holding])
 
 
 ## Stands the medium at [param at] in the world, as the row places it, with softness [param s]
@@ -217,7 +297,7 @@ func place(at: Transform3D, s: float) -> void:
 	if not lit_again and not canvas_changed:
 		return
 	var at_s := look(s)
-	var shader := material as ShaderMaterial
+	var shader := _soft.material as ShaderMaterial
 	shader.set_shader_parameter(&"blur", at_s.blur * scale_by)
 	shader.set_shader_parameter(&"shadow_y", at_s.shadow_y * scale_by)
 	shader.set_shader_parameter(&"shadow_blur", at_s.shadow_blur * scale_by)
@@ -225,9 +305,9 @@ func place(at: Transform3D, s: float) -> void:
 	_shade()
 
 
-## The view, for its size and how it is drawn.
+## The view drawn on request (the medium, then its softened picture), for its size and how it is drawn.
 func view() -> SubViewport:
-	return _view
+	return _soft_view
 
 
 ## The medium shown, under the node the row stands it with.
@@ -247,7 +327,7 @@ func environment() -> Environment:
 
 ## The shadow in the backdrop's warm colour, as dark as the medium's softness has it.
 func _shade() -> void:
-	(material as ShaderMaterial).set_shader_parameter(&"shadow_colour",
+	(_soft.material as ShaderMaterial).set_shader_parameter(&"shadow_colour",
 		Color(Backdrop.palette.warm_shadow, look(_softness).shadow_alpha))
 
 
@@ -280,7 +360,7 @@ func _frame(settled: bool) -> void:
 	_canvas_size = camera.get_viewport().get_visible_rect().size
 	_pixel_scale = scale_by
 	if _view.size != fitted:
-		_view.size = fitted
+		_resize(fitted)
 	size = Vector2(fitted) / scale_by
 	# Controls are drawn on whole pixels: the view stands on one and its camera carries the rest, so a
 	# medium moving by less than a pixel a frame (a float, a sway) moves smoothly instead of by steps.
@@ -296,7 +376,15 @@ func _frame(settled: bool) -> void:
 	_view.msaa_3d = get_viewport().msaa_3d
 	# Off the screen, it is not drawn at all.
 	if Rect2(Vector2.ZERO, shown).intersects(get_global_rect()):
-		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+		_soft_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+func _resize(pixels: Vector2i) -> void:
+	if _holds != (pixels != Vector2i.ZERO):
+		_holds = not _holds
+		holding += 1 if _holds else -1
+	_view.size = pixels
+	_soft_view.size = pixels
 
 
 ## Where the middle of the medium's top stands on the screen (the app's canvas, px).

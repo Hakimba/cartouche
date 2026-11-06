@@ -18,6 +18,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
@@ -54,7 +55,7 @@ class CartouchePluginTest {
         private val scheduled = StandardTestDispatcher(scope.testScheduler)
 
         // Planning never runs: no art is looked for, and nothing reaches the network.
-        val plugin = CartouchePlugin(godot, Threads(scope, scheduled, Executor { }.asCoroutineDispatcher(), scheduled))
+        val plugin = CartouchePlugin(godot, Threads(scope, scheduled, Executor { }.asCoroutineDispatcher(), scheduled, Dispatchers.IO))
 
         init {
             files.listFiles().orEmpty().forEach { it.deleteRecursively() }

@@ -33,7 +33,7 @@ func test_a_baked_label_draws_its_title_and_platform_where_the_manifest_of_its_s
 		var scene: PackedScene = load(found[medium].scene)
 		var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(scene))
 		var drawn := found[ConsoleManifest.folder_of(scene)]
-		var size := Vector2(model._view.size)
+		var size := Vector2(model._drawn_size)
 		assert_vector(model._title.position).is_equal_approx(size * drawn.title_area.position, Vector2.ONE * 0.01)
 		assert_vector(model._platform.size).is_equal_approx(size * drawn.platform_area.size, Vector2.ONE * 0.01)
 	assert_bool(found["snes_pal_cart"].title_area == ModelShape.TITLE_AREA).is_false()
@@ -142,6 +142,62 @@ func test_a_scan_that_arrives_replaces_the_title_of_its_game_in_view_and_nothing
 
 
 ## The material of [param model]'s label.
+func test_a_label_s_view_holds_a_picture_only_while_its_blank_is_shown() -> void:
+	var model: ShelfRow.LabelledModel = auto_free(ShelfRow.LabelledModel.new(Fixtures.DVD))
+	add_child(model)
+	var held := ShelfRow.LabelledModel.held_views
+	var view: SubViewport = model.find_child("LabelView", true, false)
+	var scan := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGBA8))
+	var drawn_size := view.size
+	for shown: StringName in [&"blank", &"scan", &"blank", &"nothing", &"blank"]:
+		match shown:
+			&"blank": model.draw_label("Title", ShelfRow.LabelLook.new())
+			&"scan": model.show_label(scan, true)
+			&"nothing": model.clear_label()
+		if shown == &"blank":
+			drawn_size = view.size
+		assert_int(ShelfRow.LabelledModel.held_views - held).override_failure_message(shown).is_equal(1 if shown == &"blank" else 0)
+		assert_bool(view.size.x * view.size.y > 16).override_failure_message(shown).is_equal(shown == &"blank")
+	assert_that(drawn_size).is_equal(model._drawn_size)
+	model.free()
+	assert_int(ShelfRow.LabelledModel.held_views).is_equal(held)
+
+
+func test_as_the_app_leaves_only_the_labels_in_view_and_the_pick_s_keep_their_picture_and_show_unchanged() -> void:
+	var games := Fixtures.games(12)
+	var art: GameArt = auto_free(GameArt.new())
+	for game in games:
+		var scan := ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGBA8))
+		art.add(AndroidServices.Art.new({"game_id": game.id, "path": ""}), scan)
+	var row: ShelfRow = auto_free(ShelfRow.new())
+	row.label_images = art
+	row.random = Fixtures.cases(3)
+	add_child(row)
+	row.show_shelf(games, 4, Fixtures.DVDS, ShelfRow.LabelLook.new())
+	row.set_process(false)
+	for frame in 10:
+		row._process(Fixtures.FRAME_S)
+	var shown := _labels_shown(row)
+	var needed: Array[AndroidServices.Game] = []
+	for game: int in shown:
+		needed.append(games[game])
+	for side: int in [0, -1, 1]:
+		needed.append(games[posmod(row._pick + side, games.size())])
+	row.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
+	assert_that(_labels_shown(row)).is_equal(shown)
+	for game in games:
+		assert_bool(art.has_texture(game)).override_failure_message(game.title).is_equal(game in needed)
+		assert_bool(art.has_art(game)).is_true()
+
+
+## The texture each game in view shows, by index.
+func _labels_shown(row: ShelfRow) -> Dictionary[int, Texture2D]:
+	var shown: Dictionary[int, Texture2D] = {}
+	for place: ShelfRow.Place in row._placed.values():
+		shown[place.game] = _label_material(place.shown).get_shader_parameter(&"label_texture")
+	return shown
+
+
 func _label_material(model: Node3D) -> ShaderMaterial:
 	var label: MeshInstance3D = model.find_child("Label", true, false)
 	return label.get_surface_override_material(0)

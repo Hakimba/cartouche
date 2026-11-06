@@ -67,7 +67,7 @@ pictures are made for a dark ground, each element at 3:1 at least against every 
 | A theme label or button in a tracked role | `StudioLabel`, `StudioNameButton`, through `TrackedText` | `studio_label.gd`, `studio_name_button.gd`, `tracked_text.gd` |
 | One line on a frost pill | `StudioPill` | `studio_pill.gd` |
 | A console's logo | `LogoView.show_logo(LogoView.Slot.RAIL_TILE, folder)`, one picture made per slot | `logo_view.gd` |
-| A console's still picture | `Plinth.request_still(folder, done)`: rendered once per model in a throw-away viewport, kept for the app's life | `app/studio/views/plinth.gd` |
+| A console's still picture | `Plinth.request_still(folder, done)`: rendered once per model in a throw-away viewport, only where a fast scroll stops, copied on the GPU (read back on the Compatibility renderer, `Still.of`); dropped whenever the app is paused (a game, the system folder picker, the home screen: `Plinth.drop_stills`) and drawn again when next shown | `app/studio/views/plinth.gd` |
 | Lights designed for a model and screen | `StudioLights.rig_of(model, screen)`, read from `app/data/studio_lights.json` | `app/studio/views/studio_lights.gd` |
 
 Godot's theme labels draw at whole sizes and whole-pixel spacing, so a long tracked line drifts from the design.
@@ -95,7 +95,7 @@ Text that must keep the design's width (a title, a note, a count) draws through 
 | `app/studio/ring/` | `RingFit`, the ordering ring's size rule, pure; `Placing`, the state machine of placing a console just added among the others, pure. |
 | `app/studio/chooser/` | `StudioChooser`: the console and emulator choosers of the add-console form, the chosen console on its plinth. |
 | `app/studio/transitions/` | `FormEntry` (the "+" button to the form), `ConsoleArrival` (a console flying from the form to its place), `LogoFlight` (two logos crossfading in flight). |
-| `app/studio/views/` | `MediaView` (one medium of the games row, softened by its distance from the centre), `Plinth`, `StudioLights`. |
+| `app/studio/views/` | `MediaView` (one medium of the games row, softened by its distance from the centre into a picture made only when it is drawn again), `Plinth`, `StudioLights`. |
 | `app/studio/games/` | See below. |
 
 ### The games screen

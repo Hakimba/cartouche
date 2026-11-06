@@ -2,7 +2,9 @@
 package app.cartouche.android.library
 
 import android.net.Uri
+import app.cartouche.android.Threads
 import app.cartouche.android.storage.AUTHORITY
+import app.cartouche.android.storage.DISC_SERIAL
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.FakeDocuments
 import app.cartouche.android.storage.FileStamp
@@ -58,6 +60,7 @@ import io.kotest.property.Arb
 import io.kotest.property.arbitrary.enum
 import io.kotest.property.arbitrary.list
 import io.kotest.property.checkAll
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeFalse
 import org.junit.Test
@@ -66,6 +69,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.io.File
 import java.io.FileNotFoundException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 class LibraryServiceTest {
@@ -90,6 +96,7 @@ class LibraryServiceTest {
         arrivals,
         Folders(context),
         FactsStore(factsFolder),
+        Dispatchers.IO.limitedParallelism(Threads.FILE_READS),
     )
 
     private fun LibraryService.scan() = scan(platform, TitleIndex.EMPTY, DataFolders.NONE)
@@ -510,6 +517,31 @@ class LibraryServiceTest {
         service.identified() shouldBe 2
         service.scanPs2()
         provider.opened.size shouldBe 6
+    }
+
+    @Test
+    fun `a scan reads its files a few at once, each telling what it holds, each read once`() {
+        val files =
+            (1..12).associate { n ->
+                val disc = n % 3 == 0
+                if (disc) "root/Disc $n.chd" to discImage("cd-cdlz.chd") else "root/Blank $n.iso" to ByteArray(4096)
+            }
+        val (service, provider) = ps2Folder(files)
+        // The first files opened wait until as many are open as read at once: read one after the other, they never are.
+        val together = CountDownLatch(Threads.FILE_READS)
+        val alone = AtomicBoolean(false)
+        val serve = provider.open
+        provider.open = { id, mode ->
+            together.countDown()
+            if (!together.await(5, TimeUnit.SECONDS)) alone.set(true)
+            serve(id, mode)
+        }
+        service.scanPs2()
+        alone.get() shouldBe false
+        provider.opened.size shouldBe files.size
+        val told = FactsStore(factsFolder).load(ps2.id).mapValues { it.value.facts }
+        told.size shouldBe files.size
+        told.forEach { (uri, facts) -> facts shouldBe if (uri.value.endsWith(".chd")) FileFacts.Serial(DISC_SERIAL) else FileFacts.Silent }
     }
 
     @Test

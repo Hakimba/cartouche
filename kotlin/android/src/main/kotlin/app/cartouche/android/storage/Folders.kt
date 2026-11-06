@@ -48,6 +48,7 @@ import arrow.core.raise.ensureNotNull
 import arrow.core.raise.option
 import arrow.core.toOption
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.TimeSource
 
 /**
@@ -98,6 +99,9 @@ internal sealed interface StorageFailure {
  * an SD card: callers run them off the main and render threads.
  */
 internal class Folders(private val context: Context) {
+    /** The bytes [facts] read of every file, for the traces of files read a few at a time. */
+    val bytesRead: AtomicLong = AtomicLong()
+
     /** Keeps read access to a folder returned by the picker across reboots and app restarts. */
     fun keepAccess(treeUri: Uri): Either<StorageFailure, Folder> = guard {
         context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -142,7 +146,7 @@ internal class Folders(private val context: Context) {
     /**
      * What [file] tells of itself, as [FileReading] reads it for [platform]: the file is opened read-only, through
      * its documents provider, and closed once read. A file that cannot be opened or read (storage removed, access
-     * revoked) is a failure; one that tells nothing is [FileFacts.Silent].
+     * revoked) is a failure; one that tells nothing is [FileFacts.Silent]. Safe to call from several threads.
      */
     fun facts(platform: PlatformId, file: ListedFile): Either<StorageFailure, FileFacts> = guard {
         val started = TimeSource.Monotonic.markNow()
@@ -154,6 +158,7 @@ internal class Folders(private val context: Context) {
             ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { stream ->
                 val source = DocumentBytes(stream.channel::read, descriptor.statSize)
                 FileReading.facts(platform, file.name, source).mapLeft { StorageFailure.Unavailable(it.detail) }.bind().also {
+                    bytesRead.addAndGet(source.bytesRead)
                     trace("files") {
                         "${file.name.value}: ${it.described}, ${source.bytesRead / 1024} kB read in " +
                             "${started.elapsedNow().inWholeMilliseconds} ms"

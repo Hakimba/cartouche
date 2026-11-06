@@ -50,7 +50,7 @@ previous file, never half of the new one.
 
 | File | Responsibility |
 |---|---|
-| `Folders.kt` | Folders picked with the system picker: keeping read access (nothing more), listing a level for `FolderWalk`, and reading a file's facts. |
+| `Folders.kt` | Folders picked with the system picker: keeping read access (nothing more), listing a level for `FolderWalk`, and reading a file's facts (a scan reads three files at once, `LibraryService.readAll`). |
 | `DocumentBytes.kt` | A document opened read-only as the core's `ByteSource`. |
 | `FactsStore.kt` | What each platform's files told, with the size and date they had then, so a rescan reads only new or changed files. |
 | `LibraryStore.kt` | The library file. An unreadable one is set aside, not lost (INV-11). |

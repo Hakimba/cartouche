@@ -310,7 +310,8 @@ static func medium_shape(medium: String) -> ModelShape:
 
 ## The platform [param id] as the catalog sends it, its media its profile's.
 static func platform(id: String) -> AndroidServices.Platform:
-	return AndroidServices.Platform.new({"id": id, "name": id, "media": _profile(id)["media"]})
+	var medium: Dictionary = _profile(id)["medium"]
+	return AndroidServices.Platform.new({"id": id, "name": id, "media": _profile(id)["media"], "medium": medium["default"]})
 
 
 ## The media [param id]'s profile declares, its default first.

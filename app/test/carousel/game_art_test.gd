@@ -47,6 +47,21 @@ func test_a_requested_image_is_read_in_the_background_then_becomes_its_game_s_te
 	assert_array(loaded).is_equal([game.id])
 
 
+func test_textures_let_go_are_read_again_when_asked_and_those_kept_stay() -> void:
+	var games := Fixtures.games(3)
+	for game in games:
+		_art.add(_stored(game))
+		_art.request(game)
+	await _settled()
+	var kept := _art.texture(games[1])
+	_art.keep_textures([games[1]])
+	assert_array(games.map(_art.has_texture)).is_equal([false, true, false])
+	assert_object(_art.texture(games[1])).is_same(kept)
+	_art.request(games[0])
+	await _settled()
+	assert_bool(_art.has_texture(games[0])).is_true()
+
+
 func test_a_game_without_art_reads_nothing() -> void:
 	var game := Fixtures.games(1)[0]
 	_art.request(game)

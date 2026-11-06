@@ -636,6 +636,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         File(folder, "arrivals.json"),
         folders,
         FactsStore(File(folder, "facts")),
+        threads.fileReads,
         ::prepare,
     )
 

@@ -34,6 +34,7 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
@@ -99,11 +100,12 @@ class ArtServiceTest {
                 File(context.filesDir, "arrivals.json"),
                 Folders(context),
                 FactsStore(File(context.filesDir, "facts")),
+                Dispatchers.IO,
             )
         private val scheduled = StandardTestDispatcher(scope.testScheduler)
         val art =
             ArtService(
-                Threads(scope, scheduled, planning ?: scheduled, scheduled),
+                Threads(scope, scheduled, planning ?: scheduled, scheduled, Dispatchers.IO),
                 store,
                 { library },
                 { reference },

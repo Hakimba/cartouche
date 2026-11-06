@@ -369,6 +369,25 @@ func test_a_filter_change_keeps_every_view_bound_to_its_own_model_and_makes_no_n
 		assert_int(ShelfRow.LabelledModel.alive).is_equal(models)
 
 
+## A place left free while the row moves keeps its view's pictures for the game coming in; once the row rests (a
+## search leaving fewer games) or the app is paused, a place with no game holds none.
+func test_a_free_place_keeps_its_view_s_pictures_only_while_the_row_moves() -> void:
+	var row := _row(10, 2)
+	_with_camera(row)
+	var kept := func() -> int:
+		return row._places.filter(func(place: ShelfRow.Place) -> bool:
+			return place.game < 0 and place.media_view != null and place.media_view._holds).size()
+	row.step(1)
+	_frames(row, 3, Fixtures.FRAME_S)
+	assert_int(kept.call()).override_failure_message("moving").is_equal(1)
+	row.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
+	assert_int(kept.call()).override_failure_message("paused").is_equal(0)
+	row.show_games(Fixtures.games(2), 0)
+	_frames(row, 3, Fixtures.FRAME_S)
+	assert_int(row._places.filter(func(place: ShelfRow.Place) -> bool: return place.media_view != null).size()).is_equal(5)
+	assert_int(kept.call()).override_failure_message("at rest").is_equal(0)
+
+
 func test_a_shelf_without_its_model_shown_yet_gives_a_pill_top_without_failing() -> void:
 	var row: ShelfRow = auto_free(ShelfRow.new())
 	row.label_images = auto_free(Fixtures.FakeArt.new())

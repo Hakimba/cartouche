@@ -65,7 +65,7 @@ public object FileReading {
 }
 
 private fun Raise<ReadFailure>.chdSerial(source: ByteSource): Option<FileFacts> =
-    chdImage(source).flatMap { chd -> Iso9660.bootSerial { n -> with(chd) { sector(n) } } }
+    chdSectors(source) { sector -> Iso9660.bootSerial(sector) }
 
 private fun Raise<ReadFailure>.isoSerial(source: ByteSource): Option<FileFacts> =
     Iso9660.bootSerial { n -> bytes(source, n * SECTOR.toLong(), SECTOR) }
