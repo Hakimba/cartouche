@@ -56,8 +56,7 @@ func _process(_delta: float) -> void:
 		queue_redraw()
 		return
 	var watched := get_viewport().get_camera_3d()
-	_camera.global_transform = watched.global_transform
-	_camera.fov = watched.fov
+	StageLens.copy(watched, _camera)
 	_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	var pixels := Vector2(_view.size) / size
 	_material.set_shader_parameter(&"border", _BORDER * consoles.peel * pixels.x)

@@ -23,7 +23,6 @@ const _SHOWN := 6
 const _MORE_UP_Y := 127.64
 const _MORE_DOWN_Y := 689.24
 const _ROW_SIZE := Vector2(624.64, 81.92)
-const _CARD_TOP := 128.0
 const _HEADING_INSET := Vector2(43.52, 37.4)
 ## The first row's top in the card, in px: a pixel above where centring puts its text and frame.
 const _ITEMS_TOP := 143.64
@@ -82,6 +81,7 @@ var _switches: Dictionary[StringName, Switch] = {}
 var _ink: Control
 
 @onready var _panel: Control = $Panel
+@onready var _rests := Rests.new([_panel])
 @onready var _items: Control = $Panel/Items
 
 
@@ -205,7 +205,7 @@ func _sample() -> void:
 	var card := Motion.phase(t, 0.0, StudioTokens.TR_SETTINGS_CARD_OUT_S, StudioTokens.TR_SETTINGS_CARD_OUT_S_CURVE) if _closing \
 		else 1.0 - Motion.phase(t, StudioTokens.TR_SETTINGS_CARD_AT_S, StudioTokens.TR_SETTINGS_CARD_S, StudioTokens.TR_SETTINGS_CARD_S_CURVE)
 	_panel.modulate.a = 1.0 - card
-	_panel.position.y = _CARD_TOP + card * (25.6 if _closing else StudioTokens.TR_SETTINGS_RISE_PX)
+	_panel.position.y = _rests.of(_panel).y + card * (25.6 if _closing else StudioTokens.TR_SETTINGS_RISE_PX)
 	_panel.scale = Vector2.ONE * lerpf(1.0, 0.98 if _closing else 0.97, card)
 	($Dim as ColorRect).modulate.a = 1.0 - Motion.phase(t, 0.06, 0.2, Motion.Easing.EASE_IN) if _closing \
 		else Motion.phase(t, StudioTokens.TR_SETTINGS_VEIL_AT_S, StudioTokens.TR_SETTINGS_VEIL_S, Motion.Easing.EASE_OUT)

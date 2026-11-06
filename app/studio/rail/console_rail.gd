@@ -4,10 +4,10 @@ extends Control
 ## The consoles screen's rail: a ring of satin tiles, one per console, centred under the posed console, in the
 ## logo of each; the selected one stands in a frame in its gel, with a pool of light under it. A press moves
 ## the spring's target by one; the tiles follow it, each at its slot's distance from the centre (the ring
-## wraps both ways; a ring short enough to show whole is a strip of its tiles side by side, so no tile ever
-## crosses the rail), the frame pops and the gel crossfades. The rail fades out toward both edges and each tile
-## has its floor reflection. At rest nothing is drawn: the spring stops the rail's frames. The pool shows only on the
-## studio's wall ([member Palette.wall]).
+## wraps both ways; a ring short enough to show whole is a strip of its tiles side by side, centred and still, the
+## frame and its pool moving along it, so no tile ever crosses the rail), the frame pops and the gel crossfades.
+## The rail fades out toward both edges and each tile has its floor reflection. At rest nothing is drawn: the spring
+## stops the rail's frames. The pool shows only on the studio's wall ([member Palette.wall]).
 
 
 ## The tiles' step, the first tile's top-left corner and the farthest slot shown, in px and slots.
@@ -15,6 +15,8 @@ const PITCH := 174.08
 const TILE_LEFT := 564.48
 const TILE_TOP := 711.68
 const HIDDEN_BEYOND := 3.6
+## The fade across the rail on the 4:3 frame, in px: nothing up to x, rising to whole at y, whole to z, nothing at w.
+const MASK := Vector4(76.8, 256.0, 1024.0, 1203.2)
 ## The selection frame's box, border, radius and glows.
 const FRAME := Rect2(553.6, 700.8, 172.8, 124.16)
 const _FRAME_BORDER := 5.76
@@ -57,6 +59,8 @@ var _gel_weight := 1.0:
 var _pop_fade: Tween
 var _slide_fade: Tween
 var _frame := Frame.new()
+## How many slots from the centre tiles show: [constant HIDDEN_BEYOND] on the 4:3 frame, more on a wider screen.
+var _reach := HIDDEN_BEYOND
 
 @onready var _stage: Control = $Stage
 @onready var _pool: TextureRect = $Stage/Pool
@@ -112,22 +116,28 @@ class Frame:
 
 ## How far past slot 0 a tile [param index] is for a rail at [param along] with [param count] tiles, in
 ## slots: the way round the ring that is shorter, on the left when both are as short.
-## A strip ([method is_strip]) is not wrapped: [param along] is then a place on it, not a turn of the ring.
-static func slot(index: int, along: float, count: int) -> float:
-	if is_strip(count):
-		return index - along
+## A strip ([method is_strip]) is not wrapped and stands still, centred on the rail: the frame moves along it instead.
+static func slot(index: int, along: float, count: int, reach := HIDDEN_BEYOND) -> float:
+	if is_strip(count, reach):
+		return index - (count - 1) / 2.0
 	return fposmod(index - along + count / 2.0, count) - count / 2.0
 
 
-## Whether a ring of [param count] consoles shows whole on the rail, as a strip: wrapping it would show a tile
-## on both sides, or move one across the rail.
-static func is_strip(count: int) -> bool:
-	return count <= 2 * floori(HIDDEN_BEYOND) + 1
+## How far past slot 0 the frame stands for a rail at [param along] with [param count] tiles, in slots: on the
+## selected tile of a strip, in the middle of a ring.
+static func frame_slot(along: float, count: int, reach := HIDDEN_BEYOND) -> float:
+	return along - (count - 1) / 2.0 if is_strip(count, reach) else 0.0
 
 
-## Whether a tile [param slots] from the centre shows.
-static func shown(slots: float) -> bool:
-	return absf(slots) <= HIDDEN_BEYOND
+## Whether a ring of [param count] consoles shows whole on a rail showing tiles up to [param reach] slots from the
+## centre, as a strip: wrapping it would show a tile on both sides, or move one across the rail.
+static func is_strip(count: int, reach := HIDDEN_BEYOND) -> bool:
+	return count <= 2 * floori(reach) + 1
+
+
+## Whether a tile [param slots] from the centre shows on a rail reaching [param reach] slots.
+static func shown(slots: float, reach := HIDDEN_BEYOND) -> bool:
+	return absf(slots) <= reach
 
 
 ## The frame's scale [param seconds] after a press: the keyframes, read at the progress the whole animation's
@@ -154,6 +164,8 @@ func _ready() -> void:
 	set_process(false)
 	_apply_sink()
 	_apply_ground()
+	get_viewport().size_changed.connect(_fit_width)
+	_fit_width()
 
 
 func _notification(what: int) -> void:
@@ -170,7 +182,7 @@ func _process(delta: float) -> void:
 
 
 ## Shows the consoles in [param folders] (under res://carousel/consoles), in this order, the tile at
-## [param selected] in the middle.
+## [param selected] in the frame.
 func show_consoles(folders: Array[String], selected: int) -> void:
 	for tile in _tiles + _mirrors:
 		tile.queue_free()
@@ -190,7 +202,7 @@ func show_consoles(folders: Array[String], selected: int) -> void:
 		_mirrors_root.add_child(_mirrors[-1])
 	_spring = Motion.Spring.new(float(selected))
 	_set_gel(_gel_of(selected), false)
-	_place()
+	_fit_width()
 
 
 ## The rail's target (an unbounded index: the ring's turns count, but a strip's place is the console's) moves to
@@ -199,7 +211,7 @@ func go_to(target: int) -> void:
 	if _folders.is_empty():
 		return
 	Diagnostics.trace("carousel", "rail target=%d" % target)
-	_spring.target = float(posmod(target, _folders.size()) if is_strip(_folders.size()) else target)
+	_spring.target = float(posmod(target, _folders.size()) if is_strip(_folders.size(), _reach) else target)
 	_place()
 	set_process(true)
 	_set_gel(_gel_of(target))
@@ -226,14 +238,16 @@ func rise(duration_s: float, delay_s := 0.0) -> Tween:
 	return _slide_to(0.0, duration_s, delay_s, Motion.Easing.ARRIVE)
 
 
-## How many steps from the target select the tile under [param point] (in the frame's px);
+## How many steps from the target select the tile under [param point] (in the screen's px);
 ## [constant NO_TILE] for a point on none.
 func slot_under(point: Vector2) -> int:
 	if not is_visible_in_tree() or sunk >= 1.0:
 		return NO_TILE
+	var on_stage := point - _stage.global_position
 	for tile in _tiles:
-		if tile.visible and Rect2(tile.position, RailTile.SIZE).has_point(point):
-			return roundi((tile.position.x - TILE_LEFT) / PITCH + _spring.position - _spring.target)
+		if tile.visible and Rect2(tile.position, RailTile.SIZE).has_point(on_stage):
+			var past_frame := (tile.position.x - TILE_LEFT) / PITCH - frame_slot(_spring.position, _tiles.size(), _reach)
+			return roundi(past_frame + _spring.position - _spring.target)
 	return NO_TILE
 
 
@@ -267,17 +281,36 @@ func spring() -> Motion.Spring:
 	return _spring
 
 
-## Where each tile stands for the spring's position.
+## Where each tile, the frame and its pool stand for the spring's position.
 func _place() -> void:
+	var shift := frame_slot(_spring.position, _tiles.size(), _reach) * PITCH
+	_frame.position.x = FRAME.position.x + shift
+	_pool.position.x = POOL.position.x + shift
 	for i in _tiles.size():
-		var slots := slot(i, _spring.position, _tiles.size())
-		var shows := shown(slots)
+		var slots := slot(i, _spring.position, _tiles.size(), _reach)
+		var shows := shown(slots, _reach)
 		_tiles[i].visible = shows
 		_mirrors[i].visible = shows
 		if shows:
 			var x := TILE_LEFT + slots * PITCH
 			_tiles[i].position = Vector2(x, TILE_TOP)
 			_mirrors[i].position = Vector2(x, TILE_TOP + 2.0 * RailTile.SIZE.y + RailTile.REFLECTION_GAP)
+
+
+## The tiles reach as far as the screen's width lets them, and the fade toward the edges goes with them; a strip shows
+## whole, its fade past its end tiles; a ring that turns into a strip (or back) stands on its console.
+func _fit_width() -> void:
+	var spare := ScreenLayout.at(get_viewport()).spare_width() / 2.0
+	var was_strip := is_strip(_folders.size(), _reach)
+	_reach = HIDDEN_BEYOND + spare / PITCH
+	var strip := is_strip(_folders.size(), _reach)
+	var end_tile := (_folders.size() - 1) / 2.0 * PITCH + RailTile.SIZE.x / 2.0 - (MASK.z - CarouselLayout.FRAME.x / 2.0)
+	var opened := maxf(spare, end_tile) if strip else spare
+	for group: CanvasGroup in [_cloth, _mirrors_root]:
+		(group.material as ShaderMaterial).set_shader_parameter(&"ramp", MASK + Vector4(-opened, -opened, opened, opened))
+	if not _folders.is_empty() and was_strip != strip:
+		_spring = Motion.Spring.new(float(posmod(roundi(_spring.target), _folders.size())))
+	_place()
 
 
 func _apply_sink() -> void:

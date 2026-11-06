@@ -43,7 +43,8 @@ func _ready() -> void:
 	_view.add_child(_camera)
 	add_child(_view)
 	texture = _view.get_texture()
-	get_viewport().size_changed.connect(_frame)
+	# Once the carousel's camera has followed the window.
+	get_viewport().size_changed.connect(_frame, CONNECT_DEFERRED)
 
 
 func _exit_tree() -> void:
@@ -138,7 +139,8 @@ func _measure() -> void:
 			var seen := watched.unproject_position(part.global_transform * box.get_endpoint(corner))
 			low = low.min(seen)
 			high = high.max(seen)
-	_silhouette = Rect2(low, high - low) if low.x < INF else Rect2()
+	# Kept on the stage: a window changing shape moves the stage, not the console on it.
+	_silhouette = Rect2(ScreenLayout.at(get_viewport()).from_stage(low), high - low) if low.x < INF else Rect2()
 
 
 ## The camera as the carousel's, its frustum narrowed round the silhouette; the view at the window's scale.
@@ -148,12 +150,7 @@ func _frame() -> void:
 	_render()
 	if not _silhouette.has_area():
 		return
-	var watched := ring.get_viewport().get_camera_3d()
-	_camera.global_transform = watched.global_transform
-	# The carousel's view keeps its height: one of its px is this much of the near plane.
-	var view := ring.get_viewport().get_visible_rect().size
-	var near_px := 2.0 * watched.near * tan(deg_to_rad(watched.fov) / 2.0) / view.y
 	var zoom := minf(_FILL * size.x / _silhouette.size.x, _FILL * size.y / _silhouette.size.y)
-	var centre := _silhouette.get_center() - view / 2.0
-	_camera.set_frustum(size.y / zoom * near_px, Vector2(centre.x, -centre.y) * near_px, watched.near, watched.far)
+	var centre := ScreenLayout.at(get_viewport()).on_stage(_silhouette.get_center())
+	StageLens.narrow(ring.get_viewport().get_camera_3d(), _camera, Rect2(centre - size / zoom / 2.0, size / zoom))
 	_render()

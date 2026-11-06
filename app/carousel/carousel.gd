@@ -244,9 +244,9 @@ func _ready() -> void:
 		_platforms[platform.id] = platform
 	_appearance = Appearance.read(_APPEARANCE)
 	var read_ms := Time.get_ticks_msec()
-	var shown := get_viewport_rect().size
 	_consoles.position.y -= _world_height(_CONSOLES_LOWER_PX, _consoles)
-	_screens.console_point = Vector2(shown.x / 2.0, _CONSOLE_Y + _CONSOLES_LOWER_PX - ConsoleRow.RAISE_PX)
+	_lay_out()
+	get_viewport().size_changed.connect(_lay_out)
 	_console_title.visibility_changed.connect(_show_rail)
 	_row_y = _row.position.y
 	_search_lift = _world_height(_SEARCH_LIFT_PX, _row)
@@ -587,11 +587,19 @@ func _selected_point() -> Vector2:
 	return _camera.unproject_position(_row.to_global(Vector3.ZERO))
 
 
-## [param pixels] of the screen's height, in world units at [param part]'s depth: there, the screen's
-## height spans 2·d·tan(fov / 2).
+## [param pixels] of the frame's height, in world units at [param part]'s depth: there, the frame's
+## height spans 2·d·tan(fov / 2), on a screen of any shape ([StageLens]).
 func _world_height(pixels: float, part: Node3D) -> float:
 	var depth := _camera.global_position.z - part.global_position.z
-	return pixels / get_viewport_rect().size.y * 2.0 * depth * tan(deg_to_rad(_camera.fov / 2.0))
+	return pixels / CarouselLayout.FRAME.y * 2.0 * depth * tan(deg_to_rad(_camera.fov / 2.0))
+
+
+## The camera and the console's resting point follow the screen's shape.
+func _lay_out() -> void:
+	var layout := ScreenLayout.at(get_viewport())
+	StageLens.aim(_camera, _camera.fov, layout)
+	_screens.console_point = layout.on_stage(
+		Vector2(CarouselLayout.FRAME.x / 2.0, _CONSOLE_Y + _CONSOLES_LOWER_PX - ConsoleRow.RAISE_PX))
 
 
 ## Forgets the finger, as if lifted: a screen changing under it leaves nothing pending.

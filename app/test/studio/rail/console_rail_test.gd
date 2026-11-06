@@ -22,10 +22,17 @@ func _nearest(index: int, along: int, count: int, right := false) -> float:
 func _rail(count: int, selected := 0) -> ConsoleRail:
 	var rail: ConsoleRail = auto_free((load("res://studio/rail/console_rail.tscn") as PackedScene).instantiate())
 	add_child(rail)
+	rail.size = CarouselLayout.FRAME
 	var folders: Array[String] = []
 	folders.assign(_folders.slice(0, count))
 	rail.show_consoles(folders, selected)
 	return rail
+
+
+## Whether the frame stands on tile [param index].
+func _framed(rail: ConsoleRail, index: int) -> bool:
+	var frame_past := rail.frame().position.x - ConsoleRail.FRAME.position.x
+	return absf(frame_past - (rail.tile_at(index).x - ConsoleRail.TILE_LEFT)) < 0.01
 
 
 func _settle(rail: ConsoleRail) -> void:
@@ -68,11 +75,11 @@ func test_a_walk_of_presses_with_random_frames_ends_on_the_right_console() -> vo
 		var place := posmod(target, count) if ConsoleRail.is_strip(count) else target
 		assert_float(rail.spring().position).is_equal(float(place))
 		for index in count:
-			var slots := float(index - place) if ConsoleRail.is_strip(count) else _nearest(index, target, count)
+			var slots := index - (count - 1) / 2.0 if ConsoleRail.is_strip(count) else _nearest(index, target, count)
 			assert_bool(rail.is_shown(index)).is_equal(absf(slots) <= 3.6)
 			if absf(slots) <= 3.6:
 				assert_float(rail.tile_at(index).x).is_equal_approx(ConsoleRail.TILE_LEFT + slots * ConsoleRail.PITCH, 0.01)
-		assert_vector(rail.tile_at(posmod(target, count))).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
+		assert_bool(_framed(rail, posmod(target, count))).is_true()
 
 
 func test_a_tap_under_a_tile_names_its_place_along_the_ring() -> void:
@@ -85,14 +92,24 @@ func test_a_tap_under_a_tile_names_its_place_along_the_ring() -> void:
 	assert_int(rail.slot_under(Vector2(middle.x, 300.0))).is_equal(ConsoleRail.NO_TILE)
 
 
+func test_on_a_wide_screen_the_rail_stands_in_the_middle_and_takes_taps_there() -> void:
+	var rail := _rail(12, 0)
+	rail.size = Vector2(1920.0, 960.0)
+	var middle := Vector2(rail.size.x / 2.0, _MIDDLE.y + 20.0)
+	assert_int(rail.slot_under(middle)).is_equal(0)
+	assert_int(rail.slot_under(middle + Vector2(ConsoleRail.PITCH, 0.0))).is_equal(1)
+	assert_int(rail.slot_under(middle - Vector2(2.0 * ConsoleRail.PITCH, 0.0))).is_equal(-2)
+
+
 func test_a_tap_on_a_strip_steps_as_many_places_as_the_tile_is_away() -> void:
 	var rail := _rail(3, 0)
-	var middle := _MIDDLE + Vector2(RailTile.SIZE.x / 2.0, 20.0)
-	assert_int(rail.slot_under(middle + Vector2(2.0 * ConsoleRail.PITCH, 0.0))).is_equal(2)
-	assert_int(rail.slot_under(middle - Vector2(ConsoleRail.PITCH, 0.0))).is_equal(ConsoleRail.NO_TILE)
-	rail.go_to(2)
-	_settle(rail)
-	assert_int(rail.slot_under(middle - Vector2(2.0 * ConsoleRail.PITCH, 0.0))).is_equal(-2)
+	for selected in 3:
+		rail.go_to(selected)
+		_settle(rail)
+		for index in 3:
+			assert_int(rail.slot_under(rail.tile_at(index) + RailTile.SIZE / 2.0)).is_equal(index - selected)
+	var past_end := rail.tile_at(2) + RailTile.SIZE / 2.0 + Vector2(ConsoleRail.PITCH, 0.0)
+	assert_int(rail.slot_under(past_end)).is_equal(ConsoleRail.NO_TILE)
 
 
 ## Every tile shown, as (console, x), sorted, for a rail at its spring's position.
@@ -105,7 +122,7 @@ func _stood(rail: ConsoleRail) -> Array[Vector2]:
 	return all
 
 
-func test_a_short_ring_is_a_strip_of_its_consoles_each_shown_once() -> void:
+func test_a_short_ring_is_a_centred_strip_of_its_consoles_the_frame_on_the_selected_one() -> void:
 	assert_bool(ConsoleRail.is_strip(7)).is_true()
 	assert_bool(ConsoleRail.is_strip(8)).is_false()
 	for count in range(1, 8):
@@ -117,12 +134,10 @@ func test_a_short_ring_is_a_strip_of_its_consoles_each_shown_once() -> void:
 			var consoles: Array[int] = []
 			for tile in _stood(rail):
 				consoles.append(roundi(tile.x))
-				assert_float(tile.y).is_equal_approx(ConsoleRail.TILE_LEFT + (tile.x - selected) * ConsoleRail.PITCH, 0.01)
-			var wanted: Array[int] = []
-			for index in count:
-				if absi(index - selected) <= 3:
-					wanted.append(index)
-			assert_array(consoles).override_failure_message("n=%d target=%d" % [count, target]).is_equal(wanted)
+				var slots := tile.x - (count - 1) / 2.0
+				assert_float(tile.y).is_equal_approx(ConsoleRail.TILE_LEFT + slots * ConsoleRail.PITCH, 0.01)
+			assert_array(consoles).override_failure_message("n=%d target=%d" % [count, target]).is_equal(range(count))
+			assert_bool(_framed(rail, selected)).is_true()
 
 
 func test_an_empty_ring_shows_no_rail() -> void:

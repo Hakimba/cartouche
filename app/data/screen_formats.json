@@ -1,0 +1,12 @@
+{
+  "formats": [
+    {"name": "portrait", "up_to": 1.0},
+    {"name": "square", "up_to": 1.25},
+    {"name": "4:3", "up_to": 1.42},
+    {"name": "16:10", "up_to": 1.68, "shelf_level": true},
+    {"name": "16:9", "up_to": 1.95, "shelf_level": true},
+    {"name": "20:9", "up_to": 2.3, "shelf_level": true},
+    {"name": "21:9", "up_to": 2.8, "shelf_level": true},
+    {"name": "32:9", "shelf_level": true}
+  ]
+}

@@ -166,7 +166,7 @@ var _opening := Motion.Timeline.new(_place_opening, self)
 var _returning := false
 var _choosing := false
 ## Where each line of the screen rests, and the one the plate's ink is drawn on.
-var _rests: Dictionary[Control, Vector2] = {}
+var _rests: Rests
 var _plate_ink: Control
 var _plate_rest := 0.0
 ## The touch in progress: where it began, and whether it has become a drag.
@@ -175,13 +175,13 @@ var _pressing := false
 var _dragging := false
 var _motions: Dictionary[StringName, Tween] = {}
 
-@onready var _backdrop: Cyclorama = $Backdrop
-@onready var _title_node: Control = $Title
-@onready var _count_node: Control = $Count
-@onready var _plate_node: Control = $PlateText
-@onready var _window: TextureRect = $List
-@onready var _inner: Control = $List/Inner
-@onready var _cursor: SatinPanel = $List/Inner/Cursor
+@onready var _frame: Control = $Frame
+@onready var _title_node: Control = $Frame/Title
+@onready var _count_node: Control = $Frame/Count
+@onready var _plate_node: Control = $Frame/PlateText
+@onready var _window: TextureRect = $Frame/List
+@onready var _inner: Control = $Frame/List/Inner
+@onready var _cursor: SatinPanel = $Frame/List/Inner/Cursor
 
 
 func _ready() -> void:
@@ -207,8 +207,7 @@ func _ready() -> void:
 	_cursor.look = StudioTokens.Look.FOCUS
 	_cursor.size = _ROW
 	_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for line: Control in [_title_node, _count_node, _window, _plate_node]:
-		_rests[line] = line.position
+	_rests = Rests.new([_title_node, _count_node, _window, _plate_node])
 
 
 func _notification(what: int) -> void:
@@ -373,8 +372,8 @@ func _present_plinth(still_folder: String) -> void:
 		_plinth.name = "Plinth"
 		_plinth.position = StudioTokens.PLINTH.position
 		_plinth.size = StudioTokens.PLINTH.size
-		add_child(_plinth)
-		move_child(_plinth, _backdrop.get_index() + 1)
+		_frame.add_child(_plinth)
+		_frame.move_child(_plinth, 0)
 	(_plinth.get_node("Plate") as Control).visible = _is_type
 	if not _is_type:
 		_plinth.show_console(still_folder)
@@ -469,7 +468,7 @@ func _place_opening() -> void:
 		Motion.Easing.EASE_OUT)
 	var progress := Motion.phase(_opening.seconds, StudioTokens.TR_CHOOSER_LINES_AT_S, StudioTokens.TR_CHOOSER_IN_S, Motion.Easing.ARRIVE)
 	for line in _lines():
-		line.position = _rests[line] + Vector2(StudioTokens.TR_CHOOSER_SHIFT_PX, StudioTokens.TR_CHOOSER_TITLE_PX) * (1.0 - progress)
+		line.position = _rests.of(line) + Vector2(StudioTokens.TR_CHOOSER_SHIFT_PX, StudioTokens.TR_CHOOSER_TITLE_PX) * (1.0 - progress)
 		line.modulate.a = progress
 
 
@@ -530,9 +529,7 @@ func _answer(picked: int, turn_back := false) -> void:
 	_motions.clear()
 	# Given up mid-entry, the lines go back to rest, so the next opening starts from where it should.
 	modulate.a = 1.0
-	for line: Control in _rests:
-		line.position = _rests[line]
-		line.modulate.a = 1.0
+	_rests.restore()
 	_plate_ink.position.y = 0.0
 	_plate_ink.modulate.a = 1.0
 	_pressing = false

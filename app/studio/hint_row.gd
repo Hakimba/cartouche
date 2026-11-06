@@ -13,6 +13,7 @@ func _init() -> void:
 
 func _ready() -> void:
 	set_notify_transform(true)
+	get_viewport().size_changed.connect(_pin)
 	_pin()
 	_fit()
 
@@ -22,10 +23,11 @@ func _notification(what: int) -> void:
 		_pin()
 
 
-## Its fixed place on the screen, wherever the screen's own parts start and wherever they move.
+## Its fixed place on the screen, at its bottom left, wherever the screen's own parts start and wherever they move.
 func _pin() -> void:
-	if global_position != StudioTokens.HINTS.position:
-		global_position = StudioTokens.HINTS.position
+	var place := ScreenLayout.at(get_viewport()).bottom(StudioTokens.HINTS.position, ScreenLayout.Side.LEFT)
+	if global_position != place:
+		global_position = place
 
 
 func _lay_out() -> void:

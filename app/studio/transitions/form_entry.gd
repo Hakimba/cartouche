@@ -37,15 +37,15 @@ func _init() -> void:
 ## The button turns into the form's first field, from the ball [param ball] (open) as it stands; returns the flight.
 func open(ball: AddBall) -> Tween:
 	var centre := ball.get_global_rect().get_center()
-	return _fly(Rect2(centre - BUTTON / 2.0, BUTTON), BUTTON.y / 2.0, FIELD, StudioTokens.FOCUS_RADIUS, StudioTokens.TR_FORM_OPEN_S, 0.0,
+	return _fly(Rect2(centre - BUTTON / 2.0, BUTTON), BUTTON.y / 2.0, _field(), StudioTokens.FOCUS_RADIUS, StudioTokens.TR_FORM_OPEN_S, 0.0,
 		CARD_IN_S, 0.0, 1.0, StudioTokens.TR_FORM_OPEN_S_CURVE)
 
 
 ## The card leaves the form's first field for the ball [param ball] (closed); returns the flight.
 func close(ball: AddBall) -> Tween:
 	var centre := ball.get_global_rect().get_center()
-	return _fly(FIELD, StudioTokens.FOCUS_RADIUS, Rect2(centre - BALL.size / 2.0, BALL.size), BALL.size.y / 2.0, StudioTokens.TR_FORM_BACK_S,
-		0.0, StudioTokens.TR_FORM_OUT_S, 1.0, 0.0, StudioTokens.TR_FORM_BACK_S_CURVE)
+	return _fly(_field(), StudioTokens.FOCUS_RADIUS, Rect2(centre - BALL.size / 2.0, BALL.size), BALL.size.y / 2.0,
+		StudioTokens.TR_FORM_BACK_S, 0.0, StudioTokens.TR_FORM_OUT_S, 1.0, 0.0, StudioTokens.TR_FORM_BACK_S_CURVE)
 
 
 ## The card flies from [param from] to [param to] in [param seconds], its look going from [param alpha_from] to
@@ -71,6 +71,11 @@ func _fly(from: Rect2, from_radius: float, to: Rect2, to_radius: float, seconds:
 	_flight.tween_property(_card, ^"modulate:a", alpha_to, fade_s).set_delay(delay_s)
 	_flight.chain().tween_callback(_card.hide)
 	return _flight
+
+
+## The form's first field where it stands: the form is on the stage ([ScreenLayout]).
+func _field() -> Rect2:
+	return Rect2(ScreenLayout.at(get_viewport()).on_stage(FIELD.position), FIELD.size)
 
 
 func _place() -> void:

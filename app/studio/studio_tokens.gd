@@ -4,7 +4,7 @@ extends RefCounted
 ## Every value of the Studio design the app draws with, in px at the 1280×960 frame. Generated from the
 ## design's tokens: never edited by hand (a test fails on a hand edit).
 
-const SHA256 := "6c7c33ec0f488e67990337dbb4db2a9823813567fcfc0a9e0997863691fb2657"
+const SHA256 := "d0e7aebc66d5cc0ae8d0b69da789a6740787dea685d0b5e737ae00649aad5c26"
 
 const INK := Color("#24201b")
 const MUTE := Color("#857a6d")
@@ -219,6 +219,7 @@ static var TR_REVERSE := 0
 static var TR_SETTLE_S := 0.0
 
 
-## The window's pixels to the design's: the 1280 px frame stretched to the window's width.
+## The window's pixels to the design's: the frame fitted whole in the window, as the stretch shows it (a wider
+## or taller window shows more around it, at the same size).
 static func window_scale(window: Window) -> float:
-	return window.size.x / 1280.0
+	return minf(window.size.x / 1280.0, window.size.y / 960.0)

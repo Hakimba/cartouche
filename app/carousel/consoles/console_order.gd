@@ -129,6 +129,7 @@ func _ready() -> void:
 	set_process(false)
 	# Before the consoles, which stand where the placing says this frame.
 	process_priority = -1
+	get_viewport().size_changed.connect(_fit_view)
 	_arrow.draw.connect(_draw_arrow)
 
 
@@ -663,7 +664,7 @@ func _tap(at: Vector2) -> void:
 		_put_down()
 		return
 	var nearest := -1
-	var reach := _TAP_REACH * consoles.view_scale()
+	var reach := _TAP_REACH
 	for slot in _wheel.order.size():
 		var distance := _distance_to_box(_row.find(_wheel.order[slot]), at)
 		if distance < reach:
@@ -677,7 +678,7 @@ func _tap(at: Vector2) -> void:
 ## How far [param at] (px of the viewport) is from the box of the console at [param index] of the row: 0 inside it.
 func _distance_to_box(index: int, at: Vector2) -> float:
 	var stand := consoles.ring_stand(index)
-	var half := consoles.silhouette(index).size * CarouselLayout.FRAME * stand.size * consoles.view_scale() / 2.0
+	var half := consoles.silhouette(index).size * CarouselLayout.FRAME * stand.size / 2.0
 	var away := (at - consoles.to_view(stand.centre)).abs() - half
 	return Vector2(maxf(away.x, 0.0), maxf(away.y, 0.0)).length()
 
@@ -704,10 +705,9 @@ func _show() -> void:
 	_fit_view()
 
 
-## The ring's parts stand in the reference frame as the viewport shows it.
+## The ring's parts stand in the reference frame, on the stage.
 func _fit_view() -> void:
 	_frame.position = consoles.view_origin()
-	_frame.scale = Vector2.ONE * consoles.view_scale()
 
 
 ## The scale every console stands on, for the order the ring is in.

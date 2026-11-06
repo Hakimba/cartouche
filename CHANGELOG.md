@@ -35,6 +35,11 @@ follows [Keep a Changelog](https://keepachangelog.com).
   folders picked when a console is added.
 
 ### Fixed
+- Cartouche fits screens of every shape, from near-square handhelds to 32:9 monitors: a wider screen shows more
+  consoles in the bar and more games on the shelf at the same size, a taller one keeps the bar and the hints at the
+  bottom and the console in the middle, and every screen, form and launch stands where it does on a 4:3 screen.
+  When every console fits in the bar, the bar stands centred and whole and the selection frame moves along it. A
+  window that changes shape while a screen is open keeps that screen laid out for its new shape.
 - The hints at the bottom of the games screen and the console's logo now leave with the rest while a game is launched.
 - A button style that could not be saved no longer stays in use until Cartouche closes.
 

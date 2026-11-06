@@ -12,10 +12,12 @@ var side: Vector2
 var side_size: float
 
 
-## A bounded set of candidates, so a large library never adds per-frame work. MediaView orders them.
-static func offsets(count: int, scroll: float) -> Dictionary[int, float]:
-	var start := floori(scroll) - 3 if count > 7 else 0
-	var local := MediaView.drawing_order(mini(count, 7), scroll - start)
+## A bounded set of candidates, so a large library never adds per-frame work: those of a row drawn [param within]
+## places from its centre. MediaView orders them.
+static func offsets(count: int, scroll: float, within := MediaView.DRAWN_WITHIN) -> Dictionary[int, float]:
+	var span := 2 * ceili(within) + 1
+	var start := floori(scroll) - ceili(within) if count > span else 0
+	var local := MediaView.drawing_order(mini(count, span), scroll - start, within)
 	var shown: Dictionary[int, float] = {}
 	for index in local:
 		var game := posmod(start + index, count)
@@ -49,11 +51,13 @@ static func _vector(xyz: Array) -> Vector3:
 	return Vector3(x, y, z)
 
 
-func standing(offset: float, pose_amount := 1.0, seconds := 0.0, floating := false) -> Transform3D:
+## Where a game [param offset] places from the centre stands; on a [param level] row, those past the neighbours at their
+## height ([method MediaView.standing]).
+func standing(offset: float, pose_amount := 1.0, seconds := 0.0, floating := false, level := false) -> Transform3D:
 	var start := chosen
 	start.basis = Basis(Quaternion.IDENTITY.slerp(chosen.basis.get_rotation_quaternion(), pose_amount)) \
 		.scaled(chosen.basis.get_scale())
-	var at := MediaView.standing(offset, start, side, side_size)
+	var at := MediaView.standing(offset, start, side, side_size, level)
 	if floating:
 		var share := (1.0 - MediaView.softness(offset)) * pose_amount
 		var t := 1.6 * seconds

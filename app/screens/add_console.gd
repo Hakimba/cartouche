@@ -104,7 +104,7 @@ var _leaving := false
 ## Whether the form has gone for the ring placing its console, and is not back.
 var _away := false
 ## Where each moving part rests, and each motion running.
-var _rests: Dictionary[Control, Vector2] = {}
+var _rests: Rests
 var _motions: Dictionary[StringName, Tween] = {}
 var _fields: Array[Control] = []
 
@@ -142,8 +142,7 @@ func _ready() -> void:
 	_fields = [_type, _emulator, _folder_field, _model, _subfolders, _discs, _cancel, _add]
 	for field: Control in _fields:
 		field.focus_entered.connect(_aim.bind(field, true))
-	for line: Control in [_title, _list, _console, _model]:
-		_rests[line] = line.position
+	_rests = Rests.new([_title, _list, _console, _model])
 	_cancel_x = _cancel.position.x
 
 
@@ -566,7 +565,7 @@ func _make_way(away: bool) -> void:
 	var easing := Motion.curve(Motion.Easing.EASE)
 	for line: Control in [_type, _emulator, _folder_field, _note, _subfolders, _discs, _cancel, _add]:
 		motion.tween_property(line, ^"modulate:a", 0.0 if away else 1.0, _MAKE_WAY_S).set_custom_interpolator(easing)
-	motion.tween_property(_model, ^"position:y", _HEADER_Y if away else _rests[_model].y, _MAKE_WAY_S) \
+	motion.tween_property(_model, ^"position:y", _HEADER_Y if away else _rests.of(_model).y, _MAKE_WAY_S) \
 		.set_custom_interpolator(easing)
 	if away:
 		motion.tween_property(_card, ^"modulate:a", 0.0, _MAKE_WAY_S * 0.6)
@@ -664,9 +663,7 @@ func _glide_card(rect: Rect2, radius: float, seconds: float, moving: Motion.Easi
 func _settle_lines() -> void:
 	_stop_lines()
 	modulate.a = 1.0
-	for line: Control in _rests:
-		line.position = _rests[line]
-		line.modulate.a = 1.0
+	_rests.restore()
 
 
 ## The motions of the lines stopped where they are: the next one starts from there, nothing jumps.
@@ -687,12 +684,13 @@ func _enter() -> void:
 		.set_custom_interpolator(Motion.curve(Motion.Easing.EASE_OUT))
 	var arrive := Motion.curve(Motion.Easing.ARRIVE)
 	_console.position.y += StudioTokens.TR_FORM_LIFT_PX
-	motion.tween_property(_console, ^"position:y", _rests[_console].y,
+	motion.tween_property(_console, ^"position:y", _rests.of(_console).y,
 		_ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
 	_list.position.x += StudioTokens.TR_FORM_SLIDE_PX
-	motion.tween_property(_list, ^"position:x", _rests[_list].x, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S).set_custom_interpolator(arrive)
+	motion.tween_property(_list, ^"position:x", _rests.of(_list).x, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S) \
+		.set_custom_interpolator(arrive)
 	_title.position.y += StudioTokens.TR_FORM_CHOOSER_TITLE_PX
-	motion.tween_property(_title, ^"position:y", _rests[_title].y, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S) \
+	motion.tween_property(_title, ^"position:y", _rests.of(_title).y, _ENTER_S).set_delay(StudioTokens.TR_FORM_AT_S) \
 		.set_custom_interpolator(arrive)
 
 
@@ -740,9 +738,9 @@ func _leave() -> Tween:
 	_motions[&"leave"] = motion
 	var ease_in := Motion.curve(Motion.Easing.EASE_IN)
 	motion.tween_property(self, ^"modulate:a", 0.0, _LEAVE_FADE_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_list, ^"position:x", _rests[_list].x + StudioTokens.TR_FORM_SLIDE_PX,
+	motion.tween_property(_list, ^"position:x", _rests.of(_list).x + StudioTokens.TR_FORM_SLIDE_PX,
 		StudioTokens.TR_FORM_LEAVE_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_console, ^"position:y", _rests[_console].y + StudioTokens.TR_FORM_LIFT_PX,
+	motion.tween_property(_console, ^"position:y", _rests.of(_console).y + StudioTokens.TR_FORM_LIFT_PX,
 		StudioTokens.TR_FORM_LEAVE_S).set_custom_interpolator(ease_in)
 	return motion
 
@@ -754,10 +752,10 @@ func _step_aside() -> void:
 	var motion := create_tween().set_parallel()
 	_motions[&"lines"] = motion
 	var ease_in := Motion.curve(Motion.Easing.EASE_IN)
-	motion.tween_property(_list, ^"position:x", _rests[_list].x - StudioTokens.TR_CHOOSER_SHIFT_PX,
+	motion.tween_property(_list, ^"position:x", _rests.of(_list).x - StudioTokens.TR_CHOOSER_SHIFT_PX,
 		StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
 	motion.tween_property(_list, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
-	motion.tween_property(_title, ^"position:y", _rests[_title].y - StudioTokens.TR_FORM_CHOOSER_TITLE_PX,
+	motion.tween_property(_title, ^"position:y", _rests.of(_title).y - StudioTokens.TR_FORM_CHOOSER_TITLE_PX,
 		StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
 	motion.tween_property(_title, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_OUT_S).set_custom_interpolator(ease_in)
 	motion.tween_property(_console, ^"modulate:a", 0.0, StudioTokens.TR_CHOOSER_MODEL_S)
@@ -778,12 +776,12 @@ func _come_back(cursor: Rect2) -> void:
 	var motion := create_tween().set_parallel()
 	_motions[&"lines"] = motion
 	var arrive := Motion.curve(Motion.Easing.ARRIVE)
-	motion.tween_property(_list, ^"position:x", _rests[_list].x, _COME_BACK_S).set_custom_interpolator(arrive)
+	motion.tween_property(_list, ^"position:x", _rests.of(_list).x, _COME_BACK_S).set_custom_interpolator(arrive)
 	motion.tween_property(_list, ^"modulate:a", 1.0, _COME_BACK_S).set_custom_interpolator(arrive)
-	motion.tween_property(_title, ^"position:y", _rests[_title].y, _COME_BACK_S).set_custom_interpolator(arrive)
+	motion.tween_property(_title, ^"position:y", _rests.of(_title).y, _COME_BACK_S).set_custom_interpolator(arrive)
 	motion.tween_property(_title, ^"modulate:a", 1.0, _COME_BACK_S).set_custom_interpolator(arrive)
 	motion.tween_property(_console, ^"modulate:a", 1.0, _MODEL_RISE_S).set_custom_interpolator(Motion.curve(Motion.Easing.RISE))
-	_card.position = cursor.position - _rests[_list]
+	_card.position = cursor.position - _rests.of(_list)
 	_card.size = cursor.size
 	_card.radius = StudioTokens.FOCUS_RADIUS
 	var field := get_viewport().gui_get_focus_owner()

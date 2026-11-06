@@ -243,15 +243,37 @@ func leaveGame(_id: int, game_id: String) -> String:
 	return JSON.stringify({"ok": true, "arrivals": _arrivals})
 
 
-## The library as it now stands, whatever the number of games asked for; at first the demo's, every game on
-## [param platform_id] when one is given, as on the device.
-func useDemoLibrary(id: int, _games: int, platform_id: String) -> String:
+## The library as it now stands; at first the demo's, grown to [param games] games when more are asked for, every game
+## on [param platform_id] when one is given, as on the device.
+func useDemoLibrary(id: int, games: int, platform_id: String) -> String:
 	if not _snapshot.is_empty():
 		return library(id)
-	var made := _current.duplicate(true) if not _current.is_empty() else _on_one_shelf(demo_library(), platform_id)
+	var made := _current.duplicate(true) if not _current.is_empty() \
+		else _on_one_shelf(_with_games(demo_library(), games), platform_id)
 	_with_variants(made, _variants())
 	_current = made
 	return JSON.stringify({"ok": true, "library": made})
+
+
+## [param made] grown to [param games] games, each new one a demo game under a new number, dealt in turn to its shelves
+## as the device deals its demo's; as it is when it holds as many.
+static func _with_games(made: Dictionary, games: int) -> Dictionary:
+	var all: Array = made.get("games", [])
+	var shelves: Array = made.get("shelves", [])
+	var demo_count := all.size()
+	for index in range(demo_count, games if not shelves.is_empty() else 0):
+		var shelf: Dictionary = shelves[index % shelves.size()]
+		var indexes: Array = shelf["game_indexes"]
+		var first: float = indexes[0]
+		var console: Dictionary = all[int(first)]
+		var original: Dictionary = all[index % demo_count]
+		var game := original.duplicate(true)
+		var title := "%s %d" % [str(game["title"]).rsplit(" ", true, 1)[0], index]
+		game.merge({"id": "demo/%d" % index, "title": title, "discs": [{"name": title + ".iso"}],
+			"platform_id": console["platform_id"], "medium": console["medium"]}, true)
+		indexes.append(all.size())
+		all.append(game)
+	return made
 
 
 ## [param made] with all its games on [param platform_id] and its medium; as it is without a game of that console.

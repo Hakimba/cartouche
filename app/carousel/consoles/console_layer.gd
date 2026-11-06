@@ -30,7 +30,8 @@ const _TAPS := 16
 func _ready() -> void:
 	_material.set_shader_parameter(&"taps", MediaView.spiral(_TAPS))
 	texture = view.get_texture()
-	get_window().size_changed.connect(_fit)
+	# Once the carousel's camera has followed the window: the copy looks where it looks.
+	get_window().size_changed.connect(_fit, CONNECT_DEFERRED)
 	look(false, 0.0, 1.0, 1.0)
 
 
@@ -44,8 +45,6 @@ func look(behind: bool, blur: float, opacity: float, saturation: float) -> void:
 	if appearing:
 		# From the first frame drawn, where the carousel's camera looks.
 		_fit()
-		camera.global_transform = watched.global_transform
-		camera.fov = watched.fov
 	if not behind:
 		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		return
@@ -63,4 +62,5 @@ func draw_again() -> void:
 
 func _fit() -> void:
 	view.size = Vector2i(Vector2(get_window().size) * _RESOLUTION)
+	StageLens.copy(watched, camera)
 	draw_again()

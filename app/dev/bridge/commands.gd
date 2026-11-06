@@ -24,6 +24,9 @@ const _REPLAY_SPEED := 8.0
 const _WAIT_UNIT_S := 0.02
 ## Fonts keep their shapes in caches a reload does not reach.
 const _FONT_EXTENSIONS: Array[String] = ["ttf", "otf"]
+## A screen shape takes at most this share of the desktop, and a window manager this long to apply it.
+const _ROOM_USED := 0.85
+const _RESIZE_MS := 3000
 
 var android: AndroidServices = Android
 var route: Array = []
@@ -83,6 +86,9 @@ func run(message: Dictionary) -> Dictionary:
 		"sound": result = _sounds.play(message)
 		"sounds": result = _sounds.set_map(message)
 		"snapshot": result = await _snapshot()
+		"window":
+			var wanted := _size(message.get("size"))
+			result = await _window(wanted) if wanted.x >= 1.0 and wanted.y >= 1.0 else _error("invalid size")
 		_: result = _error("unknown command")
 	answer.merge(result, true)
 	Diagnostics.trace("bridge", "%s %s" % [command, "ok" if answer["ok"] else answer.get("error", "failed")])
@@ -482,6 +488,36 @@ func _snapshot() -> Dictionary:
 				"region": android.browse_text(platform_id, &"region", "")}
 	return {"library": library, "settings": settings, "variants": content.get("console_variants", {}),
 		"browse": browsed, "locale": TranslationServer.get_locale()}
+
+
+## The window takes the shape of a screen [param wanted] px wide and high, as large as the desktop's room allows: a
+## layout reads only the shape, so a 5120 × 1440 screen can be looked at on a smaller monitor. Kept clear of the
+## desktop's edges, where a window manager would maximise it and then ignore the sizes asked after. The root window is
+## sized, not the display server's window alone, so the app lays itself out at once.
+func _window(wanted: Vector2) -> Dictionary:
+	var window := get_tree().root
+	var room := DisplayServer.screen_get_usable_rect(window.current_screen)
+	var size := fitted(wanted, Vector2(room.size) * _ROOM_USED)
+	window.mode = Window.MODE_WINDOWED
+	window.size = size
+	window.position = room.position + Vector2i((Vector2(room.size - size) / 2.0).round())
+	var deadline := Time.get_ticks_msec() + _RESIZE_MS
+	while DisplayServer.window_get_size() != size and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+	return {"size": [window.size.x, window.size.y]} if window.size == size else _error("the window kept %s, not %s" % [window.size, size])
+
+
+## A [code][width, height][/code] pair as a size; zero when it is not one.
+static func _size(value: Variant) -> Vector2:
+	if not value is Array:
+		return Vector2.ZERO
+	var pair: Array = value
+	return Vector2(_float(pair[0]), _float(pair[1])) if pair.size() == 2 and _number(pair[0]) and _number(pair[1]) else Vector2.ZERO
+
+
+## [param wanted] scaled to fit in [param room] (never enlarged), its shape kept.
+static func fitted(wanted: Vector2, room: Vector2) -> Vector2i:
+	return Vector2i((wanted * minf(1.0, minf(room.x / wanted.x, room.y / wanted.y))).round())
 
 
 static func _number(value: Variant) -> bool:

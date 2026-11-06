@@ -65,6 +65,7 @@ README.md                      you are here: the entry, the commands, the "I wan
 ├── adding-a-setting.md        a setting: its declaration in the core, its row on the card
 ├── adding-a-background.md     a background: its scheme, its key in three lists, its name
 ├── adding-a-screen.md         a screen or a gesture, its guards, hints, sounds and tests
+├── adding-a-screen-format.md  screens of every shape: the stage, the bands, the families of screens
 ├── device-testing.md          a debug build on a device, beside your own, its traces, benchmarks
 ├── releasing.md               publishing a version (maintainers)
 ├── testing.md                 the kinds of tests, their helpers, how to run each
@@ -261,6 +262,7 @@ Find your task, open the page, then the files in the order given.
 | the search ribbon | [architecture/core.md](architecture/core.md#shelves-and-search) | `Finder.kt`, `game_search.gd` |
 | what the plugin sends to Godot | [architecture/android.md](architecture/android.md#the-wire) | `Sent.kt`, `Wire.kt`, `android_wire.gd` (generated) |
 | a timing, colour or size of the design | [architecture/studio.md](architecture/studio.md#values) | `studio_tokens.gd` (generated, never edited by hand) |
+| how a screen of another shape lays out (16:9, 21:9, near-square) | [adding-a-screen-format.md](adding-a-screen-format.md) | `app/data/screen_formats.json`, `screen_layout.gd`, `stage_lens.gd`, `rests.gd` |
 | a game's pose on the games screen | [architecture/studio.md](architecture/studio.md#the-games-screen) | `app/data/media_poses.json`, `games_layout.gd` |
 | a translation | [translating.md](translating.md) | `app/locale/` |
 

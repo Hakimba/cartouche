@@ -4,7 +4,7 @@ extends Node
 const Commands := preload("res://dev/bridge/commands.gd")
 ## The version of the commands and answers: raised whenever one changes shape, so a client can refuse an app
 ## it does not speak to instead of failing on a command.
-const PROTOCOL := 1
+const PROTOCOL := 2
 const URL := "ws://127.0.0.1:5201"
 const RETRY_MS := 2000
 const BUFFER_BYTES := 16 << 20

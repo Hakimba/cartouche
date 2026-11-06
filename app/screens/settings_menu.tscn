@@ -26,11 +26,18 @@ mouse_filter = 2
 script = ExtResource("palette_rect")
 
 [node name="Panel" type="Control" parent="."]
-layout_mode = 0
-offset_left = 294.4
-offset_top = 128.0
-offset_right = 985.6
-offset_bottom = 833.28
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -345.6
+offset_top = -352.0
+offset_right = 345.6
+offset_bottom = 353.28
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 
 [node name="Items" type="Control" parent="Panel"]

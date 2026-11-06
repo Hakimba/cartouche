@@ -10,8 +10,6 @@ signal selection_changed(game: AndroidServices.Game)
 
 ## A label texture shown whole (see [method preview_label]).
 const WHOLE := Rect2(0.0, 0.0, 1.0, 1.0)
-## Every game [method GamesLayout.offsets] can show at once.
-const _PLACES := 5
 
 @export var frame_origin := Vector3.ZERO
 
@@ -63,6 +61,10 @@ var _pose_s := 0.0
 var _stick := Vector2.ZERO
 var _turn := StickTurn.new()
 var _places: Array[Place] = []
+## How many places from the centre the row draws its games ([method _fit_width]).
+var _within := MediaView.DRAWN_WITHIN
+## Whether the games past the neighbours stand at their height ([member ScreenLayout.Format.shelf_level]).
+var _level := false
 var _placed: Dictionary[int, Place] = {}
 ## Places waiting for their label, drawn one per frame so that a fast move never stalls.
 var _unlabelled: Array[Place] = []
@@ -95,10 +97,11 @@ func settle() -> void:
 
 
 func _ready() -> void:
-	for i in _PLACES:
-		var place := Place.new()
-		add_child(place)
-		_places.append(place)
+	get_viewport().size_changed.connect(func() -> void:
+		_fit_width()
+		if not _games.is_empty():
+			_arrange())
+	_fit_width()
 	add_to_group(Resting.PACED)
 	# Nothing moves before a shelf is shown.
 	set_process(false)
@@ -178,7 +181,8 @@ func show_games(games: Array[AndroidServices.Game], selected: int) -> void:
 	_placed.clear()
 	for place in _places:
 		place.game = -1
-	for game: int in GamesLayout.offsets(_games.size(), _scroll):
+	_fit_width()
+	for game: int in GamesLayout.offsets(_games.size(), _scroll, _within):
 		var place: Place = kept.get(_games[game].id)
 		if place:
 			place.game = game
@@ -479,7 +483,7 @@ func _draw_pick() -> void:
 
 
 func _arrange() -> void:
-	var shown := GamesLayout.offsets(_games.size(), _scroll)
+	var shown := GamesLayout.offsets(_games.size(), _scroll, _within)
 	for game: int in _placed.keys():
 		if game not in shown:
 			_placed[game].game = -1
@@ -518,7 +522,7 @@ func _arrange() -> void:
 		var offset: float = shown[game]
 		var centred := 1.0 - MediaView.softness(offset)
 		var turn := Basis(Vector3.UP, TAU * turntable * _clock_s * centred) * _turn.of(game)
-		var placed := place.layout.standing(offset, pose_amount, _pose_s, games_float)
+		var placed := place.layout.standing(offset, pose_amount, _pose_s, games_float, _level)
 		placed.origin += frame_origin
 		placed.basis *= turn
 		var outside := (_launched or stage > 0.0) and game == selected_index()
@@ -536,7 +540,7 @@ func _arrange() -> void:
 		var presence := selected_presence if game == selected_index() else neighbours
 		place.shown.fade(1.0 - presence if not _launched or game != selected_index() else 0.0)
 		var mode := Place.Draw.OUTSIDE if outside else Place.Draw.SHOWN if is_visible_in_tree() else Place.Draw.HIDDEN
-		place.draw_at(global_transform * placed, MediaView.softness(offset), blank_weight, mode, order - _PLACES)
+		place.draw_at(global_transform * placed, MediaView.softness(offset), blank_weight, mode, order - _places.size())
 		order += 1
 
 
@@ -562,10 +566,29 @@ func title_top() -> float:
 	var instance := place.shown.get_child(0) as Node3D if place else null
 	if Vector2(kept.x, kept.y) != frame and instance:
 		var layout := GamesLayout.new(ConsoleManifest.folder_of(model))
-		kept = Vector3(frame.x, frame.y, TitlePlace.top(TitlePlace.vertices(instance),
-			layout.chosen, camera.global_transform if camera else TitlePlace.CAMERA, frame, camera.fov if camera else 32.0))
+		var top := TitlePlace.top(TitlePlace.vertices(instance), layout.chosen,
+			camera.global_transform if camera else TitlePlace.CAMERA, CarouselLayout.FRAME, camera.fov if camera else 32.0)
+		kept = Vector3(frame.x, frame.y, ScreenLayout.of(frame).on_stage(Vector2(0.0, top)).y)
 		_title_tops[model] = kept
 	return kept.z
+
+
+## The row draws its games as far as the screen's width shows them, with a place for every game it can show at once
+## ([method GamesLayout.offsets]).
+func _fit_width() -> void:
+	_within = MediaView.DRAWN_WITHIN
+	_level = ScreenLayout.at(get_viewport()).format.shelf_level
+	if camera and not _games.is_empty():
+		var side := GamesLayout.new(ConsoleManifest.folder_of(_models[_games[0].medium])).side.x
+		var depth := camera.global_position.z - global_position.z
+		var layout := ScreenLayout.at(get_viewport())
+		var place_px := side * CarouselLayout.FRAME.y / (2.0 * depth * tan(deg_to_rad(camera.fov) / 2.0))
+		_within += layout.spare_width() / 2.0 / place_px
+	Diagnostics.trace("carousel", "shelf drawn within %.2f places, %d games" % [_within, _games.size()])
+	while _places.size() < floori(2.0 * _within) + 1:
+		var place := Place.new()
+		add_child(place)
+		_places.append(place)
 
 
 func _free_place() -> Place:

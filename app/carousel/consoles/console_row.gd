@@ -541,25 +541,19 @@ func ring_point(slot: float) -> Vector2:
 	return to_view(RingFit.place(slot / _ring_places * TAU))
 
 
-## How many px of the viewport one px of the reference frame covers: the camera keeps the view's height, so a screen
-## taller than the frame's 4:3 shows it larger.
-func view_scale() -> float:
-	return get_viewport().get_visible_rect().size.y / CarouselLayout.FRAME.y
-
-
-## Where the corner of the reference frame, centred in the viewport, stands, in px of the viewport.
+## Where the corner of the reference frame stands, in px of the viewport.
 func view_origin() -> Vector2:
 	return to_view(Vector2.ZERO)
 
 
 ## The point [param design] of the reference frame, in px of the viewport.
 func to_view(design: Vector2) -> Vector2:
-	return get_viewport().get_visible_rect().size / 2.0 + (design - CarouselLayout.FRAME / 2.0) * view_scale()
+	return ScreenLayout.at(get_viewport()).on_stage(design)
 
 
 ## The point [param view] of the viewport, in px of the reference frame.
 func to_design(view: Vector2) -> Vector2:
-	return (view - get_viewport().get_visible_rect().size / 2.0) / view_scale() + CarouselLayout.FRAME / 2.0
+	return ScreenLayout.at(get_viewport()).from_stage(view)
 
 
 ## The console's look in the hero's place, measured once, the first time it is wanted: the boxes of its visible parts

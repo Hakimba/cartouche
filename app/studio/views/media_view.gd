@@ -81,16 +81,17 @@ static func softness(d: float) -> float:
 	return minf(absf(d), 1.0)
 
 
-## Whether a medium [param d] places from the centre is drawn.
-static func drawn_at(d: float) -> bool:
-	return absf(d) < DRAWN_WITHIN
+## Whether a medium [param d] places from the centre is drawn, on a row drawn [param within] places from it.
+static func drawn_at(d: float, within := DRAWN_WITHIN) -> bool:
+	return absf(d) < within
 
 
-## The games of a row of [param n] standing at [param at] that are drawn, the farthest first.
-static func drawing_order(n: int, at: float) -> Array[int]:
+## The games of a row of [param n] standing at [param at] that are drawn [param within] places from the centre, the
+## farthest first.
+static func drawing_order(n: int, at: float, within := DRAWN_WITHIN) -> Array[int]:
 	var drawn: Array[int] = []
 	for j in n:
-		if drawn_at(offset(j, at, n)):
+		if drawn_at(offset(j, at, n), within):
 			drawn.append(j)
 	drawn.sort_custom(func(a: int, b: int) -> bool: return absf(offset(a, at, n)) > absf(offset(b, at, n)))
 	return drawn
@@ -99,11 +100,13 @@ static func drawing_order(n: int, at: float) -> Array[int]:
 ## Where a game [param d] places from the centre stands, between the chosen game's [param chosen] (its
 ## place, pose and size) and a neighbour's, straight, at [param side] (x, y) one place away, its size
 ## [param side_size]: across, on an arc, its pose easing into the straight one and its size into the
-## neighbours' over the first place.
-static func standing(d: float, chosen: Transform3D, side: Vector2, side_size: float) -> Transform3D:
+## neighbours' over the first place. On a [param level] row the arc ends at the neighbours: those past them stand at
+## their height, so that a wide screen shows them.
+static func standing(d: float, chosen: Transform3D, side: Vector2, side_size: float, level := false) -> Transform3D:
 	var a := softness(d)
 	var start := chosen.origin
-	var at := Vector3(start.x * (1.0 - a) + side.x * d, start.y + (side.y - start.y) * d * d, start.z * (1.0 - a))
+	var drop := minf(d * d, 1.0) if level else d * d
+	var at := Vector3(start.x * (1.0 - a) + side.x * d, start.y + (side.y - start.y) * drop, start.z * (1.0 - a))
 	var turned := chosen.basis.get_rotation_quaternion().slerp(Quaternion.IDENTITY, a)
 	return Transform3D(Basis(turned).scaled(Vector3.ONE * lerpf(chosen.basis.get_scale().x, side_size, a)), at)
 
@@ -366,13 +369,7 @@ func _frame(settled: bool) -> void:
 	# medium moving by less than a pixel a frame (a float, a sway) moves smoothly instead of by steps.
 	global_position = ((wanted.get_center() - size / 2.0) * scale_by).round() / scale_by
 	var shown := camera.get_viewport().get_visible_rect().size
-	var height := 2.0 * camera.near * tan(deg_to_rad(camera.fov) / 2.0)
-	var centre := global_position + size / 2.0
-	_camera.global_transform = camera.global_transform
-	_camera.near = camera.near
-	_camera.far = camera.far
-	_camera.size = height * size.y / shown.y
-	_camera.frustum_offset = Vector2(centre.x - shown.x / 2.0, shown.y / 2.0 - centre.y) * height / shown.y
+	StageLens.narrow(camera, _camera, get_global_rect())
 	_view.msaa_3d = get_viewport().msaa_3d
 	# Off the screen, it is not drawn at all.
 	if Rect2(Vector2.ZERO, shown).intersects(get_global_rect()):

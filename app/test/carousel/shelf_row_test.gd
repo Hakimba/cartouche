@@ -106,7 +106,7 @@ func test_the_games_around_the_selected_one_are_it_then_its_neighbours_nearest_f
 func test_a_blank_shows_no_title_nor_platform_until_a_try_found_no_image_then_both() -> void:
 	var row := _row(3, 1)
 	row._look.platform_name = "PlayStation 2"
-	_frames(row, ShelfRow._PLACES, 0.016)
+	_frames(row, row._places.size(), 0.016)
 	var titles := func() -> Dictionary:
 		var shown := {}
 		for place: ShelfRow.Place in row.get_children():
@@ -120,7 +120,7 @@ func test_a_blank_shows_no_title_nor_platform_until_a_try_found_no_image_then_bo
 	# Shown again, a game found to have none is titled at once, the others plain.
 	row.label_images.mark_absent("test/0")
 	row.show_shelf(row._games, 1, Fixtures.DVDS, row._look)
-	_frames(row, ShelfRow._PLACES, 0.016)
+	_frames(row, row._places.size(), 0.016)
 	assert_str(titles.call()["test/0"][0]).is_equal(row._games[0].title)
 	assert_str(titles.call()["test/1"][0]).is_empty()
 
@@ -143,7 +143,7 @@ func test_the_pick_selected_stands_in_the_middle_at_once_among_its_own_neighbour
 	for i in 40:
 		var count := random.randi_range(2, 12)
 		var row := _row(count, random.randi_range(0, count - 1))
-		_frames(row, random.randi_range(0, 2 * ShelfRow._PLACES), Fixtures.FRAME_S)
+		_frames(row, random.randi_range(0, 2 * row._places.size()), Fixtures.FRAME_S)
 		for toss in random.randi_range(1, 4):
 			var pick := row.pick()
 			row.select_pick()

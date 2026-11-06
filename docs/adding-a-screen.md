@@ -24,7 +24,9 @@ Reuse before you make something new: `ChoiceScreen` and `CardChoiceScreen` choos
 
 1. **Scene and script** under `app/screens/`. Build it from the Studio pieces (`SatinPanel`, `StudioText`,
    `ButtonHint` and others). Put its button hints in a `HintRow`. Unique-name (`%`) nodes become typed `@onready`
-   members.
+   members. Its places are px of the 1280 × 960 frame; on a screen of another shape each part stands on the stage, the
+   top band or the bottom band, anchored as [adding-a-screen-format.md](adding-a-screen-format.md) says. Check it in
+   a near-square, a 16:9 and a 21:9 window.
 2. **Show it** from `ScreenFlow` (`app/screens/screen_flow.gd`) with `_show`, and await the signal that says it is
    done (`chosen` on a `ChoiceScreen`, for example). `ScreenFlow` decides which screen shows when; a screen never
    shows another by itself.

@@ -57,6 +57,12 @@ var _home := 0
 var _held := 0
 var _repeat := CarouselLayout.Repeat.new()
 var _rise: Tween
+## How far below its place the ribbon stands while it rises.
+var _lowered := 0.0:
+	set(value):
+		_lowered = value
+		_ribbon.offset_top = _ribbon_place.x + value
+		_ribbon.offset_bottom = _ribbon_place.y + value
 var _big_fade: Tween
 ## The ribbon's hints shown, as (button, text).
 var _hints_shown: Array[PackedStringArray] = []
@@ -72,14 +78,15 @@ var _hints_shown: Array[PackedStringArray] = []
 @onready var _filter: Control = %Filter
 @onready var _filter_text: Label = %FilterText
 @onready var _hints: HintRow = %Hints
-@onready var _ribbon_y := _ribbon.position.y
+## The ribbon's place, kept to the screen's bottom.
+@onready var _ribbon_place := Vector2(_ribbon.offset_top, _ribbon.offset_bottom)
 @onready var _big_size := _big_text.get_theme_font_size(&"font_size")
 
 
 func _ready() -> void:
 	_strip.sort_children.connect(_centre_strip)
 	_ribbon.hide()
-	_ribbon.position.y = _ribbon_y + _RISE_PX
+	_lowered = _RISE_PX
 	_ribbon.modulate.a = 0.0
 	_big.modulate.a = 0.0
 	set_process(false)
@@ -419,7 +426,7 @@ func _show_big(label: String) -> void:
 
 func _animate_ribbon(up: bool) -> void:
 	_rise = Motion.restart(self, _rise).set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_rise.tween_property(_ribbon, ^"position:y", _ribbon_y if up else _ribbon_y + _RISE_PX, RISE_S)
+	_rise.tween_property(self, ^"_lowered", 0.0 if up else _RISE_PX, RISE_S)
 	_rise.tween_property(_ribbon, ^"modulate:a", 1.0 if up else 0.0, RISE_S)
 	if not up:
 		_rise.chain().tween_callback(_ribbon.hide)
