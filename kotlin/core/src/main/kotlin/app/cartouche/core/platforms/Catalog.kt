@@ -112,7 +112,8 @@ public value class ScreenScraperSystem(public val id: Int)
  * medium its games are shown as, the exact medium each game comes in ([MediaRule]), the size under
  * which an unknown file is not taken for a game, what its scans show ([ArtKind]: none when its
  * games' images are not looked for), where its scans are named after their serial, if anywhere, and
- * the system ScreenScraper's textures of its games are asked under, when it has a texture table.
+ * the system ScreenScraper's textures of its games are asked under, when it has a texture table,
+ * and what Cartouche corrects in its Daijishō players ([PlayerFix]), by player id.
  */
 @Serializable
 public data class PlatformProfile(
@@ -122,7 +123,16 @@ public data class PlatformProfile(
     public val art: Option<ArtKind> = None,
     public val scansBySerial: Option<SerialScans> = None,
     public val screenScraperSystem: Option<ScreenScraperSystem> = None,
+    public val players: Map<PlayerId, PlayerFix> = emptyMap(),
 )
+
+/**
+ * A Daijishō player as Cartouche ships it, where checking it on a device showed the definition wrong: the [name]
+ * shown (Daijishō names some by their package) and the file [extensions] the emulator really opens, in place of the
+ * definition's. The definition files stay Daijishō's own.
+ */
+@Serializable
+public data class PlayerFix(public val name: Option<String> = None, public val extensions: Option<List<String>> = None)
 
 /**
  * A platform of the Type chooser: its maker, shown small above, when its name holds one of the
@@ -133,6 +143,10 @@ public data class PlatformProfile(
 public data class OfferedConsole(public val platform: PlatformId, public val maker: Option<String>, public val model: String) {
     public companion object {
         private val MAKERS = listOf("Atari", "Microsoft", "Nintendo", "Sega", "Sony")
+
+        /** The chooser's order: the consoles grouped under their maker, those without one last. */
+        internal val BY_MAKER: Comparator<OfferedConsole> =
+            compareBy({ it.maker.isNone() }, { it.maker.getOrElse { "" }.lowercase() }, { it.model.lowercase() })
 
         internal fun of(platform: Platform): OfferedConsole {
             val maker = MAKERS.firstOrNone { platform.name.contains(it) }
@@ -185,6 +199,9 @@ public sealed interface CatalogError {
 
     public data class MissingProfile(override val source: String, public val platform: PlatformId) : CatalogError
 
+    /** The platform's profile corrects a player its definition does not have. */
+    public data class UnknownPlayerFix(override val source: String, public val player: PlayerId) : CatalogError
+
     /** The value under [key] is not one the file allows. */
     public data class InvalidValue(override val source: String, public val key: String, public val detail: String) : CatalogError
 
@@ -198,6 +215,7 @@ public sealed interface CatalogError {
                 is DuplicatePlatform -> "Platform ${platform.value} is already defined"
                 is DuplicatePlayer -> "Player ${player.value} is already defined"
                 is MissingProfile -> "Platform ${platform.value} has no Cartouche profile"
+                is UnknownPlayerFix -> "The profile corrects player ${player.value}, which the platform does not have"
                 is InvalidValue -> "Invalid value for \"$key\": $detail"
             }
 }
@@ -239,9 +257,9 @@ public data class Catalog(
     public val shown: List<PlatformId>
         get() = platforms.map { it.id }.filter { it in supported }
 
-    /** The platforms a person may add, those of the catalog that are [supported], in the order of their names. */
+    /** The platforms a person may add, those of the catalog that are [supported], by maker then model, as the chooser shows them. */
     public val offered: List<OfferedConsole>
-        get() = platforms.filter { it.id in supported }.sortedBy { it.name.lowercase() }.map(OfferedConsole::of)
+        get() = platforms.filter { it.id in supported }.map(OfferedConsole::of).sortedWith(OfferedConsole.BY_MAKER)
 
     /** Resolves how [id] opens [file]. */
     public fun launch(id: PlayerId, file: GameFile): Either<LaunchError, Launch> = either {
@@ -294,11 +312,26 @@ private class DefinitionReader(val source: String, val profiles: Map<PlatformId,
     fun platform(text: String): Pair<Platform, List<CatalogError>> {
         val root = Either.catch { Json.parseToJsonElement(text) }.getOrElse { raise(CatalogError.InvalidJson(source, it.toString())) }
         val platform = field(root, "platform") { it as? JsonObject }
-        val (rejected, players) =
-            field(root, "playerList") { it as? JsonArray }.separateEither { either { DefinitionReader(source, profiles, this).player(it) } }
         val id = PlatformId(text(platform, "uniqueId"))
         val profile = profiles.getOrElse(id) { raise(CatalogError.MissingProfile(source, id)) }
-        return Platform(id, text(platform, "name"), players, pattern(platform, "acceptedFilenameRegex"), profile) to rejected
+        val (rejected, players) =
+            field(root, "playerList") { it as? JsonArray }.separateEither {
+                either { with(DefinitionReader(source, profiles, this)) { player(it).fixed(profile.players) } }
+            }
+        val unknown = (profile.players.keys - players.map { it.id }.toSet()).map { CatalogError.UnknownPlayerFix(source, it) }
+        return Platform(id, text(platform, "name"), players, pattern(platform, "acceptedFilenameRegex"), profile) to rejected + unknown
+    }
+
+    /** The player as [fixes] correct it, when they name it. */
+    private fun Player.fixed(fixes: Map<PlayerId, PlayerFix>): Player = fixes[id].toOption().fold({ this }) { fix ->
+        copy(
+            name = fix.name.getOrElse { name },
+            accepts =
+                fix.extensions.fold({ accepts }) { extensions ->
+                    val source = "^(.*)\\.(?:${extensions.joinToString("|")})$"
+                    FileNamePattern.of(source).getOrElse { raise(CatalogError.InvalidPattern(this@DefinitionReader.source, source)) }
+                },
+        )
     }
 
     fun player(element: JsonElement): Player {

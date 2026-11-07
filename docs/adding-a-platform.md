@@ -35,11 +35,15 @@ There are two folders:
 Write your file in `app/data/platforms/cartouche/`, in two cases:
 
 - **A platform Daijishō lacks.** Pick a file name and a `uniqueId` that no Daijishō file uses.
-- **A Daijishō platform that needs a fix** (a renamed console, a dead emulator, a wrong extension). Name your file
+- **A Daijishō platform that needs a fix** of the platform itself (a renamed console, a dead emulator). Name your file
   exactly like the Daijishō one: it **replaces** it (`AndroidServices.platform_definitions()` merges the two
   folders, yours last). Keep the platform's `uniqueId` and every player's `uniqueId` and template, so the users'
   libraries and choices stay valid. `SegaGenesis.json` does this to name the console Mega Drive. The test of
   INV-14 in `CatalogTest` compares a replacement with the file it replaces.
+
+A player that is right but for its name or the files it opens (Daijishō names some by their package, and leaves out
+archives some emulators open) is corrected in its platform's profile instead (`players`, section 3): the definition
+stays Daijishō's own.
 
 Each player needs:
 
@@ -100,6 +104,7 @@ Add an entry to `app/data/platforms/profiles.json`, keyed by the platform's `uni
 | `screenScraperSystem` | the number ScreenScraper gives this system, in its systems list. Optional. |
 | `art` | what its scans show: `disc` for a disc's face, or `cartridge_front` with the shape and label crop of each cartridge (`ArtKind.kt`). Without `art`, no label is looked for. |
 | `scansBySerial` | optional: a site naming disc scans after a game's serial, and the serials' pattern (`SerialScans.kt`) |
+| `players` | optional: corrections to the definition's players, by player `uniqueId`: the `name` shown and the file `extensions` the emulator opens, in place of the definition's (`PlayerFix` in `Catalog.kt`). Only what a device test proved: launch each format, archives included, with the emulator. A correction of a player the platform lacks is reported. |
 
 A medium not modelled yet is listed in `AWAITING` of `app/test/carousel/media/media_folders_test.gd`, and the
 games are drawn on a stand-in until it is.

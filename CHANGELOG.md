@@ -35,6 +35,12 @@ follows [Keep a Changelog](https://keepachangelog.com).
   folders picked when a console is added.
 
 ### Fixed
+- Games kept in `.zip` or `.7z` archives start with Snes9x EX+, GBC.emu, GBA.emu and NES.emu, which open them: they
+  were listed on the shelf, then refused with "No emulator is installed". These emulators, the My Boy! and
+  My OldBoy! apps, Nesoid and Mupen64Plus are shown under their names instead of their Android package; Dolphin also
+  takes `.wia` disc images, and FPse no longer offers `.chd` images, which it cannot open.
+- The console list of "+" groups the consoles under their maker: the Super Nintendo was last, after Sony's.
+- A name such as "Snes9x" keeps its "x": the app's font drew a multiplication sign after a digit.
 - Cartouche fits screens of every shape, from near-square handhelds to 32:9 monitors: a wider screen shows more
   consoles in the bar and more games on the shelf at the same size, a taller one keeps the bar and the hints at the
   bottom and the console in the middle, and every screen, form and launch stands where it does on a 4:3 screen.

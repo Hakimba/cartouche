@@ -16,6 +16,7 @@ import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
+import arrow.core.getOrElse
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
@@ -108,8 +109,12 @@ class CatalogTest {
     @Test
     fun `offered holds the catalog platforms that have a model and nothing else, whatever the models named`() = runBlocking<Unit> {
         val known = shippedCatalog.platforms.map { it.id }
-        // The chooser's order: names compared in lower case, as the rule says, not taken from the code's own output.
-        val byName = shippedCatalog.platforms.sortedBy { it.name.lowercase() }.map { it.id }
+        // The chooser's order: grouped by maker, then the model, compared in lower case, as the rule says.
+        val split = shippedCatalog.platforms.map { OfferedConsole.of(it) }
+        val byName =
+            split
+                .sortedWith(compareBy({ it.maker.isNone() }, { it.maker.getOrElse { "" }.lowercase() }, { it.model.lowercase() }))
+                .map { it.platform }
         checkAll(Arb.set(Arb.element(known + PlatformId("dreamcast-without-definition")), 0..known.size)) { named ->
             val catalog = Catalog.parse(shipped, Shipped.profiles, named)
             catalog.offered.map { it.platform }.toSet() shouldBe named.intersect(known.toSet())
@@ -245,6 +250,21 @@ class CatalogTest {
                 CatalogError.DuplicatePlayer("test.json", PlayerId("good")),
                 CatalogError.DuplicatePlatform("again.json", PlatformId("ps2")),
             )
+    }
+
+    @Test
+    fun `a profile's fix renames a player and sets the files it opens, and a fix of a player the platform lacks is reported`() {
+        val fixes =
+            """"players": {"p": {"name": "ps2 - Shown", "extensions": ["sfc", "zip"]}, "gone": {"name": "x"}, "q": {"name": "ps2 - Q"}}"""
+        val profiles = """{"ps2": {"media": "dvd", "medium": {"default": "ps2_dvd"}, "minimumGameBytes": 1, $fixes}}"""
+        val catalog = Catalog.parse(listOf(definition(playerJson("p"), playerJson("q"))), DefinitionSource("profiles.json", profiles))
+        val fixed = catalog.find(PlayerId("p")).shouldBeSome().player
+        fixed.emulatorName shouldBe "Shown"
+        listOf("Game.sfc", "Game.ZIP").forEach { fixed.accepts.matches(FileName(it)) shouldBe true }
+        fixed.accepts.matches(FileName("Game.chd")) shouldBe false
+        // A fix without extensions keeps the definition's.
+        catalog.find(PlayerId("q")).shouldBeSome().player.accepts.matches(FileName("Game.chd")) shouldBe true
+        catalog.rejected shouldBe listOf(CatalogError.UnknownPlayerFix("test.json", PlayerId("gone")))
     }
 
     @Test

@@ -7,7 +7,7 @@
     "art": {"kind": "disc"},
     "scansBySerial": {"url": "https://psxdatacenter.com/psx2/images2/covers/{serial}/{serial}-D-ALL.jpg", "serial": "[A-Z]{4}-\\d{5}"}
   },
-  "gc": {"media": "minidisc", "medium": {"default": "gc_mini_dvd"}, "minimumGameBytes": 16000000, "screenScraperSystem": 13, "art": {"kind": "disc"}},
+  "gc": {"media": "minidisc", "medium": {"default": "gc_mini_dvd"}, "minimumGameBytes": 16000000, "screenScraperSystem": 13, "art": {"kind": "disc"}, "players": {"gc.org.dolphinemu.dolphinemu": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}, "gc.org.dolphinemu.dolphinemu.debug": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}}},
   "gba": {
     "media": "cartridge",
     "medium": {"default": "gba_cart"},
@@ -15,7 +15,8 @@
     "screenScraperSystem": 12,
     "art": {"kind": "cartridge_front", "fronts": {
       "gba_cart": {"proportion": 1.74, "label": {"left": 0.147, "top": 0.218, "width": 0.706, "height": 0.628}}
-    }}
+    }},
+    "players": {"gba.com.explusalpha.GbaEmu": {"name": "gba - GBA.emu", "extensions": ["agb", "bin", "cgb", "dmg", "gb", "gba", "gbc", "gbz", "sgb", "zip", "7z"]}, "gba.com.fastemulator.gbafree": {"name": "gba - My Boy! Free"}, "gba.com.fastemulator.gba": {"name": "gba - My Boy!"}}
   },
   "nes": {
     "media": "cartridge",
@@ -25,7 +26,8 @@
     "art": {"kind": "cartridge_front", "fronts": {
       "nes_cart": {"proportion": 0.895, "label": {"left": 0.397, "top": 0.0, "width": 0.472, "height": 0.68}},
       "famicom_cart": {"proportion": 1.545, "label": {"left": 0.074, "top": 0.104, "width": 0.852, "height": 0.634}}
-    }}
+    }},
+    "players": {"nes.com.explusalpha.NesEmu": {"name": "nes - NES.emu", "extensions": ["bin", "fds", "nes", "nsf", "qd", "rom", "unf", "unif", "zip", "7z"]}, "nes.com.androidemu.nes": {"name": "nes - Nesoid"}}
   },
   "snes": {
     "media": "cartridge",
@@ -35,7 +37,8 @@
     "art": {"kind": "cartridge_front", "fronts": {
       "snes_pal_cart": {"proportion": 1.41, "label": {"left": 0.09, "top": 0.06, "width": 0.82, "height": 0.4}},
       "snes_us_cart": {"proportion": 1.57, "label": {"left": 0.177, "top": 0.017, "width": 0.647, "height": 0.432}}
-    }}
+    }},
+    "players": {"snes.com.explusalpha.Snes9xPlus": {"name": "snes - Snes9x EX+", "extensions": ["bml", "bs", "bsx", "dx2", "fig", "gb", "gbc", "gd3", "gd7", "rom", "sfc", "smc", "st", "swc", "zip", "7z"]}}
   },
   "n64": {
     "media": "cartridge",
@@ -44,7 +47,8 @@
     "screenScraperSystem": 14,
     "art": {"kind": "cartridge_front", "fronts": {
       "n64_cart": {"proportion": 1.514, "label": {"left": 0.249, "top": 0.089, "width": 0.503, "height": 0.841}}
-    }}
+    }},
+    "players": {"n64.org.mupen64plusae.v3.fzurita": {"name": "n64 - Mupen64Plus FZ"}, "n64.org.mupen64plusae.v3.alpha": {"name": "n64 - Mupen64Plus AE (alpha)"}, "n64.org.mupen64plusae.v3.fzurita.pro": {"name": "n64 - Mupen64Plus FZ Pro"}, "n64.paulscode.android.mupen64plusae": {"name": "n64 - Mupen64Plus AE"}}
   },
   "gb": {
     "media": "cartridge",
@@ -53,7 +57,8 @@
     "screenScraperSystem": 9,
     "art": {"kind": "cartridge_front", "fronts": {
       "gb_cart": {"proportion": 0.885, "label": {"left": 0.124, "top": 0.285, "width": 0.752, "height": 0.577}}
-    }}
+    }},
+    "players": {"gb.com.explusalpha.GbcEmu": {"name": "gb - GBC.emu", "extensions": ["bin", "cgb", "dmg", "gb", "gbc", "gbs", "rom", "sgb", "zip", "7z"]}, "gb.com.fastemulator.gbcfree": {"name": "gb - My OldBoy! Free"}, "gb.com.fastemulator.gbc": {"name": "gb - My OldBoy!"}}
   },
   "gbc": {
     "media": "cartridge",
@@ -64,7 +69,8 @@
       "gbc_cart": {"proportion": 0.885, "label": {"left": 0.124, "top": 0.285, "width": 0.752, "height": 0.577}}
     }, "exclusives": {
       "gbc_cart": {"proportion": 0.885, "label": {"left": 0.124, "top": 0.337, "width": 0.752, "height": 0.577}}
-    }}
+    }},
+    "players": {"gbc.com.explusalpha.GbcEmu": {"name": "gbc - GBC.emu", "extensions": ["bin", "cgb", "dmg", "gb", "gbc", "gbs", "rom", "sgb", "zip", "7z"]}, "gbc.com.fastemulator.gbcfree": {"name": "gbc - My OldBoy! Free"}, "gbc.com.fastemulator.gbc": {"name": "gbc - My OldBoy!"}}
   },
   "nds": {"media": "cartridge", "medium": {"default": "nds_card"}, "minimumGameBytes": 131072},
   "3ds": {"media": "cartridge", "medium": {"default": "3ds_card"}, "minimumGameBytes": 1048576},
@@ -74,10 +80,10 @@
   "gamegear": {"media": "cartridge", "medium": {"default": "gamegear_cart"}, "minimumGameBytes": 8192},
   "tg16": {"media": "cartridge", "medium": {"default": "tg16_card"}, "minimumGameBytes": 8192},
   "atari2600": {"media": "cartridge", "medium": {"default": "atari2600_cart"}, "minimumGameBytes": 1024},
-  "psx": {"media": "dvd", "medium": {"default": "ps1_cd"}, "minimumGameBytes": 0, "screenScraperSystem": 57, "art": {"kind": "disc"}},
+  "psx": {"media": "dvd", "medium": {"default": "ps1_cd"}, "minimumGameBytes": 0, "screenScraperSystem": 57, "art": {"kind": "disc"}, "players": {"psx.com.emulator.fpse": {"extensions": ["bin", "cue", "ecm", "exe", "img", "iso", "m3u", "mds", "pbp", "psexe", "psf"]}, "psx.com.emulator.fpse64": {"extensions": ["bin", "cue", "ecm", "exe", "img", "iso", "m3u", "mds", "pbp", "psexe", "psf"]}}},
   "psp": {"media": "dvd", "medium": {"default": "psp_umd"}, "minimumGameBytes": 1048576, "screenScraperSystem": 61},
   "psvita": {"media": "cartridge", "medium": {"default": "psvita_card"}, "minimumGameBytes": 1, "screenScraperSystem": 62},
-  "wii": {"media": "dvd", "medium": {"default": "wii_dvd"}, "minimumGameBytes": 16000000, "screenScraperSystem": 16, "art": {"kind": "disc"}},
+  "wii": {"media": "dvd", "medium": {"default": "wii_dvd"}, "minimumGameBytes": 16000000, "screenScraperSystem": 16, "art": {"kind": "disc"}, "players": {"wii.org.dolphinemu.dolphinemu": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "json", "wia"]}, "wii.org.dolphinemu.dolphinemu.debug": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}}},
   "saturn": {"media": "dvd", "medium": {"default": "saturn_cd"}, "minimumGameBytes": 0},
   "dreamcast": {"media": "dvd", "medium": {"default": "dreamcast_gd"}, "minimumGameBytes": 0, "screenScraperSystem": 23},
   "segacd": {"media": "dvd", "medium": {"default": "segacd_cd"}, "minimumGameBytes": 0},
