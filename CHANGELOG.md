@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-07
+
 ### Added
 - Games copied into a console's folder show up on their own: each time Cartouche opens or comes back to the screen,
   it reads the folders again, adds the new games and takes away the ones deleted. A console that got new games carries
@@ -98,6 +100,7 @@ the emulators you already have. NES, Super Nintendo, Nintendo 64, GameCube, Wii,
 Game Boy Advance, PlayStation, PlayStation 2, Xbox and Xbox 360; labels from ScreenScraper and LaunchBox; filters,
 a wheel to order your consoles, renaming; controller and touch; English and French.
 
+[0.4.0]: ../../compare/v0.3.0...v0.4.0
 [0.3.0]: ../../compare/v0.2.0...v0.3.0
 [0.2.0]: ../../compare/v0.1.0...v0.2.0
 [0.1.0]: ../../releases/tag/v0.1.0
