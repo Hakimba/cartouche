@@ -2,7 +2,7 @@
 extends GdUnitTestSuite
 
 const ScreenFixtures := preload("res://test/screens/fixtures.gd")
-const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
+const ScreenAgreement := preload("res://dev/screen_agreement.gd")
 
 
 ## A carousel on a device holding [param consoles], on its consoles screen once the first re-read is over.

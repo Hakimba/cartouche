@@ -6,7 +6,7 @@ const LaunchView := preload("res://dev/bridge/launch_view.gd")
 const Views := preload("res://dev/bridge/views.gd")
 const BridgeSounds := preload("res://dev/bridge/sounds.gd")
 const RouteFixture := preload("res://dev/bridge/route_fixture.gd")
-const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
+const ScreenAgreement := preload("res://dev/screen_agreement.gd")
 const _PLINTH := preload("res://studio/views/plinth.gd")
 const CACHE_FILES := {
 	"res://data/studio_lights.json":

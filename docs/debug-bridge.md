@@ -51,7 +51,7 @@ order, including the ones that wait for frames. `app/dev/bridge/commands.gd` dis
 | `window {size}` | desktop: the window takes the shape of a `[width, height]` screen, as large as the desktop allows, so a layout can be checked on screens of any shape |
 
 On the carousel, `state` also tells what it shows of the parts each screen owns, by
-`app/dev/bridge/screen_agreement.gd`, the rule the INV-20 walk asserts after every step:
+`app/dev/screen_agreement.gd`, the rule the INV-20 walk asserts after every step:
 
 | Field | What it holds |
 |---|---|

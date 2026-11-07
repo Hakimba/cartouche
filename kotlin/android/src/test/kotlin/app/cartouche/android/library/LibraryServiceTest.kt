@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android.library
 
+import android.database.Cursor
 import android.net.Uri
 import app.cartouche.android.Threads
 import app.cartouche.android.storage.AUTHORITY
@@ -322,6 +323,39 @@ class LibraryServiceTest {
         service.reread().shouldBeLeft().shouldBeInstanceOf<LibraryFailure.Storage>()
         service().library() shouldBe library
         service().arrivals() shouldBe marked
+    }
+
+    @Test
+    fun `INV-25 a re-read that cannot list a sub-folder keeps its games and what the user chose for them`() {
+        val service = service()
+        service.setUp(platform.id, PlatformSetup(Some(TREE), depth = FolderDepth.SUBFOLDERS)).shouldBeRight()
+
+        fun holding(sub: () -> Cursor?) = installDocuments { folder ->
+            if (folder == "root/s") sub() else rows(fileRow("root/Okage.iso"), folderRow("root/s"))
+        }
+        holding { rows(fileRow("root/s/Rez.iso")) }
+        service.scan().shouldBeRight()
+        val rez = service.library().games.single { it.title == "Rez" }.id
+        service.rename(rez, DisplayName.of("Rez Infinite")).shouldBeRight()
+        val library = service.library()
+        holding { throw IllegalStateException("card removed") }
+        service.reread().shouldBeRight().library.shouldBeNone()
+        service().library() shouldBe library
+        holding { rows(fileRow("root/s/Rez.iso")) }
+        service.reread().shouldBeRight().arrivals shouldBe Arrivals()
+        service().library().game(rez).shouldBeSome().shownTitle shouldBe "Rez Infinite"
+        holding { throw IllegalStateException("card removed") }
+        service.scan().shouldBeRight()
+        installDocuments { folder ->
+            if (folder ==
+                "root/s"
+            ) {
+                throw IllegalStateException("card removed")
+            } else {
+                rows(fileRow("root/Okage.iso"), fileRow("root/Ico.iso"), folderRow("root/s"))
+            }
+        }
+        service.titles(service.reread().shouldBeRight().arrivals.unseen) shouldBe setOf("Ico")
     }
 
     @Test

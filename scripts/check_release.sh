@@ -46,3 +46,11 @@ with Path(sys.argv[1]).open('rb') as pack:
         raise SystemExit('release pack is empty')
     print(f'Release pack: {count} paths, no bridge files')
 CHECK
+# A script the pack keeps may still need a file it leaves out (a preload of dev/bridge/): start the pack and refuse
+# any script error.
+started=$(timeout 120s "$GODOT" --headless --main-pack "$pack_dir/release.pck" --quit-after 240 2>&1 || true)
+if grep -q 'SCRIPT ERROR' <<<"$started"; then
+  grep -A1 'SCRIPT ERROR' <<<"$started"
+  exit 1
+fi
+echo 'Release pack starts without a script error'

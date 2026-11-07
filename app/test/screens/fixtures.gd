@@ -5,7 +5,7 @@ extends RefCounted
 
 const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 ## The rule every screen settles whole by (INV-20), shared with the bridge.
-const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
+const ScreenAgreement := preload("res://dev/screen_agreement.gd")
 const NAVIGATION: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_right"]
 ## The flags a screen sets while it takes no press (a screen without one, or a signal of that name, is not guarded),
 ## and must have cleared once it is shown and still.

@@ -289,12 +289,18 @@ internal class LibraryService(
      * Scans [platform] as [scan] does, the user not asking for it: the games it brings are marked as new
      * ([Arrivals.after]). The library is written only when the scan changed it, as a re-read usually finds what was
      * there, and answered only when its games changed. The marks are another file, written after the library: a kill
-     * in between leaves those games unmarked.
+     * in between leaves those games unmarked. A sub-folder it cannot list though the last scan did changes nothing:
+     * dropping its games would drop what the user chose for them.
      */
     fun reread(platform: Platform, titles: TitleIndex, dataFolders: DataFolders): Either<LibraryFailure, Reread> = either {
         val started = TimeSource.Monotonic.markNow()
         val before = library()
         val (scan, report) = found(platform, before.setup(platform.id), titles, dataFolders) { factsOf(platform.id, it) }.bind()
+        val unread = before.newlyUnreadable(platform.id, scan)
+        if (unread.isNotEmpty()) {
+            trace("refresh") { "${platform.id.value}: unchanged, ${unread.joinToString { it.path.value }} could not be listed" }
+            return@either Reread(None, arrivals())
+        }
         val after = before.withScan(platform.id, scan)
         val kept = if (after.scansAlike(platform.id, before)) before else save(after).bind()
         val shown = if (after.gamesAlike(platform.id, before)) None else Some(kept)

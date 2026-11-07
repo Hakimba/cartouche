@@ -132,6 +132,15 @@ public data class Library(
         ).withIgnored(platform, scan.ignored)
     }
 
+    /**
+     * The sub-folders [scan] could not list though the last scan of [platform] did: a card going away or a listing
+     * cut short, their games still there for all a scan knows.
+     */
+    public fun newlyUnreadable(platform: PlatformId, scan: Scan): List<SkippedFolder> {
+        val before = skippedFolders.getOrElse(platform) { emptyList() }.toSet()
+        return scan.skippedFolders.filter { it.reason == SkipReason.UNREADABLE && it !in before }
+    }
+
     /** Whether [other] holds the same games of [platform], though [withScan] puts them last. */
     public fun gamesAlike(platform: PlatformId, other: Library): Boolean = gamesOf(platform) == other.gamesOf(platform)
 

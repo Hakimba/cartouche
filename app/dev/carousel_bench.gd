@@ -41,7 +41,7 @@ const _STEP_EVERY_S := 0.6
 const _PLACING_EVERY_S := 4.0
 const _ARRIVED_S := 0.6
 const _REST_S := 40.0
-const ScreenAgreement := preload("res://dev/bridge/screen_agreement.gd")
+const ScreenAgreement := preload("res://dev/screen_agreement.gd")
 ## The presses `order` goes round: take, move right twice, back left twice, let go.
 const _ORDER_PRESSES: Array[StringName] = [&"ui_accept", &"carousel_right", &"carousel_right",
 	&"carousel_left", &"carousel_left", &"screen_back"]
