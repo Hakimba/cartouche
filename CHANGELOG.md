@@ -5,6 +5,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-09
+
 ### Fixed
 - Moving from one console to another no longer shows both of them half see-through, one inside the other: the
   console left is gone at once and the one reached slides in, whole, from the side.
@@ -104,6 +106,7 @@ the emulators you already have. NES, Super Nintendo, Nintendo 64, GameCube, Wii,
 Game Boy Advance, PlayStation, PlayStation 2, Xbox and Xbox 360; labels from ScreenScraper and LaunchBox; filters,
 a wheel to order your consoles, renaming; controller and touch; English and French.
 
+[0.4.1]: ../../compare/v0.4.0...v0.4.1
 [0.4.0]: ../../compare/v0.3.0...v0.4.0
 [0.3.0]: ../../compare/v0.2.0...v0.3.0
 [0.2.0]: ../../compare/v0.1.0...v0.2.0
