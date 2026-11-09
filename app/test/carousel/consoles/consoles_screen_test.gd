@@ -297,39 +297,19 @@ static func _looks(consoles: ConsoleRow) -> Array[float]:
 	return found
 
 
-func test_a_press_in_the_middle_of_a_swap_jumps_nothing() -> void:
+func test_a_swap_shows_only_the_console_reached_opaque() -> void:
 	var carousel := await Fixtures.shown_carousel(self)
 	var consoles := carousel._consoles
 	_select(carousel, 0)
 	Fixtures.step_frames(carousel, 30)
-	consoles.step(1)
-	for frame in 4:
-		consoles._process(0.016)
-	var earlier := _stood(consoles)
-	consoles.step(1)
-	consoles.arrange()
-	var later := _stood(consoles)
-	# Every console drawn a frame ago keeps its opacity and place within what one frame moves them.
-	for index: int in earlier:
-		var was: Array = earlier[index]
-		var was_opacity: float = was[0]
-		var was_place: Vector3 = was[1]
-		if index in later:
-			var now: Array = later[index]
-			var now_opacity: float = now[0]
-			var now_place: Vector3 = now[1]
-			assert_float(now_opacity).override_failure_message("opacity of %d jumps" % index).is_equal_approx(was_opacity, 0.05)
-			assert_float(now_place.distance_to(was_place)).override_failure_message("place of %d jumps" % index).is_less(0.05)
-		else:
-			assert_float(was_opacity).override_failure_message("%d vanished" % index).is_less(0.02)
-
-
-## Opacity and position of every console drawn now, by index.
-func _stood(consoles: ConsoleRow) -> Dictionary:
-	var looks := {}
-	for i in consoles._items.size():
-		var model := consoles._items[i].model
-		if model.visible:
-			var fade: ModelFade = model.get(&"_fade")
-			looks[i] = [1.0 - fade.amount, model.position]
-	return looks
+	for press in 3:
+		consoles.step(1)
+		for frame in 2 + press * 3:
+			consoles._process(0.016)
+			# The console left is gone at once: a half faded model shows as a pale ghost.
+			var drawn := consoles._items.filter(func(item: ConsoleRow.Item) -> bool: return item.model.visible)
+			assert_array(drawn).has_size(1)
+			var shown: ConsoleRow.Item = drawn[0]
+			assert_object(shown).is_same(consoles.selected())
+			var fade: ModelFade = shown.model.get(&"_fade")
+			assert_float(fade.amount).is_zero()

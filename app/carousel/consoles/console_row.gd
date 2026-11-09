@@ -4,7 +4,7 @@ extends Node3D
 ## The consoles screen's row: one console per platform with games, the selected one alone in the middle,
 ## posed by its launch animation's first step; the right stick turns it ([StickTurn]). Left and right
 ## step along a ring, whatever the count: its position shows console `posmod(position, count)`. A step
-## swaps the consoles: the old one slides away and fades, the new one comes in from the other side.
+## swaps the consoles: the old one is gone at once, the new one comes in from the other side, opaque.
 ##
 ## The selected console stands as its launch animation has it: the animation drives the properties
 ## below, from where the console rests to where a game goes into it, and the console's own parts.
@@ -34,11 +34,8 @@ const _RAIL_PULL := Vector2(0.45, 0.55)
 const _RAIL_SIZE := 0.6
 const _FLIER_NEARER := 0.9
 const _COMING_SIZE := 0.7
-## A swap: the console leaving slides this far away (px of the screen), shrinks to this size and fades in
-## [constant _OUT_S]; the one coming slides in from this far, grows from this size in [constant _IN_S].
-const _OUT_S := 0.18
-const _OUT_PX := 64.0
-const _OUT_SCALE := 0.97
+## A swap: the console coming slides in from this far (px of the screen) and grows from this size in
+## [constant _IN_S], opaque all along: a 3D model half faded shows as a pale ghost over the backdrop.
 const _IN_S := 0.34
 const _IN_PX := 76.8
 const _IN_SCALE := 0.96
@@ -119,11 +116,9 @@ var _stuck := -1
 ## Whether they were arranged since this node's last frame: then, behind the games too, they are
 ## arranged again as the clock moves on.
 var _arranged := false
-## The consoles leaving, each from where it stood when it was left; the way the row went (-1 or 1) and the seconds
-## since the selected console started coming in: the swap is over once it arrived.
-var _leavers: Array[Leaver] = []
+## The way the row went (-1 or 1) and the seconds since the selected console started coming in: the swap is over
+## once it arrived.
 var _way := 0
-var _in_from := Swap.new(0.0, 1.0, 1.0)
 var _swap_s := _IN_S
 var _screen_presence := 1.0
 
@@ -153,9 +148,6 @@ func _process(delta: float) -> void:
 	_pose_s += delta * pace
 	_scroll = CarouselLayout.scrolled(_scroll, _position, delta)
 	_swap_s += delta
-	for leaver in _leavers:
-		leaver.seconds += delta
-	_leavers = _leavers.filter(func(leaver: Leaver) -> bool: return leaver.seconds < _OUT_S)
 	_turn.follow(_stick, selected_index(), delta)
 	_slide(delta)
 	for i in _pop.size():
@@ -266,21 +258,13 @@ func reorder(order: Array[int]) -> void:
 
 
 ## [param places] steps towards [param direction] (-1 or 1) round the ring: from the last console, the first, and
-## back. The console left swaps with the one reached; a step during a swap starts the swap again.
+## back. The console reached replaces the one left; a step during a swap starts the swap again.
 func step(direction: int, places := 1) -> void:
 	if _items.size() < 2:
 		return
-	var leaver := Leaver.new()
-	leaver.index = selected_index()
-	leaver.way = direction
-	leaver.from = _swap_in() if _swap_s < _IN_S else Swap.new(0.0, 1.0, 1.0)
 	_way = direction
 	_swap_s = 0.0
 	_position += direction * places
-	var returning := _leaver_of(selected_index())
-	_in_from = returning.look() if returning else Swap.new(_way * _IN_PX, _IN_SCALE, 0.0)
-	_leavers.append(leaver)
-	_leavers = _leavers.filter(func(other: Leaver) -> bool: return other.index != selected_index())
 	_turn.release()
 	Sounds.play(SoundEffects.Cue.CONSOLE)
 	selection_changed.emit(selected_index())
@@ -347,17 +331,14 @@ func arrange() -> void:
 	_arranged = true
 	var on_ring := wheel > 0.0 or others_wheel > 0.0
 	_light_selected()
-	var settled := Swap.new(0.0, 1.0, 1.0)
-	var swap := _swap_in() if _swap_s < _IN_S else settled
+	var arrived := Motion.eased(Motion.Easing.ARRIVE, clampf(_swap_s / _IN_S, 0.0, 1.0))
 	for i in _items.size():
 		var item := _items[i]
 		var chosen := i == selected_index()
-		var leaver := _leaver_of(i)
-		var going := leaver != null and not chosen and leaver.seconds < _OUT_S
-		item.model.visible = chosen or going or on_ring and wheel_slots[i] >= 0
+		item.model.visible = chosen or on_ring and wheel_slots[i] >= 0
 		if not item.model.visible:
 			continue
-		var offset := 0.0 if chosen or going else CarouselLayout.nearest(_position, i, _items.size()) - _scroll
+		var offset := 0.0 if chosen else CarouselLayout.nearest(_position, i, _items.size()) - _scroll
 		var rest := item.rest
 		var at_position := console_position if chosen else rest.console_position
 		var amount := pose_amount if chosen else rest.pose_amount
@@ -366,12 +347,12 @@ func arrange() -> void:
 		pose.sway = sway_degrees if chosen else rest.sway_degrees
 		var bob := CarouselLayout.float_height(_pose_s, bob_height if chosen else rest.bob_height, centred)
 		var turned := _three_euler(console_rotation if chosen else rest.console_rotation)
-		var swapping := swap if chosen else leaver.look() if going else settled
-		var size := (console_scale if chosen else rest.console_scale) * maxf(arrival, 0.001) * swapping.size
+		var size := (console_scale * lerpf(_IN_SCALE, 1.0, arrived) if chosen else rest.console_scale) * maxf(arrival, 0.001)
 		var posed := place.basis * pose.at(_pose_s, centred) * _turn.of(i)
 		var stand := posed * turned.scaled(Vector3.ONE * size)
 		var lift := Vector3.UP * bob
-		var slid := Vector3.RIGHT * swapping.shift_px * _WORLD_PER_PX * (3.7 - at_position.z - global_position.z)
+		var shift_px := lerpf(_way * _IN_PX, 0.0, arrived) if chosen else 0.0
+		var slid := Vector3.RIGHT * shift_px * _WORLD_PER_PX * (3.7 - at_position.z - global_position.z)
 		var in_row := Transform3D(stand, at_position + place.origin + lift + slid)
 		if chosen and _lights:
 			_lights.place(Transform3D(stand, at_position + place.origin + lift) * _lit_centre)
@@ -382,7 +363,7 @@ func arrange() -> void:
 		# Set again, even unchanged, it would be sent to every part of the console.
 		if item.model.transform != moved:
 			item.model.transform = moved
-		var presence := (1.0 if chosen else others_opacity) * swapping.opacity
+		var presence := 1.0 if chosen else others_opacity
 		item.fade.call(1.0 - ringed.opacity if on_ring else CarouselLayout.faded(offset, presence * _screen_presence))
 
 
@@ -466,22 +447,7 @@ func _front_layer(index: int) -> int:
 	return HERO if index == _lit else ConsoleLayer.FRONT
 
 
-func _swap_in() -> Swap:
-	var arrived := Motion.eased(Motion.Easing.ARRIVE, clampf(_swap_s / _IN_S, 0.0, 1.0))
-	return Swap.new(lerpf(_in_from.shift_px, 0.0, arrived), lerpf(_in_from.size, 1.0, arrived),
-		lerpf(_in_from.opacity, 1.0, clampf(arrived, 0.0, 1.0)))
-
-
-## The leaver of console [param index], none when it is not leaving.
-func _leaver_of(index: int) -> Leaver:
-	for leaver in _leavers:
-		if leaver.index == index:
-			return leaver
-	return null
-
-
 func _stop_swap() -> void:
-	_leavers.clear()
 	_swap_s = _IN_S
 
 
@@ -615,33 +581,6 @@ func _stick_on() -> void:
 static func _three_euler(angles: Vector3) -> Basis:
 	return Basis(Vector3.RIGHT, angles.x) * Basis(Vector3.UP, angles.y) \
 		* Basis(Vector3.BACK, angles.z)
-
-
-## How a console stands in a swap: slid by [member shift_px] pixels, [member size] times its size and
-## [member opacity] opaque.
-class Swap:
-	var shift_px: float
-	var size: float
-	var opacity: float
-
-	func _init(shift: float, scaled: float, opaque: float) -> void:
-		shift_px = shift
-		size = scaled
-		opacity = opaque
-
-
-## A console leaving the row: from [member from], where it stood when it was left, it slides away, shrinks and
-## fades as the swap has it, [member seconds] into it.
-class Leaver:
-	var index: int
-	var way: int
-	var from: Swap
-	var seconds := 0.0
-
-	func look() -> Swap:
-		var gone := Motion.eased(Motion.Easing.EASE_IN, clampf(seconds / ConsoleRow._OUT_S, 0.0, 1.0))
-		return Swap.new(lerpf(from.shift_px, -way * ConsoleRow._OUT_PX, gone),
-			lerpf(from.size, ConsoleRow._OUT_SCALE, gone), from.opacity * (1.0 - gone))
 
 
 ## One console of the row: its model, how to fade it, and where it rests.

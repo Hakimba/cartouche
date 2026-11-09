@@ -5,6 +5,10 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+### Fixed
+- Moving from one console to another no longer shows both of them half see-through, one inside the other: the
+  console left is gone at once and the one reached slides in, whole, from the side.
+
 ## [0.4.0] - 2026-11-07
 
 ### Added
