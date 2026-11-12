@@ -6,3 +6,4 @@
 script = ExtResource("1")
 seat_centre = Vector3(0, 62, -5)
 seat_degrees = Vector3(-90, 0, 0)
+housings = Array[StringName]([&"body", &"lid"])

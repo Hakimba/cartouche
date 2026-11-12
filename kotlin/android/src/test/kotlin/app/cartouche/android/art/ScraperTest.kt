@@ -7,7 +7,6 @@ import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.art.Candidate
 import app.cartouche.core.art.Closure
 import app.cartouche.core.art.Identity
-import app.cartouche.core.art.LookAgain
 import app.cartouche.core.art.PS2_DISC
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.ScreenScraperState
@@ -21,6 +20,7 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.getOrElse
+import arrow.core.left
 import arrow.core.nonEmptyListOf
 import arrow.core.right
 import arrow.core.toNonEmptyListOrNone
@@ -47,11 +47,19 @@ import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
 import io.kotest.property.checkAll
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Delay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -63,9 +71,12 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.CoroutineContext
 
 /** Where the downloads of the games on screen are told when a test does not look. */
 private val unseen: (GameId, LabelDownload) -> Unit = { _, _ -> }
+
+private const val RENEWED = "https://art/0/renewed.png"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -144,7 +155,8 @@ class ScraperTest {
                 var going = emptySet<String>()
                 val askedWhileStopped = mutableListOf<String>()
                 var last = Scraping.NONE
-                val scraper = Scraper(store, fetch, scope, downloading = unseen) { run, _ -> last = run }
+                // A network the device has not validated: every failure stalls the run.
+                val scraper = Scraper(store, fetch, scope, online = { false }, downloading = unseen) { run, _ -> last = run }
                 script.forEach { step ->
                     val before = fetch.asked.size
                     when (step) {
@@ -199,7 +211,8 @@ class ScraperTest {
                     val reachable = candidates.takeWhile { it != Held.REFUSAL }
                     when {
                         Held.IMAGE in reachable -> store.stored(id).shouldBeSome().also { stored++ }
-                        Held.REFUSAL in candidates || Held.SKIPPED in candidates -> {
+                        // A page in place of an image tells nothing of the game either.
+                        listOf(Held.REFUSAL, Held.SKIPPED, Held.NOT_AN_IMAGE).any { it in candidates } -> {
                             store.stored(id).shouldBeNone()
                             (id in absent) shouldBe false
                         }
@@ -228,7 +241,7 @@ class ScraperTest {
     private class Harness(store: ArtStore, fetch: FakeFetch, textures: Textures = Textures.NONE) {
         val scope = TestScope(StandardTestDispatcher())
         var last = Scraping.NONE
-        val scraper = Scraper(store, fetch, scope, textures, downloading = unseen) { run, _ -> last = run }
+        val scraper = Scraper(store, fetch, scope, textures, { fetch.online }, downloading = unseen) { run, _ -> last = run }
 
         fun lookFor(requests: List<ArtRequest>) = scope.launch { scraper.lookFor(requests) }
     }
@@ -321,11 +334,12 @@ class ScraperTest {
                 val kept = (held(Held.IMAGE) + held(Held.NOTHING)).filter { it.startsWith("ss:") }
                 kept.forEach { asked().getOrDefault(it, 0) shouldBeLessThanOrEqual 1 }
                 found += requests.count { store.stored(it.game).isSome() }
-                store.lookAgain(LookAgain(requests.map { it.game }.toSet(), emptySet())).shouldBeRight()
+                store.retry(requests.map { it.game }.toSet(), store.choices()).shouldBeRight()
                 val again = Harness(store, fetch, FakeTextures(open = true))
                 again.lookFor(requests)
                 again.scope.runCurrent()
-                kept.forEach { asked().getOrDefault(it, 0) shouldBeLessThanOrEqual 2 }
+                // A texture ScreenScraper has none of stays remembered: only the images found are asked once more.
+                kept.forEach { asked().getOrDefault(it, 0) shouldBeLessThanOrEqual if (it in held(Held.NOTHING)) 1 else 2 }
                 val before = asked()
                 val renewed = Harness(store, fetch, FakeTextures(open = true))
                 renewed.lookFor(requests(newer))
@@ -451,8 +465,9 @@ class ScraperTest {
         store.isAbsent(GameId("ps2/0"), Some(version)) shouldBe true
         news.clear()
         fetch.online = false
-        store.lookAgain(LookAgain(setOf(GameId("ps2/0")), emptySet())).shouldBeRight()
-        scope.launch { scraper.lookFor(requests(listOf(listOf(Held.NOTHING)), 1)) }
+        // New sources' tables want it again.
+        val renewed = requests(listOf(listOf(Held.NOTHING)), 1).map { it.copy(version = Some(ArtVersion("2026-11-01"))) }
+        scope.launch { scraper.lookFor(renewed) }
         scope.runCurrent()
         news.shouldBeEmpty()
         scope.cancel()
@@ -498,16 +513,52 @@ class ScraperTest {
     }
 
     @Test
+    fun `a download's file is there while it downloads and gone after an image, an error, an unreadable image or a cancellation`() {
+        val downloads = File(folder, "downloads")
+
+        fun left() = downloads.listFiles().orEmpty().toList()
+        val held = listOf(listOf(Held.IMAGE), listOf(Held.NOTHING), listOf(Held.NOT_AN_IMAGE), listOf(Held.REFUSAL))
+        val fetch = server(held)
+        val during = mutableListOf<Int>()
+        fetch.during = { during += left().size }
+        val store = ArtStore(folder)
+        val scope = TestScope(StandardTestDispatcher())
+        val scraper = Scraper(store, fetch, scope, downloading = unseen) { _, _ -> }
+        scope.launch { scraper.lookFor(requests(held, 4)) }
+        scope.runCurrent()
+        during.size shouldBe 4
+        during.all { it >= 1 } shouldBe true
+        store.stored(GameId("ps2/0")).shouldBeSome()
+        left().shouldBeEmpty()
+        val cut =
+            Scraper(
+                store,
+                Fetch { _, _, file ->
+                    file.writeBytes(image)
+                    awaitCancellation()
+                },
+                scope,
+                downloading = unseen,
+            ) { _, _ -> }
+        scope.launch { cut.lookFor(requests(listOf(listOf(Held.IMAGE)), 1).map { it.copy(game = GameId("ps2/9")) }) }
+        scope.runCurrent()
+        left().size shouldBe 1
+        scope.cancel()
+        scope.runCurrent()
+        left().shouldBeEmpty()
+    }
+
+    @Test
     fun `a label asked again while its old look downloads is looked for again once that look ends, in the new order`() {
         val store = ArtStore(folder)
         val scope = TestScope(StandardTestDispatcher())
         val first = CompletableDeferred<Unit>()
         val asked = mutableListOf<String>()
         val fetch =
-            Fetch { candidate, _ ->
+            Fetch { candidate, _, file ->
                 asked += candidate.identity.value
                 if (asked.size == 1) first.await()
-                image.right()
+                file.writeBytes(image).right()
             }
         val scraper = Scraper(store, fetch, scope, downloading = unseen) { _, _ -> }
         val old = requests(listOf(listOf(Held.IMAGE, Held.IMAGE)), 1).single()
@@ -521,6 +572,135 @@ class ScraperTest {
         asked shouldBe listOf(url(0, 0), url(0, 1))
         store.wants(old.game, old.version) shouldBe false
         scope.cancel()
+    }
+
+    /**
+     * A game whose label is stored and asked again: its first look, under that ask, finds nothing once the fetch is let
+     * go ([gate]); the other image is found.
+     */
+    private inner class AskedAgain {
+        val store = ArtStore(folder)
+        val scope = TestScope(StandardTestDispatcher())
+        val gate = CompletableDeferred<Unit>()
+        val asked = mutableListOf<String>()
+        val scraper =
+            Scraper(
+                store,
+                { candidate, progress, file ->
+                    asked += candidate.identity.value
+                    if (candidate.identity.value == RENEWED) {
+                        file.writeBytes(image)
+                        progress.read(Some(1.0))
+                        Unit.right()
+                    } else {
+                        gate.await()
+                        FetchFailure.NotFound.left()
+                    }
+                },
+                scope,
+                downloading = unseen,
+            ) { _, _ -> }
+        val old = requests(listOf(listOf(Held.NOTHING)), 1).single()
+        val renewed = old.copy(candidates = nonEmptyListOf(web(RENEWED)), version = Some(ArtVersion("2026-11-01")))
+
+        init {
+            store.save(old.game, image).shouldBeRight()
+            scope.launch { scraper.lookFor(listOf(old), setOf(old.game)) }
+            scope.runCurrent()
+        }
+
+        fun planAgain() {
+            scope.launch { scraper.lookFor(listOf(renewed), setOf(old.game)) }
+            scope.runCurrent()
+        }
+
+        fun letGo() {
+            gate.complete(Unit)
+            scope.runCurrent()
+        }
+    }
+
+    @Test
+    fun `a label asked again once its look found nothing is looked for again`() {
+        val run = AskedAgain()
+        run.letGo()
+        run.planAgain()
+        run.asked.last() shouldBe RENEWED
+        run.store.stored(run.old.game).shouldBeSome()
+        run.scope.cancel()
+    }
+
+    @Test
+    fun `a label asked again while its look finds nothing keeps its image and is looked for again once that look ends`() {
+        val run = AskedAgain()
+        run.planAgain()
+        run.store.stored(run.old.game).shouldBeSome()
+        run.letGo()
+        run.asked.last() shouldBe RENEWED
+        run.store.stored(run.old.game).shouldBeSome()
+        run.scope.cancel()
+    }
+
+    @Test
+    fun `INV-13 a game removed while its label downloads, or before a plan made earlier runs, gets no art`() {
+        val store = ArtStore(folder)
+        val fetch = FakeFetch(mapOf(url(0, 0) to image, url(1, 0) to image))
+        val scope = TestScope(StandardTestDispatcher())
+        val scraper = Scraper(store, fetch, scope, downloading = unseen) { _, _ -> }
+        val (downloading, planned) = requests(listOf(listOf(Held.IMAGE), listOf(Held.IMAGE)), 2)
+        fetch.during = { store.keepOnly(setOf(planned.game)).shouldBeRight() }
+        scope.launch { scraper.lookFor(listOf(downloading)) }
+        scope.runCurrent()
+        store.stored(downloading.game).shouldBeNone()
+        fetch.during = {}
+        store.keepOnly(emptySet()).shouldBeRight()
+        scope.launch { scraper.lookFor(listOf(planned)) }
+        scope.runCurrent()
+        fetch.asked shouldBe listOf(url(0, 0))
+        store.stored(planned.game).shouldBeNone()
+        scope.cancel()
+    }
+
+    /** `scope.launch` orders nothing between two calls: the resume's coroutine may run before the pause's. */
+    @Test
+    fun `INV-17 a stalled run paused and resumed tries again, whatever order the pause and the resume run in`() {
+        val time = StandardTestDispatcher()
+        val held = HeldLaunches(time)
+        val scope = CoroutineScope(held + Job())
+        val store = ArtStore(folder)
+        val fetch = FakeFetch(mapOf(url(0, 0) to image)).apply { online = false }
+        val scraper = Scraper(store, fetch, scope, online = { fetch.online }, downloading = unseen) { _, _ -> }
+        scope.launch { scraper.lookFor(requests(listOf(listOf(Held.IMAGE)), 1)) }
+        time.scheduler.runCurrent()
+        held.holding = true
+        scraper.stop()
+        scraper.start()
+        held.releaseReversed()
+        time.scheduler.runCurrent()
+        fetch.online = true
+        time.scheduler.advanceTimeBy(31_000)
+        time.scheduler.runCurrent()
+        store.stored(GameId("ps2/0")).shouldBeSome()
+        scope.cancel()
+    }
+
+    /** Holds the coroutines dispatched while [holding], to start them in the other order; time is [inner]'s. */
+    @OptIn(InternalCoroutinesApi::class)
+    private class HeldLaunches(private val inner: TestDispatcher) :
+        CoroutineDispatcher(),
+        Delay by inner {
+        var holding = false
+        private val held = mutableListOf<Pair<CoroutineContext, Runnable>>()
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            if (holding) held += context to block else inner.dispatch(context, block)
+        }
+
+        fun releaseReversed() {
+            holding = false
+            held.reversed().forEach { (context, block) -> inner.dispatch(context, block) }
+            held.clear()
+        }
     }
 
     @Test
@@ -537,5 +717,63 @@ class ScraperTest {
         store.isAbsent(blank, Some(version)) shouldBe true
         store.stored(chosen).shouldBeSome()
         scope.cancel()
+    }
+
+    @Test
+    fun `a host failing while the device is online is passed over for the run, the others' images come at once and the run ends`() {
+        listOf(FetchFailure.Refused(503), FetchFailure.Offline("SSLHandshakeException")).forEach { failure ->
+            folder.deleteRecursively()
+            val store = ArtStore(folder)
+            val games = 0..5
+            val down = games.associate { "https://down/$it.png" to failure }
+            val fetch = FakeFetch(games.associate { "https://up/$it.png" to image }, down + ("https://down/only.png" to failure))
+            val harness = Harness(store, fetch)
+            val both =
+                games.map { game ->
+                    val candidates = nonEmptyListOf(web("https://down/$game.png"), web("https://up/$game.png"))
+                    ArtRequest(GameId("ps2/$game"), "Game $game", candidates, Some(version), PS2_DISC)
+                }
+            val onlyDown = ArtRequest(GameId("ps2/only"), "Only", nonEmptyListOf(web("https://down/only.png")), Some(version), PS2_DISC)
+            harness.lookFor(both + onlyDown)
+            harness.scope.runCurrent()
+            games.forEach { store.stored(GameId("ps2/$it")).shouldBeSome() }
+            harness.last.isOver shouldBe true
+            harness.last.stall shouldBe None
+            fetch.asked.count { "down" in it } shouldBe 1
+            // Wanted still, not remembered without art: the host is asked again at the next run.
+            store.isAbsent(onlyDown.game, onlyDown.version) shouldBe false
+            store.wants(onlyDown.game, onlyDown.version) shouldBe true
+        }
+    }
+
+    @Test
+    fun `with ScreenScraper closed, a scan its site has none of is asked once per sources' version, not at every run`() {
+        val store = ArtStore(folder)
+        val fetch = FakeFetch(emptyMap(), mapOf(texture(0).identity.value to skipped))
+        val harness = Harness(store, fetch, FakeTextures(open = false))
+        repeat(3) {
+            harness.lookFor(listOf(withTexture(0)))
+            harness.scope.runCurrent()
+        }
+        fetch.asked.count { it == url(0, 0) } shouldBe 1
+        harness.lookFor(listOf(withTexture(0).copy(version = Some(ArtVersion("2026-11-01")))))
+        harness.scope.runCurrent()
+        fetch.asked.count { it == url(0, 0) } shouldBe 2
+    }
+
+    @Test
+    fun `a page in place of an image or a download failing unexpectedly leaves the label wanted, never remembered without art`() {
+        val store = ArtStore(folder)
+        val fetch = FakeFetch(mapOf(url(0, 0) to "<html>sign in to this network</html>".encodeToByteArray()))
+        fetch.during = { candidate -> if (candidate.identity.value == url(1, 0)) throw IllegalStateException("unexpected") }
+        val harness = Harness(store, fetch)
+        val requests = requests(listOf(listOf(Held.NOT_AN_IMAGE), listOf(Held.NOTHING)), 2)
+        harness.lookFor(requests)
+        harness.scope.runCurrent()
+        harness.last.isOver shouldBe true
+        requests.forEach { request ->
+            store.isAbsent(request.game, request.version) shouldBe false
+            store.wants(request.game, request.version) shouldBe true
+        }
     }
 }

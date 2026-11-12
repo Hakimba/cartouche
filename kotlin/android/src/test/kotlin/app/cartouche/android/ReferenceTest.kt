@@ -84,13 +84,13 @@ class ReferenceTest {
     @Test
     fun `a platform's tables are read once, by whichever thread asks first, and only those of the platforms asked for`() =
         runBlocking<Unit> {
-            val platforms = Table.entries.flatMap(::platformsIn).distinct() + PlatformId("none")
+            val platforms = tinyPlatforms + PlatformId("none")
             val pool = Executors.newFixedThreadPool(4)
             checkAll(20, Arb.list(Arb.pair(Arb.element(platforms), Arb.element(Ask.entries)), 0..12)) { asks ->
                 val opened = ConcurrentHashMap<Pair<Table, PlatformId>, AtomicInteger>()
                 val counted =
                     TableFiles { table, platform ->
-                        shipped.open(table, platform).onSome { opened.getOrPut(table to platform, ::AtomicInteger).incrementAndGet() }
+                        tiny.open(table, platform).onSome { opened.getOrPut(table to platform, ::AtomicInteger).incrementAndGet() }
                     }
                 val reference = Reference(catalog, files = counted)
                 pool.invokeAll(asks.map { (platform, ask) -> Callable { ask.of(reference, platform) } }).forEach { it.get() }
@@ -102,12 +102,21 @@ class ReferenceTest {
                                 (table to platform) to
                                     asks.filter { it.first == platform }.map { it.second }.toSet().count { table in it.reads }
                             }
-                        }.filter { (read, times) -> times > 0 && File(app, read.first.path(read.second)).exists() }
+                        }.filter { (read, times) -> times > 0 && read.second in tinyPlatforms }
                         .toMap()
                 opened.mapValues { it.value.get() } shouldBe expected
             }
             pool.shutdown()
         }
+
+    // What the property proves does not depend on the tables' content: two lines each, for three made-up platforms.
+    private val tinyPlatforms = listOf("alpha", "beta", "gamma").map(::PlatformId)
+    private val tiny =
+        tableTexts(
+            *Table.entries
+                .flatMap { table -> tinyPlatforms.map { platform -> (table to platform) to "# 2026-01-01\nGame\t1\tus\n" } }
+                .toTypedArray(),
+        )
 
     /** What is asked of a platform, and the tables it reads. */
     private enum class Ask(val reads: Set<Table>) {

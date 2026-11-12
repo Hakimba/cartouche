@@ -25,4 +25,7 @@ dependencies {
 }
 
 // The tests check the definition files shipped with the app, not copies.
-tasks.test { systemProperty("cartouche.data", rootProject.file("../app/data").path) }
+tasks.test {
+    systemProperty("cartouche.data", rootProject.file("../app/data").path)
+    systemProperty("cartouche.vectors", rootProject.file("../app/test/vectors").path)
+}

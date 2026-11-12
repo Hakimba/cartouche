@@ -1,0 +1,11 @@
+{
+	"cases": [
+		{"picture": [1600, 1200], "zoom": 1.0, "centre": [0.5, 0.5], "proportion": 1.0, "framed": [200, 0, 1200, 1200]},
+		{"picture": [900, 1600], "zoom": 1.0, "centre": [0.5, 0.5], "proportion": 1.0, "framed": [0, 350, 900, 900]},
+		{"picture": [1600, 1200], "zoom": 1.0, "centre": [0.5, 0.5], "proportion": 2.0, "framed": [0, 200, 1600, 800]},
+		{"picture": [1600, 1200], "zoom": 1.0, "centre": [0.5, 0.5], "proportion": 0.5, "framed": [500, 0, 600, 1200]},
+		{"picture": [1600, 1200], "zoom": 2.0, "centre": [0.25, 0.5], "proportion": 1.0, "framed": [100, 300, 600, 600]},
+		{"picture": [1600, 1200], "zoom": 2.0, "centre": [0.25, 0.5], "proportion": 2.0, "framed": [0, 400, 800, 400]},
+		{"picture": [1600, 1200], "zoom": 2.0, "centre": [1.0, 0.0], "proportion": 1.0, "framed": [1000, 0, 600, 600]}
+	]
+}

@@ -5,3 +5,4 @@
 [resource]
 script = ExtResource("1")
 seat_centre = Vector3(-0.4, 44.4, -32.3)
+housings = Array[StringName]([&"body", &"flap_front", &"flap_back"])

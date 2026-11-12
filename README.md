@@ -2,43 +2,12 @@
 
 A game launcher for Android handhelds that shows your games as physical discs and cartridges.
 Cartouche does not emulate anything itself: it finds your games, recognises them, and starts them
-in the emulators you already have.
+in the emulators you already have. It is free and open source, and meant to stay easy to get into:
+use it, contribute to it, or fork it and make it yours.
 
 <p align="center"><img src="docs/media/hero.webp" width="640" alt="The consoles ring turns to the PlayStation 2, its games come in on their discs, and Final Fantasy X goes into the console"></p>
 
-More and more frontends are heading in this direction, but none of them ever fully won me over.
-Two things kept bugging me: they don't push immersion as far as I'd like, and I believe this kind
-of experience should be completely free and open source.
-
-So I built my own. First for me, and now for anyone who wants to use it, contribute to it, or fork
-it and make it theirs; I tried to keep the codebase easy to get into.
-
-## Consoles
-
-Nineteen consoles, each a 3D model of the real one. Twelve are ready to play; the PSP, PS Vita, DS Lite, Switch, Master
-System, Mega Drive and Dreamcast are shown greyed as coming soon until their launch is made.
-
-| Maker | Consoles |
-|---|---|
-| Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Switch (neon or grey) · Game Boy · Game Boy Color · Game Boy Advance (original or SP) · DS Lite |
-| Sony | PlayStation · PlayStation 2 (slim or fat) · PSP · PS Vita |
-| Sega | Master System · Mega Drive (model 1 or 2) · Dreamcast |
-| Microsoft | Xbox · Xbox 360 |
-
-## Languages
-
-<table>
-<tr><td>English</td><td>Français</td><td>Deutsch</td><td>Español</td></tr>
-<tr><td>Italiano</td><td>Português (Portugal)</td><td>Português (Brasil)</td><td>日本語</td></tr>
-</table>
-
-Cartouche speaks your device's language when it has it, English otherwise; to choose another, open the settings and
-go down to **Language**.
-
-A translation reads wrong, or your language is missing? Open an issue, or change the text yourself: each language
-is one file, and [docs/translating.md](docs/translating.md) says how to fix one or add one.
-
-## Key features
+## What it does
 
 <table>
 <tr>
@@ -55,95 +24,83 @@ is one file, and [docs/translating.md](docs/translating.md) says how to fix one 
 </tr>
 </table>
 
-- **Speaks your language:** eight languages, following your device's until you pick one ([Languages](#languages)).
-- **Uses your emulators:** Cartouche emulates nothing. It finds the emulators you already installed and starts each
-  game in the right one.
-- **Light:** at rest it draws nothing, and it stays smooth with thousands of games.
+- **Uses your emulators.** It finds the emulators you installed and starts each game in the right one.
+- **Speaks your language.** English, Français, Deutsch, Español, Italiano, Português (Portugal), Português (Brasil)
+  and 日本語. It follows your device's language, English otherwise; **Language** in the settings picks another.
+- **Light on your device.** On a Snapdragon 8 Gen 2 handheld the games screen holds about 200 MB of graphics
+  memory, a third of what version 0.4.1 took, and the download is 85 MB instead of 110 MB. Left alone, the app stops
+  drawing everything but the background's moving veil, which the settings switch off. The games row costs the
+  same with thousands of games as with a few.
 
-## Contributing
+## Consoles
 
-Ideas, feedback and pull requests are welcome: open an issue to talk about a bigger change first.
-[CONTRIBUTING.md](CONTRIBUTING.md) says how to build, test and send a change.
+Nineteen consoles, each a 3D model of the real one. Twelve are ready to play; the PSP, PS Vita, DS Lite, Switch, Master
+System, Mega Drive and Dreamcast are shown greyed as coming soon until their launch is made.
 
-### What I'd love help with
-
-- **Better 3D models** of the consoles and of their discs and cartridges: closer to the real thing, lighter to draw.
-- **A music theme** for the menus: the gestures have their sounds, the background still waits for its music.
-- **New consoles:** each one is a folder with its model, its medium and its launch animation
-  ([adding a console](docs/adding-a-console.md)).
-- **Translations:** a native reader for Japanese and Portuguese, or a new language
-  ([translating](docs/translating.md)).
-- **Integrations** such as RetroAchievements or RomM, and more ways to make Cartouche look like yours.
-
-### Where to start
-
-- [docs/README.md](docs/README.md): start here. The three layers of the code, the commands, and for each task
-  (add a console, a screen, a setting, a sound…) the page and the files to open.
-- [docs/GLOSSARY.md](docs/GLOSSARY.md): every word of the domain, as the code spells it.
-- [docs/INVARIANTS.md](docs/INVARIANTS.md): the guarantees every change must keep, each enforced by tests.
-- [docs/adding-a-console.md](docs/adding-a-console.md) and [docs/adding-a-medium.md](docs/adding-a-medium.md): a
-  new console or a new disc or cartridge, step by step; [docs/adding-a-platform.md](docs/adding-a-platform.md): its
-  emulators and data.
-- [docs/adding-a-screen.md](docs/adding-a-screen.md), [docs/adding-a-setting.md](docs/adding-a-setting.md) and
-  [docs/adding-a-background.md](docs/adding-a-background.md): a screen or gesture, a setting, a background.
-- [docs/device-testing.md](docs/device-testing.md): a build on your device, beside your own Cartouche.
-- [docs/testing.md](docs/testing.md): the kinds of tests and how to run each.
-
-## How a label is found
-
-1. **Which game it is.** Cartouche reads the file itself (a cartridge's CRC32, a disc's serial) and looks it up in
-   the No-Intro and Redump lists; when the file says nothing, its name decides.
-2. **Which region.** The regions of the release found (France, Europe, USA, Japan…).
-3. **The images on offer.** LaunchBox's scans, found by the game's name. ScreenScraper's images, found in a table
-   shipped with the app (`app/data/screenscraper/`): for every release of the reference lists, its ScreenScraper
-   game and the images it has. The table is built once per version of the app, so the device never asks
-   ScreenScraper which game a file is; it only downloads images, one request each. PS2 discs also have
-   psxdatacenter's scans, by serial.
-4. **Which image first.** An image of the game's region (its country, or the zone containing it: France → Europe)
-   comes first: on a cartridge ScreenScraper's (the printed label itself), then LaunchBox's; on a disc LaunchBox's,
-   then ScreenScraper's, then psxdatacenter's. Then every other image, closest region first. The first image that
-   downloads is kept. A label you chose, or a picture of your own, is never replaced; a game's properties list every
-   image of every source, each named by its region and source.
-5. **When ScreenScraper cannot answer** (busy, closed, quota spent), the next image is taken at once and ScreenScraper
-   is tried again at a later scan.
+| Maker | Consoles |
+|---|---|
+| Nintendo | NES · Super Nintendo · Nintendo 64 · GameCube · Wii · Switch (neon or grey) · Game Boy · Game Boy Color · Game Boy Advance (original or SP) · DS Lite |
+| Sony | PlayStation · PlayStation 2 (slim or fat) · PSP · PS Vita |
+| Sega | Master System · Mega Drive (model 1 or 2) · Dreamcast |
+| Microsoft | Xbox · Xbox 360 |
 
 ## Install
 
 Download the APK from this repository's Releases page and install it on your handheld. You need Android 11 or
 later on an arm64 device with Vulkan, and the emulators of the consoles you want to play.
 
+## How a label is found
+
+1. **Which game.** Cartouche reads the file itself (a cartridge's CRC32, a disc's serial) and looks it up in the
+   No-Intro and Redump lists; when the file says nothing, its name decides.
+2. **Which images.** LaunchBox's scans, found by the game's name; ScreenScraper's images, found in a table shipped
+   with the app (`app/data/screenscraper/`), so the device never asks ScreenScraper which game a file is and only
+   downloads images; for PS2 discs, psxdatacenter's scans, by serial.
+3. **Which one first.** An image of the game's region (its country, or the zone containing it: France → Europe):
+   on a cartridge ScreenScraper's, then LaunchBox's; on a disc LaunchBox's, then ScreenScraper's, then
+   psxdatacenter's. Then every other image, closest region first. The first that downloads is kept.
+4. **Yours stays.** A label you chose, or a picture of your own, is never replaced. A game's properties list every
+   image of every source. When ScreenScraper cannot answer, the next image is taken and ScreenScraper is tried again
+   at a later scan.
+
+## Contributing
+
+Ideas, feedback and pull requests are welcome; open an issue to talk about a bigger change first. Help is most
+wanted on:
+
+- **3D models** of the consoles and their discs and cartridges: closer to the real thing, lighter to draw.
+- **A music theme** for the menus.
+- **New consoles** ([docs/adding-a-console.md](docs/adding-a-console.md)).
+- **Translations:** a native reader for Japanese and Portuguese, or a new language
+  ([docs/translating.md](docs/translating.md)).
+- **Integrations** such as RetroAchievements or RomM.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) says how to build, check and send a change; [docs/README.md](docs/README.md)
+maps the code and has one short guide per kind of addition.
+
 ## Building
 
-Requirements: Godot 4.7.2 with its export templates, JDK 17, the Android SDK (platform 36, build
-tools 36.1.0, NDK 29.0.14206865 and CMake 3.22.1, which Gradle installs when missing), Python 3,
-gdtoolkit 4 for `gdlint` (`pip install --user "gdtoolkit==4.*"`), and `adb` for installing on a device.
-
 ```sh
-export JAVA_HOME=/path/to/jdk-17 ANDROID_HOME=/path/to/android-sdk
-export GODOT=/path/to/godot     # if `godot` is not on PATH
-scripts/build.sh                # docs check, lint, Kotlin and GDScript tests, Kotlin build, debug APK in build/
-scripts/build.sh --install      # same, then installs and starts it on the connected device
-scripts/logs.sh                 # follows the debug build's traces on the device
-scripts/bench.sh                # measures the installed debug build at several library sizes
+export JAVA_HOME=/path/to/jdk-17 ANDROID_HOME=/path/to/android-sdk GODOT=/path/to/godot
+scripts/build.sh                # every check and test, then the debug APK in build/
+scripts/build.sh --install      # the same, then installs and starts it on the connected device
 ```
 
-A build asks ScreenScraper for images with Cartouche's developer key, read from `kotlin/local.properties`
-(`screenscraper.devid`, `screenscraper.devpassword`), never from the repository; see
-[Credentials](docs/README.md#credentials).
+You need Godot 4.7.2 with its export templates, JDK 17, the Android SDK, Python 3 and gdtoolkit 4; the exact
+versions are in [CONTRIBUTING.md](CONTRIBUTING.md#build-and-check). Releases are exported with
+Cartouche's own Godot Android template: Godot 4.7.2 plus six small patches, built once with
+`scripts/godot_template.sh build` and cached. Without it the export uses Godot's official template: the same app,
+heavier ([docs/README.md](docs/README.md#the-engine-template)).
 
 ## Stack
 
-- **Android only**, from Android 11 (API 30) to Android 16 (API 36), on arm64 devices with
-  Vulkan. The library, folder access and launching live in the Android plugin: on a desktop, the
-  Godot project shows a demo library instead, to work on the carousel without a device.
+- **Android only**, from Android 11 (API 30) to Android 16 (API 36), arm64 with Vulkan. On a desktop the Godot
+  project runs on a demo library, to work on the screens without a device.
 - **App:** [Godot](https://godotengine.org) 4.7.2 (GDScript, Mobile renderer).
-- **Domain and Android plugin:** Kotlin 2.1.21 with [Arrow](https://arrow-kt.io) 2.1.2,
-  kotlinx.serialization 1.8.1 and kotlinx.coroutines 1.10.2. The domain is pure Kotlin, tested on
-  the JVM; the plugin is a Godot Android plugin (v2).
-- **Build:** Gradle 8.11.1, Android Gradle Plugin 8.6.1, JDK 17.
-- **Tests:** [Kotest](https://kotest.io) 5.9.1 (property-based), [Robolectric](https://robolectric.org)
-  4.16.1 on Android 11, 13 and 14, [GdUnit4](https://github.com/MikeSchulze/gdUnit4) 6.2.1 for
-  GDScript, ktlint.
+- **Domain and Android plugin:** Kotlin 2.1.21 with [Arrow](https://arrow-kt.io) 2.1.2, kotlinx.serialization 1.8.1
+  and kotlinx.coroutines 1.10.2; Gradle 8.11.1, Android Gradle Plugin 8.6.1, JDK 17.
+- **Tests:** [Kotest](https://kotest.io) 5.9.1, [Robolectric](https://robolectric.org) 4.16.1,
+  [GdUnit4](https://github.com/MikeSchulze/gdUnit4) 6.2.1, ktlint.
 
 ## Credits
 

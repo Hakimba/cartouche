@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.art
 
+import app.cartouche.core.anyText
 import app.cartouche.core.art.ScreenScraperState.ClosedForRun
 import app.cartouche.core.art.ScreenScraperState.ClosedUntil
 import app.cartouche.core.art.ScreenScraperState.Off
@@ -13,21 +14,25 @@ import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.constant
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import org.junit.Test
 import java.time.LocalDate
+import java.util.Locale
 
 class ScreenScraperTest {
-    private val today = Day("2026-10-18")
-    private val tomorrow = Day("2026-10-19")
+    private val today = Day.of(LocalDate.of(2026, 10, 18))
+    private val tomorrow = Day.of(LocalDate.of(2026, 10, 19))
     private val key = KeyHash("1a2b")
 
     /** [answer] to a request sent and answered as the clock starts. */
@@ -59,7 +64,12 @@ class ScreenScraperTest {
         Arb.choice(
             answers.map(Step::Answered),
             Arb.constant(Step.NewRun),
-            Arb.element(Day("2026-10-18"), Day("2026-10-19"), Day("2026-10-20")).map(Step::DayCame),
+            Arb
+                .element(
+                    Day.of(LocalDate.of(2026, 10, 18)),
+                    Day.of(LocalDate.of(2026, 10, 19)),
+                    Day.of(LocalDate.of(2026, 10, 20)),
+                ).map(Step::DayCame),
         )
 
     @Test
@@ -115,10 +125,43 @@ class ScreenScraperTest {
         }
 
     @Test
+    fun `a closures file whose day is not a day is unreadable, so ScreenScraper is asked again`() {
+        KeptClosures.decode("""{"closedUntil":"zzzz"}""").shouldBeNone()
+        KeptClosures.decode("""{"closedUntil":"2026-10-19"}""").shouldBeSome().state(key, tomorrow) shouldBe Open()
+        KeptClosures.decode("""{"closedUntil":"9999-99-99"}""").shouldBeNone()
+        Day.of("9999-99-99").shouldBeNone()
+        Day.of("٢٠٢٦-١٠-١٨").shouldBeNone()
+    }
+
+    @Test
+    fun `a day made from any date is one the next start reads back`() {
+        listOf(LocalDate.of(2026, 10, 18), LocalDate.of(9999, 12, 31), LocalDate.of(12026, 1, 1), LocalDate.of(-1, 1, 1)).forEach { date ->
+            val made = Day.of(date)
+            Day.of(made.iso) shouldBe Some(made)
+            Day.of(made.next().iso) shouldBe Some(made.next())
+        }
+    }
+
+    @Test
+    fun `a day is made in ASCII digits whatever the device's language, and compares with one 0_4_1 stored`() {
+        val before = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("ar-EG"))
+        try {
+            val made = Day.of(LocalDate.of(2026, 10, 18))
+            made.iso shouldBe "2026-10-18"
+            val stored = KeptClosures.decode("""{"closedUntil":"2026-10-19"}""").shouldBeSome()
+            stored.state(key, made) shouldBe ClosedUntil(Day.of("2026-10-19").shouldBeSome())
+            stored.state(key, Day.of(LocalDate.of(2026, 10, 19))) shouldBe Open()
+        } finally {
+            Locale.setDefault(before)
+        }
+    }
+
+    @Test
     fun `an app off for its key is open again under another key, a closure until a day holding still`() {
         val kept = KeptClosures.NONE.after(ClosedUntil(tomorrow), key).after(Off(Refusal.WRONG_KEY), key)
         kept.state(key, today) shouldBe Off(Refusal.WRONG_KEY)
-        kept.state(key, Day("2099-01-01")) shouldBe Off(Refusal.WRONG_KEY)
+        kept.state(key, Day.of(LocalDate.of(2099, 1, 1))) shouldBe Off(Refusal.WRONG_KEY)
         kept.state(KeyHash("other"), today) shouldBe ClosedUntil(tomorrow)
         kept.state(KeyHash("other"), tomorrow) shouldBe Open()
         KeptClosures.NONE.after(Off(Refusal.BLACKLISTED), key).state(KeyHash("other"), today) shouldBe Open()
@@ -156,7 +199,7 @@ class ScreenScraperTest {
             off.reason shouldBe (if (refusal == ScreenScraperAnswer.Status(426)) Refusal.BLACKLISTED else Refusal.WRONG_KEY)
             checkAll(answers) { answer -> off.answered(answer) shouldBe off }
             off.reopened() shouldBe off
-            off.on(Day("2099-01-01")) shouldBe off
+            off.on(Day.of(LocalDate.of(2099, 1, 1))) shouldBe off
         }
     }
 
@@ -202,9 +245,10 @@ class ScreenScraperTest {
                 closed.reopened() shouldBe Open()
                 closed.on(tomorrow) shouldBe closed
             }
-            // Whatever the status, the state is never open after one that is not 200's answer.
+            // Whatever the status, the state is never open after one that is not 200's answer, but for a slow-down and
+            // a game that has no such image.
             checkAll(Arb.int(100..599)) { code ->
-                (Open().answered(ScreenScraperAnswer.Status(code)) is Open) shouldBe (code == 429)
+                (Open().answered(ScreenScraperAnswer.ofStatus(code)) is Open) shouldBe (code in setOf(404, 410, 429))
             }
         }
 
@@ -227,14 +271,24 @@ class ScreenScraperTest {
             Account.of(200, None).shouldBeNone()
             Account.of(200, Some("""{"response":{"ssuser":{"maxthreads":"0","maxrequestspermin":"7168"}}}""")).shouldBeNone()
             Account.of(200, Some("""{"response":{"ssuser":{"maxthreads":"6"}}}""")).shouldBeNone()
-            checkAll(Arb.string()) { text ->
+            checkAll(Arb.choice(anyText, userAnswers)) { text ->
                 Account.of(200, Some(text)).onSome { if (it is Account.Member) it.limits.threads shouldBeGreaterThan 0 }
             }
         }
 
     private companion object {
+        // A limit as the server writes it, or as a damaged answer does: a number, zero, negative, huge or text.
+        val limitValues: Arb<String> = Arb.choice(Arb.long(-5L..9_000_000_000L).map { it.toString() }, anyText)
+
+        /** Answers that parse as JSON and reach the limits. */
+        val userAnswers: Arb<String> =
+            Arb.bind(limitValues, limitValues) { threads, perMinute ->
+                val quote = { text: String -> Json.encodeToString(String.serializer(), text) }
+                """{"response":{"ssuser":{"maxthreads":${quote(threads)},"maxrequestspermin":${quote(perMinute)}}}}"""
+            }
+
         val QUOTA_SPENT = setOf(ScreenScraperAnswer.Status(430), ScreenScraperAnswer.Status(431))
 
-        fun dayAfter(day: Day): Day = Day(LocalDate.parse(day.iso).plusDays(1).toString())
+        fun dayAfter(day: Day): Day = day.next()
     }
 }

@@ -11,17 +11,15 @@ var timeline := false:
 		timeline = value
 		if value and _fade:
 			_fade.kill()
-			_fade = null
 		if value and _motion:
 			_motion.kill()
-			_motion = null
 
 var _from := Vector2.ZERO
 var _to := Vector2.ZERO
 var _fade: Tween
 var _line: StudioText
 var _backing: SatinPanel.Backing
-var _studio := false
+var _text := ""
 var _caption_box := Rect2()
 var _target_box := Rect2()
 var _target_from := Vector2.ZERO
@@ -29,46 +27,24 @@ var _target_to := Vector2.ZERO
 var _motion: Tween
 var _fade_alpha := 0.0
 
-@onready var _caption: Label = $Caption
-
-
 func _ready() -> void:
 	modulate.a = 0.0
-
-
-## Draws on a frost pill, the lead starting at a dot; otherwise a plain caption, the lead ending in an arrow.
-func use_studio() -> void:
-	_studio = true
 	_backing = SatinPanel.Backing.new(self, StudioTokens.Look.FROST)
-	_caption.hide()
 
 
 func _draw() -> void:
-	draw_line(_from, _to, Backdrop.palette.ink, _WIDTH if _studio else 2.5, true)
-	if _studio:
-		draw_circle(_from, 10.24, Backdrop.palette.callout_ring, true, -1.0, true)
-		draw_circle(_from, 7.04, Backdrop.palette.ink, true, -1.0, true)
-		if _line:
-			_line.draw(self, _caption_box.position + Vector2(15.36, 5.76), Backdrop.palette.ink)
-	else:
-		var back := (_from - _to).normalized() * 14.0
-		var side := back.orthogonal().normalized() * 7.0
-		draw_colored_polygon(PackedVector2Array([_to, _to + back + side, _to + back - side]), Backdrop.palette.ink)
+	draw_line(_from, _to, Backdrop.palette.ink, _WIDTH, true)
+	draw_circle(_from, 10.24, Backdrop.palette.callout_ring, true, -1.0, true)
+	draw_circle(_from, 7.04, Backdrop.palette.ink, true, -1.0, true)
+	if _line:
+		_line.draw(self, _caption_box.position + Vector2(15.36, 5.76), Backdrop.palette.ink)
 
 
 func point(caption: String, at: Vector2, target: Vector2) -> void:
-	var changed := _caption.text != caption
+	var changed := _text != caption
 	if changed:
-		_caption.text = caption
-		_caption.reset_size()
+		_text = caption
 	_fade_to(1.0)
-	if not _studio:
-		_caption.position = at - Vector2(0.0, _caption.size.y / 2.0)
-		if at != _from or target != _to or changed:
-			_from = at
-			_to = target
-			queue_redraw()
-		return
 	var had_caption := _line != null
 	if changed or not _line:
 		_line = StudioText.new(caption, StudioTokens.Face.JAKARTA_700, 23.04)
@@ -79,13 +55,12 @@ func point(caption: String, at: Vector2, target: Vector2) -> void:
 	_target_from = start
 	_target_to = at
 	_target_box = box
-	if _motion:
-		_motion.kill()
 	if changed and had_caption and not timeline:
-		_motion = create_tween()
+		_motion = Motion.restart(self, _motion)
 		_motion.tween_method(_move_geometry.bind(_from, start, _to, at, _caption_box, box), 0.0, 1.0, 0.32)
-		_motion.finished.connect(func() -> void: _motion = null)
-	elif not _motion or not _motion.is_running():
+	else:
+		if _motion:
+			_motion.kill()
 		_set_geometry(start, at, box)
 
 
@@ -114,9 +89,8 @@ func clear() -> void:
 
 
 func _fade_to(alpha: float) -> void:
-	if timeline or (_fade_alpha == alpha and (_fade or is_equal_approx(modulate.a, alpha))):
+	if timeline or (_fade_alpha == alpha and ((_fade and _fade.is_running()) or is_equal_approx(modulate.a, alpha))):
 		return
 	_fade_alpha = alpha
 	_fade = Motion.restart(self, _fade)
 	_fade.tween_property(self, ^"modulate:a", alpha, _FADE_S)
-	_fade.finished.connect(func() -> void: _fade = null)

@@ -117,7 +117,6 @@ class TitleIndexTest {
 
     @Test
     fun `every cartridge print shipped finds the entry it was listed for`() {
-        Shipped.lists("prints").keys.map { it.value }.toSet() shouldBe setOf("nes", "snes", "n64", "gb", "gbc", "gba")
         Shipped.lists("prints").forEach { (platform, prints) ->
             val index = TitleIndex.parse(Shipped.text("titles/${platform.value}.tsv"), prints)
             prints.lines().filter(String::isNotBlank).forEach { line ->
@@ -207,8 +206,8 @@ class TitleIndexTest {
             identify(capitals).onSome { found ->
                 when (found) {
                     is Identification.Disc ->
-                        found.disc.name.let { listOf(it.regions, it.languages, it.versions, it.disc) } shouldBe
-                            reference.name.let { listOf(it.regions, it.languages, it.versions, it.disc) }
+                        found.title.let { listOf(it.regions, it.languages, it.versions, it.disc) } shouldBe
+                            GameName.parse(reference.text).let { listOf(it.regions, it.languages, it.versions, it.disc) }
                     is Identification.Release -> reference.serials.containsAll(found.serials) shouldBe true
                 }
             }

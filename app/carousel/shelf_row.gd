@@ -8,9 +8,6 @@ extends Node3D
 ## The game at the centre changed.
 signal selection_changed(game: AndroidServices.Game)
 
-## A label texture shown whole (see [method preview_label]).
-const WHOLE := Rect2(0.0, 0.0, 1.0, 1.0)
-
 @export var frame_origin := Vector3.ZERO
 
 ## Debug builds: turns per second of the selected game around its vertical axis, to see every side.
@@ -23,6 +20,8 @@ var label_images: GameArt:
 		art.loaded.connect(refresh_label)
 var camera: Camera3D
 var games_float := false
+## Whether the games stand in a straight line on a screen whose shelf is an arc, as on the wider ones.
+var games_in_line := false
 var room_energy := 0.55
 ## How much of its pose and float the selected game has, from 0 (none) to 1.
 var pose_amount := 1.0
@@ -32,16 +31,6 @@ var pace := 1.0
 ## 1 (as the layout fades them).
 var neighbours := 1.0
 var selected_presence := 1.0
-## How far the selected game has left the row to stand as [member staged] has it, from 0 to 1.
-## Staged, it is still: the stick turns it, and it turns back to the front once let go.
-var stage := 0.0
-## Where the selected game stands once staged, in the row's space.
-var staged := Transform3D.IDENTITY
-## How the selected game is tossed ([GameToss]): lifted (world units), flipped about the horizontal axis (radians), and
-## squashed (above 0) or stretched (below 0) by that part of its height.
-var selected_lift := 0.0
-var selected_flip := 0.0
-var selected_squash := 0.0
 ## Draws the pick.
 var random := RandomNumberGenerator.new()
 var _games: Array[AndroidServices.Game] = []
@@ -50,6 +39,10 @@ var _look := LabelLook.new()
 ## The selected game's position on the endless row (see [CarouselLayout]); the scroll follows it.
 var _position := 0
 var _scroll := 0.0
+## What the last [method _process] arranged: whether the row stood out of sight, where it scrolled, the labels' edits.
+var _arranged_out := false
+var _arranged_scroll := 0.0
+var _arranged_edits := 0
 var _spring := Motion.Spring.new(0.0)
 var _title_tops: Dictionary[PackedScene, Vector3] = {}
 ## The direction held (-1 or 1), 0 when none.
@@ -59,21 +52,22 @@ var _clock_s := 0.0
 ## How far the selected game's float and sway have gone, in seconds at full pace.
 var _pose_s := 0.0
 var _stick := Vector2.ZERO
+var _selected_in_row := Transform3D.IDENTITY
 var _turn := StickTurn.new()
-var _places: Array[Place] = []
+var _places: Array[ShelfPlace] = []
 ## How many places from the centre the row draws its games ([method _fit_width]).
 var _within := MediaView.DRAWN_WITHIN
 ## Whether the games past the neighbours stand at their height ([member ScreenLayout.Format.shelf_level]).
 var _level := false
-var _placed: Dictionary[int, Place] = {}
+var _placed: Dictionary[int, ShelfPlace] = {}
 ## Places waiting for their label, drawn one per frame so that a fast move never stalls.
-var _unlabelled: Array[Place] = []
-## While the selected game is launched, how it stands instead of posed, and how its drive has turned
-## it (see [method stand_selected]).
-var _launched := false
-var _launch_stand := Transform3D.IDENTITY
-var _launch_spin := 0.0
-var _launch_blur := 0.0
+var _unlabelled: Array[ShelfPlace] = []
+## The games gone out of view while their label was read, as the row's indices: their read stops once the row is far.
+var _reads_left: Dictionary[int, bool] = {}
+## How the selected game stands ([method stand]): posed in the row until told otherwise.
+var _stand := SelectedStand.new()
+## How many times the row was arranged: a place not shown in the latest arrangement is free.
+var _arrangements := 0
 ## Whether the selected game shows another label than its own (see [method preview_label]): its own
 ## image arriving meanwhile waits.
 var _previewing := false
@@ -93,14 +87,14 @@ func is_settling() -> bool:
 func settle() -> void:
 	_scroll = float(_position)
 	_spring = Motion.Spring.new(_scroll)
-	_arrange()
+	arrange()
 
 
 func _ready() -> void:
 	get_viewport().size_changed.connect(func() -> void:
 		_fit_width()
 		if not _games.is_empty():
-			_arrange())
+			arrange())
 	_fit_width()
 	add_to_group(Resting.PACED)
 	# Nothing moves before a shelf is shown.
@@ -111,8 +105,12 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree():
 		for place in _places:
 			place.hide_view()
-	elif what == NOTIFICATION_APPLICATION_PAUSED and label_images:
-		_keep_needed_labels()
+	elif what == NOTIFICATION_APPLICATION_PAUSED:
+		# The game launched kept its view's pictures for its way back: away, they go.
+		if _stand.mode == SelectedStand.Mode.OUTSIDE and _selected_place():
+			_selected_place().hide_view()
+		if label_images:
+			_keep_needed_labels()
 
 
 func _process(delta: float) -> void:
@@ -124,13 +122,22 @@ func _process(delta: float) -> void:
 	_spring.step(delta)
 	_scroll = _spring.position
 	if not _games.is_empty():
-		if stage > 0.0 and _stick.is_zero_approx():
+		if _stand.amount > 0.0 and _stick.is_zero_approx():
 			_turn.release()
 		_turn.follow(_stick, selected_index(), delta)
-	_arrange()
+	# Out of sight and still, the arrangement stands: only a label read since (it sets the room's light) changes it.
+	var out := not is_visible_in_tree() or (selected_presence <= 0.0 and neighbours <= 0.0 and _stand.amount <= 0.0
+			and _stand.mode != SelectedStand.Mode.OUTSIDE)
+	var still := out and _arranged_out and _scroll == _arranged_scroll and _held == 0 and _spring.is_still() \
+			and LabelledModel.label_edits == _arranged_edits
+	if not still:
+		arrange()
+	_arranged_out = out
+	_arranged_scroll = _scroll
+	_arranged_edits = LabelledModel.label_edits
 	if not _unlabelled.is_empty():
-		var place: Place = _unlabelled.pop_front()
-		if place.game >= 0:
+		var place: ShelfPlace = _unlabelled.pop_front()
+		if game_at(place) >= 0:
 			_label(place)
 	if not _downloads.is_empty():
 		_turn_rings(delta)
@@ -169,34 +176,32 @@ func show_shelf(games: Array[AndroidServices.Game], selected: int, models: Dicti
 ## search, or all of them again, from index [param selected]. A game still in view keeps its place
 ## and its label.
 func show_games(games: Array[AndroidServices.Game], selected: int) -> void:
-	var kept: Dictionary[String, Place] = {}
+	var kept: Dictionary[String, ShelfPlace] = {}
 	for game: int in _placed:
 		kept[_games[game].id] = _placed[game]
 	_games = games
+	_reads_left.clear()
 	_position = selected
 	_scroll = selected
 	_spring = Motion.Spring.new(selected)
 	_turn = StickTurn.new()
 	_held = 0
 	_placed.clear()
-	for place in _places:
-		place.game = -1
 	_fit_width()
 	for game: int in GamesLayout.offsets(_games.size(), _scroll, _within):
-		var place: Place = kept.get(_games[game].id)
+		var place: ShelfPlace = kept.get(_games[game].id)
 		if place:
-			place.game = game
 			_placed[game] = place
-	_unlabelled = _unlabelled.filter(func(place: Place) -> bool: return place.game >= 0)
+	_unlabelled = _unlabelled.filter(func(place: ShelfPlace) -> bool: return game_at(place) >= 0)
 	_draw_pick()
-	_arrange()
+	arrange()
 
 
 ## Brings the game at [param index] to the centre at once, the row sliding in from [param slide]
 ## places before it, towards [param direction] (-1 or 1).
 func jump(index: int, direction: int, slide: float) -> void:
 	var ahead := posmod(index - _position, _games.size())
-	_position += ahead if ahead * 2 <= _games.size() else ahead - _games.size()
+	_position = _on_row(_position + (ahead if ahead * 2 <= _games.size() else ahead - _games.size()))
 	_scroll = _position - direction * slide
 	_spring = Motion.Spring.new(_scroll)
 	_turn.release()
@@ -227,7 +232,7 @@ func read_pick() -> void:
 ## neighbours, its label shown at once rather than in turn.
 func select_pick() -> void:
 	jump(_pick, 1, 0.0)
-	_arrange()
+	arrange()
 	var place := _placed[selected_index()]
 	if _unlabelled.has(place):
 		_unlabelled.erase(place)
@@ -248,7 +253,7 @@ func games_around(reach: int) -> Array[AndroidServices.Game]:
 ## Whether a game of the row stands in the carousel's own world, out of its view (launched, its properties), where
 ## the carousel's camera draws it.
 func stands_outside() -> bool:
-	return is_visible_in_tree() and _places.any(func(place: Place) -> bool:
+	return is_visible_in_tree() and _places.any(func(place: ShelfPlace) -> bool:
 		return place.visible and place.shown != null and place.shown.get_parent() == place)
 
 
@@ -273,6 +278,12 @@ func selected_position() -> int:
 
 func selected_index() -> int:
 	return posmod(_position, _games.size())
+
+
+## Index of the game [param place] shows, -1 when the place is free.
+func game_at(place: ShelfPlace) -> int:
+	var game: Variant = _placed.find_key(place)
+	return game if game is int else -1
 
 
 ## Steps once towards [param direction] (-1 or 1), then again and again, faster, until
@@ -314,59 +325,72 @@ func freeze() -> void:
 	if has_games() and selected_index() not in _placed:
 		_scroll = _position
 		_spring = Motion.Spring.new(_scroll)
-		_arrange()
+		arrange()
 
 
-## Stands the selected game as [param stand] says (in the row's space) instead of posed, turned
-## [param spin] radians about its own axis with its label blurred over [param blur] radians, until
-## [method pose_selected].
-func stand_selected(stand: Transform3D, spin: float, blur: float) -> void:
-	_launched = true
-	_launch_stand = stand
-	_launch_spin = spin
-	_launch_blur = blur
+## Stands the selected game as [param selected] says, until told otherwise; a new [SelectedStand] poses it in the
+## row again. Its drivers, the toss, a launch and the properties, never overlap ([CarouselState] lets one of them
+## run at a time), so one value holds what each of them tells.
+func stand(selected: SelectedStand) -> void:
+	var back := _stand.mode == SelectedStand.Mode.OUTSIDE and selected.mode != SelectedStand.Mode.OUTSIDE
+	_stand = selected
+	if back:
+		var place := _selected_place()
+		if place:
+			# What its drive turned it by stays on the model: undone as it comes back.
+			place.shown.spin(0.0, 0.0)
 
 
-## Poses the selected game again, as it was before [method stand_selected].
-func pose_selected() -> void:
-	_launched = false
-	var place: Place = _placed.get(selected_index())
-	if place:
-		place.shown.spin(0.0, 0.0)
+## What [method stand] was last told.
+func standing() -> SelectedStand:
+	return _stand
 
 
 ## How the selected game stands now, in the row's space.
 func selected_stand() -> Transform3D:
-	var place: Place = _placed.get(selected_index())
+	var place := _selected_place()
 	return place.transform if place else Transform3D.IDENTITY
+
+
+## Where the row poses the selected game now, in its space, wherever its drive has it stand meanwhile.
+func selected_in_row() -> Transform3D:
+	return _selected_in_row
 
 
 ## Shows [param label], an image of a real label, on the selected game instead of its own, until
 ## [method show_own_label]; only its [param window] when given, as fractions of it.
-func preview_label(label: Texture2D, window := WHOLE) -> void:
-	var place: Place = _placed.get(selected_index())
+func preview_label(label: Texture2D, window := LabelledModel.WHOLE) -> void:
+	var place := _selected_place()
 	if place:
 		_previewing = true
-		place.shown.show_label(label, true, window)
+		place.shown.show_label(label, window)
 
 
 ## How the selected game's model is brought from its size in the row to its real size, in its own
 ## frame: as it stands on a console's seat.
 func selected_real_size() -> Transform3D:
-	var place: Place = _placed.get(selected_index())
+	var place := _selected_place()
 	return place.shown.to_real_size if place else Transform3D.IDENTITY
 
 
 ## The width of the selected game's label over its height: of the model of its medium.
 func selected_label_proportion() -> float:
-	var place: Place = _placed.get(selected_index())
+	var place := _selected_place()
 	return place.shown.label_proportion if place else 1.0
+
+
+## The selected game's labelled model, still whole in its place, for its properties: the row only finds it. They
+## measure it where it stands, then take its model out themselves ([method LabelledModel.lend]) until
+## [method LabelledModel.take_back]. None when the game has no place or its model is out already.
+func lend_selected() -> LabelledModel:
+	var place := _selected_place()
+	return place.shown if place and not place.shown.is_lent() else null
 
 
 ## The selected game shows its own label again, after [method preview_label].
 func show_own_label() -> void:
 	_previewing = false
-	var place: Place = _placed.get(selected_index())
+	var place := _selected_place()
 	if place:
 		_label(place)
 
@@ -388,10 +412,11 @@ func downloaded(game_id: String) -> void:
 ## Shows [param game_id]'s image on its place, once read, if the game is in view: it replaces the
 ## blank drawn there; without one, once no source had one, its title is written on the blank.
 func refresh_label(game_id: String) -> void:
-	for place: Place in _placed.values():
-		if _previewing and place.game == selected_index():
+	for index: int in _placed:
+		var place := _placed[index]
+		if _previewing and index == selected_index():
 			continue
-		var game := _games[place.game]
+		var game := _games[index]
 		if game.id != game_id or place in _unlabelled:
 			continue
 		if not _show_image(place, game) and label_images.is_absent(game):
@@ -409,9 +434,10 @@ func _keep_needed_labels() -> void:
 		for side: int in [0, -1, 1]:
 			needed.append(_games[posmod(_pick + side, _games.size())])
 	for place in _places:
-		if place.game < 0 or not is_visible_in_tree():
+		var free := game_at(place) < 0
+		if free or not is_visible_in_tree():
 			place.hide_view()
-		if place.game < 0 and place.shown:
+		if free and place.shown:
 			place.shown.clear_label()
 	label_images.keep_textures(needed)
 	Diagnostics.trace("memory", "label views: %d alive, %d holding a blank; media views: %d holding pictures" % [
@@ -419,16 +445,16 @@ func _keep_needed_labels() -> void:
 
 
 ## Shows its game's image on [param place], or its blank until the image is read.
-func _label(place: Place) -> void:
-	var game := _games[place.game]
+func _label(place: ShelfPlace) -> void:
+	var game := _games[game_at(place)]
 	if not _show_image(place, game):
 		_draw_blank(place, game)
 
 
 ## Shows [param game]'s image on [param place] when it is read; otherwise asks for it and is false.
-func _show_image(place: Place, game: AndroidServices.Game) -> bool:
+func _show_image(place: ShelfPlace, game: AndroidServices.Game) -> bool:
 	if label_images.has_texture(game):
-		place.shown.show_label(label_images.texture(game), true)
+		place.shown.show_label(label_images.texture(game))
 		return true
 	label_images.request(game)
 	return false
@@ -436,20 +462,22 @@ func _show_image(place: Place, game: AndroidServices.Game) -> bool:
 
 ## Draws [param game]'s blank on [param place]: plain until no source had an image of it, then
 ## with its title; made-up artwork, never looked for, always has it. Its download's ring shows on it.
-func _draw_blank(place: Place, game: AndroidServices.Game) -> void:
+func _draw_blank(place: ShelfPlace, game: AndroidServices.Game) -> void:
 	place.shown.ring(_download(game.id))
 	place.shown.draw_label(game.title if _look.demo_art or label_images.is_absent(game) else "", _look)
 
 
 func _show_ring(game_id: String) -> void:
-	for place: Place in _placed.values():
-		if _games[place.game].id == game_id and place not in _unlabelled:
+	for game: int in _placed:
+		var place := _placed[game]
+		if _games[game].id == game_id and place not in _unlabelled:
 			place.shown.ring(_download(game_id))
 
 
 func _turn_rings(delta: float) -> void:
-	for place: Place in _placed.values():
-		if _download(_games[place.game].id) < 0.0 and place not in _unlabelled:
+	for game: int in _placed:
+		var place := _placed[game]
+		if _download(_games[game].id) < 0.0 and place not in _unlabelled:
 			place.shown.turn_ring(delta)
 
 
@@ -459,12 +487,32 @@ func _download(game_id: String) -> float:
 	return _downloads.get(game_id, NAN)
 
 
+## Stops the label reads of the games the row went far from, the pick and its neighbours aside: on a long scroll each
+## would only be decoded and sent to the GPU to be dropped before the row came back to it.
+func _stop_far_reads(shown: Dictionary[int, float]) -> void:
+	for game: int in _reads_left.keys():
+		if game in shown or not label_images.is_reading(_games[game]) or has_pick() and _away(_pick, game) <= 1 \
+				or label_images.cancel_far(_games[game], _away(selected_index(), game)):
+			_reads_left.erase(game)
+
+
+## How many games apart [param from] and [param game] stand on the endless row, the shorter way.
+func _away(from: int, game: int) -> int:
+	return mini(posmod(game - from, _games.size()), posmod(from - game, _games.size()))
+
+
+## [param at] as the row counts it: any whole number round the ring, the first or the second of two games
+## side by side ([method GamesLayout.offsets]), so that either way from one leads to the other.
+func _on_row(at: int) -> int:
+	return posmod(at, 2) if _games.size() == 2 else at
+
+
 ## One step towards [param direction] (-1 or 1); a direction held stays held.
 func step(direction: int) -> void:
 	if _games.size() < 2:
 		return
 	Sounds.play(SoundEffects.Cue.GAME)
-	_position += direction
+	_position = _on_row(_position + direction)
 	_turn.release()
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "step %d to %d (held for %d steps)" % [direction, selected_index(), _repeat.steps])
@@ -482,65 +530,73 @@ func _draw_pick() -> void:
 	_pick = posmod(selected_index() + random.randi_range(1, count - 1), count) if count > 1 else -1
 
 
-func _arrange() -> void:
+## Stands and draws the games as the row's values have it now, rather than at its next frame.
+func arrange() -> void:
 	var shown := GamesLayout.offsets(_games.size(), _scroll, _within)
 	for game: int in _placed.keys():
 		if game not in shown:
-			_placed[game].game = -1
 			_placed.erase(game)
+			if label_images.is_reading(_games[game]):
+				_reads_left[game] = true
+	_stop_far_reads(shown)
 	for game: int in shown:
 		if game not in _placed:
 			var place := _free_place()
-			place.game = game
 			place.use_model(_models[_games[game].medium])
 			place.shown.clear_label()
 			_placed[game] = place
 			if place not in _unlabelled:
 				_unlabelled.append(place)
+	_arrangements += 1
 	var blank_weight := 0.0
 	for game: int in shown:
 		var place := _placed[game]
+		place.visible = true
+		place.arranged = _arrangements
 		if place.shown.is_blank():
 			blank_weight += 1.0 - MediaView.softness(shown[game])
-	var focused: Place = _placed.get(selected_index())
+	var focused := _selected_place()
 	if focused:
 		room_energy = lerpf(focused.lit.room, focused.blank.room, blank_weight)
-	var gone := selected_presence <= 0.0 and neighbours <= 0.0 and stage <= 0.0 and not _launched
+	var stood_outside := _stand.mode == SelectedStand.Mode.OUTSIDE
+	var gone := selected_presence <= 0.0 and neighbours <= 0.0 and _stand.amount <= 0.0 and not stood_outside
 	var order := 0
 	# A free place keeps its view's pictures for the game coming in only while the row moves: at rest, none comes.
 	var moving := _held != 0 or not _spring.is_still()
 	for place in _places:
-		place.visible = place.game >= 0
-		if not place.visible:
+		if place.arranged != _arrangements:
+			place.visible = false
 			place.hide_view(moving)
 	for game: int in shown:
 		var place := _placed[game]
 		if gone:
-			place.shown.fade(1.0)
+			place.shown.visible = false
 			place.hide_view()
 			continue
 		var offset: float = shown[game]
 		var centred := 1.0 - MediaView.softness(offset)
 		var turn := Basis(Vector3.UP, TAU * turntable * _clock_s * centred) * _turn.of(game)
-		var placed := place.layout.standing(offset, pose_amount, _pose_s, games_float, _level)
+		var placed := place.layout.standing(offset, pose_amount, _pose_s, games_float, _level or games_in_line)
 		placed.origin += frame_origin
 		placed.basis *= turn
-		var outside := (_launched or stage > 0.0) and game == selected_index()
-		if _launched and game == selected_index():
-			placed = _launch_stand
-			place.shown.spin(_launch_spin, _launch_blur)
-		elif stage > 0.0 and game == selected_index():
-			placed = placed.interpolate_with(Transform3D(staged.basis * turn, staged.origin), stage)
+		if game == selected_index():
+			_selected_in_row = placed
+		var outside := (stood_outside or _stand.amount > 0.0) and game == selected_index()
+		if stood_outside and game == selected_index():
+			placed = _stand.at
+			place.shown.spin(_stand.spin, _stand.blur)
+		elif _stand.amount > 0.0 and game == selected_index():
+			placed = placed.interpolate_with(Transform3D(_stand.at.basis * turn, _stand.at.origin), _stand.amount)
 		elif game == selected_index():
-			var squash := Vector3(1.0 + selected_squash / 2.0, 1.0 - selected_squash, 1.0 + selected_squash / 2.0)
-			placed = Transform3D(Basis.from_scale(squash) * Basis(Vector3.RIGHT, selected_flip) * placed.basis,
-				placed.origin + Vector3.UP * selected_lift)
+			var squash := Vector3(1.0 + _stand.squash / 2.0, 1.0 - _stand.squash, 1.0 + _stand.squash / 2.0)
+			placed = Transform3D(Basis.from_scale(squash) * Basis(Vector3.RIGHT, _stand.flip) * placed.basis,
+				placed.origin + Vector3.UP * _stand.lift)
 		if place.transform != placed:
 			place.transform = placed
 		var presence := selected_presence if game == selected_index() else neighbours
-		place.shown.fade(1.0 - presence if not _launched or game != selected_index() else 0.0)
-		var mode := Place.Draw.OUTSIDE if outside else Place.Draw.SHOWN if is_visible_in_tree() else Place.Draw.HIDDEN
-		place.draw_at(global_transform * placed, MediaView.softness(offset), blank_weight, mode, order - _places.size())
+		var mode := ShelfPlace.Draw.OUTSIDE if outside else ShelfPlace.Draw.SHOWN if is_visible_in_tree() else ShelfPlace.Draw.HIDDEN
+		place.draw_at(global_transform * placed, MediaView.softness(offset), blank_weight, mode, order - _places.size(),
+			presence)
 		order += 1
 
 
@@ -561,9 +617,9 @@ func drawn(wanted: Callable) -> Array[Drawn]:
 func title_top() -> float:
 	var frame := camera.get_viewport().get_visible_rect().size if camera else CarouselLayout.FRAME
 	var model := _models[selected_game().medium]
-	var place: Place = _placed.get(selected_index())
+	var place := _selected_place()
 	var kept: Vector3 = _title_tops.get(model, Vector3(NAN, NAN, 0.0))
-	var instance := place.shown.get_child(0) as Node3D if place else null
+	var instance := place.shown.instance if place and not place.shown.is_lent() else null
 	if Vector2(kept.x, kept.y) != frame and instance:
 		var layout := GamesLayout.new(ConsoleManifest.folder_of(model))
 		var top := TitlePlace.top(TitlePlace.vertices(instance), layout.chosen,
@@ -586,14 +642,19 @@ func _fit_width() -> void:
 		_within += layout.spare_width() / 2.0 / place_px
 	Diagnostics.trace("carousel", "shelf drawn within %.2f places, %d games" % [_within, _games.size()])
 	while _places.size() < floori(2.0 * _within) + 1:
-		var place := Place.new()
+		var place := ShelfPlace.new()
 		add_child(place)
 		_places.append(place)
 
 
-func _free_place() -> Place:
+## The place of the selected game; none while it has none.
+func _selected_place() -> ShelfPlace:
+	return _placed.get(selected_index())
+
+
+func _free_place() -> ShelfPlace:
 	for place in _places:
-		if place.game < 0:
+		if game_at(place) < 0:
 			return place
 	# Unreachable: there are as many places as games shown at once.
 	push_error("ShelfRow: no free place")
@@ -616,13 +677,12 @@ class Drawn:
 
 
 ## How the selected game is shown: leaning back and turned as told, it sways slowly so that the
-## light moves over it, and floats [member bob] high (world units). Angles in degrees.
+## light moves over it. Angles in degrees.
 class Pose:
 	var tilt := 0.0
 	var turn := 0.0
 	var sway := 0.0
 	var sway_period_s := 6.0
-	var bob := CarouselLayout.BOB_HEIGHT
 
 	## The pose at [param clock_s], [param centred] from 0 (beside the centre, not posed) to 1.
 	func at(clock_s: float, centred: float) -> Basis:
@@ -641,292 +701,3 @@ class LabelLook:
 	var band_text := ""
 	## Made-up artwork instead of a plain colour, for demo libraries.
 	var demo_art := false
-
-
-## One game's place in the row, showing the model of its game's medium. Each medium's model is kept
-## once made, until the library has no game of it, so that another game or shelf only shows another
-## one.
-class Place extends Node3D:
-	## Where its medium is drawn: in its own view, in the main world (the launch has it outside the
-	## row), or nowhere.
-	enum Draw { SHOWN, OUTSIDE, HIDDEN }
-
-	## Index of the game shown here, -1 when the place is free.
-	var game := -1
-	var shown: LabelledModel
-	var layout: GamesLayout
-	var lit: StudioLights.Rig
-	var blank: StudioLights.Rig
-	## One view per place, kept while the place lives: a place is reused by the games of the row, not
-	## made again at each move.
-	var media_view: MediaView
-	var _models: Dictionary[PackedScene, LabelledModel] = {}
-	var _blank_weight := -1.0
-
-	## Frees its models of the media not among [param models].
-	func keep_models(models: Array[PackedScene]) -> void:
-		for model: PackedScene in _models.keys():
-			if model not in models:
-				if _models[model] == shown and media_view:
-					shown.reparent(self, false)
-					media_view.free()
-					media_view = null
-				_models[model].free()
-				_models.erase(model)
-
-	## Shows [param model], made the first time it is used here.
-	func use_model(model: PackedScene) -> void:
-		if model in _models and _models[model] == shown:
-			return
-		if media_view:
-			shown.reparent(self, false)
-			media_view.free()
-			media_view = null
-		if model not in _models:
-			_models[model] = LabelledModel.new(model)
-			add_child(_models[model])
-			var instance := _models[model].get_child(0) as Node3D
-			instance.transform = TitlePlace.fitting(instance) * instance.transform
-			_models[model].to_real_size = instance.transform.affine_inverse()
-		shown = _models[model]
-		for made: LabelledModel in _models.values():
-			made.visible = made == shown
-			if not made.visible:
-				made.clear_label()
-		var medium := ConsoleManifest.folder_of(model)
-		layout = GamesLayout.new(medium)
-		lit = StudioLights.rig_of(medium, &"games")
-		blank = StudioLights.rig_of(medium, &"games", true)
-
-	## Told at every frame the place is not drawn: only a view still drawn is sent to the renderer. [param keep], a
-	## free place keeps its view's pictures for the game coming in next ([method MediaView.put_away]).
-	func hide_view(keep := false) -> void:
-		if media_view:
-			media_view.put_away(keep)
-			media_view.set_process(false)
-			if media_view.view().render_target_update_mode != SubViewport.UPDATE_DISABLED:
-				media_view.view().render_target_update_mode = SubViewport.UPDATE_DISABLED
-
-	func draw_at(at: Transform3D, softness: float, weight: float, mode: Draw, order: int) -> void:
-		var camera := (get_parent() as ShelfRow).camera
-		if not camera:
-			return
-		if mode == Draw.OUTSIDE:
-			if media_view and shown.get_parent() != self:
-				shown.reparent(self, false)
-			hide_view()
-			return
-		if mode == Draw.HIDDEN:
-			hide_view()
-			return
-		if not media_view:
-			media_view = MediaView.new()
-			media_view.camera = camera
-			add_child(media_view)
-			remove_child(shown)
-			media_view.show_medium(shown, lit, blank)
-			_blank_weight = -1.0
-		elif shown.get_parent() == self:
-			shown.reparent(media_view.holder(), false)
-			shown.dirty = true
-		var redraw := shown.dirty or not media_view.visible
-		media_view.show()
-		media_view.set_process(true)
-		# Set again, even unchanged, it would draw the whole screen again.
-		if media_view.z_index != order:
-			media_view.z_index = order
-		# A change below one percent relights nothing visible; the ends are still reached exactly.
-		if weight != _blank_weight and (absf(weight - _blank_weight) >= 0.01 or weight in [0.0, 1.0]):
-			media_view.crossfade(weight)
-			_blank_weight = weight
-		media_view.place(at, softness)
-		if redraw:
-			media_view.view().render_target_update_mode = SubViewport.UPDATE_ONCE
-		shown.dirty = false
-
-
-## A model and the label drawn for it, in its own small viewport shaped like the model's `Label`
-## mesh.
-class LabelledModel extends Node3D:
-	const _LABEL_VIEW := preload("res://carousel/label_view.tscn")
-	const _DEMO_ART := preload("res://carousel/demo_label.gdshader")
-	const _LABEL_WIDTH := 512
-	## A title area at least this tall, as a fraction of the label, takes the theme's font size;
-	## a smaller one shrinks it.
-	const _FULL_TITLE_HEIGHT := 0.22
-	const _DARK_INK := Color(0.12, 0.13, 0.15)
-	## How far above the platform's name the band starts, as a fraction of the label.
-	const _BAND_ABOVE := 0.02
-
-	## How many are alive, each with its label's viewport, and how many of those views hold a picture (a blank drawn):
-	## for the traces.
-	static var alive := 0
-	static var held_views := 0
-
-	## The width of the model's label face over its height.
-	var label_proportion := 1.0
-	## Brings the model from its size in the row to its real size, in its own frame: its root's
-	## transform undone.
-	var to_real_size := Transform3D.IDENTITY
-	var dirty := true
-
-	var _fade: ModelFade
-	## The size of its view while it holds a blank; it holds nothing otherwise.
-	var _drawn_size := Vector2i.ZERO
-	var _label_mesh: MeshInstance3D
-	var _view: SubViewport = _LABEL_VIEW.instantiate()
-	var _background: ColorRect = _view.get_node("Background")
-	var _title: Label = _view.get_node("Title")
-	var _platform: Label = _view.get_node("Platform")
-	var _band: ColorRect = _view.get_node("Band")
-	var _ring := ProgressRing.new()
-	var _demo_art := ShaderMaterial.new()
-	## Whether its label shows the blank drawn in its viewport, not an image.
-	var _blank := false
-	var _blur := 0.0
-
-	func _init(model: PackedScene) -> void:
-		alive += 1
-		var instance: Node3D = model.instantiate()
-		add_child(instance)
-		to_real_size = instance.transform.affine_inverse()
-		add_child(_view)
-		var label: MeshInstance3D = instance.get_node("Label")
-		var material: ShaderMaterial = label.get_surface_override_material(0).duplicate()
-		label.set_surface_override_material(0, material)
-		_label_mesh = label
-		_fade = ModelFade.new(instance)
-		var face := label.get_aabb().size
-		# To a ten-thousandth: a disc's face, built round, is square.
-		label_proportion = snappedf(face.x / face.y, 0.0001)
-		_drawn_size = Vector2i(_LABEL_WIDTH, roundi(_LABEL_WIDTH / label_proportion))
-		_view.size = Vector2i.ZERO
-		# Where the title and the platform go is the medium's manifest's, or its shape's when built from one: round a
-		# disc's hub, for one.
-		var manifest := MediumManifest.of_scene(model)
-		var title := manifest.title_area
-		var platform := manifest.platform_area
-		if label.mesh is ShapedMesh:
-			var shape := (label.mesh as ShapedMesh).shape
-			title = shape.title_area()
-			platform = shape.platform_area()
-			_ring.radius = shape.progress_ring_radius()
-		var size := Vector2(_drawn_size)
-		_title.position = size * title.position
-		_title.size = size * title.size
-		var font_size := ThemeDB.get_project_theme().get_font_size(&"font_size", &"LabelTitle")
-		var shrink := minf(1.0, title.size.y / _FULL_TITLE_HEIGHT)
-		_title.add_theme_font_size_override(&"font_size", roundi(font_size * shrink))
-		_platform.position = size * platform.position
-		_platform.size = size * platform.size
-		# From just above the platform's name to the bottom, where the label's edge rounds it.
-		_band.position = Vector2(0.0, _platform.position.y - size.y * _BAND_ABOVE)
-		_band.size = Vector2(size.x, size.y - _band.position.y)
-		_ring.size = size
-		_ring.hide()
-		_view.add_child(_ring)
-		_demo_art.shader = _DEMO_ART
-
-	func _notification(what: int) -> void:
-		if what == NOTIFICATION_PREDELETE:
-			alive -= 1
-			_hold_view(false)
-
-	func is_blank() -> bool:
-		return _blank
-
-	## Shows no label, and lets go of what it showed: its picture, its view's.
-	func clear_label() -> void:
-		_label(&"has_label", false)
-		_label(&"label_texture", null)
-		_blank = false
-		_hold_view(false)
-
-	## Draws a blank of [param look] with [param title] and the platform's name; plain, with
-	## neither, nor the band holding it, when [param title] is empty.
-	func draw_label(title: String, look: LabelLook) -> void:
-		_background.color = look.color
-		_background.material = _demo_art if look.demo_art else null
-		_demo_art.set_shader_parameter(&"seed", fposmod(title.hash() / 1000.0, 1.0))
-		# The ink that stands out most from the label, and white with a dark outline on artwork.
-		var shade := look.color.get_luminance()
-		var dark := absf(shade - _DARK_INK.get_luminance()) > absf(shade - 1.0)
-		var ink := _DARK_INK if dark and not look.demo_art else Color.WHITE
-		for text: Label in [_title, _platform]:
-			text.add_theme_color_override(&"font_color", Color(ink, 1.0 if text == _title else 0.7))
-			text.add_theme_constant_override(&"outline_size", 10 if look.demo_art else 0)
-		# The band carries the platform's name: a plain blank has none, its ring takes the band's colour.
-		var banded := look.band.a > 0.0 and not look.demo_art
-		_band.visible = banded and not title.is_empty()
-		_band.color = look.band
-		if _band.visible:
-			_platform.add_theme_color_override(&"font_color", Color.WHITE)
-		_title.text = title
-		_platform.text = "" if title.is_empty() else look.band_text if _band.visible else look.platform_name
-		_ring.color = look.band if banded else ink
-		_hold_view(true)
-		_view.render_target_update_mode = SubViewport.UPDATE_ONCE
-		show_label(_view.get_texture(), false)
-
-	## Shows on the blank the ring of a download [param fraction] read (below 0 when its size is
-	## unknown), or none when NAN; the blank shown is drawn again.
-	func ring(fraction: float) -> void:
-		_ring.visible = not is_nan(fraction)
-		_ring.fraction = fraction
-		_redraw_ring()
-
-	## Turns the ring of a download of unknown size by [param delta] seconds.
-	func turn_ring(delta: float) -> void:
-		_ring.turn = fposmod(_ring.turn + delta * TAU, TAU)
-		_redraw_ring()
-
-	func _redraw_ring() -> void:
-		dirty = dirty or _blank
-		_ring.queue_redraw()
-		if _blank:
-			_view.render_target_update_mode = SubViewport.UPDATE_ONCE
-
-	## Shows [param label] as the model's label, an image of a real one when [param scanned]; only
-	## its [param window] when given, as fractions of it, and of that, the middle of the label's
-	## proportions: an image of another shape (a Famicom's label on an NES cartridge) covers the
-	## label, cut, never stretched.
-	func show_label(label: Texture2D, scanned: bool, window := WHOLE) -> void:
-		var pixels := Vector2(label.get_size()) * window.size
-		var cover := window.size
-		if pixels.x > 0.0 and pixels.y > 0.0:
-			var wider := pixels.x / pixels.y / label_proportion
-			cover *= Vector2(minf(1.0, 1.0 / wider), minf(1.0, wider))
-		var shown := Rect2(window.get_center() - cover / 2.0, cover)
-		_label(&"label_texture", label)
-		_label(&"label_window", Vector4(shown.position.x, shown.position.y, shown.size.x, shown.size.y))
-		_label(&"scanned", scanned)
-		_label(&"has_label", true)
-		_blank = not scanned
-		if scanned:
-			_hold_view(false)
-
-	## Turns the model [param angle] radians about its own axis, its label blurred over
-	## [param blur] radians as when it spins fast.
-	func spin(angle: float, blur: float) -> void:
-		var turned := Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO)
-		dirty = dirty or transform != turned
-		transform = turned
-		# Told every frame while it stands launched: only a blur that changed is a look that changed.
-		if blur != _blur:
-			_blur = blur
-			_label(&"spin_blur", blur)
-
-	## Fades the model [param amount], from 0 (opaque) to 1 (gone).
-	func fade(amount: float) -> void:
-		dirty = dirty or _fade.amount != amount
-		_fade.apply(amount)
-
-	# A view sized holds its picture on the graphics card, drawn or not: only a blank shown needs it.
-	func _hold_view(held: bool) -> void:
-		if held != (_view.size == _drawn_size):
-			held_views += 1 if held else -1
-			_view.size = _drawn_size if held else Vector2i.ZERO
-
-	func _label(parameter: StringName, value: Variant) -> void:
-		dirty = true
-		_fade.set_shader_value(_label_mesh, parameter, value)

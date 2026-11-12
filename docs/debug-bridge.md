@@ -1,113 +1,75 @@
 # The debug bridge
 
-**You are here.** The bridge is a remote control for debugging and automation. A local client (a test harness, a
-screenshot script, a tuning page) drives a running debug build over a WebSocket: it takes pictures, presses
-buttons, and changes lights, poses, launch steps and timings live. It lives in `app/dev/bridge/`, depends on the
-app's classes, and nothing in the app depends on it. A release build holds none of it and starts none (INV-24).
+A remote control for debugging and automation. A local client (a test harness, a screenshot script, a tuning
+page) drives a running debug build over a WebSocket: it takes pictures, presses buttons, and changes lights,
+poses, launch steps and timings live. It lives in `app/dev/bridge/`; nothing in the app depends on it, and a
+release build holds none of it and starts none (INV-24, `app/test/dev/bridge/bridge_security_test.gd`).
 
-## Connecting
+- **Connecting.** A debug build started with `--bridge` connects to `ws://127.0.0.1:5201`; `--bridge-port=<n>`
+  picks another port, so several builds can run side by side, each with its own packs folder under `user://dev/`.
+  On a device, `adb reverse tcp:5201 tcp:5201` forwards the address to your computer.
 
-A debug build started with `--bridge` connects to `ws://127.0.0.1:5201`. `--bridge-port=<n>` picks another port,
-so several clients can run side by side on a desktop, each with its own packs folder under `user://dev/`. Without
-the flag the app adds no bridge node and opens no connection.
+  ```sh
+  $GODOT --path app -- --bridge --bridge-port=5202
+  ```
 
-```sh
-$GODOT --path app -- --bridge --bridge-port=5202
-```
+- **Protocol.** The first message, `hello`, carries the OS, the screen size and `protocol` (`PROTOCOL` in
+  `app/dev/bridge/bridge.gd`), raised whenever a command or an answer changes shape.
+- **Messages.** A request is a JSON object with `id`, `cmd` and the command's arguments; the answer keeps `id` and
+  `cmd`, with `ok` or an `error`. Commands run in order (`app/dev/bridge/commands.gd`).
+- **Privates.** The bridge may read private members of the app's classes. It is the one exception to the rule, and
+  holds only because the bridge is debug-only.
+- **Nothing is written.** Every change stays in memory. The bridge never writes the user's library, settings or
+  labels; it writes only its own packs, under `user://dev/`.
 
-The bridge's first message, `hello`, carries the OS, the screen size and `protocol` (`PROTOCOL` in
-`app/dev/bridge/bridge.gd`). The protocol number goes up whenever a command or an answer changes shape, so a client
-can refuse an app it does not know.
-
-`Diagnostics` loads the bridge by path. The export filter (`app/addons/cartouche_dev/export_filter.gd`) leaves
-`app/dev/bridge/` out of release exports, and `scripts/check_release.sh` inspects a real release pack to prove it.
-
-The bridge may read private members of the app's classes (the carousel's screen, a launch's stage, a view's
-tweens). That is the one exception to the rule that no class reaches into another's privates, and it holds only
-because the bridge is debug-only.
-
-## Messages
-
-A request is a JSON object with `id`, `cmd` and the command's arguments. The answer keeps `id` and `cmd`, with `ok`
-or an `error`. `shot` answers with `size`, `w` and `h`, followed by one binary PNG or JPEG message. Commands run in
-order, including the ones that wait for frames. `app/dev/bridge/commands.gd` dispatches them.
+## Commands
 
 | Command | What it does |
 |---|---|
-| `state` | the route, screen, focus, selected console and game, frame timing, the video memory the engine holds (`video_mb`), pause state, and the lights shown (`rig`); on the carousel, what it shows (below) |
-| `shot` | a picture of the screen |
-| `go {route}` | reloads the scene and plays the route's steps (`press`, `push`, `release`, `wait` in frames), faster than recorded except while a direction is held. A last step marked `hold` pauses on the first frame of what it started. A last `push` with `keep` holds its action. Fails if the scene does not settle. |
+| `state` | the route, screen, focus, selected console and game, frame timing, the video memory the engine holds (`video_mb`), pause state, the lights shown (`rig`); on the carousel, what it shows (below) |
+| `shot` | a picture of the screen: `size`, `w` and `h`, followed by one binary PNG or JPEG message |
+| `go {route}` | reloads the scene and plays the route's steps (`press`, `push`, `release`, `wait` in frames). A last step marked `hold` pauses on the first frame of what it started; a last `push` with `keep` holds its action. Fails if the scene does not settle. With `library: "adding"` it answers from `app/dev/bridge/route_fixture.gd`: two consoles, then the form adding a PS2 and placing it |
 | `step {frames}` | while paused, advances processes, animation players and tweens one frame at a time |
 | `pause`, `resume` | hold or release the tree, engine time and viewport input |
-| `lifecycle {event, arrive}` | desktop only: `event` `pause` or `resume` sends the notification Android sends as the app is put aside or brought back, then waits a frame. `arrive` (`gba:2`, as `--new-games`) has the next re-read of those consoles bring games; only a console given a folder at start (`--new-games=gba:0`) is read again. Answers `reading`, whether the consoles' folders are being read again. Refused on a device, where the re-read would write the user's library. |
+| `lifecycle {event, arrive}` | desktop only: `event` `pause` or `resume` sends the notification Android sends as the app is put aside or brought back. `arrive` (`gba:2`, as `--new-games`) has the next re-read of those consoles bring games. Answers `reading` |
 | `scrub {t}` | samples the selected console's launch animation at a time and holds it |
-| `reload {files}` | loads resources through an overlay pack, forgets their caches, reloads the scene and replays the route |
-| `restart {files}` | prepares resources read only at start for the next start (a start pack in the instance's folder). The client restarts the process. |
-| `tune` | changes a value live: see below |
+| `reload {files}` | loads resources through an overlay pack, forgets their caches, reloads the scene and replays the route. Refuses scripts, fonts and files read only at start |
+| `restart {files}` | prepares resources read only at start for the next start; the client restarts the process. Refuses scripts |
+| `tune` | changes a value live (below) |
 | `pick {x, y}` | the visible controls under a point, topmost first, and the console or medium under it |
 | `sound {data, format, gain_db}` | plays base64 `wav` or `ogg` bytes once |
-| `sounds {map}` | plays sounds as the app's input actions and screens happen, without changing what the app does |
+| `sounds {map}` | plays sounds as the app's input actions and screens happen |
 | `snapshot` | the plugin's library and settings answers and the consoles' chosen models |
-| `window {size}` | desktop: the window takes the shape of a `[width, height]` screen, as large as the desktop allows, so a layout can be checked on screens of any shape |
+| `window {size}` | desktop: the window takes the shape of a `[width, height]` screen |
 
-On the carousel, `state` also tells what it shows of the parts each screen owns, by
-`app/dev/screen_agreement.gd`, the rule the INV-20 walk asserts after every step:
+On the carousel, `state` also tells what shows of the parts each screen owns, by `app/dev/screen_agreement.gd`,
+the rule the INV-20 walk asserts each time it settles:
 
-| Field | What it holds |
+| Field | Holds |
 |---|---|
-| `parts` | `still` (no screen in front, no move, launch or toss under way), `consoles` (`front` or `behind`), `consoles_behind_drawn` (how much of them shows behind the games), and whether `rail` (on its ground), `console_title`, `games_logo`, `title_pill` and `games_hints` show, and `ribbon_open` |
+| `parts` | `still` (no screen in front, no move, launch or toss under way), `consoles` (`front` or `behind`), `consoles_behind_drawn`, whether `rail`, `console_title`, `games_logo`, `title_pill` and `games_hints` show, and `ribbon_open` |
 | `disagreement` | what shows that the screen does not have, once still: empty when they agree |
 | `badges` | the new games each console's rail tile announces, in the ring's order |
 | `new_games` | `reading` (folders read again) and `waiting` (a library read again, not shown yet) |
 
-`reload` and `restart` refuse scripts: the engine compiles every script a scene names before any of it runs, so no
-pack can replace one. `reload` also refuses fonts and files read only at start.
-
-### Tune targets
-
-| `target` | What it changes |
+| `tune` target | What it changes |
 |---|---|
-| a light index, `room` | a shown light (in the rig's model-centred coordinates), or the room's ambient energy |
-| `pose` | the shown model's pose. An empty `values` only reads it, with the camera and transforms a pose editor needs to draw handles. |
-| `control`, `controls` | a Control's position, size, rotation, corner radius, colour or font size, one or a batch. A batch checks every target before changing any. `values: {"reset": true}` restores the control as it was. |
+| a light index, `room` | a shown light, or the room's ambient energy |
+| `pose` | the shown model's pose. An empty `values` only reads it, with what a pose editor needs to draw handles |
+| `control`, `controls` | a Control's position, size, rotation, corner radius, colour or font size, one or a batch. `values: {"reset": true}` restores it |
 | `turntable` | stands the plinth's live model at a start pose |
-| `launch` | holds the carousel in a launch of the given steps at a time. With `handles`, also where each moving piece stands on screen. `stop` ends the preview. |
+| `launch` | holds the carousel in a launch of the given steps at a time; `stop` ends the preview |
 | `motion` | one of the timings `StudioTokens.LIVE` lists, until the app starts again |
-| `speed` | the engine speed. `resume` and `go` reset it. |
+| `speed` | the engine speed. `resume` and `go` reset it |
 | `input` | holds or releases an input action |
 
-Every change stays in memory. The bridge never writes the user's library, settings or labels (INV-24). It writes
-only its own packs, under `user://dev/`.
+Data files read once and cached (lights, turntable poses, plinth pictures, media poses) are listed in
+`commands.gd`, which clears them on a live change. The plugin's catalog inputs and the platforms' tables load once:
+they are outside live editing.
 
-## Running on a device's data
+## A device's data on the desktop
 
-On a desktop debug build, `--snapshot=<directory>` makes `DesktopPlugin` read `snapshot.json` from that directory: the
-library, settings and models of a device, with label images under the directory's files/art folder. Changes to
-settings and models stay in memory, and the snapshot is never written. A snapshot not in the shape `snapshot` writes
-is refused with a `snapshot:` trace; one whose library is a JSON text inside the answer, as earlier versions wrote it,
-must be taken again.
-
-## Caches
-
-Some data files are read once and cached. `commands.gd` lists the ones a live change must clear: lights,
-turntable poses, plinth pictures, media poses. Console and medium manifests are Godot resources, replaced before
-the scene reloads. The plugin's catalog inputs load once at start, and the platforms' tables from the installed APK: both are outside
-live editing.
-
-## Previewing the add-console route
-
-A `go` route with `library: "adding"` answers from `app/dev/bridge/route_fixture.gd` instead of the plugin: two
-consoles, then the real form adding a PS2 and placing it on the ring. Everything stays in memory.
-
-## Tests
-
-`app/test/dev/bridge/bridge_security_test.gd` carries INV-24: the export filter drops every bridge file in a release
-build, no bridge starts without the flag or outside debug, and `reload`, `restart` and `snapshot` write only beneath
-the dev folder.
-
-## Neighbours
-
-- [architecture/godot.md](architecture/godot.md#developer-tools-in-the-app): the other tools in the app.
-- [architecture/studio.md](architecture/studio.md): the timings, poses and lights the bridge tunes.
-- [testing.md](testing.md): the tests a harness on the bridge complements.
-- Back to the entry: [README.md](README.md).
+`--snapshot=<directory>` makes `DesktopPlugin` read `snapshot.json` from that directory: a device's library,
+settings and models as the `snapshot` command wrote them, with label images under the directory's files/art
+folder. Changes stay in memory; the snapshot is never written. One not in that shape is refused with a `snapshot:`
+trace.

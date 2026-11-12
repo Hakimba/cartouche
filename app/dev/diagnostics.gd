@@ -97,7 +97,7 @@ func _process(delta: float) -> void:
 
 
 func _notification(what: int) -> void:
-	if what in _NOTIFICATIONS:
+	if enabled and what in _NOTIFICATIONS:
 		trace("app", _NOTIFICATIONS[what])
 		trace("memory", memory())
 

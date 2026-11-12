@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 extends GdUnitTestSuite
-## The framing shown must be the rectangle the plugin cuts: the same cases as LabelFramingTest.
+## The framing shown must be the rectangle the plugin cuts: the cases are the file the core's tests read.
 
 const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
+const VECTORS := "res://test/vectors/label_framing.json"
 
 
 func _framing(zoom: float, centre: Vector2, proportion := 1.0) -> LabelFraming:
@@ -12,23 +13,29 @@ func _framing(zoom: float, centre: Vector2, proportion := 1.0) -> LabelFraming:
 	return framing
 
 
-func test_a_picture_first_framed_shows_the_largest_square_in_its_middle() -> void:
-	assert_object(LabelFraming.new().framed(Vector2i(1600, 1200))).is_equal(Rect2i(200, 0, 1200, 1200))
-	assert_object(LabelFraming.new().framed(Vector2i(900, 1600))).is_equal(Rect2i(0, 350, 900, 900))
+func test_the_rectangle_framed_is_the_one_the_plugin_cuts_for_each_picture_proportion_zoom_and_centre() -> void:
+	var vectors: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(VECTORS))
+	assert_array(vectors["cases"]).is_not_empty()
+	for each: Dictionary in vectors["cases"]:
+		var picture_sides: Array = each["picture"]
+		var centre_at: Array = each["centre"]
+		var picture := _pair(picture_sides)
+		var centre := _pair(centre_at)
+		var rect: Array = each["framed"]
+		var zoom: float = each["zoom"]
+		var proportion: float = each["proportion"]
+		var left: int = rect[0]
+		var top: int = rect[1]
+		var width: int = rect[2]
+		var height: int = rect[3]
+		assert_object(_framing(zoom, centre, proportion).framed(Vector2i(picture))).override_failure_message(str(each)) \
+			.is_equal(Rect2i(left, top, width, height))
 
 
-func test_a_picture_first_framed_on_a_cartridge_shows_the_largest_rectangle_of_its_label_s_proportions() -> void:
-	assert_object(LabelFraming.new(2.0).framed(Vector2i(1600, 1200))).is_equal(Rect2i(0, 200, 1600, 800))
-	assert_object(LabelFraming.new(0.5).framed(Vector2i(1600, 1200))).is_equal(Rect2i(500, 0, 600, 1200))
-
-
-func test_a_closer_framing_shows_a_smaller_rectangle_round_the_centre_asked() -> void:
-	assert_object(_framing(2.0, Vector2(0.25, 0.5)).framed(Vector2i(1600, 1200))).is_equal(Rect2i(100, 300, 600, 600))
-	assert_object(_framing(2.0, Vector2(0.25, 0.5), 2.0).framed(Vector2i(1600, 1200))).is_equal(Rect2i(0, 400, 800, 400))
-
-
-func test_a_centre_too_close_to_an_edge_is_moved_in_as_little_as_the_rectangle_needs() -> void:
-	assert_object(_framing(2.0, Vector2(1.0, 0.0)).framed(Vector2i(1600, 1200))).is_equal(Rect2i(1000, 0, 600, 600))
+func _pair(values: Array) -> Vector2:
+	var first: float = values[0]
+	var second: float = values[1]
+	return Vector2(first, second)
 
 
 func test_moving_and_zooming_keep_the_rectangle_inside_the_picture_and_the_zoom_in_range() -> void:

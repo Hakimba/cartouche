@@ -197,8 +197,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	# It watches the edge smoothing once it shows a medium.
-	set_process(_shown)
+	add_to_group(&"edge_smoothing")
 	_environment.environment = StudioLights.environment_of(self)
 	# Its world has no canvas: cleared, not copied from an empty one.
 	_environment.environment.background_mode = Environment.BG_CLEAR_COLOR
@@ -212,7 +211,8 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_VISIBILITY_CHANGED and visible and _hidden_size != Vector2i.ZERO:
 		_resize(_hidden_size)
 		_hidden_size = Vector2i.ZERO
-		Diagnostics.trace("media", "view pictures made again: %s, %d views hold theirs" % [_view.size, holding])
+		if Diagnostics.enabled:
+			Diagnostics.trace("media", "view pictures made again: %s, %d views hold theirs" % [_view.size, holding])
 		redraw()
 	elif what == NOTIFICATION_THEME_CHANGED and _framed:
 		_shade()
@@ -221,8 +221,9 @@ func _notification(what: int) -> void:
 		holding -= 1
 
 
-func _process(_delta: float) -> void:
-	if _view.msaa_3d != get_viewport().msaa_3d:
+## Told by the one place that changes the edge smoothing ([method ScreenFlow._choose_edge_smoothing], the start).
+func smoothing_changed() -> void:
+	if _shown and _view.msaa_3d != get_viewport().msaa_3d:
 		_view.msaa_3d = get_viewport().msaa_3d
 		_soft_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 
@@ -233,7 +234,6 @@ func _process(_delta: float) -> void:
 func show_medium(model: Node3D, lit: StudioLights.Rig, blank: StudioLights.Rig) -> void:
 	_hold(model, lit, blank)
 	_lights = StudioLights.new(_view, StudioLights.mixed(lit, blank, 0.0), Vector3.ZERO, _environment.environment)
-	set_process(true)
 
 
 ## Lit again by [param lit] and [param blank] (the light file reloaded), whatever their number of lights.
@@ -244,6 +244,13 @@ func relight(lit: StudioLights.Rig, blank: StudioLights.Rig) -> void:
 	_lights = StudioLights.new(_view, StudioLights.mixed(lit, blank, 0.0), Vector3.ZERO, _environment.environment)
 	_light()
 	redraw()
+
+
+## Lit by [param lit] and [param blank] instead, other shares of the lights it was shown with.
+func remix(lit: StudioLights.Rig, blank: StudioLights.Rig) -> void:
+	_lit = lit
+	_blank = blank
+	crossfade(_blank_weight)
 
 
 ## The share of the light for a game without a picture, from 0 (the light with one) to 1, as the focus
@@ -266,12 +273,14 @@ func redraw() -> void:
 ## the five of a row) until it is shown again.
 func put_away(keep: bool) -> void:
 	if keep and visible and _framed:
-		Diagnostics.trace("media", "view put away, pictures kept: %s, %d views hold theirs" % [_view.size, holding])
+		if Diagnostics.enabled:
+			Diagnostics.trace("media", "view put away, pictures kept: %s, %d views hold theirs" % [_view.size, holding])
 	hide()
 	if not keep and _framed and _hidden_size == Vector2i.ZERO:
 		_hidden_size = _view.size
 		_resize(Vector2i.ZERO)
-		Diagnostics.trace("media", "view pictures freed: %s, %d views hold theirs" % [_hidden_size, holding])
+		if Diagnostics.enabled:
+			Diagnostics.trace("media", "view pictures freed: %s, %d views hold theirs" % [_hidden_size, holding])
 
 
 ## Stands the medium at [param at] in the world, as the row places it, with softness [param s]
@@ -380,8 +389,14 @@ func _resize(pixels: Vector2i) -> void:
 	if _holds != (pixels != Vector2i.ZERO):
 		_holds = not _holds
 		holding += 1 if _holds else -1
+	var made := _view.size == Vector2i.ZERO and pixels != Vector2i.ZERO
 	_view.size = pixels
 	_soft_view.size = pixels
+	if made:
+		# Pictures made again hold nothing until drawn: shown before, they would flash white for a frame.
+		self_modulate.a = 0.0
+		await RenderingServer.frame_post_draw
+		self_modulate.a = 1.0
 
 
 ## Where the middle of the medium's top stands on the screen (the app's canvas, px).

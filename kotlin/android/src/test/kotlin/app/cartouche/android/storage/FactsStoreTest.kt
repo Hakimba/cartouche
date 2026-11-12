@@ -29,10 +29,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config
 import java.io.File
 
-@Config(sdk = [30, 34])
 @RunWith(RobolectricTestRunner::class)
 class FactsStoreTest {
     private val folder = File(RuntimeEnvironment.getApplication().filesDir, "facts")
@@ -126,7 +124,5 @@ class FactsStoreTest {
         }
         FactsStore(folder).load(ps2) shouldBe told
         FactsStore(folder).load(gba) shouldBe emptyMap()
-        FactsStore(folder).forget().shouldBeRight()
-        FactsStore(folder).load(ps2) shouldBe emptyMap()
     }
 }

@@ -79,3 +79,16 @@ func test_an_image_of_three_byte_colours_reaches_the_gpu_in_four() -> void:
 	await _idle()
 	var texture: ImageTexture = _told[0][1]
 	assert_int(texture.get_format()).is_equal(Image.FORMAT_RGBA8)
+
+
+func test_an_image_cancelled_once_read_leaves_the_reader_quiet() -> void:
+	# Held between the image read and the frame that would send it.
+	_reader.process_mode = Node.PROCESS_MODE_DISABLED
+	_reader.request("a", _image("a.png", 8), "a")
+	assert_bool(await Fixtures.until(self, func() -> bool: return "a" in _reader._waiting)).is_true()
+	_reader.cancel("a")
+	_reader.process_mode = Node.PROCESS_MODE_INHERIT
+	for frame in 3:
+		await await_idle_frame()
+	assert_bool(_reader.is_processing()).is_false()
+	assert_array(_told).is_empty()

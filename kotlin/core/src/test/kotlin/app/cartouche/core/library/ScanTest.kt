@@ -10,7 +10,6 @@ import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.Shell
 import app.cartouche.core.files.facts
 import app.cartouche.core.platforms.PlatformId
-import app.cartouche.core.platforms.PlatformTables
 import arrow.core.None
 import arrow.core.Some
 import io.kotest.assertions.arrow.core.shouldBeRight
@@ -19,12 +18,15 @@ import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.bind
+import io.kotest.property.arbitrary.boolean
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.enum
+import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.map
+import io.kotest.property.arbitrary.set
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -91,7 +93,7 @@ class ScanTest {
                     mapOf(file.uri to facts("gbc", "Rayman.gbc", rom)),
                 ).games
                 .single()
-        return ArtSources.of(Shipped.catalog, gbc.id, PlatformTables()).cutOf(game).on(663, 755).shouldBeSome()
+        return ArtSources.cutOf(Shipped.catalog, game).on(663, 755).shouldBeSome()
     }
 
     @Test
@@ -128,15 +130,14 @@ class ScanTest {
                 .single()
                 .copy(label = label)
         }
-        val sources = ArtSources.of(Shipped.catalog, gbc.id, PlatformTables())
-        val recut = { before: Game, after: Game -> ArtSources.recut(listOf(before), listOf(after)) { sources } }
+        val recut = { before: Game, after: Game -> ArtSources.recut(listOf(before), listOf(after), Shipped.catalog) }
         val unknown = game(Shell.UNKNOWN, LabelChoice.Automatic)
         recut(unknown, game(Shell.EXCLUSIVE, LabelChoice.Automatic)) shouldBe setOf(unknown.id)
         recut(unknown, game(Shell.COMPATIBLE, LabelChoice.Automatic)) shouldBe emptySet()
         recut(unknown, game(Shell.UNKNOWN, LabelChoice.Automatic)) shouldBe emptySet()
         recut(game(Shell.EXCLUSIVE, LabelChoice.Automatic), game(Shell.EXCLUSIVE, LabelChoice.Automatic)) shouldBe emptySet()
         recut(unknown, game(Shell.EXCLUSIVE, LabelChoice.Own)) shouldBe emptySet()
-        ArtSources.recut(emptyList(), listOf(game(Shell.EXCLUSIVE, LabelChoice.Automatic))) { sources } shouldBe emptySet()
+        ArtSources.recut(emptyList(), listOf(game(Shell.EXCLUSIVE, LabelChoice.Automatic)), Shipped.catalog) shouldBe emptySet()
     }
 
     @Test
@@ -193,6 +194,63 @@ class ScanTest {
         game.discs.map { it.number } shouldBe listOf(Some(1), Some(2))
         game.serials shouldBe listOf("SLPM-65002", "SLPM-65003")
         scan(*discs, discs = DiscGrouping.SEPARATE).games.size shouldBe 2
+    }
+
+    private val psx = Shipped.catalog.platforms.single { it.id == PlatformId("psx") }
+
+    @Test
+    fun `numbered discs make one game beside the playlist of their name, which they stand for`() = runBlocking<Unit> {
+        checkAll(Arb.set(Arb.int(1..4), 1..4), Arb.boolean(), Arb.long()) { numbers, playlist, seed ->
+            val discs = numbers.map { listed("Game (USA) (Disc $it).chd") }
+            val m3u = if (playlist) listOf(listed("Game (USA).m3u")) else emptyList()
+            val scan = Scan.of(psx, contents((discs + m3u).shuffled(Random(seed))), TitleIndex.EMPTY, DiscGrouping.GROUPED)
+            scan.games.single().discs.map { it.number } shouldBe numbers.sorted().map(::Some)
+            scan.ignored shouldBe m3u.map { IgnoredFile(it, IgnoreReason.NOT_A_GAME) }
+        }
+        // A playlist with no numbered disc beside it is the game.
+        val alone = Scan.of(psx, contents(listOf(listed("Game (USA).m3u"))), TitleIndex.EMPTY, DiscGrouping.GROUPED)
+        alone.games.map { game -> game.discs.map { it.file.name.value } } shouldBe listOf(listOf("Game (USA).m3u"))
+    }
+
+    @Test
+    fun `a Wii channel far under a disc's size is a game, a disc image that small is not`() {
+        val wii = shipped("wii")
+        val channel = listed("Super Mario Bros. (Europe) (Virtual Console).WAD", size = Some(300_000))
+        val image = listed("Unknown.iso", size = Some(300_000))
+        val stub = listed("Tiny.wad", size = Some(1_000))
+        val scan = Scan.of(wii, contents(listOf(channel, image, stub)), TitleIndex.EMPTY, DiscGrouping.GROUPED)
+        scan.games.map { it.discs.head.file } shouldBe listOf(channel)
+        scan.ignored shouldContainExactlyInAnyOrder listOf(image, stub).map { IgnoredFile(it, IgnoreReason.NOT_A_GAME) }
+    }
+
+    private fun shipped(id: String) = Shipped.catalog.platforms.single { it.id == PlatformId(id) }
+
+    @Test
+    fun `a CD game's small index file is its one game, its tracks beside it no game`() {
+        val tg16 = shipped("tg16")
+        listOf("cue", "ccd", "toc").forEach { index ->
+            val sheet = listed("Game (Japan).$index", size = Some(200))
+            val tracks = listOf(listed("Game (Japan) (Track 01).bin"), listed("Game (Japan) (Track 02).bin"), listed("Game (Japan).img"))
+            val scan = Scan.of(tg16, contents(listOf(sheet) + tracks), TitleIndex.EMPTY, DiscGrouping.GROUPED)
+            scan.games.map { it.discs.head.file } shouldBe listOf(sheet)
+            scan.ignored shouldContainExactlyInAnyOrder tracks.map { IgnoredFile(it, IgnoreReason.UNSUPPORTED) }
+        }
+    }
+
+    @Test
+    fun `a GameCube or Wii playlist is the game of its discs once, and the game when its discs are elsewhere`() {
+        listOf("gc", "wii").map(::shipped).forEach { platform ->
+            val playlist = listed("Game (USA).m3u", size = Some(60))
+            val discs = listOf(listed("Game (USA) (Disc 1).rvz"), listed("Game (USA) (Disc 2).rvz"))
+            val grouped = Scan.of(platform, contents(discs + playlist), TitleIndex.EMPTY, DiscGrouping.GROUPED)
+            grouped.games.map { game -> game.discs.map { it.file } } shouldBe listOf(discs)
+            grouped.ignored shouldBe listOf(IgnoredFile(playlist, IgnoreReason.NOT_A_GAME))
+            val alone = Scan.of(platform, contents(listOf(playlist)), TitleIndex.EMPTY, DiscGrouping.GROUPED)
+            alone.games.map { it.discs.head.file } shouldBe listOf(playlist)
+            // An image that small is still no game.
+            val tiny = contents(listOf(listed("Game (USA).rvz", size = Some(60))))
+            Scan.of(platform, tiny, TitleIndex.EMPTY, DiscGrouping.GROUPED).games shouldBe emptyList()
+        }
     }
 
     @Test

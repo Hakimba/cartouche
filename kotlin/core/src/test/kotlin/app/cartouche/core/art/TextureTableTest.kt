@@ -2,6 +2,7 @@
 package app.cartouche.core.art
 
 import app.cartouche.core.Shipped
+import app.cartouche.core.anyText
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.ScreenScraperSystem
 import app.cartouche.core.regions.Regions
@@ -13,7 +14,12 @@ import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.string
+import io.kotest.property.arbitrary.bind
+import io.kotest.property.arbitrary.choice
+import io.kotest.property.arbitrary.element
+import io.kotest.property.arbitrary.int
+import io.kotest.property.arbitrary.list
+import io.kotest.property.arbitrary.map
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -21,6 +27,19 @@ import io.kotest.matchers.maps.shouldNotBeEmpty as mapShouldNotBeEmpty
 
 class TextureTableTest {
     private val ps2 = ScreenScraperSystem(58)
+
+    // Lines shaped like a table's: tab-separated, a number and texture codes, with the brackets of a disc.
+    private val tableLine: Arb<String> =
+        Arb.bind(
+            anyText,
+            Arb.choice(Arb.int().map { it.toString() }, anyText),
+            Arb.list(
+                Arb.element("c", "cc", "us", "us[2]", "[", "]", "ss"),
+                0..3,
+            ),
+        ) { game, id, codes ->
+            "$game\t$id\t${codes.joinToString(" ")}"
+        }
 
     @Test
     fun `a release's textures are its game's, one per region and disc, under the app's region names`() {
@@ -74,7 +93,8 @@ class TextureTableTest {
 
     @Test
     fun `reading any text never fails`() = runBlocking<Unit> {
-        checkAll(Arb.string()) { text -> TextureTable.parse(text, ps2).size shouldBeGreaterThan -1 }
+        checkAll(anyText) { text -> TextureTable.parse(text, ps2).size shouldBeGreaterThan -1 }
+        checkAll(Arb.list(tableLine, 0..8)) { lines -> TextureTable.parse(lines.joinToString("\n"), ps2).size shouldBeGreaterThan -1 }
     }
 
     @Test

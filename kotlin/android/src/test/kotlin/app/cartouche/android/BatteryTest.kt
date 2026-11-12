@@ -17,9 +17,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config
 
-@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 class BatteryTest {
     private val context = RuntimeEnvironment.getApplication()

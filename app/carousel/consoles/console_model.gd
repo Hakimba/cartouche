@@ -40,7 +40,6 @@ var light_energy := 0.0:
 				set_shader_value(light, &"emission_energy", value)
 		light_energy = value
 
-var _fade: ModelFade
 ## Each part's value once set, by property; a part not set yet is at its rest.
 var _values: Dictionary[StringName, float] = {}
 ## Where each turning or sliding part's node rests, its rotation or its position, as the scene gives it.
@@ -49,7 +48,6 @@ var _rests: Dictionary[ConsolePart, Vector3] = {}
 
 func _ready() -> void:
 	Diagnostics.trace("console", "model=%s" % scene_file_path.get_file().get_basename())
-	_fade = ModelFade.new(self)
 	for light in _lights():
 		set_shader_value(light, &"emission_energy", light_energy)
 	for part in parts:
@@ -106,18 +104,8 @@ func hold(angle: float) -> void:
 		spindle.turn(angle)
 
 
-## Fades the console [param amount], from 0 (opaque) to 1 (gone).
-func fade(amount: float) -> void:
-	_fade.apply(amount)
-
-
-## Sets the shader [param parameter] of what [param geometry] is drawn with to [param value], on its
-## own materials and on the copies it fades through (see [ModelFade]): a light coming on. Before the
-## model is ready, on its own materials, which the copies are then made from.
+## Sets the shader [param parameter] of what [param geometry] is drawn with to [param value]: a light coming on.
 func set_shader_value(geometry: MeshInstance3D, parameter: StringName, value: Variant) -> void:
-	if _fade:
-		_fade.set_shader_value(geometry, parameter, value)
-		return
 	for index in geometry.mesh.get_surface_count():
 		var material: ShaderMaterial = geometry.get_active_material(index)
 		material.set_shader_parameter(parameter, value)

@@ -7,7 +7,6 @@ extends Button
 
 const _SIZE := Vector2(56.0 * FormPaint.CQW, 6.4 * FormPaint.CQW)
 const _PAD_LEFT := 2.2 * FormPaint.CQW
-const _PAD_RIGHT := 1.8 * FormPaint.CQW
 const _GAP := 1.6 * FormPaint.CQW
 const _CHIP := 3.4 * FormPaint.CQW
 const _CHIP_RING := 0.14 * FormPaint.CQW
@@ -16,16 +15,15 @@ const _KICK_PX := 1.35 * FormPaint.CQW
 const _NAME_PX := 2.35 * FormPaint.CQW
 const _CHEVRON := 1.1 * FormPaint.CQW
 const _CHEVRON_STROKE := 2.2 * 1.1 * FormPaint.CQW / 10.0
-const _SEPARATOR_RIGHT := 1.4 * FormPaint.CQW
-const _SEPARATOR_GAP := 0.3 * FormPaint.CQW
 const _UNCHOSEN_ALPHA := 0.82
-## The chip's number goes from muted to white over this long when the choice is made.
-const _LIT_S := 0.3
 
 ## The line's name, over its value (a msgid).
 @export var label := ""
 ## Its number, from 1.
 @export var step := 1
+
+## Drawn as the focused line although it has no focus: a copy standing in for the line focused ([FormEntry]).
+var looks_focused := false
 
 ## Whether its choice is made: the chip fills with the gel.
 var done := false:
@@ -34,7 +32,7 @@ var done := false:
 			return
 		done = value
 		_paint_chip()
-		_light(1.0 if value else 0.0)
+		_lit.light(1.0 if value else 0.0)
 		queue_redraw()
 ## The gel's colour now.
 var rim := StudioTokens.NEUTRAL:
@@ -42,10 +40,9 @@ var rim := StudioTokens.NEUTRAL:
 		rim = value
 		_paint_chip()
 
-var _chip := FormPaint.Layer.new(self, _chip_material())
-## How far the chip's number is lit, 0 (muted) to 1 (white).
-var _lit := 0.0
-var _lighting: Tween
+var _chip := SatinPanel.Backing.of(self, _chip_material())
+## The chip's number, muted until the choice is made.
+var _lit := FormPaint.Lit.new(self)
 
 
 func _init() -> void:
@@ -71,7 +68,7 @@ func show_value(shown: String, chosen := true) -> void:
 
 ## The width the value has: between the chip and the chevron.
 func room() -> float:
-	return size.x - _PAD_RIGHT - _CHEVRON - _GAP - (_PAD_LEFT + _CHIP + _GAP)
+	return size.x - FormPaint.PAD_RIGHT - _CHEVRON - _GAP - (_PAD_LEFT + _CHIP + _GAP)
 
 
 func _draw() -> void:
@@ -81,7 +78,7 @@ func _draw() -> void:
 		draw_arc(chip, _CHIP / 2.0 - _CHIP_RING / 2.0, 0.0, TAU, 48, Backdrop.palette.line, _CHIP_RING, true)
 	var number := FormPaint.line("%02d" % step, StudioTokens.Face.PLEX_600, _CHIP_PX)
 	number.draw(self, Vector2(chip.x - number.width / 2.0, middle - FormPaint.PLEX_LINE * _CHIP_PX / 2.0
-		+ FormPaint.PLEX_ASCENT * _CHIP_PX - number.baseline), Backdrop.palette.mute.lerp(Color.WHITE, _lit))
+		+ FormPaint.PLEX_ASCENT * _CHIP_PX - number.baseline), _lit.ink())
 	var left := _PAD_LEFT + _CHIP + _GAP
 	var kick := FormPaint.line(tr(label).to_upper(), StudioTokens.Face.PLEX_600, _KICK_PX, 0.14)
 	var value := FormPaint.line(text, _value_face(), _NAME_PX)
@@ -90,32 +87,22 @@ func _draw() -> void:
 	kick.draw(self, Vector2(left, top + FormPaint.PLEX_ASCENT * _KICK_PX - kick.baseline), Backdrop.palette.mute)
 	value.fit(room())
 	var ink := Backdrop.palette.ink if done else Backdrop.palette.mute
-	ink.a = 1.0 if has_focus() else _UNCHOSEN_ALPHA
+	ink.a = 1.0 if _focused() else _UNCHOSEN_ALPHA
 	value.draw(self, Vector2(left, top + kick_line), ink)
+	# A 10 × 16 stroke from (2, 2) to (8, 8) and back to (2, 14).
 	if not disabled:
-		_draw_chevron(Vector2(size.x - _PAD_RIGHT - _CHEVRON, (size.y - _CHEVRON * 1.6) / 2.0))
-	draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), Backdrop.palette.line)
-
-
-## The chevron: a 10 × 16 round-capped stroke from (2, 2) to (8, 8) and back to (2, 14).
-func _draw_chevron(at: Vector2) -> void:
-	var k := _CHEVRON / 10.0
-	var points := PackedVector2Array([at + Vector2(2.0, 2.0) * k, at + Vector2(8.0, 8.0) * k, at + Vector2(2.0, 14.0) * k])
-	draw_polyline(points, Backdrop.palette.mute, _CHEVRON_STROKE, true)
-	for point in points:
-		draw_circle(point, _CHEVRON_STROKE / 2.0, Backdrop.palette.mute)
+		var k := _CHEVRON / 10.0
+		FormPaint.chevron(self, Vector2(size.x - FormPaint.PAD_RIGHT - _CHEVRON, (size.y - _CHEVRON * 1.6) / 2.0) + Vector2(8.0, 8.0) * k,
+			Vector2(-6.0, 0.0) * k, Vector2(0.0, 6.0) * k, Backdrop.palette.mute, _CHEVRON_STROKE)
+	FormPaint.separator(self)
 
 
 func _value_face() -> StudioTokens.Face:
-	return StudioTokens.Face.JAKARTA_800 if done and has_focus() else StudioTokens.Face.JAKARTA_700
+	return StudioTokens.Face.JAKARTA_800 if done and _focused() else StudioTokens.Face.JAKARTA_700
 
 
-func _light(to: float) -> void:
-	var from := _lit
-	_lighting = Motion.restart(self, _lighting)
-	_lighting.tween_method(func(t: float) -> void:
-		_lit = lerpf(from, to, Motion.eased(Motion.Easing.EASE, t))
-		queue_redraw(), 0.0, 1.0, _LIT_S)
+func _focused() -> bool:
+	return has_focus() or looks_focused
 
 
 func _place_chip() -> void:

@@ -10,10 +10,24 @@ import android.graphics.Rect
 import app.cartouche.core.art.Candidate
 import app.cartouche.core.art.LabelCut
 import app.cartouche.core.platforms.ArtKind
+import arrow.core.Either
 import arrow.core.Option
+import arrow.core.flatMap
 import arrow.core.toOption
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.ByteArrayOutputStream
+import java.io.File
 import kotlin.math.roundToInt
+
+/** Why a downloaded image gives no label. */
+internal enum class Unusable {
+    /** Not an image Android can read: a page in its place, or an image cut short. */
+    NOT_AN_IMAGE,
+
+    /** A scan of no shape the label's cut knows. */
+    NO_SHAPE,
+}
 
 /**
  * Turns a downloaded image into what a model's label shows: a JPEG of at most [LARGEST] pixels on its longer side, cut to the medium first
@@ -25,23 +39,30 @@ internal object ArtImages {
 
     private const val QUALITY = 90
 
+    /**
+     * Four scraper workers could each hold a 64 MB decode: two at a time bound the peak. A variant card the user opens
+     * has a gate of its own, as wide as its downloads, so it never waits behind the scraper's queue.
+     */
+    const val SCRAPER_DECODES = 2
+
     /** An alpha under this is taken for the margin round a scan. */
     private const val MARGIN_ALPHA = 32
 
-    /**
-     * The label [cut] gives of [image], [candidate]'s; none when it is not an image Android can read, or a scan of no
-     * shape [cut] knows.
-     */
-    fun label(image: ByteArray, candidate: Candidate, cut: LabelCut): Option<ByteArray> = decoded(image).flatMap { bitmap ->
-        try {
-            val medium = opaquePart(bitmap)
-            cut.on(candidate, medium.width(), medium.height()).map { label ->
-                drawn(bitmap, Rect(label.left, label.top, label.right, label.bottom).apply { offset(medium.left, medium.top) }, cut.kind)
+    /** The label [cut] gives of [image], [candidate]'s, decoded from its file under a permit of [decoding]. */
+    suspend fun label(image: File, candidate: Candidate, cut: LabelCut, decoding: Semaphore): Either<Unusable, ByteArray> =
+        decoding.withPermit {
+            decoded(image).toEither { Unusable.NOT_AN_IMAGE }.flatMap { bitmap ->
+                try {
+                    val medium = opaquePart(bitmap)
+                    cut.on(candidate, medium.width(), medium.height()).toEither { Unusable.NO_SHAPE }.map { label ->
+                        val part = Rect(label.left, label.top, label.right, label.bottom).apply { offset(medium.left, medium.top) }
+                        drawn(bitmap, part, cut.kind)
+                    }
+                } finally {
+                    bitmap.recycle()
+                }
             }
-        } finally {
-            bitmap.recycle()
         }
-    }
 
     private fun drawn(bitmap: Bitmap, part: Rect, kind: ArtKind): ByteArray {
         val longest = maxOf(part.width(), part.height())
@@ -68,16 +89,16 @@ internal object ArtImages {
         ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }.toByteArray()
 
     /** Halved as often as the longer side stays at least twice [LARGEST]: a decoded image takes 64 MB at most. */
-    private fun decoded(image: ByteArray): Option<Bitmap> {
+    private fun decoded(image: File): Option<Bitmap> {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(image, 0, image.size, bounds)
+        BitmapFactory.decodeFile(image.path, bounds)
         val longest = maxOf(bounds.outWidth, bounds.outHeight)
         val options =
             BitmapFactory.Options().apply {
                 inSampleSize = generateSequence(1) { it * 2 }.first { longest / (it * 2) < 2 * LARGEST }
                 inPreferredConfig = Bitmap.Config.ARGB_8888
             }
-        return BitmapFactory.decodeByteArray(image, 0, image.size, options).toOption()
+        return BitmapFactory.decodeFile(image.path, options).toOption()
     }
 
     private fun opaquePart(bitmap: Bitmap): Rect {

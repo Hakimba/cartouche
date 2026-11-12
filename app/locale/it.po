@@ -479,3 +479,12 @@ msgstr "Un velo di pixel ondeggia dietro le schermate"
 
 msgid "Coming soon: not fully supported yet"
 msgstr "In arrivo: non ancora del tutto supportata"
+
+msgid "Games in a line"
+msgstr "Giochi in fila"
+
+msgid "The games stand in a straight line instead of an arc"
+msgstr "I giochi stanno in fila dritta invece che ad arco"
+
+msgid "Your library could not be read. Add your consoles again."
+msgstr "Impossibile leggere la tua libreria. Aggiungi di nuovo le tue console."

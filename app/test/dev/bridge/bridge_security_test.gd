@@ -44,13 +44,13 @@ func after_test() -> void:
 		Fixtures.file(Plinth.TURNTABLE_FILE, _turntable_text), Fixtures.file(GamesLayout.FILE, _media_text)])
 	ProjectSettings.load_resource_pack(str(packed["pack"]), true)
 	StudioLights.forget()
-	ConsoleRow.forget()
 	Plinth.forget()
 	GamesLayout.forget()
 
 
 func test_inv_24_the_export_filter_excludes_every_bridge_file_only_in_release() -> void:
-	for path: String in ["res://dev/bridge/bridge.gd", "res://dev/bridge/packs.gdc", "res://dev/bridge/sub/file.json"]:
+	for path: String in ["res://dev/bridge/bridge.gd", "res://dev/bridge/packs.gdc", "res://dev/bridge/sub/file.json",
+			"res://dev/start_trace.gd", "res://dev/carousel_bench.gd", "res://dev/frame_shots.gd"]:
 		assert_bool(ExportFilter.excludes(path, false)).is_true()
 		assert_bool(ExportFilter.excludes(path, true)).is_false()
 	for path: String in ["res://dev/diagnostics.gd", "res://dev/bridge_other.gd", "res://carousel/carousel.tscn"]:

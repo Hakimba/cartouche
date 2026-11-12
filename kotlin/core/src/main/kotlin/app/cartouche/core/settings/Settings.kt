@@ -3,6 +3,7 @@
 
 package app.cartouche.core.settings
 
+import app.cartouche.core.ParsedSerializer
 import app.cartouche.core.library.Library
 import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.storage.VersionedJson
@@ -10,9 +11,13 @@ import arrow.core.None
 import arrow.core.Option
 import arrow.core.Some
 import arrow.core.serialization.OptionSerializer
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.builtins.serializer
 
 /**
  * How the face buttons are drawn on screen: Xbox's letters (A at the bottom), Nintendo's (A on the right) or
@@ -66,7 +71,7 @@ public enum class Backdrop {
 }
 
 /** How loud the app's sounds play, in [steps] from none (silenced) to [MAX]. */
-@Serializable
+@Serializable(with = SoundLevelSerializer::class)
 @JvmInline
 public value class SoundLevel private constructor(public val steps: Int) {
     public companion object {
@@ -77,6 +82,13 @@ public value class SoundLevel private constructor(public val steps: Int) {
         public fun of(steps: Int): Option<SoundLevel> = if (steps in 0..MAX) Some(SoundLevel(steps)) else None
     }
 }
+
+private object SoundLevelSerializer : KSerializer<SoundLevel> by ParsedSerializer(
+    "sound level",
+    Int.serializer(),
+    SoundLevel::of,
+    SoundLevel::steps,
+)
 
 /** The language the app's text is written in, stored and sent as its locale code: the language, and the country where it differs. */
 @Serializable
@@ -111,8 +123,11 @@ public enum class Language {
  * images; [gamesFloat] makes the selected game sway and bob (the consoles never do); [soundLevel] is how loud the
  * sounds play, full until the user turns them down; [language], none until the user chooses one, follows the
  * device's; [backdrop] is drawn behind every screen; [pixelVeil] animates a veil of pixels over it, in
- * the backdrop's own colours.
+ * the backdrop's own colours; [gamesInLine] stands the games of a screen narrower than 16:10 in a straight line, as
+ * wider screens always do, instead of on an arc, and is stored only once on, so that a file of 0.3.0 is written again as
+ * it was read (INV-15).
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 public data class Settings(
     public val buttonStyle: Option<ButtonStyle> = None,
@@ -123,6 +138,7 @@ public data class Settings(
     public val language: Option<Language> = None,
     public val backdrop: Backdrop = Backdrop.LIGHT,
     public val pixelVeil: Boolean = true,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) public val gamesInLine: Boolean = false,
 ) {
     /**
      * Whether the first launch is still to do: no button style chosen and no platform set up. An app updated from a

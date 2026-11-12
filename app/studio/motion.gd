@@ -132,6 +132,14 @@ static func animate(node: Node, motions: Dictionary[StringName, Tween], key: Str
 	tween.tween_method(func(t: float) -> void: apply.call(eased(easing, t)), 0.0, 1.0, seconds)
 
 
+## Waits for [param tween] to end: true once it finished, false when it was killed first (a wait on its
+## [signal Tween.finished] alone never returns then). To call as the tween starts.
+static func played(tween: Tween) -> bool:
+	var wait := Wait.new(tween)
+	var finished: bool = await wait.over
+	return finished
+
+
 ## A timed part of a shared transition clock, at rest before its start and after its end.
 static func phase(seconds: float, start: float, duration: float, easing := Easing.LINEAR) -> float:
 	return eased(easing, clampf((seconds - start) / maxf(duration, 0.001), 0.0, 1.0))
@@ -196,3 +204,30 @@ class Timeline:
 	func _arrive() -> void:
 		_playing = false
 		arrived.emit()
+
+
+## One wait for a tween's end ([method played]): over within the tween's own last step when it finishes, at the next
+## frame when it was killed.
+class Wait:
+	extends RefCounted
+
+	signal over(finished: bool)
+
+	var _tween: Tween
+
+	func _init(tween: Tween) -> void:
+		_tween = tween
+		tween.finished.connect(_end.bind(true), CONNECT_ONE_SHOT)
+		_frames().connect(_look)
+
+	func _look() -> void:
+		if not _tween.is_valid():
+			_end(false)
+
+	func _end(finished: bool) -> void:
+		if _frames().is_connected(_look):
+			_frames().disconnect(_look)
+			over.emit(finished)
+
+	static func _frames() -> Signal:
+		return (Engine.get_main_loop() as SceneTree).process_frame

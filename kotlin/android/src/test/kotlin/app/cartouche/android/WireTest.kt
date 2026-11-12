@@ -3,7 +3,6 @@ package app.cartouche.android
 
 import app.cartouche.android.launch.LaunchFailure
 import app.cartouche.android.library.LibraryFailure
-import app.cartouche.core.FileName
 import app.cartouche.core.PackageName
 import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.ConsoleVariant
@@ -22,9 +21,7 @@ import app.cartouche.core.library.game
 import app.cartouche.core.library.listed
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.DefinitionSource
-import app.cartouche.core.platforms.LaunchError
 import app.cartouche.core.platforms.PlatformId
-import app.cartouche.core.platforms.PlayerId
 import app.cartouche.core.platforms.catalog
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.settings.Setting
@@ -93,12 +90,10 @@ class WireTest {
     }
 
     @Serializable
-    class Clash(val revision: Int)
+    class Clash(val revision: Int) : Wired
 
     @Test
-    fun `a payload is an object, none of whose keys is the envelope's`() {
-        shouldThrow<IllegalArgumentException> { payload(3) }
-        shouldThrow<IllegalArgumentException> { payload(listOf("Okage")) }
+    fun `a payload has none of the envelope's keys`() {
         shouldThrow<IllegalArgumentException> { payload(Clash(2)) }
     }
 
@@ -125,20 +120,15 @@ class WireTest {
         }
 
     @Test
-    fun `each launch failure reaches Godot with its own code, which the carousel tells apart`() {
-        val file = uri("content://p/tree/t/document/g")
+    fun `each launch failure the carousel tells apart reaches Godot with its own code`() {
         val codes =
             mapOf(
-                LaunchFailure.Rejected(LaunchError.UnknownPlayer(PlayerId("p"))) to "unknown_player",
-                LaunchFailure.Rejected(LaunchError.UnsupportedFile(PlayerId("p"), FileName("g.chd"))) to "unsupported_file",
-                LaunchFailure.NotInstalled(PackageName.parse("com.armsx2").shouldBeSome()) to "not_installed",
-                LaunchFailure.NoPlayer(PlatformId("ps2")) to "no_player",
-                LaunchFailure.GameMissing(file) to "game_missing",
-                LaunchFailure.TooLate to "too_late",
-                LaunchFailure.ActivityNotFound("com.armsx2/.Main") to "activity_not_found",
-                LaunchFailure.PermissionDenied("denied") to "permission_denied",
+                LaunchFailure.NotInstalled(PackageName.parse("com.armsx2").shouldBeSome()) to Code.NOT_INSTALLED,
+                LaunchFailure.NoPlayer(PlatformId("ps2")) to Code.NO_PLAYER,
+                LaunchFailure.GameMissing(uri("content://p/tree/t/document/g")) to Code.GAME_MISSING,
+                LaunchFailure.TooLate to Code.TOO_LATE,
             )
-        codes.forEach { (failure, code) -> parsed(jsonOf(failure.failed)).text("code") shouldBe code }
+        codes.forEach { (failure, code) -> failure.failed.code shouldBe code }
     }
 
     @Test

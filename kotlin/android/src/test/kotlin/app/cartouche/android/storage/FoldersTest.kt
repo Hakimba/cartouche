@@ -40,11 +40,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config
 import java.util.zip.CRC32
 import kotlin.reflect.KClass
 
-@Config(sdk = [30, 33, 34])
 @RunWith(RobolectricTestRunner::class)
 class FoldersTest {
     private val context = RuntimeEnvironment.getApplication()

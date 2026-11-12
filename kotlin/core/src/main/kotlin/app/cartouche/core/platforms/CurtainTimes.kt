@@ -29,8 +29,11 @@ public class CurtainTimes private constructor(private val default: Duration, pri
     public companion object {
         public val NONE: CurtainTimes = CurtainTimes(Duration.ZERO, emptyMap())
 
-        /** No emulator takes longer to show its game; a longer time would be a mistake, keeping the screen black. */
-        public val LONGEST: Duration = 10_000.milliseconds
+        /**
+         * The longest time a file may give: the emulators measured show their game sooner, and it is half the carousel's
+         * give-up (`GameLaunch.WAIT_TIMEOUT_S`, 5 s).
+         */
+        public val LONGEST: Duration = 2_500.milliseconds
 
         /**
          * Reads `{"default_ms": time, "emulators": {package name: time}}`, times in milliseconds from zero to

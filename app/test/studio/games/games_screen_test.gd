@@ -8,7 +8,7 @@ const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
 func test_closing_settings_reads_the_new_float_choice_before_showing_the_games_again() -> void:
 	var device := Screens.past_first_launch(self, {"ps2": 5})
 	var carousel := Screens.fresh_carousel(self, device)
-	await Screens.wait(self, func() -> bool: return carousel._shown)
+	await Screens.wait(self, func() -> bool: return carousel.is_shown())
 	assert_bool(carousel._row.games_float).is_false()
 	CarouselFixtures.press(carousel, &"ui_accept")
 	CarouselFixtures.step_until(carousel, Carousel.Screen.GAMES)
@@ -21,7 +21,7 @@ func test_closing_settings_reads_the_new_float_choice_before_showing_the_games_a
 	await Screens.joypad(self, JOY_BUTTON_A)
 	await Screens.wait(self, func() -> bool: return device.games_float)
 	await Screens.joypad(self, JOY_BUTTON_B)
-	await Screens.wait(self, func() -> bool: return carousel._shown)
+	await Screens.wait(self, func() -> bool: return carousel.is_shown())
 	assert_bool(carousel._row.games_float).is_true()
 	assert_int(carousel._screen).is_equal(Carousel.Screen.GAMES)
 
@@ -30,7 +30,7 @@ func test_floating_games_keep_the_app_awake_until_still_then_let_it_rest() -> vo
 	var device := Screens.past_first_launch(self, {"ps2": 5})
 	device.games_float = true
 	var carousel := Screens.fresh_carousel(self, device)
-	await Screens.wait(self, func() -> bool: return carousel._shown)
+	await Screens.wait(self, func() -> bool: return carousel.is_shown())
 	CarouselFixtures.press(carousel, &"ui_accept")
 	CarouselFixtures.step_until(carousel, Carousel.Screen.GAMES)
 	var resting := carousel._resting

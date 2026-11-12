@@ -63,7 +63,7 @@ static func restore(control: Control, values: Dictionary) -> void:
 	if backing and values.has("backing"):
 		var tuning: Dictionary = values["backing"]
 		backing._tuning = tuning.duplicate(true)
-		backing._paint()
+		backing.repaint()
 	for child in control.find_children("*", "Control", true, false):
 		(child as Control).queue_redraw()
 	control.queue_redraw()

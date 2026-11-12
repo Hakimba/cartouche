@@ -48,6 +48,36 @@ func test_a_library_read_again_shows_once_the_carousel_is_free_never_under_the_r
 	assert_str(carousel._row.selected_game().id).is_equal("ps2/0")
 
 
+func test_a_console_that_cannot_be_read_again_leaves_the_shelf_as_it_is_until_the_next_read_succeeds() -> void:
+	var device := ScreenFixtures.past_first_launch(self, {"ps2": 6, "gc": 1})
+	var carousel := await _carousel(device)
+	await _on_games(carousel)
+	device.consoles["ps2"] = 8
+	device.answers[ScreenFixtures.Request.REFRESH_PLATFORM] = ScreenFixtures.Answer.FAILS
+	await ScreenFixtures.resume(self)
+	await ScreenFixtures.wait(self, func() -> bool: return device.refreshed.size() == 4 and not carousel._new_games._reading)
+	for frame in 10:
+		await await_idle_frame()
+	assert_bool(carousel._new_games.has_library()).is_false()
+	assert_int(carousel._row._games.size()).is_equal(6)
+	device.answers.erase(ScreenFixtures.Request.REFRESH_PLATFORM)
+	await ScreenFixtures.resume(self)
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._row._games.size() == 8)
+
+
+func test_a_console_read_again_late_shows_its_games_once_the_answer_comes() -> void:
+	var device := ScreenFixtures.past_first_launch(self, {"ps2": 6, "gc": 1})
+	var carousel := await _carousel(device)
+	await _on_games(carousel)
+	device.consoles["ps2"] = 8
+	device.answers[ScreenFixtures.Request.REFRESH_PLATFORM] = ScreenFixtures.Answer.LATER
+	await ScreenFixtures.resume(self)
+	await ScreenFixtures.wait(self, func() -> bool: return device.refreshed.size() == 3)
+	assert_int(carousel._row._games.size()).is_equal(6)
+	assert_bool(carousel._new_games.has_library()).is_false()
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._row._games.size() == 8)
+
+
 func test_the_shelf_keeps_its_middle_game_or_shows_the_one_now_at_its_place() -> void:
 	var device := ScreenFixtures.past_first_launch(self, {"ps2": 6, "gc": 1})
 	var carousel := await _carousel(device)
@@ -131,20 +161,18 @@ func test_a_new_game_stays_new_while_in_the_middle_and_is_seen_once_left() -> vo
 
 func test_an_answer_sent_before_a_game_was_left_does_not_bring_its_mark_back() -> void:
 	var device := ScreenFixtures.past_first_launch(self, {"ps2": 2})
-	device.slow = [&"leave_game"]
+	device.answers[ScreenFixtures.Request.LEAVE_GAME] = ScreenFixtures.Answer.HELD
 	var marks: NewGames = auto_free(NewGames.new())
 	marks.android = device
 	add_child(marks)
 	var told := AndroidServices.Arrivals.new({"unseen": PackedStringArray(["ps2/0"])})
 	marks.take(told)
-	var game := AndroidServices.Game.new({"id": "ps2/0", "platform_id": "ps2", "title": "ps2 0", "identified": false,
-		"discs": [], "last_disc": 0})
+	var game := AndroidServices.Game.new({"id": "ps2/0", "platform_id": "ps2", "title": "ps2 0", "last_disc": 0})
 	marks.leave(game)
 	assert_bool(marks.is_new("ps2/0")).is_false()
 	marks.take(told)
 	assert_bool(marks.is_new("ps2/0")).is_false()
-	device.slow.clear()
-	device.released.emit()
+	device.release()
 	await ScreenFixtures.wait(self, func() -> bool: return device.left == ["ps2/0"] and not marks._leaving)
 	assert_bool(marks.is_new("ps2/0")).is_false()
 
@@ -187,6 +215,36 @@ func test_a_library_read_again_while_a_game_is_renamed_keeps_its_new_name() -> v
 	assert_str(carousel._row.selected_game().title).is_equal(kept)
 
 
+## A library read again while the properties are open waits for a name the plugin keeps late, the properties left
+## two seconds into its wait: the name kept shows once the library does.
+func test_a_library_read_again_waits_for_a_name_kept_late_once_the_properties_are_left() -> void:
+	var device := ScreenFixtures.past_first_launch(self, {"ps2": 3, "gc": 1})
+	var carousel := await _carousel(device)
+	await _on_games(carousel)
+	await ScreenFixtures.joypad(self, JOY_BUTTON_X)
+	await ScreenFixtures.wait(self, func() -> bool: return _properties_still(carousel))
+	device.consoles["ps2"] = 4
+	await ScreenFixtures.resume(self)
+	await ScreenFixtures.wait(self, func() -> bool: return carousel._new_games.has_library())
+	await ScreenFixtures.action(self, &"ui_down")
+	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
+	await ScreenFixtures.wait(self, func() -> bool: return _properties_still(carousel))
+	device.answers[ScreenFixtures.Request.RENAME_GAME] = ScreenFixtures.Answer.HELD
+	await ScreenFixtures.joypad(self, JOY_BUTTON_A)
+	await ScreenFixtures.joypad(self, JOY_BUTTON_START)
+	ScreenFixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	for back in 2:
+		await ScreenFixtures.joypad(self, JOY_BUTTON_B)
+		await ScreenFixtures.wait(self, func() -> bool: return not carousel._properties._busy)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+	for frame in 10:
+		await await_idle_frame()
+	device.release()
+	await ScreenFixtures.wait(self, func() -> bool: return device.names.has("ps2/0") and carousel._row._games.size() == 4)
+	assert_str(carousel._row.selected_game().id).is_equal("ps2/0")
+	assert_str(carousel._row.selected_game().title).is_equal(device.names["ps2/0"])
+
+
 func test_a_library_read_again_waits_for_a_toss_the_order_ring_the_properties_and_the_form() -> void:
 	var busy := {
 		"toss": [_on_games, func(_on: Carousel) -> void: await ScreenFixtures.action(self, &"ui_up"), _nothing],
@@ -203,7 +261,7 @@ func test_a_library_read_again_waits_for_a_toss_the_order_ring_the_properties_an
 		var carousel := await _carousel(device)
 		await arrive.call(carousel)
 		await open.call(carousel)
-		assert_bool(carousel._is_free()).override_failure_message(case + " leaves the carousel free").is_false()
+		assert_bool(carousel._can(CarouselState.Take.LIBRARY)).override_failure_message(case + " leaves the carousel free").is_false()
 		device.consoles["ps2"] = 5
 		await ScreenFixtures.resume(self)
 		await ScreenFixtures.wait(self, func() -> bool:
@@ -254,7 +312,7 @@ func _shelf_size(carousel: Carousel, platform_id: String) -> int:
 
 
 func _properties_still(carousel: Carousel) -> bool:
-	return carousel.screen() == Carousel.Screen.PROPERTIES and not carousel._properties._busy
+	return carousel.screen() == Carousel.Screen.PROPERTIES and not carousel._properties._holding()
 
 
 ## The selected console edited in its form.

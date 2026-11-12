@@ -4,6 +4,16 @@
 [ext_resource type="Resource" path="res://carousel/consoles/snes/snes_shape.tres" id="2"]
 [ext_resource type="PackedScene" path="res://carousel/consoles/snes/snes.glb" id="3"]
 [ext_resource type="Script" path="res://carousel/consoles/console_part.gd" id="part"]
+[ext_resource type="Shader" path="res://carousel/models/solid.gdshader" id="solid"]
+[ext_resource type="ArrayMesh" path="res://carousel/consoles/snes/snes_led.res" id="led_mesh"]
+
+[sub_resource type="ShaderMaterial" id="led_material"]
+resource_local_to_scene = true
+shader = ExtResource("solid")
+shader_parameter/albedo = Color(0.2, 0.06, 0.06, 1)
+shader_parameter/roughness = 0.3
+shader_parameter/emission = Color(1, 0.08, 0.05, 1)
+shader_parameter/emission_energy = 0.0
 
 [sub_resource type="Resource" id="back_flap"]
 script = ExtResource("part")
@@ -43,10 +53,23 @@ motion = 1
 axis = Vector3(0, -1, 0)
 open = 0.45
 
+[sub_resource type="Resource" id="led"]
+script = ExtResource("part")
+property = &"light_energy"
+node = NodePath("Led")
+motion = 2
+role = 2
+open = 2.0
+
 [node name="Snes" type="Node3D"]
 script = ExtResource("1")
 shape = ExtResource("2")
-parts = Array[ExtResource("part")]([SubResource("back_flap"), SubResource("front_flap"), SubResource("eject"), SubResource("power"), SubResource("reset")])
+parts = Array[ExtResource("part")]([SubResource("back_flap"), SubResource("front_flap"), SubResource("eject"), SubResource("power"), SubResource("reset"), SubResource("led")])
 way_in = Vector3(0, 1, 0)
 
 [node name="Model" parent="." instance=ExtResource("3")]
+
+[node name="Led" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.996111, -0.088104, 0, 0.088104, 0.996111, 0.5281, 0.5328, 1.0093)
+mesh = ExtResource("led_mesh")
+surface_material_override/0 = SubResource("led_material")

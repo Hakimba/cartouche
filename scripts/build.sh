@@ -29,26 +29,36 @@ python3 scripts/check_docs.py || fail "the docs cite a path, name or heading the
 # GDScript style, as gdlintrc sets it (member order, names, line length); the generated tokens are checked by
 # their generator instead.
 command -v gdlint > /dev/null || fail "gdlint not found: pip install --user \"gdtoolkit==4.*\""
-scripts=$(git ls-files 'app/*.gd' ':!app/addons/*' ':!app/android/*' ':!app/studio/studio_tokens.gd')
+scripts=$(git ls-files -co --exclude-standard 'app/*.gd' ':!app/addons/*' ':!app/android/*' ':!app/studio/studio_tokens.gd')
 echo "$scripts" | xargs gdlint > build/gdlint.log 2>&1 \
   || { grep -v "^Success" build/gdlint.log | tail -20; fail "GDScript style (full log: build/gdlint.log)"; }
 spread=$(echo "$scripts" | xargs grep -lzP '\n\n\n\n' || true)
 [ -z "$spread" ] || fail "more than two blank lines in a row in: $spread"
+# A class the engine template leaves out exists on the desktop and not in an APK built with that template.
+left_out=$(grep -o '"[A-Z][A-Za-z0-9]*"' tools/godot/cartouche.gdbuild | tr -d '"' | paste -sd'|' -)
+named=$(git ls-files -co --exclude-standard 'app/*.gd' 'app/*.tscn' 'app/*.tres' 'app/*.res' ':!app/addons/gdUnit4/*' ':!app/test/*' \
+  | xargs grep -lawE "$left_out" || true)
+[ -z "$named" ] || fail "a class left out of the engine template (tools/godot/cartouche.gdbuild) is named in: $named"
+# With ubershaders off, the engine template compiles ahead only the pipelines app/project.godot lists.
+python3 scripts/specialized_pipelines.py listed > /dev/null || fail "the pipeline list of app/project.godot"
+python3 scripts/plinths.py check || fail "a console's plinth picture"
 status=0
 (cd kotlin && ${bounded:+"$bounded" -k 10 1800} ./gradlew --quiet ktlintCheck :core:test :android:testDebugUnitTest :android:lintDebug \
   :android:assemble) || status=$?
 [ "$status" -ne 124 ] || fail "the Kotlin build and tests did not finish within 1800 s"
 [ "$status" -eq 0 ] || exit "$status"
-GODOT="$GODOT" scripts/test_godot.sh
+# The gate before an APK runs everything, the asset checks included.
+GODOT="$GODOT" scripts/test_godot.sh res://test
 GODOT="$GODOT" bash scripts/check_release.sh
-# The export packs scripts that fail to compile: run the project briefly to catch them first.
-${bounded:+"$bounded" -k 10 120} "$GODOT" --headless --path app --quit-after 30 > build/run.log 2>&1 || status=$?
+# The export packs scripts that fail to compile: run the project briefly to catch them first, in a user data folder
+# of its own (Godot keeps user:// under XDG_DATA_HOME) so a developer's files are neither read nor written.
+rm -rf build/run-data
+XDG_DATA_HOME="$PWD/build/run-data" ${bounded:+"$bounded" -k 10 120} "$GODOT" --headless --path app --quit-after 30 \
+  > build/run.log 2>&1 || status=$?
 [ "$status" -ne 124 ] || fail "the project did not stop within 120 s (full log: build/run.log)"
 [ "$status" -eq 0 ] || fail "the project did not run (exit $status, full log: build/run.log)"
 ! grep -E "SCRIPT ERROR|Parse Error|Failed to load script" build/run.log || fail "GDScript errors (full log: build/run.log)"
-"$GODOT" --headless --path app --install-android-build-template --export-debug Android "../$APK" > build/export.log 2>&1 \
-  || { tail -40 build/export.log; fail "export failed (full log: build/export.log)"; }
-echo "APK: $APK ($(du -h "$APK" | cut -f1))"
+GODOT="$GODOT" scripts/export_apk.sh debug "$APK"
 
 if [ "${1:-}" = "--install" ]; then
   adb="$ANDROID_HOME/platform-tools/adb"

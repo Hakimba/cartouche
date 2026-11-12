@@ -24,6 +24,7 @@ import app.cartouche.android.launch.startInTime
 import app.cartouche.android.library.LaunchChoice
 import app.cartouche.android.library.LibraryFailure
 import app.cartouche.android.library.LibraryService
+import app.cartouche.android.library.Shown
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
@@ -31,7 +32,6 @@ import app.cartouche.android.storage.StateFile
 import app.cartouche.core.ContentUri
 import app.cartouche.core.PackageName
 import app.cartouche.core.art.LabelFraming
-import app.cartouche.core.launch.GameFile
 import app.cartouche.core.launch.StartDeadline
 import app.cartouche.core.library.Coming
 import app.cartouche.core.library.DataFolders
@@ -66,15 +66,15 @@ import arrow.core.firstOrNone
 import arrow.core.flatMap
 import arrow.core.getOrElse
 import arrow.core.getOrNone
+import arrow.core.left
 import arrow.core.raise.Raise
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.recover
 import arrow.core.separateEither
 import arrow.core.toOption
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -86,7 +86,6 @@ import org.godotengine.godot.plugin.SignalInfo
 import org.godotengine.godot.plugin.UsedByGodot
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 import kotlin.time.TimeSource
 import app.cartouche.core.settings.Settings as AppSettings
 
@@ -113,13 +112,13 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
             ArtService(
                 threads,
                 ArtStore(File(context.filesDir, "art")),
-                { library.value },
+                { shown },
                 { reference },
                 { storedSettings.get().preferredRegion },
                 artFetch(debug, screenScraper),
                 screenScraper.getOrElse { Textures.NONE },
                 { context.getSystemService(ConnectivityManager::class.java) },
-            ) { signal, payload -> emitSignal(signal, payload) }
+            ) { signal, payload -> emitSignal(signal, payload) }.also { if (!resumed) it.stop() }
         }
     private val art by artService
 
@@ -130,22 +129,21 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     /** Written on the render thread, read by operations too; immutable, so publishing it is enough. */
     @Volatile private var reference = Reference()
 
-    private val catalog: Catalog get() = reference.catalog
+    /** Whether Cartouche is on screen, between [onMainResume] and [onMainPause]: a game starts, and art downloads, only then. */
+    @Volatile private var resumed = true
 
-    private val preparing =
-        Executors
-            .newSingleThreadExecutor {
-                Thread(it, "finders").apply { priority = Thread.MIN_PRIORITY }
-            }.asCoroutineDispatcher()
+    private val catalog: Catalog get() = reference.catalog
 
     /**
      * Used on the library thread, which [useDemoLibrary] replaces it on; read from Godot's thread
      * too, by [browse] and [titleMarks], for the finders it publishes.
      */
-    @Volatile private var library: Lazy<LibraryService> = lazy { libraryIn(context.filesDir) }
+    @Volatile private var shown: Shown = Shown.Users(lazy { libraryIn(context.filesDir) })
+
+    private val library: LibraryService get() = shown.service
 
     /**
-     * Used on [libraryThread], and by [backdrop] as the app starts, before any request is sent there; unreadable
+     * Used on [Threads.library], and by [backdrop] as the app starts, before any request is sent there; unreadable
      * settings only mean starting without any.
      */
     private val storedSettings by lazy {
@@ -168,15 +166,18 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     ).map { SignalInfo(it, String::class.java) }.toSet()
 
     override fun onMainResume() {
+        resumed = true
         installed.clear()
         curtain.lower()
-        art.start()
+        // Made by the first call that needs art, off the main thread: making it reads and deletes files.
+        if (artService.isInitialized()) art.start()
         batteryWatch.follow(context)
     }
 
     // A game is played meanwhile: nothing is downloaded, and the battery not followed.
     override fun onMainPause() {
-        art.stop()
+        resumed = false
+        if (artService.isInitialized()) art.stop()
         batteryWatch.stop(context)
     }
 
@@ -238,7 +239,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     /** The shelf's view for [typed], or the index by `title` or `region` [order] when nothing is typed ([Sent.Browse]), at once. */
     @UsedByGodot
     public fun browse(platformId: String, order: String, typed: String): String {
-        val finders = library.value.finders
+        val finders = library.finders
         val platform = PlatformId(platformId)
         return timed(
             "search",
@@ -254,7 +255,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     /** Where [typed] is in the title of the game at [position] on the shelf ([Sent.Marks]), at once. */
     @UsedByGodot
     public fun titleMarks(platformId: String, position: Int, typed: String): String =
-        jsonOf(library.value.finders.marks(PlatformId(platformId), position, typed).sent())
+        jsonOf(library.finders.marks(PlatformId(platformId), position, typed).sent())
 
     /** The installed players of [platformId], in definition order ([Sent.Players]). */
     @UsedByGodot
@@ -284,8 +285,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
 
     /** Opens the system screen granting "display over other apps", which the curtain needs ([curtainAllowed]). */
     @UsedByGodot
-    public fun requestCurtainPermission(requestId: Int): Unit =
-        openSetting(requestId, Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+    public fun requestCurtainPermission(requestId: Int): Unit = openSetting(requestId, Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
 
     /** Answers with [Sent.Pick] once picked. */
     @UsedByGodot
@@ -346,17 +346,20 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
 
     /** Puts the last picked picture on [gameId]'s label, framed per [LabelFraming]; answers with [Sent.ArtAnswer]. */
     @UsedByGodot
-    public fun keepOwnLabel(requestId: Int, gameId: String, zoom: Double, x: Double, y: Double, proportion: Double): Unit =
-        answering(requestId) {
-            val started = TimeSource.Monotonic.markNow()
-            val image = ownPictures.framed(LabelFraming(zoom, x, y, proportion)).mapLeft { it.failed }.bind()
-            withContext(threads.library) {
+    public fun keepOwnLabel(requestId: Int, gameId: String, zoom: Double, x: Double, y: Double, proportion: Double) {
+        val started = TimeSource.Monotonic.markNow()
+        // Framed before the library's turn, which it would hold up; kept on that turn, so the answer tells the revision it wrote.
+        scope.launch {
+            val framed = Either.catch { ownPictures.framed(LabelFraming(zoom, x, y, proportion)) }
+            onLibrary(requestId) {
+                val image = framed.mapLeft(::unexpected).bind().mapLeft { it.failed }.bind()
                 val game = game(GameId(gameId))
-                val kept = LabelChoices(library.value, art.store).keepOwn(game, image).mapLeft { it.failed }.bind()
+                val kept = LabelChoices(library, art.store).keepOwn(game, image).mapLeft { it.failed }.bind()
                 trace("art") { "${game.title}: own label kept in ${started.elapsedNow().inWholeMilliseconds} ms" }
                 payload(Sent.ArtAnswer(FoundArt(game.id, kept).sent()))
             }
         }
+    }
 
     /** Answers with [Sent.FolderList], the folders whose access survived until now. */
     @UsedByGodot
@@ -371,7 +374,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         val since = { asked.elapsedNow().inWholeMilliseconds }
         onLibrary(requestId) {
             val started = since()
-            library.value.run {
+            library.run {
                 val loaded = since()
                 val (stored, absent) = art.store.labelsOf(library().games, reference::artVersion)
                 val found = since()
@@ -392,7 +395,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         val platform = platform(PlatformId(platformId))
         val choices = setupOf(setup)
         inLibrary { setUp(platform.id, choices, setup.text("variant_id"), reference.coming) }
-        payload(Sent.LibraryAnswer(sentLibrary(library.value)))
+        payload(Sent.LibraryAnswer(sentLibrary(library)))
     }
 
     /** Scans without reading game files or saving: its files are known by the last scan's facts ([LibraryService.preview]). */
@@ -415,7 +418,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     public fun settings(requestId: Int): Unit = onLibrary(requestId) {
         val settings = storedSettings.get()
         trace("settings") { "games_float=${settings.gamesFloat}" }
-        payload(settings.sent(settings.isFirstLaunch(library.value.library())))
+        payload(settings.sent(settings.isFirstLaunch(library.library())))
     }
 
     /**
@@ -438,10 +441,10 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     public fun scanPlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
         val loaded = reference
         val platform = platform(PlatformId(platformId), loaded)
-        val before = library.value.library().games
+        val before = library.library().games
         val report = inLibrary { scan(platform, loaded.titles(platform.id), loaded.dataFolders) }.second
         payload(
-            Sent.ScanAnswer(sentLibrary(library.value), report.sent(), library.value.arrivals().sent()),
+            Sent.ScanAnswer(sentLibrary(library), report.sent(), library.arrivals().sent()),
         ).also { art.recutAfterScan(before) }
     }
 
@@ -454,10 +457,10 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     public fun refreshPlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
         val loaded = reference
         val platform = platform(PlatformId(platformId), loaded)
-        val before = library.value.library().games
+        val before = library.library().games
         val reread = inLibrary { reread(platform, loaded.titles(platform.id), loaded.dataFolders) }
         reread.library.onSome { art.recutAfterScan(before) }
-        payload(Sent.RefreshAnswer(reread.arrivals.sent(), reread.library.map { sentLibrary(library.value) }))
+        payload(Sent.RefreshAnswer(reread.arrivals.sent(), reread.library.map { sentLibrary(library) }))
     }
 
     /** The user entered [platformId]'s console: it announces no new game any more. Answers with [Sent.ArrivalsAnswer]. */
@@ -480,13 +483,13 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     public fun removePlatform(requestId: Int, platformId: String): Unit = onLibrary(requestId) {
         inLibrary { remove(PlatformId(platformId)) }
         trace("library") { "$platformId removed" }
-        payload(Sent.LibraryAnswer(sentLibrary(library.value), arrivals = Some(library.value.arrivals().sent()))).also { art.lookForArt() }
+        payload(Sent.LibraryAnswer(sentLibrary(library), arrivals = Some(library.arrivals().sent()))).also { art.lookForArt() }
     }
 
     /** The library as it now stands; answers with [Sent.LibraryAnswer]. */
     @UsedByGodot
     public fun currentLibrary(requestId: Int): Unit = onLibrary(requestId) {
-        payload(Sent.LibraryAnswer(sentLibrary(library.value)))
+        payload(Sent.LibraryAnswer(sentLibrary(library)))
     }
 
     /** Remembers [gameId] as the selected game of its platform, and that platform as the one shown. */
@@ -517,33 +520,9 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         if (store.load().fold({ true }) { it.library.games.isEmpty() }) {
             store.save(DemoLibrary.of(games, platforms)).mapLeft { it.failed }.bind()
         }
-        library = lazyOf(libraryIn(folder))
-        art.demo = true
+        shown = Shown.Demo(libraryIn(folder))
         art.forgetLooks()
-        payload(Sent.LibraryAnswer(sentLibrary(library.value)))
-    }
-
-    /**
-     * Debug builds only: scans every console again, forgets the absent art and looks every automatic label up again;
-     * answers with [Sent.RescrapeAnswer] once all were looked for.
-     */
-    @UsedByGodot
-    public fun rescrape(requestId: Int): Unit = onLibrary(requestId) {
-        ensure(BuildConfig.DEBUG) { invalid("Scraping again only exists in debug builds") }
-        ensure(!art.demo) { invalid("The demo library is shown: it has no folders to scan") }
-        val service = library.value
-        val loaded = reference
-        service.forgetFacts().mapLeft { it.failed }.bind()
-        val failures =
-            service.library().setups.filterValues { it.folder.isSome() }.keys.flatMap { id ->
-                loaded.catalog
-                    .platform(id)
-                    .toEither { LibraryFailure.UnknownPlatform(id) }
-                    .flatMap { service.scan(it, loaded.titles(id), loaded.dataFolders) }
-                    .fold({ listOf("${id.value}: ${it.message}") }) { emptyList() }
-            }
-        val labels = art.lookAgain(service.library().games).bind()
-        payload(Sent.RescrapeAnswer(sentLibrary(service), service.library().games.size, labels, failures))
+        payload(Sent.LibraryAnswer(sentLibrary(library)))
     }
 
     /**
@@ -567,7 +546,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     /** A blank [name] restores the title; answers with [Sent.Renamed]. */
     @UsedByGodot
     public fun renameGame(requestId: Int, gameId: String, name: String): Unit = onLibrary(requestId) {
-        val game = library.value.rename(GameId(gameId), DisplayName.of(name)).mapLeft { it.failed }.bind()
+        val game = library.rename(GameId(gameId), DisplayName.of(name)).mapLeft { it.failed }.bind()
         trace("library") { "${game.title}: shown as '${game.shownTitle}'" }
         payload(Sent.Renamed(game.shownTitle, game.displayName.map { game.title }))
     }
@@ -575,7 +554,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     /** Shows the consoles of [platformIds] in that order from now on, on the consoles screen and after a restart. */
     @UsedByGodot
     public fun orderConsoles(requestId: Int, platformIds: Array<String>): Unit = onLibrary(requestId) {
-        library.value.orderConsoles(platformIds.map(::PlatformId)).mapLeft { it.failed }.bind()
+        library.orderConsoles(platformIds.map(::PlatformId)).mapLeft { it.failed }.bind()
         trace("library") { "consoles ordered: ${platformIds.joinToString()}" }
         Payload.NONE
     }
@@ -585,7 +564,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     public fun placeConsole(requestId: Int, platformId: String, gap: Int): Unit = onLibrary(requestId) {
         val platforms = catalog.shown
         val placed =
-            library.value
+            library
                 .placeConsole(PlatformId(platformId), gap, platforms)
                 .onLeft { trace("library") { "console $platformId not placed at $gap: ${it.message}" } }
                 .mapLeft { it.failed }
@@ -620,11 +599,16 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
             val inTime = { deadline.allows(asked.elapsedNow()) }
             val intent = launcher.prepareGame(launch, choice.file.uri, inTime).mapLeft { it.failed }.bind()
             onMain {
-                deadline.startInTime(asked) { curtain.over(reference.curtainTimes.timeFor(emulator)) { launcher.start(act, intent) } }
+                // The user left Cartouche meanwhile (Home): the game would start behind their back.
+                if (resumed) {
+                    deadline.startInTime(asked) { curtain.over(reference.curtainTimes.timeFor(emulator)) { launcher.start(act, intent) } }
+                } else {
+                    LaunchFailure.TooLate.left()
+                }
             }.mapLeft { it.failed }.bind()
             // Answered at once so the black lasts no longer than the start; a disc not saved is no failed launch.
             scope.launch(threads.library) {
-                library.value.recordLaunch(choice.game.id, choice.disc).onLeft { trace("library") { "last disc not saved: ${it.message}" } }
+                library.recordLaunch(choice.game.id, choice.disc).onLeft { trace("library") { "last disc not saved: ${it.message}" } }
             }
             Payload.NONE
         }
@@ -640,24 +624,32 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
         ::prepare,
     )
 
-    /** Makes [finders] once the library call that kept them is over, at low priority, so the first frames keep their time. */
+    /** The preparation of the last finders given, on the library thread's calls only. */
+    private var preparing: Job = Job()
+
+    /**
+     * Makes [finders] once the library call that kept them is over, at low priority, so the first frames keep their time.
+     * Finders still waiting to be made are replaced by the next ones given.
+     */
     private fun prepare(finders: Finders) {
-        scope.launch(preparing) {
-            // Queued after the call under way on the library's single thread.
-            withContext(threads.library) {}
-            timed("search", { _: Unit, took -> "finders made in ${took.inWholeMilliseconds} ms" }) { finders.prepare() }
-        }
+        preparing.cancel()
+        preparing =
+            scope.launch(threads.finders) {
+                // Queued after the call under way on the library's single thread.
+                withContext(threads.library) {}
+                timed("search", { _: Unit, took -> "finders made in ${took.inWholeMilliseconds} ms" }) { finders.prepare() }
+            }
     }
 
-    private suspend fun <T> Raise<Failed>.inLibrary(block: LibraryService.() -> Either<LibraryFailure, T>): T =
-        withContext(threads.library) { library.value.block() }.mapLeft { it.failed }.bind()
+    private fun <T> Raise<Failed>.inLibrary(block: LibraryService.() -> Either<LibraryFailure, T>): T =
+        library.block().mapLeft { it.failed }.bind()
 
     /**
      * Answers [requestId] with what [work] returns, or with the failure it raises. Library calls start on
-     * [libraryThread] itself, which runs them in the order they arrive.
+     * [Threads.library] itself, which runs them in the order they arrive.
      */
-    private fun answering(requestId: Int, on: CoroutineDispatcher = Dispatchers.IO, work: suspend Raise<Failed>.() -> Payload) {
-        scope.launch(on) { answer(requestId, None) { either { work() } } }
+    private fun answering(requestId: Int, work: suspend Raise<Failed>.() -> Payload) {
+        scope.launch { answer(requestId, None) { either { work() } } }
     }
 
     /**
@@ -667,24 +659,21 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     private fun onLibrary(requestId: Int, work: suspend Raise<Failed>.() -> Payload) {
         scope.launch(threads.library) {
             val result = guarded { either { work() } }
-            emitSignal(ANSWERED_SIGNAL, answered(requestId, Some(library.value.revision), result))
+            emitSignal(ANSWERED_SIGNAL, answered(requestId, Some(library.revision), result))
         }
     }
 
     private fun pendingPicker() = PendingPick<Failed> { requestId, failed -> answer(requestId, None) { Either.Left(failed) } }
 
-    private fun launchOf(player: PlayerId, file: GameFile): Either<LaunchFailure, Launch> =
-        catalog.launch(player, file).mapLeft(LaunchFailure::Rejected)
-
     /**
-     * Opens the settings screen [forCartouche], or [forEveryApp] on the Android builds that only offer the screen
+     * Opens the settings screen [action] for Cartouche, or for every app on the Android builds that only offer the screen
      * listing every app.
      */
-    private fun openSetting(requestId: Int, forCartouche: String, forEveryApp: String): Unit = withActivity(requestId) { act ->
+    private fun openSetting(requestId: Int, action: String): Unit = withActivity(requestId) { act ->
         onMain {
-            launcher.start(act, Intent(forCartouche, Uri.parse("package:${act.packageName}"))).recover { failure ->
+            launcher.start(act, Intent(action, Uri.parse("package:${act.packageName}"))).recover { failure ->
                 ensure(failure is LaunchFailure.ActivityNotFound) { failure }
-                launcher.start(act, Intent(forEveryApp)).bind()
+                launcher.start(act, Intent(action)).bind()
             }
         }
     }
@@ -697,7 +686,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
             choice.setup.playerFor(platform, choice.file.name, ::isAvailable).getOrElse {
                 raise(LaunchFailure.NoPlayer(platform.id).failed)
             }
-        return choice to launchOf(player.id, choice.file.asGameFile).mapLeft { it.failed }.bind()
+        return choice to catalog.launch(player.id, choice.file.asGameFile).mapLeft(LaunchFailure::Rejected).mapLeft { it.failed }.bind()
     }
 
     /** The choices sent for a platform, as [Sent.PlatformSetup] names them. */
@@ -715,8 +704,7 @@ public class CartouchePlugin internal constructor(godot: Godot, private val thre
     private fun <T> Raise<Failed>.code(key: String, text: Option<String>, values: List<T>, wire: (T) -> String): T =
         text.flatMap { name -> values.firstOrNone { wire(it) == name } }.getOrElse { raise(invalid("$key is missing or unknown")) }
 
-    private fun Raise<Failed>.game(id: GameId): Game =
-        library.value.library().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id).failed) }
+    private fun Raise<Failed>.game(id: GameId): Game = library.library().game(id).getOrElse { raise(LibraryFailure.UnknownGame(id).failed) }
 
     private fun Raise<Failed>.platform(id: PlatformId, loaded: Reference = reference): Platform =
         loaded.catalog.platform(id).getOrElse { raise(Failed(Code.UNKNOWN_PLATFORM, "No platform ${id.value}")) }

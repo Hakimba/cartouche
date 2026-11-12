@@ -32,7 +32,7 @@ public object FileReading {
     public fun reads(platform: PlatformId, name: FileName): Boolean = readerOf(platform, name).isSome()
 
     private fun readerOf(platform: PlatformId, name: FileName): Option<Reader> =
-        READERS.getOrNone(platform).flatMap { it.getOrNone(name.value.substringAfterLast('.', "").lowercase()) }
+        READERS.getOrNone(platform).flatMap { readers -> name.extension.flatMap { readers.getOrNone(it.value) } }
 
     private val playStation: Map<String, Reader> =
         mapOf("chd" to Raise<ReadFailure>::chdSerial, "iso" to Raise<ReadFailure>::isoSerial, "bin" to Raise<ReadFailure>::binSerial)

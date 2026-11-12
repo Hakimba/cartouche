@@ -1,30 +1,23 @@
 # Testing
 
-**You are here.** How Cartouche is tested: the kinds of tests, where each lives, the helpers they share and the
-command that runs them. Kotlin tests run on the JVM with Kotest and JUnit, the Android ones under Robolectric.
-GDScript tests run headless in Godot with GdUnit4. The guarantees they protect are in
-[INVARIANTS.md](INVARIANTS.md). The code they test is described in [architecture/core.md](architecture/core.md),
-[architecture/android.md](architecture/android.md) and [architecture/godot.md](architecture/godot.md).
+Kotlin tests run on the JVM with Kotest and JUnit, the plugin's under Robolectric. GDScript tests run headless in
+Godot with GdUnit4. The guarantees they protect are in [INVARIANTS.md](INVARIANTS.md).
 
 ## What a test is
 
 A test asserts a behaviour from the outside: a result, or an effect a user or the plugin would see. Name it after
-that behaviour, in a sentence. Before you keep a test, name the defect it catches.
-
-There are four kinds. Copy the closest existing test.
+that behaviour, in a sentence. Before you keep a test, name the defect it catches. Copy the closest existing one.
 
 | Kind | What it does | Example |
 |---|---|---|
-| Example | one concrete case, set up, run, checked on its typed result | `ScanTest`, "games get their reference title, regions and serials" |
-| Property | a law stated over generated cases: a round trip, never failing, not depending on an order | `FolderWalkTest`, "every file of readable, visible folders is listed once" |
+| Example | one concrete case, checked on its typed result | `ScanTest`, "games get their reference title, regions and serials" |
+| Property | a law over generated cases: a round trip, never failing, not depending on an order | `FolderWalkTest`, "every file of readable, visible folders is listed once" |
 | Invariant | a property of [INVARIANTS.md](INVARIANTS.md), its id first in its name | `INV-08 …` in `ScanTest`, `test_inv_20_…` in `resting_test.gd` |
-| Walk | a seeded run of presses through real screens, checked at each step | `live_screen_test.gd` (INV-20) |
-
-Rules every test keeps:
+| Walk | a seeded run of presses through the real screens, each compared with a model of the screens | `live_screen_test.gd` |
 
 - Check typed values, never messages or log text.
-- A property that filters its cases also checks that enough cases reach the code under test
-  (`forEveryResolvedTemplate` does it for launch templates).
+- A property that filters its cases also checks that enough of them reach the code under test
+  (`forEveryResolvedTemplate`).
 - Fake a port, never Cartouche's own code. No real clock, no sleeps, no network.
 - Never assert a visual constant, a pixel, a duration or a recipe: assert what it does.
 - Generators, fixtures and fakes are shared, never redefined in a test.
@@ -38,104 +31,90 @@ cd kotlin && ./gradlew :android:testDebugUnitTest                   # every plug
 cd kotlin && ./gradlew ktlintCheck                                  # the Kotlin style
 ```
 
-Gradle runs the tests in parallel and caches what did not change. A repeat run with nothing changed takes seconds.
+A class's test sits in its package (`kotlin/core/src/test/kotlin/app/cartouche/core/library/ScanTest.kt` tests
+`Scan.kt`). Shared helpers are in `kotlin/core/src/testFixtures/`, one `Generators.kt`, `Fixtures.kt` and
+`Fakes.kt` per package, used by both modules.
 
-### Where Kotlin tests live
-
-A class's test sits in the same package: `kotlin/core/src/test/kotlin/app/cartouche/core/library/ScanTest.kt`
-tests `Scan.kt`. Shared helpers live in `kotlin/core/src/testFixtures/`, one `Generators.kt`, `Fixtures.kt` and
-`Fakes.kt` per package, used by both modules:
-
-| Helper | What it gives |
+| Helper | Gives |
 |---|---|
-| `InMemoryFolders` | a folder tree in memory, for `FolderWalk` and scans |
-| `InMemoryBytes` | a file's bytes in memory, which can stand for a file of gigabytes |
 | `Generators.kt` of each package | Kotest `Arb`s of the package's values, reaching the edge cases |
-| `Shipped` (core tests) | the data files of `app/data`, so tests read the real files, not copies |
-| `FakeDocuments` (plugin tests) | a fake documents provider serving real files |
-| `FakeFetch`, `FakeHttp` (plugin tests) | downloads without a network |
+| `InMemoryFolders`, `InMemoryBytes` | a folder tree and a file's bytes in memory; the bytes can stand for a file of gigabytes |
+| `Shipped` | the data files of `app/data`, so tests read the real files |
+| `FakeDocuments` (plugin) | a fake documents provider serving real files |
+| `FakeFetch`, `FakeHttp` (plugin) | downloads without a network |
+| `kotlin/core/src/test/resources/files` | the disc images the file readers decode, made by `scripts/file_fixtures.py` |
+| `kotlin/core/src/test/resources/library` | libraries as released builds stored them, read by `LibraryGoldenTest` |
 
-The disc images the file readers decode are in `kotlin/core/src/test/resources/files`, made by
-`scripts/file_fixtures.py`.
-
-### Property counts
-
-`PropertyCounts` (`kotlin/core/src/testFixtures/kotlin/app/cartouche/core/PropertyCounts.kt`) sets how many cases
-a property draws from its test's name: 1000 for a test named `INV-…`, 100 for any other. Give an invariant test its
-id first and it gets the stronger run. A Robolectric test runs in a sandbox with its own copy of Kotest, which the
-listener does not reach: there every property draws Kotest's default, 1000, whatever its name.
-
-### Android versions
-
-Robolectric runs each plugin test on one Android version by default (`robolectric.properties`). A class whose
-behaviour depends on the API level lists its own with `@Config(sdk = [30, 33, 34])`, as `LauncherTest` and
-`FoldersTest` do. Add the annotation when you write code that branches on `Build.VERSION`.
+- **Property counts.** `PropertyCounts` draws 1000 cases for a test named `INV-…`, 100 for any other. Under
+  Robolectric every property draws 1000.
+- **Android versions.** A plugin test runs on one Android version (`robolectric.properties`). A class whose
+  behaviour depends on the API level lists its own with `@Config(sdk = [30, 33, 34])`, as `LauncherTest` does.
 
 ## GDScript
 
 ```sh
-GODOT=$GODOT scripts/test_godot.sh                                      # every GDScript test
+GODOT=$GODOT scripts/test_godot.sh --changed                            # the suites of what changed since main
 GODOT=$GODOT scripts/test_godot.sh res://test/screens                   # one folder
 GODOT=$GODOT scripts/test_godot.sh res://test/carousel/finger_test.gd   # one file
+GODOT=$GODOT scripts/test_godot.sh                                      # everything; asset checks only if they changed
+GODOT=$GODOT scripts/test_godot.sh res://test                           # everything, the asset checks included
 ```
 
-`scripts/test_godot.sh` downloads the pinned GdUnit4 release once into `build/`, then runs one Godot process per test
-file, four at a time, largest file first. Each process has its own user data folder, so no suite sees what another
-left behind. `GODOT_TESTS_JOBS` sets how many run at once, and `GODOT_TESTS_S` bounds each file's time. Each file's
-log is in `build/test-godot/`, named after its path below `app/test/`, all of them merged in
-`build/test-godot.log`. A run fails on any failure, error or orphan node, and on a file that ends without its
-summary. Every process runs with `--fixed-fps 60`, so a seeded walk of presses takes the same path however
-loaded the machine is; the editor's GdUnit panel runs without it, so run tests through the script.
+`scripts/test_godot.sh` downloads the pinned GdUnit4 once into `build/`, then runs one Godot process per test file,
+each with its own user data folder; the files that build no scene share one process. A run fails on any failure,
+error or orphan node. Always run tests through the script: it passes `--fixed-fps 60`, so a seeded walk takes the
+same path on any machine.
 
-Tests live under `app/test/`, in folders that mirror `app/`. Shared helpers:
-
-| Helper | What it gives |
+| What | How |
 |---|---|
-| `app/test/carousel/fixtures.gd` | `cases(seed)` (seeded random cases, so a failure always comes back), `new_carousel` (the scene every harness starts from), `arrived`, `shown_carousel`, `step_frame` and `step_until` (drive frames by hand), `press`, shape generators such as `drawn_around` |
-| `app/test/screens/fixtures.gd` | `NewDevice`, an `AndroidServices` whose answers a test sets (`slow` holds a request until `released`, `failing` refuses it); `past_first_launch`, `shown` (a carousel once it shows), `on_form`; `wait`, `on_screen`, `press_to`, `settled`; `alive`, which says something on screen takes the next press |
-| `app/test/studio/views/views_fixtures.gd` | the media views and plinth, for the Studio tests |
-| `app/test/dev/bridge/fixtures.gd` | a bridge and its commands, for the bridge tests |
-
-A GDScript test never reaches the real plugin: it uses `NewDevice` or the desktop stand-in. Drive time with
-`step_frame`, never with real waits.
-
-## Invariant tests
-
-Each invariant has tests named after its id (Kotlin `INV-07 …`, GDScript `test_inv_20_…`), so a search finds them
-all:
+| Logs | `build/test-godot/`, one file per test file, merged in `build/test-godot.log` |
+| `--changed` | runs the suites of the leaf folders a change touches; everything when the change is a script many things depend on (the carousel's own scripts, screens, adapters, studio, locale, fonts, data, the test helpers); nothing for a change under `kotlin/` |
+| The asset checks (`app/test/assets/`) | geometry and proportions of every shipped console and medium. They run when a path names them, and otherwise only when what they check changed since `main` |
+| `GODOT_TESTS_JOBS`, `GODOT_TESTS_S` | how many processes run at once (4), and the seconds one file may take (900) |
+| `fonts_test.gd` | compares drawn text with a reference and needs a window, so the headless run skips it. Run it alone, as below |
 
 ```sh
-grep -rn 'INV-07\|inv_07' kotlin app/test
+$GODOT --path app -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://test/studio/fonts_test.gd
 ```
 
-A test that carries an invariant states it from outside, over generated cases where it can. Weakening an invariant, or the
-test that carries it, is a decision to discuss in an issue first.
+Tests live under `app/test/`, in folders that mirror `app/`. A test never reaches the real plugin, and drives time
+with `step_frame`, never with real waits.
+
+| Helper | Gives |
+|---|---|
+| `app/test/carousel/fixtures.gd` | `cases(seed)` (seeded random cases), `new_carousel`, `shown_carousel`, `step_frame`, `step_until`, `press`, `console_folders()`, shape generators. `Scripted`, the fake plugin: a test scripts each request's answer (`answers[Request.SCAN] = Answer.HELD` waits until `release()`; `LATER`, `FAILS`, `NEVER`) |
+| `app/test/screens/fixtures.gd` | `NewDevice` (a `Scripted` device from its first launch), `past_first_launch`, `shown`, `on_form`, `wait`, `on_screen`, `press_to`, `settled`, and `alive`: whether something on screen takes the next press |
+| `app/test/vectors/` | cases (label framings, the names a game keeps) that a core test and a GDScript test both read |
+| `app/test/carousel/search/recorded_searches.json` | the core's own search answers, written by `RecordedSearchesTest` and read through `recorded.gd`. A query not recorded stops the test: add it to the list that test names |
+
+### The walk
+
+`app/test/screens/live_screen_test.gd` carries INV-20. From 0, 1, 2 or 3 consoles it draws 900 seeded presses and
+finger gestures, answers of the fake device held or failing at random, and after each one compares the app with a
+model of the screens: the screen, the focus, the selection, what the device was asked, and that something takes the
+next press.
+
+| File | Role | Add to it |
+|---|---|---|
+| `app/test/screens/screen_model.gd` | the model: `TABLE`, one row per screen and press, with the screen reached and the control focused. It reads no node | a new screen's or press's rows |
+| `app/test/screens/screen_watch.gd` | the one place the walk reads the app | a new page's node name in `_PAGES` |
+| `Fixtures.alive` in `app/test/screens/fixtures.gd` | what counts as taking the next press | a new busy state of the carousel |
+| `app/dev/screen_agreement.gd` | whether what the carousel shows agrees with its screen once still; the debug bridge's `state` tells the same | a part only one screen shows |
+
+`WALK_SEEDS=n` in the environment walks n seeds per start instead of one, each to its end; a failure prints its
+seed and the path to replay. `KNOWN` in the test lists the findings the walk meets and goes on from: fixing one
+deletes its line.
 
 ## Pictures and benchmarks
 
-Some changes must keep every pixel or every frame time. Two tools measure that.
+- **The same pictures.** `FrameShots` saves pictures at set frames, presses sent at set frames too; with a fixed
+  frame time two runs of the same code give the same pictures. Run it before and after a change that must keep
+  every pixel, and compare:
 
-`FrameShots` (`app/dev/frame_shots.gd`) saves pictures of the carousel at set frames, presses sent at set frames
-too. With Godot's fixed frame time, two runs of the same code give the same pictures:
+  ```sh
+  $GODOT --path app --fixed-fps 60 --resolution 1280x960 -- --welcome=skip --shelf=ps2 --launch=rehearse --shots="$PWD/build/shots/before"
+  ```
 
-```sh
-$GODOT --path app --fixed-fps 60 --resolution 1280x960 -- --welcome=skip --shelf=ps2 --launch=rehearse --shots="$PWD/build/shots/before"
-```
-
-Run it before and after a change and compare the pictures. An optimisation must leave all of them identical.
-
-`scripts/bench.sh` measures the debug build installed on a device: cold starts, then each `CarouselBench` scenario
-(`app/dev/carousel_bench.gd`) for a fixed time, at several library sizes. `--record FILE` appends each measure as
-one JSON line, and `--label` names the run:
-
-```sh
-scripts/build.sh --install && scripts/bench.sh --record build/bench.jsonl --label my-change 150 1000
-```
-
-## Neighbours
-
-- [INVARIANTS.md](INVARIANTS.md): what the invariant tests carry.
-- [architecture/core.md](architecture/core.md), [architecture/android.md](architecture/android.md),
-  [architecture/godot.md](architecture/godot.md): the code under test.
-- [debug-bridge.md](debug-bridge.md): driving a running build from a test harness.
-- Back to the entry: [README.md](README.md).
+- **A screen as the app says it.** The debug bridge's `state` and `shot` give the screen the app is on and its
+  picture ([debug-bridge.md](debug-bridge.md)).
+- **Frame times and memory** on a device: [device-testing.md](device-testing.md#benchmarks).

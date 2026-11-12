@@ -34,6 +34,8 @@ class Format:
 
 
 static var _formats: Array[Format] = []
+## The last layout [method at] made: the same screen size gives the same one until the file is read again.
+static var _last: ScreenLayout
 
 ## The screen, in px of the viewport.
 var size: Vector2
@@ -49,7 +51,10 @@ static func of(shown: Vector2) -> ScreenLayout:
 
 ## The layout of [param viewport]'s screen.
 static func at(viewport: Viewport) -> ScreenLayout:
-	return of(viewport.get_visible_rect().size)
+	var shown := viewport.get_visible_rect().size
+	if not _last or _last.size != shown:
+		_last = of(shown)
+	return _last
 
 
 ## The families read from [constant FILE], from the narrowest.
@@ -65,6 +70,7 @@ static func formats() -> Array[Format]:
 ## Drops the file read, so that the next layout follows a file the debug bridge reloaded.
 static func forget() -> void:
 	_formats.clear()
+	_last = null
 
 
 func _init(shown: Vector2) -> void:

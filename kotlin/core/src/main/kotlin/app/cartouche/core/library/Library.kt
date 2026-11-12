@@ -56,13 +56,6 @@ public data class Library(
     public val notGames: Map<PlatformId, List<ListedFile>> = emptyMap(),
     public val ignoredCounts: Map<PlatformId, Map<CountedReason, IgnoredCount>> = emptyMap(),
     public val skippedFolders: Map<PlatformId, List<SkippedFolder>> = emptyMap(),
-    /**
-     * The names the user gave consoles, shown in place of their own; left out of the stored library while there is
-     * none.
-     */
-    @OptIn(ExperimentalSerializationApi::class)
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    public val consoleNames: Map<PlatformId, DisplayName> = emptyMap(),
     /** The order the user put consoles in; left out of the stored library while they put none anywhere. */
     @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
@@ -186,7 +179,6 @@ public data class Library(
         notGames = notGames - platform,
         ignoredCounts = ignoredCounts - platform,
         skippedFolders = skippedFolders - platform,
-        consoleNames = consoleNames - platform,
         consoleOrder = consoleOrder - platform,
         consoleVariants = consoleVariants - platform,
         awaitingScan = awaitingScan - platform,

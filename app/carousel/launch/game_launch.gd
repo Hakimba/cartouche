@@ -31,10 +31,11 @@ enum Stage {
 }
 
 ## Waiting this long for an answer, or for Android to leave for the emulator, gives up: the carousel
-## shows again. Longer than [constant AndroidServices.START_WITHIN_S], so that a start refused as
-## too late has been refused before this gives up; a start let through just before its deadline can
-## still come after it when a frame of the carousel lasts longer than the margin between the two.
-const WAIT_TIMEOUT_S := 5.0
+## shows again. Half a second longer than [constant AndroidServices.START_WITHIN_S], so that a start
+## refused as too late has been refused before this gives up; a start let through just before its
+## deadline can still come after it when a frame of the carousel lasts longer than the margin between
+## the two.
+const WAIT_TIMEOUT_S := AndroidServices.START_WITHIN_S + 0.5
 const SHOW_S := 0.2
 
 @export var row: ShelfRow
@@ -196,6 +197,8 @@ func launch(game: AndroidServices.Game, disc: int, insertion: Insertion) -> void
 	blackout.visible = true
 	_enter(Stage.INSERTING)
 	await _inserted
+	if launch_id != _launch_id:
+		return
 	var inserted_s := _clock_s
 	_enter(Stage.STARTING)
 	var result := await android.launch_game(game, disc)
@@ -249,7 +252,7 @@ func _insert(delta: float) -> void:
 		var stand := _insertion.stand_at(t, _start)
 		var spin := _insertion.spin_at(t)
 		# The label blurs over the turn it makes while a frame shows.
-		row.stand_selected(stand, spin, minf(TAU, _insertion.spin_speed_at(t) * delta))
+		row.stand(SelectedStand.outside(stand, spin, minf(TAU, _insertion.spin_speed_at(t) * delta)))
 		spindle.turn(spin)
 		spindle.fade(1.0 - _insertion.spindle_at(t))
 		for control in controls:
@@ -277,7 +280,7 @@ func _show_carousel() -> void:
 	_launch_id += 1
 	if _into_console:
 		sequence.stand(&"games")
-	row.pose_selected()
+	row.stand(SelectedStand.new())
 	spindle.visible = false
 	for control in controls:
 		control.modulate.a = _presence.get(control, control.modulate.a)

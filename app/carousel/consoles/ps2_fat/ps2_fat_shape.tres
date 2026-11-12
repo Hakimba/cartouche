@@ -7,3 +7,4 @@ script = ExtResource("1")
 seat_centre = Vector3(60.111893, 62.02225, 16.1)
 seat_degrees = Vector3(-90, 0, 0)
 carrier = &"tray_mm"
+housings = Array[StringName]([&"body", &"tray"])

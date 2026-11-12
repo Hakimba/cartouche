@@ -89,11 +89,21 @@ private const val ENTRY_HEADER = 46
  * comment may follow); none for an archive of several entries, or in the zip64 format.
  */
 internal fun Raise<ReadFailure>.zipEntryPrint(source: ByteSource): Option<FileFacts> = option {
-    val tailLength = minOf(source.size, (END_RECORD + MAX_COMMENT).toLong()).toInt()
-    val tail = bytes(source, source.size - tailLength, tailLength).bind()
-    val end = (tail.size - END_RECORD downTo 0).firstOrNone { tail.bigEndian(it, 4) == END_SIGNATURE }.bind()
-    ensure(tail.littleEndian(end + 10, 2) == 1L)
-    val entry = bytes(source, tail.littleEndian(end + 16, 4), ENTRY_HEADER).bind()
+    fun tail(length: Int): ByteArray {
+        val read = minOf(source.size, length.toLong()).toInt()
+        return bytes(source, source.size - read, read).bind()
+    }
+    // An archive without a comment ends with its end record: 22 bytes, not the 64 KiB a comment could need.
+    val last = tail(END_RECORD)
+    val (record, end) =
+        if (last.size == END_RECORD && last.bigEndian(0, 4) == END_SIGNATURE) {
+            last to 0
+        } else {
+            val tail = tail(END_RECORD + MAX_COMMENT)
+            tail to (tail.size - END_RECORD downTo 0).firstOrNone { tail.bigEndian(it, 4) == END_SIGNATURE }.bind()
+        }
+    ensure(record.littleEndian(end + 10, 2) == 1L)
+    val entry = bytes(source, record.littleEndian(end + 16, 4), ENTRY_HEADER).bind()
     ensure(entry.bigEndian(0, 4) == ENTRY_SIGNATURE)
     FileFacts.Print(entry.littleEndian(16, 4).toUInt())
 }

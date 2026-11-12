@@ -12,7 +12,10 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Test
+import java.io.File
 import java.net.ServerSocket
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 class HttpFetchTest {
@@ -64,14 +67,14 @@ class HttpFetchTest {
     }
 
     @Test
-    fun `INV-17 only a busy or failing server is tried again later, any other answer is an image it will never give`() = runBlocking<Unit> {
+    fun `INV-17 only a 404 or a 410 is an image the server will never give, any other answer is tried again later`() = runBlocking<Unit> {
         (300..599).forEach { status ->
-            val busy = status == 408 || status == 429 || status >= 500
-            HttpFetch.failureFor(status) shouldBe (if (busy) FetchFailure.Refused(status) else FetchFailure.NotFound)
+            val gone = status == 404 || status == 410
+            HttpFetch.failureFor(status) shouldBe (if (gone) FetchFailure.NotFound else FetchFailure.Refused(status))
         }
         fetch.get(serve("/busy", 503), Progress.NONE).shouldBeLeft() shouldBe FetchFailure.Refused(503)
         fetch.get(serve("/missing", 404), Progress.NONE).shouldBeLeft() shouldBe FetchFailure.NotFound
-        fetch.get(serve("/forbidden", 403), Progress.NONE).shouldBeLeft() shouldBe FetchFailure.NotFound
+        fetch.get(serve("/forbidden", 403), Progress.NONE).shouldBeLeft() shouldBe FetchFailure.Refused(403)
     }
 
     @Test
@@ -79,6 +82,39 @@ class HttpFetchTest {
         val largest = ByteArray(Http.LARGEST_BYTES) { it.toByte() }
         fetch.get(serve("/largest", body = largest), Progress.NONE).shouldBeRight() shouldBe largest
         fetch.get(serve("/larger", body = largest + 1), Progress.NONE).shouldBeLeft() shouldBe FetchFailure.NotFound
+        val file = File.createTempFile("larger", ".part")
+        try {
+            fetch.get(serve("/larger", body = largest + ByteArray(Http.LARGEST_BYTES)), Progress.NONE, file).shouldBeLeft()
+            (file.length() <= Http.LARGEST_BYTES) shouldBe true
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun `an image that cannot be written on the device is a storage failure, never the network's`() = runBlocking<Unit> {
+        val nowhere = File(File.createTempFile("gone", ".d").also(File::delete), "image.part")
+        fetch.get(serve("/image", body = ByteArray(1024)), Progress.NONE, nowhere).shouldBeLeft() shouldBe FetchFailure.Unstored
+    }
+
+    @Test
+    fun `an answer with no error page to read, a redirect not followed, closes its connection`() = runBlocking<Unit> {
+        val closed = CompletableFuture<Boolean>()
+        thread {
+            server.accept().use { client ->
+                client.getInputStream().bufferedReader().let { request ->
+                    generateSequence { request.readLine() }.takeWhile { it.isNotEmpty() }.count()
+                }
+                client.getOutputStream().apply {
+                    write("HTTP/1.1 301 Moved\r\nLocation: ftp://127.0.0.1/a.png\r\nContent-Length: 5\r\n\r\nmoved".encodeToByteArray())
+                    flush()
+                }
+                client.soTimeout = 3_000
+                closed.complete(runCatching { client.getInputStream().read() == -1 }.getOrElse { false })
+            }
+        }
+        fetch.get(ArtUrl("http://127.0.0.1:${server.localPort}/moved"), Progress.NONE).shouldBeLeft() shouldBe FetchFailure.Refused(301)
+        closed.get(10, TimeUnit.SECONDS) shouldBe true
     }
 
     @Test

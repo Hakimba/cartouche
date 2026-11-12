@@ -2,7 +2,7 @@
 extends Node
 
 const ControlState := preload("res://dev/bridge/control_state.gd")
-
+const Values := preload("res://dev/bridge/values.gd")
 const Preview := preload("res://dev/bridge/plinth_preview.gd")
 var _controls: Dictionary[int, Dictionary] = {}
 var _poses: Dictionary[int, Dictionary] = {}
@@ -53,13 +53,13 @@ func _process(_delta: float) -> void:
 func tune(scene: Node, message: Dictionary) -> Dictionary:
 	var raw: Variant = message.get("values")
 	if raw is not Dictionary:
-		return _error("invalid values")
+		return Values.error("invalid values")
 	var values: Dictionary = raw
 	var target: Variant = message.get("target")
 	if target == "controls":
 		for path: String in values:
 			if values[path] is not Dictionary:
-				return _error("invalid controls")
+				return Values.error("invalid controls")
 			var placed: Dictionary = values[path]
 			var result := _control(scene, path, placed, false)
 			if not result.get("ok", true):
@@ -74,11 +74,11 @@ func tune(scene: Node, message: Dictionary) -> Dictionary:
 		return _motion(values)
 	var shown := _shown(scene, true)
 	if shown.is_empty():
-		return _error("no shown model")
+		return Values.error("no shown model")
 	var answer := {"ok": true}
 	if target == "pose":
 		if not _valid_values(values, {"position": 3, "rotation": 3, "scale": 3}):
-			return _error("invalid pose")
+			return Values.error("invalid pose")
 		var model: Node3D = shown["model"]
 		var record: Dictionary = _poses.get(model.get_instance_id(), {"node": weakref(model), "values": {}})
 		var edited: Dictionary = record["values"]
@@ -89,7 +89,7 @@ func tune(scene: Node, message: Dictionary) -> Dictionary:
 	elif target == "turntable":
 		var preview: Preview = shown.get("preview")
 		if preview == null or not _valid_values(values, {"rotation": 3, "position": 3, "size": 0}):
-			return _error("invalid turntable values")
+			return Values.error("invalid turntable values")
 		var start := preview.start
 		var size: float = values.get("size", start.size)
 		preview.place(Plinth.Start.new(_vector3(values.get("rotation", _array(start.rotation))),
@@ -100,14 +100,14 @@ func tune(scene: Node, message: Dictionary) -> Dictionary:
 		var lights: Array[Light3D] = []
 		var built: Array = shown["lights"]
 		lights.assign(built)
-		if not _number(index) or index != int(_float(index)) or index < 0 or index >= lights.size():
-			return _error("invalid light index")
+		if not Values.number(index) or index != int(Values.float_of(index)) or index < 0 or index >= lights.size():
+			return Values.error("invalid light index")
 		if not _valid_values(values, {"position": 3, "target": 3, "colour": 3,
 				"energy": 0, "range": 0, "angle": 0, "softness": 0, "shadow": -1}):
-			return _error("invalid light values")
-		var light := lights[int(_float(index))]
+			return Values.error("invalid light values")
+		var light := lights[int(Values.float_of(index))]
 		var record: Dictionary = _light_values.get(light.get_instance_id(), {"node": weakref(light), "values": {}, "rig": shown["rig"],
-			"index": int(_float(index))})
+			"index": int(Values.float_of(index))})
 		var edited: Dictionary = record["values"]
 		edited.merge(values, true)
 		_light_values[light.get_instance_id()] = record
@@ -115,11 +115,11 @@ func tune(scene: Node, message: Dictionary) -> Dictionary:
 	elif target == "room":
 		var environment := _environment(shown)
 		if not _valid_values(values, {"energy": 0}) or environment == null:
-			return _error("invalid room values")
+			return Values.error("invalid room values")
 		_rooms[environment.get_instance_id()] = {"environment": weakref(environment), "energy": values["energy"]}
 		environment.ambient_light_energy = values["energy"]
 	else:
-		return _error("unknown tune target")
+		return Values.error("unknown tune target")
 	_redraw(shown)
 	return answer
 
@@ -127,12 +127,13 @@ func tune(scene: Node, message: Dictionary) -> Dictionary:
 ## Tries other durations for the app's motion timings until the app starts again.
 static func _motion(values: Dictionary) -> Dictionary:
 	for key: Variant in values:
-		if StringName(str(key)) not in StudioTokens.LIVE or not _number(values[key]) or _float(values[key]) < 0.0:
-			return _error("invalid motion values")
-		if str(key).ends_with("_CURVE") and (_float(values[key]) != int(_float(values[key])) or _float(values[key]) > Motion.Easing.OUT_BACK):
-			return _error("invalid motion values")
+		if StringName(str(key)) not in StudioTokens.LIVE or not Values.number(values[key]) or Values.float_of(values[key]) < 0.0:
+			return Values.error("invalid motion values")
+		var number := Values.float_of(values[key])
+		if str(key).ends_with("_CURVE") and (number != int(number) or number > Motion.Easing.OUT_BACK):
+			return Values.error("invalid motion values")
 	for key: String in values:
-		(StudioTokens as Script).set(key, _float(values[key]))
+		(StudioTokens as Script).set(key, Values.float_of(values[key]))
 	return {"ok": true}
 
 
@@ -253,8 +254,10 @@ static func relight(scene: Node) -> void:
 			if view.holder().get_child_count() == 0:
 				continue
 			var medium := _medium_id(view.holder().get_child(0) as Node3D)
-			var screen := &"games" if view.get_parent() is ShelfRow else &"properties"
-			view.relight(StudioLights.rig_of(medium, screen), StudioLights.rig_of(medium, screen, true))
+			if view.get_parent() is DiscProperties:
+				view.relight(DiscProperties.light_of(medium, false), DiscProperties.light_of(medium, true))
+			else:
+				view.relight(StudioLights.rig_of(medium, &"games"), StudioLights.rig_of(medium, &"games", true))
 
 
 static func _medium_id(model: Node3D) -> String:
@@ -396,13 +399,13 @@ static func _redraw(shown: Dictionary) -> void:
 
 func _control(scene: Node, path: Variant, values: Dictionary, apply := true) -> Dictionary:
 	if scene == null or path is not String:
-		return _error("invalid control path")
+		return Values.error("invalid control path")
 	var control := scene.get_node_or_null(NodePath(str(path))) as Control
 	if control == null or (control != scene and not scene.is_ancestor_of(control)):
-		return _error("control not found in current scene")
+		return Values.error("control not found in current scene")
 	if values.has("reset"):
 		if values.size() != 1 or values["reset"] != true:
-			return _error("invalid control reset")
+			return Values.error("invalid control reset")
 		if apply and _controls.has(control.get_instance_id()):
 			var original: Dictionary = _controls[control.get_instance_id()]
 			var snapshot: Dictionary = original["original"]
@@ -413,14 +416,14 @@ func _control(scene: Node, path: Variant, values: Dictionary, apply := true) -> 
 	numbers.erase("text")
 	if not _valid_values(numbers, {"position": 2, "size": 2, "rotation": 0,
 			"corner_radius": 0, "colour": 4, "text_colour": 4, "border_colour": 4, "font_size": 0}):
-		return _error("invalid control values")
+		return Values.error("invalid control values")
 	if values.has("text"):
 		if values["text"] is not String or not (control is Label or control is BaseButton):
-			return _error("ce contrôle ne porte pas de texte éditable")
+			return Values.error("control has no editable text")
 		if _translated(control):
-			return _error("ce texte vient des traductions")
+			return Values.error("text comes from the translations")
 	if values.has("corner_radius") and not control.has_meta(&"studio_backing") and _corner_style(control) == null:
-		return _error("control has no corner radius")
+		return Values.error("control has no corner radius")
 	if not apply:
 		return {"ok": true}
 	var record: Dictionary
@@ -474,7 +477,7 @@ static func _place_control(control: Control, values: Dictionary) -> void:
 		if values.has(key): control.set(key, _vector2(values[key]))
 	if values.has("rotation"): control.rotation = values["rotation"]
 	if control is SatinPanel and values.has("corner_radius"):
-		(control as SatinPanel)._backing.place(Rect2(Vector2.ZERO, control.size), _float(values["corner_radius"]))
+		(control as SatinPanel)._backing.place(Rect2(Vector2.ZERO, control.size), Values.float_of(values["corner_radius"]))
 
 
 static func _layer(control: CanvasItem) -> int:
@@ -582,36 +585,24 @@ static func _valid_values(values: Dictionary, fields: Dictionary) -> bool:
 		if count == -1:
 			if value is not bool: return false
 		elif count == 0:
-			if not _number(value): return false
+			if not Values.number(value): return false
 		else:
 			if value is not Array: return false
 			var components: Array = value
 			if components.size() != count: return false
 			for component: Variant in components:
-				if not _number(component): return false
+				if not Values.number(component): return false
 	return true
-
-
-static func _number(value: Variant) -> bool:
-	return (value is float or value is int) and is_finite(_float(value))
 
 
 static func _vector3(value: Variant) -> Vector3:
 	var components: Array = value
-	return Vector3(_float(components[0]), _float(components[1]), _float(components[2]))
+	return Vector3(Values.float_of(components[0]), Values.float_of(components[1]), Values.float_of(components[2]))
 
 
 static func _vector2(value: Variant) -> Vector2:
 	var components: Array = value
-	return Vector2(_float(components[0]), _float(components[1]))
-
-
-static func _float(value: Variant) -> float:
-	return value
-
-
-static func _error(reason: String) -> Dictionary:
-	return {"ok": false, "error": reason}
+	return Vector2(Values.float_of(components[0]), Values.float_of(components[1]))
 
 
 static func _values(record: Dictionary) -> Dictionary:

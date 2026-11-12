@@ -5,6 +5,76 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+**A third of the graphics memory, clean transitions, and Cartouche as your home screen.**
+
+### Lighter and faster
+
+Measured on a Snapdragon 8 Gen 2 handheld:
+
+| | 0.4.1 | Now | |
+|---|---|---|---|
+| Graphics memory, games screen | 615 MB | **206 MB** | 3× less |
+| Graphics memory, consoles screen | 433 MB | **173 MB** | 2.5× less |
+| Graphics memory after a long scroll through a big library | 1 152 MB | **380 MB** | 3× less |
+| RAM, games screen | 404 MB | **347 MB** | 57 MB freed |
+| RAM, consoles screen | 428 MB | **379 MB** | 49 MB freed |
+| Longest pause of the very first start | 1.5 s | **0.38 s** | 4× shorter |
+| Download | 110 MB | **88 MB** | 22 MB smaller |
+
+- **Hundreds of megabytes go back to your games.** What Cartouche no longer takes is left to the emulator, and
+  handhelds with little memory have room to spare.
+- **A shorter first start.** The longest pause as Cartouche opens for the first time is four times shorter.
+- **The memory stays lower as you scroll.** After a long scroll through a big library it took over 1 GB; it now
+  takes a third of that.
+- **The list of consoles in Add a console follows your thumb.** Each console's picture is ready before you
+  reach it, where it used to be drawn as you passed.
+
+### You asked for it
+
+- **Cartouche as your home screen.** Choose it as the home app in Android's settings, and the Home button brings
+  you back to your consoles.
+- **Games in a line.** A new setting on 4:3 and squarer screens: the games slide by in a straight line, as on wider
+  screens, instead of on an arc.
+- **The Super Nintendo lights up.** Its red power light comes on as the power switch is pushed.
+- **A cleaner Super Nintendo cartridge.** The raised bar above the label is gone.
+
+### Labels held back less often
+
+- One image site that is down or slow, or one game nobody knows, no longer holds back the labels of all your other
+  games. A game refused once is looked for again next time.
+- In a game's properties, every image shown can be chosen, and a download that fails says so instead of spinning
+  for ever.
+- A picture of your own kept as a label is no longer covered for a moment when Cartouche comes back to the screen.
+
+### More of your games show up
+
+- Wii channels and Virtual Console games kept as `.wad` files.
+- A GameCube or Wii game whose `.m3u` playlist sits apart from its discs.
+- A game on several discs kept with its `.m3u` playlist shows once, with all its discs.
+
+### Some fifty fixes
+
+- **Clean transitions everywhere.** Opening the settings, Add a console, Edit or the order of the consoles, and
+  going into or out of a console's games, no longer show a console or a game half see-through with its insides
+  showing, nor a white trace or flash: each screen gives way to the next whole.
+- Coming back from a game's properties no longer flashes, and the game goes back to where it floats, in its own
+  light, without a jump at the end.
+- Going into another console no longer shows, for a moment, the name of the game you were on in the console left.
+- One push of the stick is one step on the search ribbon, in the settings, in the forms and on the sounds' level.
+- Holding left or right on the D-pad is no longer stopped by a stick barely touched, and a press of left or right
+  is no longer lost after the settings close.
+- A setting, an image or a name slow to save no longer locks the screen: after two seconds B lets you go back
+  while it is still being saved.
+- A game slow to start no longer starts after you left Cartouche, and nothing downloads behind a game you play.
+- **Add a console** opens one folder picker, keeps the focus where you put it, and offers an emulator you just
+  installed at once.
+- The ring that puts the consoles in order shows its button hints again after a console is added, and no longer
+  shows a console twice.
+- A console with only two games shows them side by side: the second one no longer stays on the left, half out
+  of the screen, or jumps from one side to the other as you move.
+- The search ribbon no longer lights the wrong letters when your games are read again while it is open.
+- When your library cannot be read, Cartouche says so as it starts instead of opening empty without a word.
+
 ## [0.4.1] - 2026-11-09
 
 ### Fixed

@@ -26,13 +26,16 @@ var _close_up: ImageTexture
 
 
 func _notification(what: int) -> void:
-	# The close-up is drawn in the backdrop's colours: on a dark one, a light edge on a dark ground.
+	# The close-up is drawn in the backdrop's colours: on a dark one, a light edge on a dark ground. Made when the
+	# card is first drawn, not for a page nobody opens.
 	if what == NOTIFICATION_THEME_CHANGED:
-		_close_up = ImageTexture.create_from_image(close_up(value, Vector2i(Vector2(custom_minimum_size.x - 2.0 * _MARGIN,
-			custom_minimum_size.y / 2.0))))
+		_close_up = null
 
 
 func _draw_sample() -> void:
+	if not _close_up:
+		_close_up = ImageTexture.create_from_image(close_up(value, Vector2i(Vector2(custom_minimum_size.x - 2.0 * _MARGIN,
+			custom_minimum_size.y / 2.0))))
 	draw_texture(_close_up, Vector2(_MARGIN, _MARGIN))
 	var font := get_theme_font(&"font", &"FieldValue")
 	var width := size.x - 2.0 * _MARGIN

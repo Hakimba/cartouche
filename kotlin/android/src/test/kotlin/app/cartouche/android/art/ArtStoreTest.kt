@@ -4,7 +4,6 @@ package app.cartouche.android.art
 import app.cartouche.android.storage.StorageFailure
 import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.art.Identity
-import app.cartouche.core.art.LookAgain
 import app.cartouche.core.art.web
 import app.cartouche.core.library.GameId
 import arrow.core.Either
@@ -20,11 +19,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config
 import java.io.File
 import app.cartouche.core.art.texture as candidateTexture
 
-@Config(sdk = [30, 34])
 @RunWith(RobolectricTestRunner::class)
 class ArtStoreTest {
     private val folder = File(RuntimeEnvironment.getApplication().filesDir, "art")
@@ -72,17 +69,17 @@ class ArtStoreTest {
     @Test
     fun `INV-17 games without art are remembered for the sources they were looked for in, and an unreadable memory forgets them`() {
         val store = ArtStore(folder)
-        store.markAbsent(game, older).shouldBeRight()
-        store.markAbsent(GameId("ps2/b"), older).shouldBeRight()
+        store.markAbsent(game, older, None).shouldBeRight()
+        store.markAbsent(GameId("ps2/b"), older, None).shouldBeRight()
         ArtStore(folder).isAbsent(game, older) shouldBe true
         ArtStore(folder).isAbsent(GameId("ps2/b"), older) shouldBe true
         ArtStore(folder).isAbsent(game, newer) shouldBe false
         ArtStore(folder).isAbsent(GameId("ps2/c"), older) shouldBe false
-        store.markAbsent(GameId("ps2/c"), None).shouldBeRight()
+        store.markAbsent(GameId("ps2/c"), None, None).shouldBeRight()
         ArtStore(folder).isAbsent(GameId("ps2/c"), None) shouldBe false
         folder.setWritable(false)
         try {
-            store.markAbsent(GameId("ps2/d"), older).shouldBeLeft()
+            store.markAbsent(GameId("ps2/d"), older, None).shouldBeLeft()
         } finally {
             folder.setWritable(true)
         }
@@ -97,7 +94,7 @@ class ArtStoreTest {
         val gone = listOf(game, GameId("gba/gone"))
         val store = ArtStore(folder)
         val files = (gone + kept).map { store.save(it, image).shouldBeRight().file }
-        (gone + kept).forEach { store.markAbsent(it, older).shouldBeRight() }
+        (gone + kept).forEach { store.markAbsent(it, older, None).shouldBeRight() }
         store.keepOnly(setOf(kept, GameId("ps2/no image"))) shouldBe Either.Right(2)
         files.map { it.exists() } shouldBe listOf(false, false, true)
         listOf(store, ArtStore(folder)).forEach { again ->
@@ -138,50 +135,14 @@ class ArtStoreTest {
     }
 
     @Test
-    fun `looking labels up again forgets the games without art, replaces an image found, and removes one none is found for`() {
-        val store = ArtStore(folder)
-        val (found, missed, unfound, kept, absent) = listOf("found", "missed", "unfound", "kept", "absent").map { GameId("ps2/$it") }
-        listOf(found, missed, unfound, kept).forEach { store.save(it, image).shouldBeRight() }
-        store.markAbsent(absent, older).shouldBeRight()
-        store.lookAgain(LookAgain(setOf(found, missed, absent), setOf(unfound))).shouldBeRight()
-        listOf(found, missed, absent, unfound).forEach { store.wants(it, older) shouldBe true }
-        store.wants(kept, older) shouldBe false
-        store.stored(unfound).shouldBeNone()
-        store.stored(missed).shouldBeSome().file.readBytes() shouldBe image
-        store.saveIfAbsent(found, byteArrayOf(9), None, store.asked(found)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
-        store.markAbsent(missed, older).shouldBeRight()
-        store.stored(missed).shouldBeNone()
-        store.saveIfAbsent(kept, byteArrayOf(9), None, store.asked(kept)).shouldBeRight().file.readBytes() shouldBe image
-        listOf(found, missed, kept).forEach { store.wants(it, older) shouldBe false }
-        ArtStore(folder).isAbsent(absent, older) shouldBe false
-    }
-
-    @Test
-    fun `looking labels up again changes nothing when the games without art cannot be forgotten`() {
-        val store = ArtStore(folder)
-        val (asked, unfound, absent) = listOf("asked", "unfound", "absent").map { GameId("ps2/$it") }
-        listOf(asked, unfound).forEach { store.save(it, image).shouldBeRight() }
-        store.markAbsent(absent, older).shouldBeRight()
-        folder.setWritable(false)
-        try {
-            store.lookAgain(LookAgain(setOf(asked, absent), setOf(unfound))).shouldBeLeft()
-        } finally {
-            folder.setWritable(true)
-        }
-        store.stored(unfound).shouldBeSome()
-        store.wants(asked, older) shouldBe false
-        store.isAbsent(absent, older) shouldBe true
-        store.saveIfAbsent(asked, byteArrayOf(9), None, store.asked(asked)).shouldBeRight().file.readBytes() shouldBe image
-    }
-
-    @Test
     fun `INV-16 a label chosen or of the user's own while it is looked up again is not replaced by a scan`() {
         val store = ArtStore(folder)
         store.save(game, image).shouldBeRight()
-        store.lookAgain(LookAgain(setOf(game), emptySet())).shouldBeRight()
+        store.retry(setOf(game), store.choices()).shouldBeRight()
         store.save(game, byteArrayOf(7)).shouldBeRight()
-        store.saveIfAbsent(game, byteArrayOf(9), None, store.asked(game)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(7)
-        store.markAbsent(game, older).shouldBeRight()
+        store.saveIfAbsent(game, byteArrayOf(9), None, store.asked(game)).shouldBeRight().shouldBeSome().file.readBytes() shouldBe
+            byteArrayOf(7)
+        store.markAbsent(game, older, None).shouldBeRight()
         store.stored(game).shouldBeSome()
     }
 
@@ -204,7 +165,7 @@ class ArtStoreTest {
         store.retry(setOf(game), store.choices()).shouldBeRight()
         val again = ArtStore(folder)
         again.wants(game, older) shouldBe true
-        again.saveIfAbsent(game, byteArrayOf(9), None, again.asked(game)).shouldBeRight()
+        again.saveIfAbsent(game, byteArrayOf(9), None, again.asked(game)).shouldBeRight().shouldBeSome()
         listOf(again, ArtStore(folder)).forEach { it.wants(game, older) shouldBe false }
         store.retry(setOf(game), store.choices()).shouldBeRight()
         File(folder, "again.json").writeText("{broken")
@@ -220,16 +181,17 @@ class ArtStoreTest {
         val seen = listOf(found, kept, provisional).associateWith { store.asked(it) }
         seen.getValue(found).shouldBeSome()
         store.retry(setOf(found, kept, provisional), store.choices()).shouldBeRight()
-        store.saveIfAbsent(found, byteArrayOf(9), None, seen.getValue(found)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
+        store.saveIfAbsent(found, byteArrayOf(9), None, seen.getValue(found)).shouldBeRight().shouldBeSome().file.readBytes() shouldBe
+            byteArrayOf(9)
         store.settle(kept, seen.getValue(kept)).shouldBeRight()
         store.keepProvisional(provisional, seen.getValue(provisional)).shouldBeRight()
         listOf(found, kept, provisional).forEach { store.wants(it, older) shouldBe true }
-        store.saveIfAbsent(found, image, None, store.asked(found)).shouldBeRight()
+        store.saveIfAbsent(found, image, None, store.asked(found)).shouldBeRight().shouldBeSome()
         store.wants(found, older) shouldBe false
     }
 
     @Test
-    fun `INV-17 a texture ScreenScraper has none of is remembered for the sources' version, until a new table or a look-up anew`() {
+    fun `INV-17 an image a source has none of is remembered for the sources' version, until a new table`() {
         val store = ArtStore(folder)
         val texture = candidateTexture(58, 1, "support-texture(eu)", "Europe")
         store.isMissing(texture, older) shouldBe false
@@ -238,11 +200,9 @@ class ArtStoreTest {
         store.isMissing(texture, newer) shouldBe false
         store.isMissing(web("https://a/a.png"), older) shouldBe false
         store.markMissing(web("https://a/a.png"), older).shouldBeRight()
-        store.isMissing(web("https://a/a.png"), older) shouldBe false
+        ArtStore(folder).isMissing(web("https://a/a.png"), older) shouldBe true
         store.markMissing(texture, None).shouldBeRight()
         store.isMissing(texture, None) shouldBe false
-        store.lookAgain(LookAgain(emptySet(), emptySet())).shouldBeRight()
-        store.isMissing(texture, older) shouldBe false
         File(folder, "nomedia.json").writeText("{broken")
         ArtStore(folder).isMissing(texture, older) shouldBe false
     }
@@ -259,7 +219,8 @@ class ArtStoreTest {
         store.wants(game, older) shouldBe false
         store.provisional(game) shouldBe Some(Identity("https://lb/eu.png"))
         store.retry(setOf(game), store.choices()).shouldBeRight()
-        store.saveIfAbsent(game, byteArrayOf(9), None, store.asked(game)).shouldBeRight().file.readBytes() shouldBe byteArrayOf(9)
+        store.saveIfAbsent(game, byteArrayOf(9), None, store.asked(game)).shouldBeRight().shouldBeSome().file.readBytes() shouldBe
+            byteArrayOf(9)
         ArtStore(folder).provisional(game).shouldBeNone()
         store.retry(setOf(game), store.choices()).shouldBeRight()
         store.saveIfAbsent(game, image, Some(Identity("ss:58:1:t")), store.asked(game)).shouldBeRight()
@@ -273,6 +234,7 @@ class ArtStoreTest {
                 Some(Identity("https://lb/eu.png")),
                 store.asked(game),
             ).shouldBeRight()
+            .shouldBeSome()
             .file
             .readBytes() shouldBe
             byteArrayOf(7)
@@ -281,11 +243,23 @@ class ArtStoreTest {
         store.saveIfAbsent(game, image, Some(Identity("https://lb/eu.png")), store.asked(game)).shouldBeRight()
         store.keepOnly(emptySet()).shouldBeRight(1)
         ArtStore(folder).provisional(game).shouldBeNone()
+        store.saveIfAbsent(game, image, Some(Identity("https://lb/eu.png")), store.asked(game)).shouldBeRight().shouldBeNone()
+        store.keepOnly(setOf(game)).shouldBeRight()
         store.saveIfAbsent(game, image, Some(Identity("https://lb/eu.png")), store.asked(game)).shouldBeRight()
         store.provisional(game) shouldBe Some(Identity("https://lb/eu.png"))
-        store.lookAgain(LookAgain(setOf(game), emptySet())).shouldBeRight()
-        store.provisional(game).shouldBeNone()
         File(folder, "provisional.json").writeText("{broken")
         ArtStore(folder).provisional(game).shouldBeNone()
+    }
+
+    @Test
+    fun `a new store removes the downloads a stopped process left, and nothing else`() {
+        val store = ArtStore(folder)
+        store.save(game, image).shouldBeRight()
+        File(folder, "absent.json").writeText("{}")
+        val leftover = File(File(folder, "downloads").apply { mkdirs() }, "image123.part").apply { writeBytes(image) }
+        val again = ArtStore(folder)
+        leftover.exists() shouldBe false
+        again.stored(game).shouldBeSome().file.readBytes() shouldBe image
+        File(folder, "absent.json").readText() shouldBe "{}"
     }
 }

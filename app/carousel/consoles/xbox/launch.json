@@ -30,9 +30,6 @@
     "y": 0,
     "z": 0
    },
-   "consoles": {
-    "show": 1
-   },
    "look": {
     "blur": 0,
     "opacity": 1,
@@ -89,9 +86,6 @@
     "y": 0,
     "z": 0
    },
-   "consoles": {
-    "show": 0
-   },
    "look": {
     "blur": 0,
     "opacity": 1,
@@ -147,9 +141,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,
@@ -207,9 +198,6 @@
     "y": 0,
     "z": 0
    },
-   "consoles": {
-    "show": 0
-   },
    "look": {
     "blur": 8.848,
     "opacity": 0.5,
@@ -265,9 +253,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,
@@ -325,9 +310,6 @@
     "y": 0,
     "z": 0
    },
-   "consoles": {
-    "show": 0
-   },
    "look": {
     "blur": 0,
     "opacity": 1,
@@ -383,9 +365,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,
@@ -443,9 +422,6 @@
     "y": 0,
     "z": 0
    },
-   "consoles": {
-    "show": 0
-   },
    "look": {
     "blur": 0,
     "opacity": 1,
@@ -501,9 +477,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,

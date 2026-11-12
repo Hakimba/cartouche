@@ -106,8 +106,7 @@ class Frame:
 	## The frame in [param gel]: the border, its glow inside it, and its glow outside.
 	func tint(gel: Color) -> void:
 		for i in _colors.size():
-			var color := _shown.shadows[i].shown(gel)
-			_colors[i] = Vector4(color.r, color.g, color.b, color.a)
+			_colors[i] = StudioMaterial.rgba(_shown.shadows[i].shown(gel))
 		_material.set_shader_parameter(&"shadow_colors", _colors)
 
 	func _draw() -> void:
@@ -210,7 +209,8 @@ func show_consoles(folders: Array[String], selected: int) -> void:
 func go_to(target: int) -> void:
 	if _folders.is_empty():
 		return
-	Diagnostics.trace("carousel", "rail target=%d" % target)
+	if Diagnostics.enabled:
+		Diagnostics.trace("carousel", "rail target=%d" % target)
 	_spring.target = float(posmod(target, _folders.size()) if is_strip(_folders.size(), _reach) else target)
 	_place()
 	set_process(true)

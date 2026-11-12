@@ -46,9 +46,6 @@ public enum class Shell {
     UNKNOWN,
     ;
 
-    /** How a stored file and a trace write it, as the serial name does. */
-    public val key: String get() = name.lowercase()
-
     public companion object {
         public fun of(flag: Int): Shell = when (flag) {
             0xC0 -> EXCLUSIVE

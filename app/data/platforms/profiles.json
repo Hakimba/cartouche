@@ -7,7 +7,7 @@
     "art": {"kind": "disc"},
     "scansBySerial": {"url": "https://psxdatacenter.com/psx2/images2/covers/{serial}/{serial}-D-ALL.jpg", "serial": "[A-Z]{4}-\\d{5}"}
   },
-  "gc": {"media": "minidisc", "medium": {"default": "gc_mini_dvd"}, "minimumGameBytes": 16000000, "screenScraperSystem": 13, "art": {"kind": "disc"}, "players": {"gc.org.dolphinemu.dolphinemu": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}, "gc.org.dolphinemu.dolphinemu.debug": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}}},
+  "gc": {"media": "minidisc", "medium": {"default": "gc_mini_dvd"}, "minimumGameBytes": 16000000, "minimumBytesByExtension": {"m3u": 0}, "screenScraperSystem": 13, "art": {"kind": "disc"}, "players": {"gc.org.dolphinemu.dolphinemu": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}, "gc.org.dolphinemu.dolphinemu.debug": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}}},
   "gba": {
     "media": "cartridge",
     "medium": {"default": "gba_cart"},
@@ -78,12 +78,12 @@
   "genesis": {"media": "cartridge", "medium": {"default": "genesis_cart"}, "minimumGameBytes": 65536, "screenScraperSystem": 1, "art": {"kind": "cartridge_front", "fronts": {"genesis_cart": {"proportion": 1.25, "label": {"left": 0.134, "top": 0.028, "width": 0.732, "height": 0.773}}}}},
   "master": {"media": "cartridge", "medium": {"default": "master_cart"}, "minimumGameBytes": 8192, "screenScraperSystem": 2, "art": {"kind": "cartridge_front", "fronts": {"master_cart": {"proportion": 1.565, "label": {"left": 0.028, "top": 0.304, "width": 0.944, "height": 0.638}}}}},
   "gamegear": {"media": "cartridge", "medium": {"default": "gamegear_cart"}, "minimumGameBytes": 8192},
-  "tg16": {"media": "cartridge", "medium": {"default": "tg16_card"}, "minimumGameBytes": 8192},
+  "tg16": {"media": "cartridge", "medium": {"default": "tg16_card"}, "minimumGameBytes": 8192, "minimumBytesByExtension": {"cue": 0, "ccd": 0, "toc": 0}},
   "atari2600": {"media": "cartridge", "medium": {"default": "atari2600_cart"}, "minimumGameBytes": 1024},
   "psx": {"media": "dvd", "medium": {"default": "ps1_cd"}, "minimumGameBytes": 0, "screenScraperSystem": 57, "art": {"kind": "disc"}, "players": {"psx.com.emulator.fpse": {"extensions": ["bin", "cue", "ecm", "exe", "img", "iso", "m3u", "mds", "pbp", "psexe", "psf"]}, "psx.com.emulator.fpse64": {"extensions": ["bin", "cue", "ecm", "exe", "img", "iso", "m3u", "mds", "pbp", "psexe", "psf"]}}},
   "psp": {"media": "dvd", "medium": {"default": "psp_umd"}, "minimumGameBytes": 1048576, "screenScraperSystem": 61},
   "psvita": {"media": "cartridge", "medium": {"default": "psvita_card"}, "minimumGameBytes": 1, "screenScraperSystem": 62},
-  "wii": {"media": "dvd", "medium": {"default": "wii_dvd"}, "minimumGameBytes": 16000000, "screenScraperSystem": 16, "art": {"kind": "disc"}, "players": {"wii.org.dolphinemu.dolphinemu": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "json", "wia"]}, "wii.org.dolphinemu.dolphinemu.debug": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}}},
+  "wii": {"media": "dvd", "medium": {"default": "wii_dvd"}, "minimumGameBytes": 16000000, "minimumBytesByExtension": {"wad": 65536, "m3u": 0}, "screenScraperSystem": 16, "art": {"kind": "disc"}, "players": {"wii.org.dolphinemu.dolphinemu": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "json", "wia"]}, "wii.org.dolphinemu.dolphinemu.debug": {"extensions": ["ciso", "dff", "dol", "elf", "gcm", "gcz", "iso", "tgc", "wad", "wbfs", "rvz", "m3u", "wia"]}}},
   "saturn": {"media": "dvd", "medium": {"default": "saturn_cd"}, "minimumGameBytes": 0},
   "dreamcast": {"media": "dvd", "medium": {"default": "dreamcast_gd"}, "minimumGameBytes": 0, "screenScraperSystem": 23},
   "segacd": {"media": "dvd", "medium": {"default": "segacd_cd"}, "minimumGameBytes": 0},

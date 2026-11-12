@@ -14,13 +14,13 @@ var _motion: Tween
 ## True once landed; false when the row leaves before the flight ends.
 func play(row: ConsoleRow) -> bool:
 	var target := row.silhouette(row.selected_index()).get_center() * CarouselLayout.FRAME - Vector2(0.0, ConsoleRow.RAISE_PX)
-	var stand := row.begin_arrival(Placing.PLINTH, Placing.PLINTH_WIDTH / 100.0)
+	var stand := row.begin_arrival(Placing.PLINTH, Placing.PLINTH_WIDTH / ConsoleRow.PICTURE_CQW)
 	_playing = true
 	row.tree_exiting.connect(_stop, CONNECT_ONE_SHOT)
 	_motion = create_tween().bind_node(row)
 	_motion.tween_method(func(progress: float) -> void:
 		stand.centre = Placing.flight(Placing.PLINTH, target, progress, StudioTokens.TR_PLACE_ARC_PX)
-		stand.size = lerpf(Placing.PLINTH_WIDTH / 100.0, 1.0, Motion.eased(Motion.Easing.GLIDE, progress))
+		stand.size = lerpf(Placing.PLINTH_WIDTH / ConsoleRow.PICTURE_CQW, 1.0, Motion.eased(Motion.Easing.GLIDE, progress))
 		row.arrange(), 0.0, 1.0, DURATION_S)
 	_motion.finished.connect(_over.emit, CONNECT_ONE_SHOT)
 	await _over

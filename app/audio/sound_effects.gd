@@ -72,6 +72,8 @@ const _DIRECTIONS: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_r
 
 ## The file of the sound of each cue, by cue name, read once.
 static var _files: Dictionary = {}
+## Each cue's name in lower case, by cue.
+static var _names := _lowered()
 
 ## How loud the sounds play, from 0 (silenced) to [constant LEVELS], on an even scale to the ear.
 var level := LEVELS:
@@ -91,9 +93,11 @@ var _glide: Tween
 
 func _ready() -> void:
 	for cue: Cue in Cue.values():
+		# A cue kept silent has no player.
+		if not path_of(cue):
+			continue
 		var player := AudioStreamPlayer.new()
-		if path_of(cue):
-			player.stream = load(path_of(cue))
+		player.stream = load(path_of(cue))
 		player.bus = BUS
 		add_child(player)
 		_players[cue] = player
@@ -101,22 +105,27 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if _DIRECTIONS.any(func(action: StringName) -> bool: return event.is_action_pressed(action, true)):
-		_directed_frame = Engine.get_process_frames()
+	# Pointer events arrive at the device's rate and no direction is bound to them.
+	if event is InputEventMouse or event is InputEventScreenDrag or event is InputEventScreenTouch:
+		return
+	for action in _DIRECTIONS:
+		if event.is_action_pressed(action, true):
+			_directed_frame = Engine.get_process_frames()
+			return
 
 
 ## The file of the sound [param cue] plays; empty for a cue kept silent.
 static func path_of(cue: Cue) -> String:
 	if _files.is_empty():
 		_files = JSON.parse_string(FileAccess.get_file_as_string(CUES))
-	return str(_files[str(Cue.keys()[cue]).to_lower()])
+	return str(_files[_names[cue]])
 
 
 ## Plays [param cue], unless it is silent, or one of the [constant REPEATED] played less than
 ## [constant REPEAT_GAP_S] ago.
 func play(cue: Cue) -> void:
-	var player := _players[cue]
-	if not player.stream:
+	var player: AudioStreamPlayer = _players.get(cue)
+	if not player:
 		return
 	var pitch := 1.0
 	if cue in REPEATED:
@@ -127,15 +136,15 @@ func play(cue: Cue) -> void:
 		pitch = random.randf_range(1.0 - PITCH_SPREAD, 1.0 + PITCH_SPREAD)
 	player.pitch_scale = pitch
 	player.play()
-	Diagnostics.trace("sound", str(Cue.keys()[cue]).to_lower())
+	Diagnostics.trace("sound", _names[cue])
 
 
 ## Plays [param cue] for a search going from [param before] games found to [param found], of [param total]: its
 ## note glides from the height of [param before] to that of [param found] (see [method narrowing_pitch]), the
 ## longer the farther apart.
 func play_narrowing(cue: Cue, before: int, found: int, total: int) -> void:
-	var player := _players[cue]
-	if not player.stream:
+	var player: AudioStreamPlayer = _players.get(cue)
+	if not player:
 		return
 	var from := narrowing_pitch(before, total)
 	var to := narrowing_pitch(found, total)
@@ -145,7 +154,7 @@ func play_narrowing(cue: Cue, before: int, found: int, total: int) -> void:
 	player.play()
 	_glide = create_tween()
 	_glide.tween_property(player, ^"pitch_scale", to, glide_s(from, to))
-	Diagnostics.trace("sound", "%s %.2f → %.2f" % [str(Cue.keys()[cue]).to_lower(), from, to])
+	Diagnostics.trace("sound", "%s %.2f → %.2f" % [_names[cue], from, to])
 
 
 ## How long a key glides from pitch [param from] to [param to].
@@ -158,6 +167,13 @@ static func glide_s(from: float, to: float) -> float:
 static func narrowing_pitch(found: int, total: int) -> float:
 	var share := 1.0 if found <= 1 or total < 2 else log(float(total) / found) / log(float(total))
 	return pow(2.0, NARROWING_SEMITONES * share / 12.0)
+
+
+static func _lowered() -> PackedStringArray:
+	var names := PackedStringArray()
+	for key: String in Cue.keys():
+		names.append(key.to_lower())
+	return names
 
 
 func _on_focus_changed(focused: Control) -> void:

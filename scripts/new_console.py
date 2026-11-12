@@ -248,11 +248,11 @@ ConsoleVariant {name.upper()}: {variant}; README credit added{f'; listed among t
 
 To measure and fill:
 - {name}_shape.tres: seat_centre (mm, the model's axes) and seat_degrees, where the medium stands once in.
+  housings: the parts the medium lies in (their node names), drawn solid; the medium may not pass through the others.
 - {name}.tscn: way_in (the way the medium comes down) and pose_degrees (none: its way in towards the camera; (15, 0, 0) standing; (25, 20, 0) three quarters){' (from ' + base + ')' if base else ''};
   moving parts, once the launch is designed (docs/adding-a-console.md, "Moving parts").
 - console.tres: ring_size, the console's size on the ordering ring (zero weighs it as the PS2).
 - README.md: the console in the table of consoles.
-- app/test/carousel/consoles/console_folders_test.gd: HOUSINGS (the parts the medium lies in).
 - Logos{' missing: ' + ', '.join(f'app/studio/logos/{slot}/{name}.png' for slot in logos) if logos else ': found'}.
 - Colour (gel): {'found' if gel else 'none yet; the maintainers add it (the console shows the neutral one)'}.
 Then: git add the new files, import (godot --headless --path app --import) and run

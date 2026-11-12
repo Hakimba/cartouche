@@ -23,7 +23,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-PLAYED = ("dur", "ease", "hold", "parts", "disc", "row", "consoles", "look", "ui", "fx")
+PLAYED = ("dur", "ease", "hold", "parts", "disc", "row", "look", "ui", "fx")
 SCREEN_WIDTH = 1280
 DEV = Path(__file__).resolve().parent
 CONSOLES = DEV.parent / "app" / "carousel" / "consoles"

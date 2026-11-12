@@ -29,7 +29,6 @@ import app.cartouche.core.library.ListedFile
 import app.cartouche.core.library.PlacementError
 import app.cartouche.core.library.PlatformSetup
 import app.cartouche.core.library.Scan
-import app.cartouche.core.library.StoredLibrary
 import app.cartouche.core.library.TitleIndex
 import app.cartouche.core.library.VariantError
 import app.cartouche.core.library.WalkFailure
@@ -130,10 +129,10 @@ internal class LibraryService(
     /** Given new [finders] to make, as soon as possible but not on the caller's thread. */
     private val prepare: (Finders) -> Unit = {},
 ) {
-    private var loaded: Option<Library> = None
+    private var held: Held = Held.Unread
         set(kept) {
             field = kept
-            val next = kept.fold({ Finders.NONE }, finders::after)
+            val next = if (kept is Held.Kept) finders.after(kept.library) else Finders.NONE
             if (next !== finders) prepare(next)
             finders = next
         }
@@ -156,32 +155,34 @@ internal class LibraryService(
         }
 
     /** One more at each write of the library: an answer telling it shows whether a library sent before is the latest. */
-    var revision: Int = 0
-        private set
+    val revision: Int get() = held.revision
 
     /** Why the stored library could not be read, if it could not; the library then started empty. */
-    var loadProblem: Option<String> = None
-        private set
+    val loadProblem: Option<String> get() = held.let { if (it is Held.Unreadable) Some(it.problem) else None }
 
-    /** Saving is refused when an unreadable library file could not be set aside: it would be lost. */
-    private var writable = true
+    /** The library, read from its file on first use. */
+    fun library(): Library = when (val now = held) {
+        Held.Unread -> read()
+        is Held.Kept -> now.library
+    }
 
-    /** The library, read from its file on first use; a file of an earlier format is saved again, upgraded. */
-    fun library(): Library = loaded.getOrElse {
+    /** A file of an earlier format is saved again, upgraded. */
+    private fun read(): Library {
         val started = TimeSource.Monotonic.markNow()
-        store
-            .load()
-            .onRight { stored ->
-                trace("library") { "loaded ${stored.library.games.size} games in ${started.elapsedNow().inWholeMilliseconds} ms" }
-                if (stored.isOutdated) save(stored.library).onLeft { trace("library") { "upgraded library not saved: ${it.message}" } }
-            }.map(StoredLibrary::library)
-            .getOrElse { problem ->
+        return store.load().fold(
+            { problem ->
                 val setAside = store.setAside()
                 trace("library") { "${problem.message}; set aside: $setAside" }
-                loadProblem = Some(problem.message + if (setAside) "" else "; it could not be set aside, so nothing is saved")
-                writable = setAside
-                Library()
-            }.also { loaded = Some(it) }
+                val why = problem.message + if (setAside) "" else "; it could not be set aside, so nothing is saved"
+                Library().also { held = Held.Unreadable(it, 0, why, setAside) }
+            },
+            { stored ->
+                trace("library") { "loaded ${stored.library.games.size} games in ${started.elapsedNow().inWholeMilliseconds} ms" }
+                held = Held.Read(stored.library, 0)
+                if (stored.isOutdated) save(stored.library).onLeft { trace("library") { "upgraded library not saved: ${it.message}" } }
+                stored.library
+            },
+        )
     }
 
     /** The selection, read from its file on first use. */
@@ -254,7 +255,7 @@ internal class LibraryService(
     fun gamesWithArt(): Option<Set<GameId>> {
         // Read first: whether it could be is known once it is.
         val games = library().games
-        return if (loadProblem.isSome()) None else Some(games.mapTo(HashSet()) { it.id })
+        return if (held is Held.Unreadable) None else Some(games.mapTo(HashSet()) { it.id })
     }
 
     private fun remember(selection: Selection): Either<LibraryFailure, Selection> = either {
@@ -268,7 +269,7 @@ internal class LibraryService(
 
     /** Not while the library could not be read: the folders of the one set aside are not known. */
     private fun keepFoldersOf(library: Library) {
-        if (loadProblem.isSome()) return
+        if (held is Held.Unreadable) return
         folders
             .keepOnly(library.setups.values.flatMapTo(HashSet()) { it.folder.toList() })
             .onRight { released -> if (released > 0) trace("library") { "access to $released folders given up" } }
@@ -413,9 +414,6 @@ internal class LibraryService(
     private fun read(platform: PlatformId, file: ListedFile): Option<FileFacts> =
         folders.facts(platform, file).onLeft { trace("files") { "${file.name.value} not read: ${it.message}" } }.getOrNone()
 
-    /** Forgets what the game files told: every one is read again at its platform's next scan. */
-    fun forgetFacts(): Either<StorageFailure, Unit> = facts.forget()
-
     /**
      * What launching game [id] takes: [disc] (an index) if given, else the disc launched last, and its platform's
      * choices.
@@ -458,11 +456,44 @@ internal class LibraryService(
     }
 
     private fun save(library: Library): Either<LibraryFailure, Library> = either {
-        ensure(writable) { LibraryFailure.Storage(StorageFailure.Unavailable("the unreadable library file could not be set aside")) }
+        val now = held
+        ensure(now !is Held.Unreadable || now.setAside) {
+            LibraryFailure.Storage(StorageFailure.Unavailable("the unreadable library file could not be set aside"))
+        }
         val started = TimeSource.Monotonic.markNow()
         store.save(library).mapLeft(LibraryFailure::Storage).bind()
-        revision += 1
+        val revision = now.revision + 1
+        held = if (now is Held.Unreadable) now.copy(library = library, revision = revision) else Held.Read(library, revision)
         trace("library") { "saved ${library.games.size} games in ${started.elapsedNow().inWholeMilliseconds} ms" }
-        library.also { loaded = Some(it) }
+        library
     }
+}
+
+/** What the service holds of the library: nothing before its first use, then the library and how many writes it saw. */
+private sealed interface Held {
+    val revision: Int
+
+    data object Unread : Held {
+        override val revision: Int = 0
+    }
+
+    sealed interface Kept : Held {
+        val library: Library
+    }
+
+    data class Read(override val library: Library, override val revision: Int) : Kept
+
+    /** The stored file could not be read: the library started empty. Unless [setAside], nothing is ever saved: the file would be lost. */
+    data class Unreadable(override val library: Library, override val revision: Int, val problem: String, val setAside: Boolean) : Kept
+}
+
+/** Which library the app shows: the user's, or a made-up one (debug builds) whose art is never looked for. */
+internal sealed interface Shown {
+    val service: LibraryService
+
+    class Users(service: Lazy<LibraryService>) : Shown {
+        override val service by service
+    }
+
+    class Demo(override val service: LibraryService) : Shown
 }

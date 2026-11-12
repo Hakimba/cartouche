@@ -3,7 +3,7 @@ class_name ChoiceCard
 extends Control
 ## One choice of a [ChoiceScreen]: a white card showing it ([method _draw_sample]). Focusable; the focus is a ring.
 
-## Confirmed while focused: this choice is chosen.
+## Confirmed while focused, or tapped: this choice is chosen.
 signal chosen(value: StringName)
 
 @export var value := &""
@@ -19,7 +19,8 @@ func _ready() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"ui_accept"):
+	var click := event as InputEventMouseButton
+	if event.is_action_pressed(&"ui_accept") or (click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT):
 		accept_event()
 		chosen.emit(value)
 

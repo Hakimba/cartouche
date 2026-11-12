@@ -105,7 +105,7 @@ func _ready() -> void:
 			await _carousel.screen_changed
 	var msaa := Diagnostics.argument("msaa")
 	if msaa:
-		get_viewport().msaa_3d = msaa.to_int() as Viewport.MSAA
+		EdgeSmoothingScreen.smooth(get_viewport(), msaa.to_int() as Viewport.MSAA)
 	_row.selection_changed.connect(func(_game: AndroidServices.Game) -> void: _steps += 1)
 	if _scenario in _HELD:
 		act(_HELD[_scenario], true)
@@ -375,7 +375,7 @@ func _open_ring() -> bool:
 
 ## Whether the ring shows and takes presses: open, neither coming nor moving a console.
 func _ring_still() -> bool:
-	return _carousel.screen() == Carousel.Screen.ORDER and _carousel._order.is_open() and not _carousel._order._busy
+	return _carousel.screen() == Carousel.Screen.ORDER and _carousel._order.is_open() and not _carousel._order.is_busy()
 
 
 ## Frames until [param condition] holds, ten seconds at most: whether it did.
@@ -438,7 +438,7 @@ static func media_row(count: int, medium: String, camera: Camera3D, front: Node)
 		var view := MediaView.new()
 		view.camera = camera
 		front.add_child(view)
-		var labelled := ShelfRow.LabelledModel.new(load(manifest.scene) as PackedScene)
+		var labelled := LabelledModel.new(load(manifest.scene) as PackedScene)
 		var look := ShelfRow.LabelLook.new()
 		look.demo_art = true
 		labelled.draw_label(_MEDIA_TITLES[j % _MEDIA_TITLES.size()], look)

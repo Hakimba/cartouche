@@ -8,29 +8,6 @@ enum Shape { DISC, RECTANGLE }
 const OUTSET := 10.0
 const CORNER := 20.48
 const _GLOW_REACH := 32.0
-const _SHADER := """
-shader_type canvas_item;
-uniform vec2 box_size;
-uniform float radius;
-uniform vec4 gel : source_color;
-varying vec2 point;
-void vertex() { point = VERTEX - vec2(32.0); }
-float erf_value(float x) {
-	float a = abs(x);
-	float t = 1.0 + (0.278393 + (0.230389 + 0.078108 * a * a) * a) * a;
-	return sign(x) * (1.0 - 1.0 / (t * t * t * t));
-}
-void fragment() {
-	vec2 q = abs(point - box_size * 0.5) - box_size * 0.5 + radius;
-	float d = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - radius;
-	float aa = max(fwidth(d), 0.001);
-	float rim = (1.0 - smoothstep(-aa, aa, d)) * smoothstep(-5.12 - aa, -5.12 + aa, d);
-	float outside = 0.45 * (0.5 - 0.5 * erf_value(d / (8.96 * sqrt(2.0))));
-	float inside = 0.25 * (0.5 + 0.5 * erf_value((d + 5.12) / (5.12 * sqrt(2.0))));
-	float glow = d > 0.0 ? outside : inside;
-	COLOR = vec4(gel.rgb, rim + glow * (1.0 - rim)) * COLOR;
-}
-"""
 
 var shape := Shape.DISC
 var gel := StudioTokens.NEUTRAL
@@ -44,9 +21,7 @@ var _target_box := Rect2()
 
 func _ready() -> void:
 	focus_mode = FOCUS_ALL
-	var shader := Shader.new()
-	shader.code = _SHADER
-	_material.shader = shader
+	_material.shader = preload("res://carousel/properties/label_zone.gdshader")
 	_outline.material = _material
 	_outline.mouse_filter = MOUSE_FILTER_IGNORE
 	_outline.modulate.a = 0.0
@@ -72,18 +47,16 @@ func place(label: Rect2, kind: Shape, tint: Color) -> void:
 	var same_target := _target_box == box and shape == kind
 	gel = tint
 	_material.set_shader_parameter(&"gel", Backdrop.palette.gel(gel))
-	if same_target and _morph:
+	if same_target and _morph and _morph.is_running():
 		return
 	_target_box = box
 	shape = kind
-	if _morph:
-		_morph.kill()
-		_morph = null
 	if morph:
-		_morph = create_tween()
+		_morph = Motion.restart(self, _morph)
 		_morph.tween_method(_morph_box.bind(get_rect(), box, corner_radius, radius), 0.0, 1.0, 0.32)
-		_morph.finished.connect(func() -> void: _morph = null)
 	else:
+		if _morph:
+			_morph.kill()
 		_paint(box, radius)
 
 

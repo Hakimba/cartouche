@@ -1,0 +1,21 @@
+Renderer: the blend-splits bits of a pipeline are set only for directional lights that have a shadow
+
+The field they are read from is written only for such a light; for the others it held whatever the memory did,
+so the same scene asked for different specialized pipelines from one run to the next. The shader reads the bit
+only for a light that has a shadow. Against godotengine/godot 4.7.2-stable (ed1daf0).
+
+diff --git a/servers/rendering/renderer_rd/storage_rd/light_storage.h b/servers/rendering/renderer_rd/storage_rd/light_storage.h
+index 71043e4..5998327 100644
+--- a/servers/rendering/renderer_rd/storage_rd/light_storage.h
++++ b/servers/rendering/renderer_rd/storage_rd/light_storage.h
+@@ -837,7 +837,9 @@ public:
+ 	uint32_t get_directional_light_blend_splits(uint32_t p_directional_light_count) const {
+ 		uint32_t blend_splits = 0;
+ 		for (uint32_t i = 0; i < p_directional_light_count; i++) {
+-			if (directional_lights[i].blend_splits) {
++			// Written only for a light that has a shadow, and read by the shader only then: left out otherwise, the
++			// bit is whatever the memory held, and pipelines differ from one run to the next for no visible reason.
++			if (directional_lights[i].shadow_opacity > 0.001 && directional_lights[i].blend_splits) {
+ 				blend_splits |= 1U << i;
+ 			}
+ 		}

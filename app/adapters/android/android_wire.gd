@@ -21,12 +21,37 @@ static func _ints(item: Dictionary, key: String) -> PackedInt32Array:
 
 ## An operation's answer: [member ok], or the [member code] of its failure.
 class Result:
+	const CANCELLED := &"cancelled"
+	const NO_ACTIVITY := &"no_activity"
+	const INVALID_REQUEST := &"invalid_request"
+	const UNKNOWN_PLAYER := &"unknown_player"
+	const UNSUPPORTED_FILE := &"unsupported_file"
+	const INVALID_TEMPLATE := &"invalid_template"
+	const NOT_INSTALLED := &"not_installed"
+	const NO_PLAYER := &"no_player"
+	const GAME_MISSING := &"game_missing"
+	const TOO_LATE := &"too_late"
+	const UNKNOWN_PLATFORM := &"unknown_platform"
+	const UNKNOWN_VARIANT := &"unknown_variant"
+	const COMING_CONSOLE := &"coming_console"
+	const NOT_IN_LIBRARY := &"not_in_library"
+	const GAP_OUT_OF_RANGE := &"gap_out_of_range"
+	const UNKNOWN_GAME := &"unknown_game"
+	const NO_FOLDER := &"no_folder"
+	const ACTIVITY_NOT_FOUND := &"activity_not_found"
+	const PERMISSION_DENIED := &"permission_denied"
+	const FOLDER_UNAVAILABLE := &"folder_unavailable"
+	const TOO_MANY_FILES := &"too_many_files"
+	const NO_IMAGE := &"no_image"
+	const UNREADABLE_IMAGE := &"unreadable_image"
+	const UNEXPECTED := &"unexpected"
+	## Without the plugin.
+	const UNAVAILABLE := &"unavailable"
+	## A launch rehearsed.
+	const REHEARSED := &"rehearsed"
+
 	var ok: bool
-	## One of `cancelled`, `no_activity`, `invalid_request`, `unknown_player`, `unsupported_file`, `invalid_template`,
-	## `not_installed`, `no_player`, `game_missing`, `too_late`, `unknown_platform`, `unknown_variant`,
-	## `coming_console`, `not_in_library`, `gap_out_of_range`, `unknown_game`, `no_folder`, `activity_not_found`,
-	## `permission_denied`, `folder_unavailable`, `too_many_files`, `no_image`, `unreadable_image`, `unexpected`;
-	## `unavailable` without the plugin, `rehearsed` for a launch rehearsed.
+	## One of the constants above.
 	var code: StringName
 	## English, for logs.
 	var detail: String
@@ -309,9 +334,6 @@ class Library:
 	var revision: int
 	var setups: Dictionary[String, PlatformSetup] = {}
 	var games: Array[Game] = []
-	var not_games: Dictionary[String, PackedStringArray] = {}
-	var ignored_counts: Dictionary[String, Array] = {}
-	var skipped_folders: Dictionary[String, Array] = {}
 	var console_variants: Dictionary[String, String] = {}
 	var shelves: Array[Shelf] = []
 	var selected_shelf: int
@@ -333,22 +355,6 @@ class Library:
 	func games_of(platform_id: String) -> Array[Game]:
 		return games.filter(func(game: Game) -> bool: return game.platform_id == platform_id)
 
-	## Files a player opens that were not taken for games (a BIOS, too small).
-	func not_games_of(platform_id: String) -> PackedStringArray:
-		return not_games.get(platform_id, PackedStringArray())
-
-	func ignored_counts_of(platform_id: String) -> Array[IgnoredCount]:
-		var listed: Array = ignored_counts.get(platform_id, [])
-		var counts: Array[IgnoredCount] = []
-		counts.assign(listed)
-		return counts
-
-	func skipped_folders_of(platform_id: String) -> Array[SkippedFolder]:
-		var listed: Array = skipped_folders.get(platform_id, [])
-		var folders: Array[SkippedFolder] = []
-		folders.assign(listed)
-		return folders
-
 	## Each shelf's games, from its indexes into [member games].
 	func _finish(_item: Dictionary) -> void:
 		for shelf in shelves:
@@ -363,21 +369,6 @@ class Library:
 			setups[key] = PlatformSetup.new(value)
 		for each: Dictionary in item.get("games", []):
 			games.append(Game.new(each))
-		var raw_not_games: Dictionary = item.get("not_games", {})
-		for key: String in raw_not_games:
-			not_games[key] = AndroidWire._strings(raw_not_games, key)
-		var raw_ignored_counts: Dictionary = item.get("ignored_counts", {})
-		for key: String in raw_ignored_counts:
-			var list: Array[IgnoredCount] = []
-			for each: Dictionary in raw_ignored_counts[key]:
-				list.append(IgnoredCount.new(each))
-			ignored_counts[key] = list
-		var raw_skipped_folders: Dictionary = item.get("skipped_folders", {})
-		for key: String in raw_skipped_folders:
-			var list: Array[SkippedFolder] = []
-			for each: Dictionary in raw_skipped_folders[key]:
-				list.append(SkippedFolder.new(each))
-			skipped_folders[key] = list
 		var raw_console_variants: Dictionary = item.get("console_variants", {})
 		for key: String in raw_console_variants:
 			var value: String = raw_console_variants[key]
@@ -430,15 +421,7 @@ class Game:
 	var regions: PackedStringArray
 	var has_medium: bool
 	var medium: String
-	var languages: PackedStringArray
-	var serials: PackedStringArray
-	var discs: Array[Disc] = []
 	var last_disc: int
-	var identified: bool
-	var has_version: bool
-	var version: String
-	var has_redump_name: bool
-	var redump_name: String
 	var has_label_region: bool
 	var label_region: String
 	var has_label_source: bool
@@ -459,52 +442,12 @@ class Game:
 		regions = AndroidWire._strings(item, "regions")
 		has_medium = item.has("medium")
 		medium = item.get("medium", "")
-		languages = AndroidWire._strings(item, "languages")
-		serials = AndroidWire._strings(item, "serials")
-		for each: Dictionary in item.get("discs", []):
-			discs.append(Disc.new(each))
 		last_disc = item.get("last_disc", 0)
-		identified = item.get("identified", false)
-		has_version = item.has("version")
-		version = item.get("version", "")
-		has_redump_name = item.has("redump_name")
-		redump_name = item.get("redump_name", "")
 		has_label_region = item.has("label_region")
 		label_region = item.get("label_region", "")
 		has_label_source = item.has("label_source")
 		label_source = item.get("label_source", &"")
 		label_own = item.get("label_own", false)
-
-
-class Disc:
-	var name: String
-	var has_number: bool
-	var number: int
-
-	func _init(item: Dictionary = {}) -> void:
-		name = item.get("name", "")
-		has_number = item.has("number")
-		number = item.get("number", 0)
-
-
-class IgnoredCount:
-	var reason: StringName
-	var count: int
-	var examples: PackedStringArray
-
-	func _init(item: Dictionary = {}) -> void:
-		reason = item.get("reason", &"")
-		count = item.get("count", 0)
-		examples = AndroidWire._strings(item, "examples")
-
-
-class SkippedFolder:
-	var path: String
-	var reason: StringName
-
-	func _init(item: Dictionary = {}) -> void:
-		path = item.get("path", "")
-		reason = item.get("reason", &"")
 
 
 class Shelf:
@@ -572,19 +515,11 @@ class ScanAnswer extends Result:
 
 
 class ScanReport:
-	var files: int
 	var games: int
-	var identified: int
-	var ignored: int
-	var skipped_folders: int
 	var milliseconds: int
 
 	func _init(item: Dictionary = {}) -> void:
-		files = item.get("files", 0)
 		games = item.get("games", 0)
-		identified = item.get("identified", 0)
-		ignored = item.get("ignored", 0)
-		skipped_folders = item.get("skipped_folders", 0)
 		milliseconds = item.get("milliseconds", 0)
 
 
@@ -595,21 +530,6 @@ class PreviewAnswer extends Result:
 		super(item)
 		var raw_report: Dictionary = item.get("report", {})
 		report = ScanReport.new(raw_report)
-
-
-class RescrapeAnswer extends Result:
-	var library: Library
-	var games: int
-	var labels: int
-	var failures: PackedStringArray
-
-	func _init(item: Dictionary = {}) -> void:
-		super(item)
-		var raw_library: Dictionary = item.get("library", {})
-		library = Library.new(raw_library)
-		games = item.get("games", 0)
-		labels = item.get("labels", 0)
-		failures = AndroidWire._strings(item, "failures")
 
 
 class SettingsAnswer extends Result:
@@ -625,6 +545,7 @@ class SettingsAnswer extends Result:
 	var language: StringName
 	var backdrop: StringName
 	var pixel_veil: bool
+	var games_in_line: bool
 	var button_styles: PackedStringArray
 	var edge_smoothings: PackedStringArray
 	var preferred_regions: PackedStringArray
@@ -645,6 +566,7 @@ class SettingsAnswer extends Result:
 		language = item.get("language", &"")
 		backdrop = item.get("backdrop", &"light")
 		pixel_veil = item.get("pixel_veil", true)
+		games_in_line = item.get("games_in_line", false)
 		button_styles = AndroidWire._strings(item, "button_styles")
 		edge_smoothings = AndroidWire._strings(item, "edge_smoothings")
 		preferred_regions = AndroidWire._strings(item, "preferred_regions")

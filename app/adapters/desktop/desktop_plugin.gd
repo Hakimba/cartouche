@@ -12,6 +12,9 @@ extends RefCounted
 const DEMO := "res://dev/demo/desktop.json"
 const _VARIANTS := "user://console-variants.json"
 
+## The desktop demo as read once; empty until then, or without the file.
+static var _demo := {}
+
 var _snapshot := {}
 ## The settings as the plugin sends them, a fresh install's ([method settings_of] the demo's) until changed.
 var _settings := {"ok": true}.merged(settings_of(demo("settings")))
@@ -23,15 +26,17 @@ var _story_read := false
 var _arriving: Dictionary[String, int] = {}
 ## The games not seen yet, as the plugin sends them.
 var _arrivals := {"unseen": PackedStringArray(), "announced": {}}
+## Debug builds: why the stored library could not be read, as the plugin tells it at start; none when it could.
+var _load_problem := ""
 
 
-## Part [param key] of the desktop demo, or none without the file. Exports ship it: on a device, the debug bridge's
-## route preview reads it.
+## A copy of part [param key] of the desktop demo, or none without the file. Exports ship it: on a device, the debug
+## bridge's route preview reads it.
 static func demo(key: String) -> Dictionary:
-	if not FileAccess.file_exists(DEMO):
-		return {}
-	var parsed: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(DEMO))
-	return parsed.get(key, {})
+	if _demo.is_empty() and FileAccess.file_exists(DEMO):
+		_demo = JSON.parse_string(FileAccess.get_file_as_string(DEMO))
+	var part: Dictionary = _demo.get(key, {})
+	return part.duplicate(true)
 
 
 ## The demo's library: on its ring the consoles ready, and with `--coming-consoles` those not fully supported yet too.
@@ -100,6 +105,15 @@ func start_with_backdrop(chosen: String, veil: String) -> void:
 		_settings["pixel_veil"] = veil != "off"
 
 
+## Debug builds: the stored library could not be read (`--library-unreadable`): the start finds no console, and is
+## told why, as the plugin then answers.
+func start_unreadable(unreadable: bool) -> void:
+	if not OS.is_debug_build() or not unreadable:
+		return
+	_current = demo("library").merged({"setups": {}, "games": [], "shelves": [], "selected_shelf": 0}, true)
+	_load_problem = "Not a library: unexpected end of input; set aside: true"
+
+
 ## Debug builds: the consoles of [param asked] (`gba:2,ps2:3`) are set up with a folder, and their next re-read
 ## brings that many made-up games, copies of their first one; asked at start (`--new-games`) or later.
 func start_with_arrivals(asked: String) -> void:
@@ -149,8 +163,11 @@ func pickFolder(_id: int) -> String:
 	return _form_answer({"folder": form().get("folder", {})})
 
 
-## The snapshot's answer with the library as it now stands, or the library as it now stands, or the demo's.
+## An unreadable library's answer (`--library-unreadable`); the snapshot's answer with the library as it now stands,
+## or the library as it now stands, or the demo's.
 func library(_id: int) -> String:
+	if _load_problem:
+		return JSON.stringify({"ok": true, "library": _current, "load_problem": _load_problem})
 	if _snapshot.is_empty():
 		return JSON.stringify({"ok": true, "library": _current if _current else demo_library()})
 	var original: Dictionary = _snapshot["library"]
@@ -246,7 +263,7 @@ func leaveGame(_id: int, game_id: String) -> String:
 ## The library as it now stands; at first the demo's, grown to [param games] games when more are asked for, every game
 ## on [param platform_id] when one is given, as on the device.
 func useDemoLibrary(id: int, games: int, platform_id: String) -> String:
-	if not _snapshot.is_empty():
+	if not _snapshot.is_empty() or _load_problem:
 		return library(id)
 	var made := _current.duplicate(true) if not _current.is_empty() \
 		else _on_one_shelf(_with_games(demo_library(), games), platform_id)
@@ -269,7 +286,7 @@ static func _with_games(made: Dictionary, games: int) -> Dictionary:
 		var original: Dictionary = all[index % demo_count]
 		var game := original.duplicate(true)
 		var title := "%s %d" % [str(game["title"]).rsplit(" ", true, 1)[0], index]
-		game.merge({"id": "demo/%d" % index, "title": title, "discs": [{"name": title + ".iso"}],
+		game.merge({"id": "demo/%d" % index, "title": title,
 			"platform_id": console["platform_id"], "medium": console["medium"]}, true)
 		indexes.append(all.size())
 		all.append(game)
@@ -291,13 +308,6 @@ static func _on_one_shelf(made: Dictionary, platform_id: String) -> Dictionary:
 	return made
 
 
-## The demo's library, none of whose games has a label.
-func rescrape(_id: int) -> String:
-	var made := demo_library()
-	var games: Array = made.get("games", [])
-	return JSON.stringify({"ok": true, "library": made, "games": games.size(), "labels": 0})
-
-
 ## The library as it now stands takes that order until the app quits.
 func orderConsoles(_id: int, platform_ids: PackedStringArray) -> String:
 	if not _current.is_empty():
@@ -313,7 +323,7 @@ func orderConsoles(_id: int, platform_ids: PackedStringArray) -> String:
 func placeConsole(_id: int, _platform_id: String, gap: int) -> String:
 	var orders: Dictionary = form().get("placing", {})
 	var order: Array = orders.get(str(gap), [])
-	return _form_answer({"order": order} if orders.has(str(gap)) else {"ok": false, "code": "gap_out_of_range"})
+	return _form_answer({"order": order} if orders.has(str(gap)) else {"ok": false, "code": AndroidServices.Result.GAP_OUT_OF_RANGE})
 
 
 ## Every game can: the insertion plays.
@@ -342,7 +352,7 @@ func _keep_variant(id: int, platform_id: String, variant: String) -> String:
 	var library_data := _current.duplicate(true) if not _current.is_empty() else demo_library()
 	var file := FileAccess.open(_VARIANTS, FileAccess.WRITE)
 	if file == null:
-		return JSON.stringify({"ok": false, "code": "permission_denied"})
+		return JSON.stringify({"ok": false, "code": AndroidServices.Result.PERMISSION_DENIED})
 	file.store_string(JSON.stringify(kept))
 	_with_variants(library_data, kept)
 	_current = library_data
@@ -371,14 +381,14 @@ func _variants() -> Dictionary:
 ## The games the form story's folder holds, as a scan or a preview reports them.
 func _report() -> Dictionary:
 	var games: int = form().get("games", 0)
-	return {"games": games, "files": games}
+	return {"games": games}
 
 
 ## [param story] as an operation's answer when the demo holds a form story; none, and the operation fails as
 ## unavailable, when it does not.
 func _form_answer(story: Dictionary) -> String:
 	if form().is_empty():
-		return JSON.stringify({"ok": false, "code": &"unavailable", "detail": "Android plugin not loaded"})
+		return JSON.stringify({"ok": false, "code": AndroidServices.Result.UNAVAILABLE, "detail": "Android plugin not loaded"})
 	var answer := {"ok": true}
 	answer.merge(story, true)
 	return JSON.stringify(answer)

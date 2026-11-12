@@ -14,7 +14,9 @@ import app.cartouche.core.regions.PreferredRegion
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.Some
 import arrow.core.getOrElse
+import arrow.core.getOrNone
 import arrow.core.toOption
 import java.io.FileNotFoundException
 import java.io.InputStream
@@ -50,8 +52,8 @@ internal fun interface TableFiles {
 /**
  * Everything `loadCatalog` loads, as one immutable value: a call sees one load, never new lists with old indexes. A
  * platform's tables are read from [files] and indexed on its first need, on the thread needing them (never Godot's:
- * only operations and the art's threads ask), once: a scan or a look for art gets them by asking, so none runs
- * without them.
+ * only operations and the art's threads ask), once, until its art tables are forgotten ([forgetSources]): a scan or a
+ * look for art gets them by asking, so none runs without them.
  */
 internal class Reference(
     val catalog: Catalog = Catalog(),
@@ -84,6 +86,16 @@ internal class Reference(
                 ) { ArtSources.of(catalog, platform, tables) }
             }
         }.preferring(preferred)
+
+    /** Whether [platform]'s art tables are indexed and held: a [sources] ask then indexes nothing. */
+    fun holdsSources(platform: PlatformId): Boolean = artSources.getOrNone(platform).isSome(Lazy<ArtSources>::isInitialized)
+
+    /** Drops every platform's indexed art tables but [keeping]'s: the next ask indexes them again. */
+    fun forgetSources(keeping: Option<PlatformId>) {
+        val held = artSources.size
+        artSources.keys.removeIf { keeping != Some(it) }
+        if (artSources.size < held) trace("art") { "${held - artSources.size} art tables forgotten" }
+    }
 
     /** Read from the first lines of the platform's art tables alone: asked for each game, it indexes nothing. */
     fun artVersion(platform: PlatformId): Option<ArtVersion> = versions.once(platform) {

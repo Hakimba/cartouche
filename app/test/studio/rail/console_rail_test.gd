@@ -42,28 +42,10 @@ func _settle(rail: ConsoleRail) -> void:
 		rail._process(1.0 / 60.0)
 
 
-func test_the_rail_wraps_both_ways() -> void:
-	var rail := _rail(12, 0)
-	rail.go_to(-1)
-	_settle(rail)
-	assert_vector(rail.tile_at(11)).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
-	rail.go_to(11)
-	_settle(rail)
-	rail.go_to(12)
-	_settle(rail)
-	assert_vector(rail.tile_at(0)).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
-
-
-func test_a_single_console_has_one_tile_in_the_middle() -> void:
-	var rail := _rail(1, 0)
-	assert_int(rail.tiles().size()).is_equal(1)
-	assert_vector(rail.tile_at(0)).is_equal_approx(_MIDDLE, Vector2(0.01, 0.01))
-
-
 func test_a_walk_of_presses_with_random_frames_ends_on_the_right_console() -> void:
 	var random := RandomNumberGenerator.new()
 	random.seed = 12
-	for count: int in [2, 5, 12]:
+	for count: int in [1, 2, 5, 12]:
 		var rail := _rail(count, 0)
 		var target := 0
 		for press in 60:

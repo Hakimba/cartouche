@@ -7,6 +7,7 @@ import arrow.core.Some
 import arrow.core.getOrElse
 import arrow.core.getOrNone
 import arrow.core.left
+import java.io.File
 
 /**
  * Servers holding [images] by candidate identity (a scan's URL), answering [answers] where they
@@ -20,14 +21,17 @@ internal class FakeFetch(var images: Map<String, ByteArray>, var answers: Map<St
     val served = mutableMapOf<String, Int>()
     val asked = mutableListOf<String>()
 
-    override suspend fun get(candidate: Candidate, progress: Progress): Either<FetchFailure, ByteArray> {
+    override suspend fun get(candidate: Candidate, progress: Progress, image: File): Either<FetchFailure, Unit> {
         val identity = candidate.identity.value
         asked += identity
         during(candidate)
         if (!online) return FetchFailure.Offline("no network").left()
         return images
             .getOrNone(identity)
-            .map { image -> image.also { served.merge(identity, 1, Int::plus) }.also { progress.read(Some(1.0)) } }
-            .toEither { answers.getOrElse(identity) { FetchFailure.NotFound } }
+            .map { bytes ->
+                image.writeBytes(bytes)
+                served.merge(identity, 1, Int::plus)
+                progress.read(Some(1.0))
+            }.toEither { answers.getOrElse(identity) { FetchFailure.NotFound } }
     }
 }

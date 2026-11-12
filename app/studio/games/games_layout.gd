@@ -13,8 +13,11 @@ var side_size: float
 
 
 ## A bounded set of candidates, so a large library never adds per-frame work: those of a row drawn [param within]
-## places from its centre. MediaView orders them.
+## places from its centre. MediaView orders them. Two games stand side by side, the first on the left: round a ring
+## each would stand on both sides of the other, and jump from one to the other as the row moves.
 static func offsets(count: int, scroll: float, within := MediaView.DRAWN_WITHIN) -> Dictionary[int, float]:
+	if count == 2:
+		return {0: -scroll, 1: 1.0 - scroll}
 	var span := 2 * ceili(within) + 1
 	var start := floori(scroll) - ceili(within) if count > span else 0
 	var local := MediaView.drawing_order(mini(count, span), scroll - start, within)

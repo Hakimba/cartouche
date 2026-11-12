@@ -4,6 +4,7 @@ package app.cartouche.core.library
 import app.cartouche.core.FileName
 import app.cartouche.core.Shipped.ps2
 import app.cartouche.core.Shipped.ps2Titles
+import app.cartouche.core.platforms.FileNamePattern
 import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.serialName
 import app.cartouche.core.uri
@@ -98,6 +99,13 @@ class LibraryTest {
         chosen.playerFor(ps2, chd) { true } shouldBe Some(armsx2)
         chosen.playerFor(ps2, chd) { it != armsx2 } shouldBe Some(ps2.players.first { it != armsx2 && it.accepts.matches(chd) })
         PlatformSetup().playerFor(ps2, chd) { false } shouldBe None
+    }
+
+    @Test
+    fun `a stored game whose name its platform no longer accepts still has its player, so the launch names the unsupported file`() {
+        val chd = FileName("Game.chd")
+        val isosOnly = ps2.copy(accepts = FileNamePattern.of("^.*\\.iso$").shouldBeSome())
+        PlatformSetup().playerFor(isosOnly, chd) { true } shouldBe Some(ps2.players.first { it.accepts.matches(chd) })
     }
 
     @Test
@@ -245,22 +253,11 @@ class LibraryTest {
     }
 
     @Test
-    fun `INV-11 old console names survive reading and rescans`() = runBlocking<Unit> {
-        var named = 0
-        checkAll(folderFiles, typedNames, typedNames) { files, ps2Name, gbaName ->
-            val gba = PlatformId("gba")
-            val names =
-                DisplayName.of(ps2Name).fold({ emptyMap() }) { mapOf(ps2.id to it) } +
-                    DisplayName.of(gbaName).fold({ emptyMap() }) { mapOf(gba to it) }
-            val library = Library(consoleNames = names).withScan(ps2.id, scan(files))
-            LibraryFormat.decode(LibraryFormat.encode(library)).shouldBeRight().library shouldBe library
-            library.withScan(ps2.id, scan(files.drop(1))).consoleNames shouldBe names
-            library.without(ps2.id).consoleNames shouldBe names - ps2.id
-            val ordered = library.withConsoleOrder(listOf(gba, ps2.id))
+    fun `the console order survives rescans`() = runBlocking<Unit> {
+        checkAll(folderFiles) { files ->
+            val ordered = Library().withScan(ps2.id, scan(files)).withConsoleOrder(listOf(PlatformId("gba"), ps2.id))
             ordered.withScan(ps2.id, scan(files.drop(1))).consoleOrder shouldBe ordered.consoleOrder
-            if (names.isNotEmpty()) named++
         }
-        named shouldBeGreaterThan 60
     }
 
     @Test

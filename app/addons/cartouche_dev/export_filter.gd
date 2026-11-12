@@ -2,11 +2,14 @@
 @tool
 extends EditorExportPlugin
 
+## What a release build leaves out besides the bridge: the start trace and what it starts, the bench and the frame pictures.
+const _DEBUG_ONLY: Array[String] = ["res://dev/start_trace.gd", "res://dev/carousel_bench.gd", "res://dev/frame_shots.gd"]
+
 var _debug := false
 
 
 static func excludes(path: String, debug: bool) -> bool:
-	return not debug and path.begins_with("res://dev/bridge/")
+	return not debug and (path.begins_with("res://dev/bridge/") or path in _DEBUG_ONLY)
 
 
 func _get_name() -> String:

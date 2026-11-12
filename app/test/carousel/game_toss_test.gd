@@ -25,7 +25,7 @@ func test_inv_20_up_lands_the_game_as_the_pick_at_rest_whether_it_lands_or_the_a
 		for frame in 120:
 			if not carousel._toss.is_busy():
 				break
-			if frame == paused_at or (in_air and row.selected_lift > 0.0):
+			if frame == paused_at or (in_air and row.standing().lift > 0.0):
 				if in_air:
 					assert_str(row.selected_game().id).is_not_equal(pick.id)
 				carousel.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
@@ -38,7 +38,7 @@ func test_inv_20_up_lands_the_game_as_the_pick_at_rest_whether_it_lands_or_the_a
 		assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
 		assert_bool(carousel._search.is_open() or carousel._screens.visible or carousel._game_launch.is_busy()).is_false()
 		assert_int(launches.checks).is_equal(0)
-		assert_array([row.pose_amount, row.neighbours, row.selected_lift, row.selected_flip, row.selected_squash,
+		assert_array([row.pose_amount, row.neighbours, row.standing().lift, row.standing().flip, row.standing().squash,
 			carousel._pill.modulate.a, carousel._games_logo.modulate.a]).is_equal([1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0])
 		if is_failure():
 			return
@@ -57,7 +57,9 @@ func test_up_held_on_the_stick_tosses_once() -> void:
 		var stick := InputEventJoypadMotion.new()
 		stick.axis = JOY_AXIS_LEFT_Y
 		stick.axis_value = value
-		carousel._unhandled_input(stick)
+		# Through the whole input path: the carousel takes the stick's stream apart before the screens' focus.
+		Input.parse_input_event(stick)
+		Input.flush_buffered_events()
 		tosses += 1 if carousel._toss.is_busy() else 0
 		carousel._toss.finish()
 	assert_int(tosses).is_equal(1)

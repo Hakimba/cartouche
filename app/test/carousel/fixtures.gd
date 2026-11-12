@@ -16,6 +16,53 @@ const CAROUSEL := preload("res://carousel/carousel.tscn")
 ## Loaded, never preloaded: a script holding a console's scene keeps it cached, and the loading tests tell
 ## which consoles were loaded by the cache.
 const PS2_SLIM := "res://carousel/consoles/ps2_slim/ps2_slim.tscn"
+const PROFILES := "res://data/platforms/profiles.json"
+## The detail every shipped part is built at in the tests.
+const SHAPE_DETAIL := 32
+## The media made for a later stage, which shows a console's regional cartridges: no platform's games
+## come in them yet, though the fronts of their scans may be declared already.
+const LATER_MEDIA: Array[String] = ["famicom_cart", "sfc_cart", "snes_us_cart"]
+const Request := Scripted.Request
+const Answer := Scripted.Answer
+
+## Every medium's scene, loaded on the main thread and kept, so that Appearance's background loads find it cached and
+## make no mesh on a worker: the headless engine's mesh owner is not thread-safe (Godot 4.7.2,
+## servers/rendering/dummy/storage/mesh_storage.h:50) and a mesh made there can break one made on the main thread.
+static var held_media: Array = medium_scenes().map(func(scene: String) -> Resource: return load(scene))
+
+
+## The JSON file at [param path], read.
+static func json(path: String) -> Dictionary:
+	return JSON.parse_string(FileAccess.get_file_as_string(path))
+
+
+## The fronts of [param platform_id]'s cartridges whose scans its labels are cut from, by medium; none
+## for a platform of discs or of no scans.
+static func fronts(platform_id: String) -> Dictionary:
+	var profile: Dictionary = json(PROFILES)[platform_id]
+	var art: Dictionary = profile.get("art", {})
+	return art.get("fronts", {})
+
+
+## The scene of every medium folder.
+static func medium_scenes() -> Array[String]:
+	var found: Array[String] = []
+	for manifest: MediumManifest in MediumManifest.found().values():
+		found.append(manifest.scene)
+	return found
+
+
+## Whether [param model] is drawn from a glb: its meshes are its own, placed as the glb places them.
+static func is_glb(model: Node) -> bool:
+	return model.find_children("*", "Node3D", true, false).any(func(node: Node) -> bool:
+		return node.scene_file_path.get_extension() == "glb")
+
+
+## [param carousel]'s consoles row stepped to the console at [param index], a second on.
+static func select_console(carousel: Carousel, index: int) -> void:
+	while carousel._consoles.selected_index() != index:
+		press(carousel, &"carousel_right" if carousel._consoles.selected_index() < index else &"carousel_left")
+	step_frames(carousel, 60)
 
 
 ## A generator of cases, seeded by the test so that a failure always comes back.
@@ -35,8 +82,7 @@ static func games(count: int) -> Array[AndroidServices.Game]:
 	var shelf: Array[AndroidServices.Game] = []
 	for i in count:
 		shelf.append(AndroidServices.Game.new({
-			"id": "test/%d" % i, "platform_id": "test", "title": "Game %d" % i, "identified": false,
-			"discs": [{"name": "Game %d.iso" % i}], "last_disc": 0,
+			"id": "test/%d" % i, "platform_id": "test", "title": "Game %d" % i, "last_disc": 0,
 		}))
 	return shelf
 
@@ -169,10 +215,10 @@ static func shown_carousel(suite: GdUnitTestSuite) -> Carousel:
 	row.random = cases(0)
 	suite.add_child(carousel)
 	for i in 100:
-		if carousel._shown:
+		if carousel.is_shown():
 			break
 		await suite.await_idle_frame()
-	suite.assert_bool(carousel._shown).is_true()
+	suite.assert_bool(carousel.is_shown()).is_true()
 	arrived(carousel)
 	row.set_process(false)
 	carousel.set_process(false)
@@ -363,16 +409,66 @@ class FakeArt extends GameArt:
 		pass
 
 
-## The Android services answering launches as the test says, counting them: a game can start
-## unless [member check_code] (or [member start_code]) holds the code of a failure. With
-## [member late], each answer waits for [signal replied]; with [member silent], it never comes.
-class FakeAndroid extends AndroidServices:
-	signal replied
+## What the fakes of the plugin share: every request they answer is scripted by the test, at once by default.
+class Scripted extends AndroidServices:
+	signal released
 
-	var check_code := &""
-	var start_code := &""
-	var late := false
-	var silent: Array[StringName] = []
+	## The requests a fake answers; the settings' saves are one each, named by [method save_of].
+	enum Request {
+		CURTAIN, CURRENT_LIBRARY, PICK_FOLDER, PREVIEW, SET_UP, SCAN, REMOVE, ORDER_CONSOLES, RENAME_GAME, REFRESH_PLATFORM,
+		ENTER_CONSOLE, LEAVE_GAME, CHOOSE_LABEL, PICK_LABEL_PICTURE, KEEP_OWN_LABEL, CHECK_LAUNCH,
+		START_LAUNCH, SAVE_BUTTON_STYLE, SAVE_EDGE_SMOOTHING, SAVE_BACKDROP, SAVE_PREFERRED_REGION, SAVE_LANGUAGE, SAVE_SOUND_LEVEL,
+		SAVE_GAMES_FLOAT, SAVE_PIXEL_VEIL, SAVE_GAMES_IN_LINE, LABEL_VARIANTS,
+	}
+	## How a request is answered: as the fake usually does, [constant LATER_FRAMES] frames later, once [signal released]
+	## (a request asked while HELD waits for the next release; [method release] answers those waiting and erases every HELD
+	## script, so a request asked after it is answered as usual; a test that wants it held again scripts it again), as a
+	## failure, or never while the script says so.
+	enum Answer { AT_ONCE, LATER, HELD, FAILS, NEVER }
+
+	const LATER_FRAMES := 20
+	const _UNEXPECTED := &"unexpected"
+
+	## The scripted answers; a request not in it is answered at once.
+	var answers: Dictionary[Request, Answer] = {}
+	## The codes of the failures, by request: a request in it fails with its code whenever it is answered.
+	var failures: Dictionary[Request, StringName] = {}
+
+	## Answers the requests held, no longer held: each as the script now says.
+	func release() -> void:
+		for request: Request in answers.keys():
+			if answers[request] == Answer.HELD:
+				answers.erase(request)
+		released.emit()
+
+	## The request of the setting [param key]'s save; a key the settings do not save stops the test.
+	static func save_of(key: StringName) -> Request:
+		return Request["SAVE_" + String(key).to_upper()]
+
+	## [param request]'s answer, [param usual_frames] frames after it is asked as the plugin does, then as scripted.
+	func _answer(request: Request, usual_frames := 0) -> Dictionary:
+		if usual_frames > 0:
+			await _frames(usual_frames)
+		match answers.get(request, Answer.AT_ONCE):
+			Answer.LATER:
+				await _frames(LATER_FRAMES)
+			Answer.HELD:
+				await released
+			Answer.NEVER:
+				while answers.get(request, Answer.AT_ONCE) == Answer.NEVER:
+					await released
+		if answers.get(request, Answer.AT_ONCE) == Answer.FAILS or failures.has(request):
+			return {"ok": false, "code": failures.get(request, _UNEXPECTED)}
+		return {"ok": true}
+
+	static func _frames(count: int) -> void:
+		for frame in count:
+			await (Engine.get_main_loop() as SceneTree).process_frame
+
+
+## The Android services answering launches as the test says, counting them: a game can start unless the answer of
+## [constant Request.CHECK_LAUNCH] or [constant Request.START_LAUNCH] is scripted otherwise.
+class FakeAndroid extends Scripted:
 	## Called as the game starts, before the answer; as it is checked, with the game.
 	var on_start := func() -> void: pass
 	var on_check := func(_game: AndroidServices.Game) -> void: pass
@@ -382,19 +478,12 @@ class FakeAndroid extends AndroidServices:
 	func check_launch(game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
 		checks += 1
 		on_check.call(game)
-		return await _answer(&"check", check_code)
+		return AndroidServices.Result.new(await _answer(Request.CHECK_LAUNCH))
 
 	func launch_game(_game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
 		starts += 1
 		on_start.call()
-		return await _answer(&"start", start_code)
-
-	func _answer(request: StringName, code: StringName) -> AndroidServices.Result:
-		while late or request in silent:
-			await replied
-			if request not in silent:
-				break
-		return AndroidServices.Result.new({"ok": true} if code.is_empty() else {"ok": false, "code": code, "detail": "fake"})
+		return AndroidServices.Result.new(await _answer(Request.START_LAUNCH))
 
 
 ## The profile `data/platforms/profiles.json` gives [param id].
@@ -421,6 +510,15 @@ static func triangles(arrays: Array) -> Array[PackedVector3Array]:
 	for i in range(0, indices.size(), 3):
 		found.append(PackedVector3Array([vertices[indices[i]], vertices[indices[i + 1]], vertices[indices[i + 2]]]))
 	return found
+
+
+## How many triangles [param model]'s meshes are drawn with.
+static func triangle_count(model: Node) -> int:
+	var count := 0
+	for geometry: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		for surface in geometry.mesh.get_surface_count() if geometry.mesh else 0:
+			count += triangles(geometry.mesh.surface_get_arrays(surface)).size()
+	return count
 
 
 static func points(arrays: Array) -> PackedVector3Array:

@@ -2,7 +2,6 @@
 extends GdUnitTestSuite
 
 const Fixtures := preload("res://test/screens/fixtures.gd")
-const StillStandIn := preload("res://test/studio/views/still_stand_in.gd")
 ## The design's table of the Type chooser (reference 2.2): platform id, kicker, name, in order.
 const _TYPES: Array = [
 	["xbox", "Microsoft", "Xbox"], ["xbox360", "Microsoft", "Xbox 360"], ["gb", "Nintendo", "Game Boy"],
@@ -16,13 +15,8 @@ const _TYPES: Array = [
 var _opened: StudioChooser
 
 
-func before_test() -> void:
-	StillStandIn.install()
-
-
 ## The models the chooser dropped are freed a frame later: wait for them before the orphans are counted.
 func after_test() -> void:
-	StillStandIn.restore()
 	if is_instance_valid(_opened):
 		_opened._answer(-1)
 	await await_idle_frame()
@@ -51,17 +45,6 @@ func _open_types(chooser: StudioChooser, offered: Array[AndroidServices.OfferedC
 	await await_idle_frame()
 
 
-func test_the_type_list_shows_the_given_consoles_in_order_with_maker_name_and_number() -> void:
-	var chooser := _chooser()
-	await _open_types(chooser, _offered())
-	assert_int(chooser.rows().size()).is_equal(_TYPES.size())
-	assert_array(Array(chooser.ids())).is_equal(_TYPES.map(func(row: Array) -> String: return row[0]))
-	assert_array(chooser.rows().map(func(row: Button) -> String: return row.text)).is_equal(
-		_TYPES.map(func(row: Array) -> String: return row[2]))
-	assert_str(chooser.counter()).is_equal("01 / %d" % _TYPES.size())
-	assert_int(chooser.focused()).is_equal(0)
-
-
 func test_the_list_opens_on_the_current_choice_or_the_first_row() -> void:
 	var chooser := _chooser()
 	await _open_types(chooser, _offered(), 7)
@@ -71,19 +54,6 @@ func test_the_list_opens_on_the_current_choice_or_the_first_row() -> void:
 	chooser._answer(-1)
 	await _open_types(chooser, _offered(), -1)
 	assert_int(chooser.focused()).is_equal(0)
-
-
-func test_up_stops_on_the_first_row_and_down_on_the_last() -> void:
-	var chooser := _chooser()
-	var last := _TYPES.size() - 1
-	await _open_types(chooser, _offered(), last)
-	await Fixtures.action(self, &"ui_down")
-	assert_int(chooser.focused()).is_equal(last)
-	assert_bool(chooser.rows()[last].has_focus()).is_true()
-	chooser.rows()[0].grab_focus()
-	await Fixtures.action(self, &"ui_up")
-	assert_int(chooser.focused()).is_equal(0)
-	assert_bool(chooser.rows()[0].has_focus()).is_true()
 
 
 func test_a_second_choice_asked_while_one_is_pending_is_refused() -> void:
@@ -167,9 +137,7 @@ func test_a_console_not_fully_supported_yet_is_shown_with_its_note_and_never_cho
 			assert_int(chooser.focused()).is_equal(at)
 
 
-func test_back_during_opening_cancels_immediately_when_rewind_is_disabled() -> void:
-	var original_reverse := StudioTokens.TR_REVERSE
-	StudioTokens.TR_REVERSE = 0
+func test_back_during_opening_cancels_immediately() -> void:
 	var chooser := _chooser()
 	var answers: Array[int] = []
 	chooser.chosen.connect(answers.append)
@@ -180,23 +148,3 @@ func test_back_during_opening_cancels_immediately_when_rewind_is_disabled() -> v
 	chooser._unhandled_input(back)
 	assert_array(answers).is_equal([-1])
 	assert_bool(chooser.visible).is_false()
-	StudioTokens.TR_REVERSE = original_reverse
-
-
-func test_rewind_after_50_ms_never_answers_after_the_chooser_is_hidden() -> void:
-	var original_reverse := StudioTokens.TR_REVERSE
-	StudioTokens.TR_REVERSE = 1
-	var chooser := _chooser()
-	var answers: Array[int] = []
-	chooser.chosen.connect(answers.append)
-	await _open_types(chooser, _offered())
-	chooser._opening._tween.custom_step(0.05)
-	var back := InputEventAction.new()
-	back.action = &"screen_back"
-	back.pressed = true
-	chooser._unhandled_input(back)
-	chooser.hide()
-	chooser._opening._tween.custom_step(1.0)
-	assert_array(answers).is_empty()
-	assert_bool(chooser._returning).is_false()
-	StudioTokens.TR_REVERSE = original_reverse

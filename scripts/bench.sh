@@ -37,7 +37,9 @@ set -euo pipefail
 # Decimal points, whatever the machine's language.
 export LC_ALL=C
 cd "$(dirname "$0")/.."
-adb="${ANDROID_HOME:?ANDROID_HOME is not set}/platform-tools/adb"
+adb_binary="${ANDROID_HOME:?ANDROID_HOME is not set}/platform-tools/adb"
+# Every adb call is bounded: a hung daemon or device fails the run instead of waiting for ever.
+adb() { timeout 20 "$adb_binary" "$@"; }
 # The package measured: a test build installs under its own name beside the release.
 package="${CARTOUCHE_PACKAGE:-app.cartouche}"
 record=""
@@ -59,31 +61,32 @@ done
 
 date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 commit=$(git rev-parse --short HEAD)$(git diff --quiet HEAD -- app kotlin || echo "+changes")
-device=$("$adb" shell getprop ro.product.model | tr -d '\r')
-android=$("$adb" shell getprop ro.build.version.release | tr -d '\r')
+device=$(adb shell getprop ro.product.model | tr -d '\r')
+android=$(adb shell getprop ro.build.version.release | tr -d '\r')
 
 # emit SCENARIO GAMES METRIC VALUE UNIT RUN
+# A value left empty (a reworded trace, a missing line) fails the run, so a metric is never recorded as null.
 emit() {
+  [ -n "${4:-}" ] || { echo "error: no value for $1 $3 (is its trace reworded?)" >&2; exit 1; }
   printf '%-12s %-5s %-24s %10s %s (run %s)\n' "$1" "$2" "$3" "$4" "$5" "$6"
   [ -z "$record" ] || printf '{"date":"%s","commit":"%s","build":"debug","device":"%s","android":"%s","scenario":"%s","games":"%s","metric":"%s","value":%s,"unit":"%s","run":%s,"label":"%s"}\n' \
-    "$date" "$commit" "$device" "$android" "$1" "$2" "$3" "${4:-null}" "$5" "$6" "$label" >> "$record"
+    "$date" "$commit" "$device" "$android" "$1" "$2" "$3" "$4" "$5" "$6" "$label" >> "$record"
 }
 
 # start [ARGUMENTS]: Cartouche started anew with the comma-separated ARGUMENTS, past its welcome
 # screen (which waits for a press).
 start() {
-  "$adb" shell am force-stop "$package"
-  "$adb" logcat -c
-  "$adb" shell am start -n "$package"/com.godot.game.GodotAppLauncher --esa arguments "--welcome=skip${1:+,$1}" > /dev/null
+  adb shell am force-stop "$package"
+  adb logcat -c
+  adb shell am start -n "$package"/com.godot.game.GodotAppLauncher --esa arguments "--welcome=skip${1:+,$1}" > /dev/null
 }
 
 # wait_for PATTERN SECONDS: until the log has a line matching PATTERN.
 wait_for() {
-  local waited=0
-  until "$adb" logcat -d | grep -qE "$1"; do
+  local deadline=$((SECONDS + $2))
+  until adb logcat -d | grep -qE "$1"; do
+    [ "$SECONDS" -lt "$deadline" ] || { echo "error: no \"$1\" within $2 s" >&2; exit 1; }
     sleep 0.5
-    waited=$((waited + 1))
-    [ "$waited" -lt $(($2 * 2)) ] || { echo "error: no \"$1\" within $2 s" >&2; exit 1; }
   done
 }
 
@@ -95,12 +98,12 @@ sampled() {
   wait_for "bench: $1 started" 60
   local pid ticks started busy=0 clock=0 samples=0 reading limit=$([ "$1" = session ] && echo 480 || echo 120)
   local deadline=$((SECONDS + limit))
-  pid=$("$adb" shell pidof "$package" | tr -d '\r')
-  ticks=$("$adb" shell cat "/proc/$pid/stat" | awk '{ print $14 + $15 }')
+  pid=$(adb shell pidof "$package" | tr -d '\r')
+  ticks=$(adb shell cat "/proc/$pid/stat" | awk '{ print $14 + $15 }')
   started=$(date +%s.%N)
-  until "$adb" logcat -d | grep -qE "bench: $1:"; do
+  until adb logcat -d | grep -qE "bench: $1:"; do
     [ "$SECONDS" -lt "$deadline" ] || { echo "error: no \"bench: $1:\" within $limit s" >&2; exit 1; }
-    reading=$("$adb" shell "cat $gpu/gpu_busy_percentage $gpu/clock_mhz 2> /dev/null" | tr -d '\r %' | paste -sd ' ')
+    reading=$(adb shell "cat $gpu/gpu_busy_percentage $gpu/clock_mhz 2> /dev/null" | tr -d '\r %' | paste -sd ' ')
     if [ -n "$reading" ]; then
       busy=$(echo "$busy ${reading% *}" | awk '{ print $1 + $2 }')
       clock=$(echo "$clock ${reading#* }" | awk '{ print $1 + $2 }')
@@ -109,7 +112,7 @@ sampled() {
     sleep 1
   done
   # Clock ticks of 10 ms (USER_HZ 100).
-  emit "$1" "$2" cpu_ms_per_s "$("$adb" shell cat "/proc/$pid/stat" | awk -v t="$ticks" -v s="$started" -v n="$(date +%s.%N)" \
+  emit "$1" "$2" cpu_ms_per_s "$(adb shell cat "/proc/$pid/stat" | awk -v t="$ticks" -v s="$started" -v n="$(date +%s.%N)" \
     '{ printf "%.0f", ($14 + $15 - t) * 10 / (n - s) }')" ms 1
   [ "$samples" -eq 0 ] || emit "$1" "$2" gpu_busy "$(awk -v b="$busy" -v n="$samples" 'BEGIN { printf "%.1f", b / n }')" % 1
   [ "$samples" -eq 0 ] || emit "$1" "$2" gpu_mhz "$(awk -v c="$clock" -v n="$samples" 'BEGIN { printf "%.0f", c / n }')" MHz 1
@@ -118,7 +121,7 @@ sampled() {
 # emit_bench SCENARIO SIZE KEY...: the KEYs of the scenario's `bench:` line.
 emit_bench() {
   local line
-  line=$("$adb" logcat -d | grep -oE "bench: $1: .*" | head -1)
+  line=$(adb logcat -d | grep -oE "bench: $1: .*" | head -1)
   for key in "${@:3}"; do
     emit "$1" "$2" "$key" "$(echo "$line" | grep -oE " $key=[0-9.]+" | head -1 | cut -d= -f2)" \
       "$(case "$key" in fps) echo fps ;; *_ms) echo ms ;; *_mb) echo MB ;; *_per_s) echo per_s ;; *) echo count ;; esac)" 1
@@ -130,28 +133,28 @@ emit_bench() {
 # service's per-process total (Android 12 and later), then Adreno's kgsl files; left out when none is.
 app_memory() {
   local pid summary gpu_kb
-  pid=$("$adb" shell pidof "$package" | tr -d '\r')
-  summary=$("$adb" shell dumpsys meminfo "$package" | tr -d '\r')
+  pid=$(adb shell pidof "$package" | tr -d '\r')
+  summary=$(adb shell dumpsys meminfo "$package" | tr -d '\r')
   emit "$1" "$2" memory_pss "$(echo "$summary" | awk '/TOTAL PSS:/ { print $3; exit }')" kB 1
   emit "$1" "$2" memory_java_kb "$(echo "$summary" | awk '/Java Heap:/ { print $3; exit }')" kB 1
   emit "$1" "$2" memory_native_kb "$(echo "$summary" | awk '/Native Heap:/ { print $3; exit }')" kB 1
   emit "$1" "$2" memory_graphics_kb "$(echo "$summary" | awk '/Graphics:/ { print $2; exit }')" kB 1
-  gpu_kb=$("$adb" shell dumpsys gpu --gpumem 2> /dev/null | tr -d '\r' |
+  gpu_kb=$(adb shell dumpsys gpu --gpumem 2> /dev/null | tr -d '\r' |
     awk -v pid="$pid" '$1 == "Proc" && $2 == pid && $3 == "total:" { printf "%d", $4 / 1024; exit }')
-  [ -n "$gpu_kb" ] || gpu_kb=$("$adb" shell "cat /sys/class/kgsl/kgsl/proc/$pid/gpumem_mapped /sys/class/kgsl/kgsl/proc/$pid/gpumem_unmapped" \
+  [ -n "$gpu_kb" ] || gpu_kb=$(adb shell "cat /sys/class/kgsl/kgsl/proc/$pid/gpumem_mapped /sys/class/kgsl/kgsl/proc/$pid/gpumem_unmapped" \
     2> /dev/null | tr -d '\r' | awk '/^[0-9]+$/ { b += $1; n++ } END { if (n) printf "%d", b / 1024 }')
-  [ -n "$gpu_kb" ] || gpu_kb=$("$adb" shell cat "/sys/class/kgsl/kgsl/proc/$pid/mem" 2> /dev/null | tr -d '\r' |
+  [ -n "$gpu_kb" ] || gpu_kb=$(adb shell cat "/sys/class/kgsl/kgsl/proc/$pid/mem" 2> /dev/null | tr -d '\r' |
     awk '$3 ~ /^[0-9]+$/ { b += $3; n++ } END { if (n) printf "%d", b / 1024 }')
   [ -z "$gpu_kb" ] || emit "$1" "$2" memory_gpu_kb "$gpu_kb" kB 1
 }
 
 # first NUMBER-PATTERN: the first number the log shows in a line matching the extended regex.
-first() { "$adb" logcat -d | grep -oE "$1" | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' | tail -1; }
+first() { adb logcat -d | grep -oE "$1" | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' | tail -1; }
 
 # seconds_between START-PATTERN END-PATTERN [NTH]: seconds from the first line matching START to
 # the NTH (default: first) line matching END, by the device's clock.
 seconds_between() {
-  "$adb" logcat -d -v epoch | awk -v start="$1" -v end="$2" -v nth="${3:-1}" '
+  adb logcat -d -v epoch | awk -v start="$1" -v end="$2" -v nth="${3:-1}" '
     $0 ~ start && !s { s = $1 } $0 ~ end && s { if (++n == nth) { printf "%.1f", $1 - s; exit } }'
 }
 
@@ -161,13 +164,13 @@ seconds_between() {
 # is put back first. Only the folder made for the run, marked, is ever deleted: when the app made
 # another one meanwhile, both are the user's and the run stops, for them to be put together by hand.
 put_art_back() {
-  "$adb" shell am force-stop "$package"
-  "$adb" shell "run-as $package sh -c 'if [ -d files/art.aside ]; then [ ! -d files/art ] || [ -f files/art/.bench ] || exit 3;
+  adb shell am force-stop "$package"
+  adb shell "run-as $package sh -c 'if [ -d files/art.aside ]; then [ ! -d files/art ] || [ -f files/art/.bench ] || exit 3;
     rm -rf files/art; mv files/art.aside files/art; fi'" || { echo "files/art and files/art.aside both hold the user's art" >&2; exit 1; }
 }
 set_art_aside() {
   put_art_back
-  "$adb" shell "run-as $package sh -c 'if [ -d files/art ]; then mv files/art files/art.aside; fi; mkdir files/art; touch files/art/.bench'"
+  adb shell "run-as $package sh -c 'if [ -d files/art ]; then mv files/art files/art.aside; fi; mkdir files/art; touch files/art/.bench'"
   trap put_art_back EXIT
 }
 
@@ -182,10 +185,11 @@ for size in "${sizes[@]}"; do
     wait_for "bench: scrape:" 90
     emit_bench scrape "$size" fps worst_ms p95_ms slow_frames steps
     wait_for "art: run over" 300
-    emit scrape "$size" scrape_40_games "$(seconds_between 'games to look for' ', stored in ' 40)" s 1
+    forty=$(seconds_between 'games to look for' ', stored in ' 40)
+    [ -z "$forty" ] || emit scrape "$size" scrape_40_games "$forty" s 1
     emit scrape "$size" scrape_all "$(first 'run over: [0-9]+ games in [0-9]+ s')" s 1
     emit scrape "$size" scrape_games "$(first 'run over: [0-9]+ games')" count 1
-    emit scrape "$size" labels_stored "$("$adb" logcat -d | grep -c ', stored in ')" count 1
+    emit scrape "$size" labels_stored "$(adb logcat -d | grep -c ', stored in ')" count 1
     put_art_back
     trap - EXIT
   fi
@@ -194,7 +198,7 @@ for size in "${sizes[@]}"; do
     wait_for "carousel: shown" 30
     sleep 3
     # The device's own clock: from the start request to the first frame showing the carousel.
-    shown=$("$adb" logcat -d -v epoch | awk '/START u0 .*app.cartouche/ && !s { s = $1 }
+    shown=$(adb logcat -d -v epoch | awk -v package="$package" '$0 ~ "START u0 .*" package && !s { s = $1 }
       /carousel: shown/ && !e { e = $1 } END { printf "%d", (e - s) * 1000 }')
     emit start "$size" start_to_shown "$shown" ms "$run"
     # The answer's time ends once its text is parsed, that parse included (library_read_by_godot); the typed
@@ -204,14 +208,15 @@ for size in "${sizes[@]}"; do
     emit library "$size" library_read_by_godot "$(first 'library: [0-9]+ characters read in [0-9.]+ ms')" ms "$run"
     emit library "$size" library_typed_by_godot "$(first 'library: [0-9]+ games typed in [0-9.]+ ms')" ms "$run"
     emit library "$size" library_json_characters "$(first 'library: [0-9]+ characters read in')" characters "$run"
+    emit start "$size" engine_ready "$(first 'engine ready [0-9]+ ms')" ms "$run"
     emit catalog "$size" catalog_read "$(first 'catalog read in [0-9.]+ ms')" ms "$run"
     emit catalog "$size" catalog_loaded "$(first 'catalog read in [0-9.]+ ms, loaded in [0-9.]+ ms')" ms "$run"
     # The first frames showing the shelf: the slowest of them.
-    worst=$("$adb" logcat -d | grep -oE "first frames: [0-9., ]+ ms" | head -1 | grep -oE "[0-9]+\.[0-9]+" | sort -n | tail -1)
+    worst=$(adb logcat -d | grep -oE "first frames: [0-9., ]+ ms" | head -1 | grep -oE "[0-9]+\.[0-9]+" | sort -n | tail -1)
     emit first_frames "$size" first_frames_worst "$worst" ms "$run"
     selected=$(first 'selected label shown [0-9]+ ms after' || true)
     [ -z "$selected" ] || emit art "$size" selected_label_shown "$selected" ms "$run"
-    read_worst=$("$adb" logcat -d | grep -oE "art: .* read in [0-9.]+" | grep -oE "[0-9.]+$" | sort -n | tail -1 || true)
+    read_worst=$(adb logcat -d | grep -oE "art: .* read in [0-9.]+" | grep -oE "[0-9.]+$" | sort -n | tail -1 || true)
     [ -z "$read_worst" ] || emit art "$size" label_read_worst "$read_worst" ms "$run"
   done
   for scenario in "${scenarios[@]}"; do
@@ -224,44 +229,52 @@ for size in "${sizes[@]}"; do
       session)
         emit_bench session "$size" fps worst_ms p95_ms slow_frames steps draw_calls process_ms draw_cpu_ms
         # Each part's line, in the order played: the memory before (start), hitches and memory over time.
-        for part in $("$adb" logcat -d | grep -oE "bench: session/[a-z_]+:" | cut -d/ -f2 | tr -d :); do
-          emit_bench "session/$part" "$size" fps worst_ms p95_ms slow_frames drawn_per_s static_mb video_mb texture_mb
+        for part in $(adb logcat -d | grep -oE "bench: session/[a-z_]+:" | cut -d/ -f2 | tr -d :); do
+          # The first part is the memory before anything is played, the last one a rest with no frame counted.
+          case "$part" in
+            start) emit_bench "session/$part" "$size" static_mb video_mb texture_mb ;;
+            rest) emit_bench "session/$part" "$size" drawn_per_s static_mb video_mb texture_mb ;;
+            *) emit_bench "session/$part" "$size" fps worst_ms p95_ms slow_frames drawn_per_s static_mb video_mb texture_mb ;;
+          esac
+          # Pipelines compiled so far (all kinds): the part where the count grows is the screen that compiles.
+          emit "session/$part" "$size" pipelines "$(adb logcat -d | grep -E "bench: session/$part:" | head -1 | grep -oE 'pipelines: .*' |
+            grep -oE '[0-9]+' | awk '{ n += $1 } END { print n + 0 }')" count 1
         done ;;
       *) emit_bench "$scenario" "$size" fps worst_ms p95_ms slow_frames steps draw_calls process_ms draw_cpu_ms ;;
     esac
     # Each slow frame (its processing, drawing, GPU time and the pipelines compiled) between the steps it fell among,
     # to tell what a hitch was.
-    "$adb" logcat -d | grep -E "frame: slow frame|carousel: (step|jump|platform) " > "build/bench/$scenario-$size.log" || true
+    adb logcat -d | grep -E "frame: slow frame|carousel: (step|jump|platform) " > "build/bench/$scenario-$size.log" || true
     if [ "$scenario" = session ]; then
       app_memory session "$size"
       # Left as a game's launch leaves it: what stays held while an emulator runs.
-      "$adb" shell am start -a android.settings.SETTINGS > /dev/null
+      adb shell am start -a android.settings.SETTINGS > /dev/null
       sleep 5
       app_memory paused "$size"
-      "$adb" shell am start -n "$package"/com.godot.game.GodotAppLauncher > /dev/null
+      adb shell am start -n "$package"/com.godot.game.GodotAppLauncher > /dev/null
       sleep 2
     fi
     if [ "$scenario" = scroll ]; then
       app_memory memory "$size"
       # Leaving the app (here for the system settings) saves the selection.
-      "$adb" shell am start -a android.settings.SETTINGS > /dev/null
+      adb shell am start -a android.settings.SETTINGS > /dev/null
       wait_for "selection: saved" 10
-      emit selection "$size" selection_saved "$(first 'selection: saved .* in [0-9]+ ms')" ms 1
+      emit selection "$size" selection_saved "$(first 'selection: saved in [0-9]+ ms')" ms 1
     fi
   done
   if [ "$size" = real ]; then
     start "${args}--bench=launch"
     wait_for "bench: launch:" 60
     emit_bench launch "$size" worst_ms p95_ms slow_frames check_ms start_ms
-    emulator=$("$adb" logcat -d | grep -oE "launch: .* in [A-Za-z0-9_.]+$" | head -1 | awk '{ print $NF }')
+    emulator=$(adb logcat -d | grep -oE "launch: .* in [A-Za-z0-9_.]+$" | head -1 | awk '{ print $NF }')
     sleep 5
     # Android's own measure, such as "Displayed com.example/.Main: +1s187ms".
-    shown=$("$adb" logcat -d | grep -oE "Displayed $emulator/[^ ]+: \+[0-9s]+ms" | head -1 | grep -oE "[0-9s]+ms$" |
+    shown=$(adb logcat -d | grep -oE "Displayed $emulator/[^ ]+: \+[0-9s]+ms" | head -1 | grep -oE "[0-9s]+ms$" |
       sed 's/ms$//' | awk -F's' '{ print NF == 2 ? $1 * 1000 + $2 : $1 + 0 }')
     [ -z "$shown" ] || emit launch "$size" emulator_shown "$shown" ms 1
-    "$adb" shell am start -n "$package"/com.godot.game.GodotAppLauncher > /dev/null
+    adb shell am start -n "$package"/com.godot.game.GodotAppLauncher > /dev/null
     sleep 2
-    [ -z "$emulator" ] || "$adb" shell am force-stop "$emulator"
+    [ -z "$emulator" ] || adb shell am force-stop "$emulator"
   fi
 done
-"$adb" shell am force-stop "$package"
+adb shell am force-stop "$package"

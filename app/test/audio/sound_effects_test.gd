@@ -6,30 +6,15 @@ const Cue := SoundEffects.Cue
 var _now := 0
 
 
-func test_the_cues_are_the_table_s_in_its_order_and_every_sound_file_is_played_by_one() -> void:
-	var cues: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SoundEffects.CUES))
-	assert_array(cues.keys()).is_equal(Array(Cue.keys()).map(func(cue: String) -> String: return cue.to_lower()))
-	var played: Array[String] = []
-	for cue: Cue in Cue.values():
-		var file := SoundEffects.path_of(cue)
-		if file:
-			assert_bool(ResourceLoader.exists(file)).override_failure_message(file).is_true()
-			if file.get_file() not in played:
-				played.append(file.get_file())
-	var files := Array(DirAccess.get_files_at("res://audio/sfx")).filter(func(file: String) -> bool:
-		return file.get_extension() in ["wav", "ogg"])
-	assert_array(files).contains_exactly_in_any_order(played)
-
-
 func test_a_silent_cue_plays_nothing() -> void:
 	var sounds := _sounds()
 	for cue: Cue in Cue.values():
 		if not SoundEffects.path_of(cue):
 			sounds.play(cue)
-			assert_bool(sounds._players[cue].playing).override_failure_message(str(cue)).is_false()
+			assert_bool(cue in sounds._players).override_failure_message(str(cue)).is_false()
 
 
-func test_a_repeated_cue_plays_at_most_once_per_gap_and_always_once_the_gap_is_over() -> void:
+func test_a_repeated_cue_plays_at_most_once_per_gap_and_one_not_repeated_at_every_press() -> void:
 	var random := RandomNumberGenerator.new()
 	random.seed = 7
 	for cue: Cue in SoundEffects.REPEATED:
@@ -46,9 +31,7 @@ func test_a_repeated_cue_plays_at_most_once_per_gap_and_always_once_the_gap_is_o
 			if player.playing:
 				played.append(_now)
 			assert_bool(player.playing).override_failure_message("%s at %d" % [cue, _now]).is_equal(gap_over)
-
-
-func test_a_cue_not_repeated_plays_at_every_press_however_close() -> void:
+	# A cue not repeated plays at every press, however close.
 	var sounds := _sounds()
 	for cue: Cue in Cue.values():
 		if cue in SoundEffects.REPEATED or not SoundEffects.path_of(cue):

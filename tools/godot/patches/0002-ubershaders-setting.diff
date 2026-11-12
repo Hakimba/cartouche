@@ -1,0 +1,20 @@
+Mobile renderer: a project setting to turn ubershaders off
+
+rendering/shader_compiler/ubershaders/enabled (default true). Off, a pipeline is compiled when first drawn.
+Against godotengine/godot 4.7.2-stable (ed1daf0).
+
+diff --git a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+index b30e19ca..aa312fca 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
++++ b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+@@ -3557,7 +3557,9 @@ void RenderForwardMobile::_update_shader_quality_settings() {
+ RenderForwardMobile::RenderForwardMobile() {
+ 	singleton = this;
+ 
+-	disable_ubershaders = RD::get_singleton()->get_driver_workarounds().disable_ubershaders;
++	// Without ubershaders, a pipeline is compiled when first drawn instead of ahead of time; some drivers keep
++	// a large amount of memory for every ubershader pipeline.
++	disable_ubershaders = RD::get_singleton()->get_driver_workarounds().disable_ubershaders || !bool(GLOBAL_DEF_RST("rendering/shader_compiler/ubershaders/enabled", true));
+ 	if (disable_ubershaders) {
+ 		print_verbose("Ubershaders: Disabled");
+ 	} else {

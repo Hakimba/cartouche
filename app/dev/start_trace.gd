@@ -47,6 +47,8 @@ func _ready() -> void:
 	var bench := Diagnostics.argument("bench")
 	if bench:
 		_carousel.add_child(CarouselBench.new(bench, _carousel, _row))
+	if Diagnostics.flag("bake-plinths"):
+		_carousel.add_child(PlinthBake.new())
 	var shots := Diagnostics.argument("shots")
 	if shots:
 		_carousel.add_child(FrameShots.new(shots))

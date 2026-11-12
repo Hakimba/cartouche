@@ -2,6 +2,7 @@
 package app.cartouche.core.library
 
 import app.cartouche.core.Shipped
+import app.cartouche.core.anyText
 import arrow.core.None
 import arrow.core.Some
 import arrow.core.getOrElse
@@ -49,12 +50,12 @@ class GameNameTest {
     fun `a name is filed from its title alone under the keys its whole reading has`() = runBlocking<Unit> {
         fun filedAsRead(text: String) = GameName.parse(text).let { GameName.Filing(it.key, it.mainKey.getOrElse { it.key }) }
         Shipped.text("titles/ps2.tsv").lines().map { it.substringBefore('\t') }.forEach { GameName.filing(it) shouldBe filedAsRead(it) }
-        checkAll(Arb.choice(fileNames, Arb.string())) { text -> GameName.filing(text) shouldBe filedAsRead(text) }
+        checkAll(Arb.choice(fileNames, anyText)) { text -> GameName.filing(text) shouldBe filedAsRead(text) }
     }
 
     @Test
     fun `INV-03 reading names is total, never gives a blank title, and is idempotent on titles`() = runBlocking<Unit> {
-        checkAll(Arb.string().filter { it.isNotBlank() }) { text ->
+        checkAll(anyText.filter { it.isNotBlank() }) { text ->
             val name = GameName.parse(text)
             name.displayTitle.shouldNotBeBlank()
             GameName.parse(name.title).title shouldBe name.title

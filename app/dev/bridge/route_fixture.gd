@@ -35,7 +35,7 @@ func pick_folder() -> Pick:
 
 
 func preview_platform(_platform_id: String, _choices: PlatformSetup) -> PreviewAnswer:
-	return PreviewAnswer.new({"ok": true, "report": {"games": 2, "files": 2}})
+	return PreviewAnswer.new({"ok": true, "report": {"games": 2}})
 
 
 func set_up_platform(_platform_id: String, choices: PlatformSetup) -> LibraryAnswer:
@@ -57,7 +57,7 @@ func persisted_folders() -> FolderList:
 
 
 func _library() -> Dictionary:
-	var data := DesktopPlugin.demo("library").duplicate(true)
+	var data := DesktopPlugin.demo("library")
 	var source: Array = data.get("games", [])
 	var games: Array = source.filter(func(game: Dictionary) -> bool: return game["platform_id"] in ["gc", "gba", "ps2"] \
 		and (_added or game["platform_id"] != "ps2"))

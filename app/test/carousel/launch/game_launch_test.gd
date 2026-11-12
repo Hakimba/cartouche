@@ -62,15 +62,15 @@ func test_a_game_that_cannot_start_plays_nothing_while_it_is_checked_nor_after()
 	var carousel := await _carousel()
 	var launch := carousel._game_launch
 	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
-	android.check_code = &"game_missing"
-	android.late = true
+	android.failures[Fixtures.Request.CHECK_LAUNCH] = &"game_missing"
+	android.answers[Fixtures.Request.CHECK_LAUNCH] = Fixtures.Answer.HELD
 	launch.android = android
 	var codes := _codes(launch)
 	var as_it_was := _presence(launch)
 	carousel._unhandled_input(Fixtures.button(&"ui_accept", true))
 	for frame in 20:
 		if frame == 10:
-			android.replied.emit()
+			android.release()
 		Fixtures.step_frame(carousel)
 		_assert_nothing_shown(carousel, as_it_was)
 	assert_bool(launch.is_busy()).is_false()
@@ -84,7 +84,7 @@ func test_a_game_launched_as_the_hints_come_gives_them_back_whole() -> void:
 	Fixtures.step_until(carousel, Carousel.Screen.GAMES)
 	var launch := carousel._game_launch
 	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
-	android.start_code = &"not_installed"
+	android.failures[Fixtures.Request.START_LAUNCH] = &"not_installed"
 	launch.android = android
 	carousel._unhandled_input(Fixtures.button(&"ui_accept", true))
 	for frame in 1000:
@@ -143,13 +143,15 @@ func _check_launch(carousel: Carousel, outcome: Outcome, random: RandomNumberGen
 			waited_s = maxf(waited_s, launch._stage_s)
 		# Answers come between frames, the launch may end with them: nothing is pressed after.
 		if random.randf() < 0.3:
-			android.replied.emit()
+			android.released.emit()
 		stood = row._placed[row.selected_index()].transform
 		Fixtures.step_frame(carousel, delta)
 		frames += 1
 	if outcome in [Outcome.CHECK_ANSWERED_TOO_LATE, Outcome.START_REFUSED_TOO_LATE]:
-		android.silent.clear()
-		android.replied.emit()
+		for request: Fixtures.Request in android.answers:
+			if android.answers[request] == Fixtures.Answer.NEVER:
+				android.answers[request] = Fixtures.Answer.AT_ONCE
+		android.released.emit()
 	Fixtures.step_frame(carousel)
 	var case: String = Outcome.keys()[outcome]
 	assert_bool(launch.is_busy()).override_failure_message("%s: still busy" % case).is_false()
@@ -197,9 +199,9 @@ func _leave_or_come_back(launch: GameLaunch, outcome: Outcome, random: RandomNum
 func _failures(outcome: Outcome, android: Fixtures.FakeAndroid) -> Array[StringName]:
 	match outcome:
 		Outcome.CHECK_REFUSED:
-			return [android.check_code]
+			return [android.failures[Fixtures.Request.CHECK_LAUNCH]]
 		Outcome.START_REFUSED:
-			return [android.start_code]
+			return [android.failures[Fixtures.Request.START_LAUNCH]]
 		Outcome.CHECK_NEVER_ANSWERED, Outcome.CHECK_ANSWERED_TOO_LATE:
 			return [&"timeout"]
 	return []
@@ -230,7 +232,7 @@ func test_a_game_goes_into_its_console_from_as_far_as_its_own_medium_is_long() -
 	manifest.launch = ""
 	carousel._appearance._consoles["nes"] = manifest
 	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
-	android.check_code = &"not_installed"
+	android.failures[Fixtures.Request.CHECK_LAUNCH] = &"not_installed"
 	carousel._game_launch.android = android
 	var platform := Fixtures.platform("nes")
 	var lifts: Dictionary[String, float] = {}
@@ -287,27 +289,29 @@ func _carousel(platform := "gba") -> Carousel:
 func _android(outcome: Outcome, launch: GameLaunch, random: RandomNumberGenerator) -> Fixtures.FakeAndroid:
 	var android: Fixtures.FakeAndroid = auto_free(Fixtures.FakeAndroid.new())
 	launch.android = android
-	android.late = random.randf() < 0.5
+	if random.randf() < 0.5:
+		android.answers[Fixtures.Request.CHECK_LAUNCH] = Fixtures.Answer.HELD
+		android.answers[Fixtures.Request.START_LAUNCH] = Fixtures.Answer.HELD
 	var failure := FAILURES[random.randi_range(0, FAILURES.size() - 1)]
 	match outcome:
 		Outcome.CHECK_REFUSED:
-			android.check_code = failure
+			android.failures[Fixtures.Request.CHECK_LAUNCH] = failure
 		Outcome.START_REFUSED:
-			android.start_code = failure
+			android.failures[Fixtures.Request.START_LAUNCH] = failure
 		Outcome.BACK_BEFORE_THE_ANSWER:
 			android.on_start = func() -> void: _leave_and_come_back(launch)
 		Outcome.BACK_BEFORE_NO_ANSWER:
 			android.on_start = func() -> void: _leave_and_come_back(launch)
-			android.silent = [&"start"]
+			android.answers[Fixtures.Request.START_LAUNCH] = Fixtures.Answer.NEVER
 		Outcome.LEFT_BEFORE_THE_ANSWER:
 			android.on_start = func() -> void: launch.notification(Node.NOTIFICATION_APPLICATION_PAUSED)
 		Outcome.CHECK_NEVER_ANSWERED, Outcome.CHECK_ANSWERED_TOO_LATE:
-			android.silent = [&"check"]
+			android.answers[Fixtures.Request.CHECK_LAUNCH] = Fixtures.Answer.NEVER
 		Outcome.START_NEVER_ANSWERED:
-			android.silent = [&"start"]
+			android.answers[Fixtures.Request.START_LAUNCH] = Fixtures.Answer.NEVER
 		Outcome.START_REFUSED_TOO_LATE:
-			android.silent = [&"start"]
-			android.start_code = failure
+			android.answers[Fixtures.Request.START_LAUNCH] = Fixtures.Answer.NEVER
+			android.failures[Fixtures.Request.START_LAUNCH] = failure
 	return android
 
 
@@ -339,7 +343,7 @@ func _assert_nothing_shown(carousel: Carousel, as_it_was: Dictionary[CanvasItem,
 	var launch := carousel._game_launch
 	assert_bool(launch.blackout.visible).is_false()
 	assert_bool(launch.spindle.visible).is_false()
-	assert_bool(carousel._row._launched).is_false()
+	assert_int(carousel._row.standing().mode).is_not_equal(SelectedStand.Mode.OUTSIDE)
 	for control: CanvasItem in launch.controls:
 		assert_float(control.modulate.a).is_equal(as_it_was[control])
 
@@ -348,7 +352,7 @@ func _assert_nothing_shown(carousel: Carousel, as_it_was: Dictionary[CanvasItem,
 func _assert_on_the_console_spindle(carousel: Carousel) -> void:
 	var row := carousel._row
 	var console: ConsoleModel = carousel._consoles.selected().model
-	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	var place: ShelfPlace = row._placed[row.selected_index()]
 	var seat := row.global_transform.affine_inverse() * console.global_transform * console.seat()
 	var model: Node3D = place.shown._label_mesh.get_parent()
 	var on_console := console.global_transform * console.seat()
@@ -372,7 +376,7 @@ func _assert_into_the_console(carousel: Carousel) -> void:
 	var spindle: Spindle = console.get_node_or_null("%Spindle")
 	if spindle:
 		var rotor := spindle._rotor.basis
-		var spin := carousel._row._launch_spin
+		var spin := carousel._row.standing().spin
 		if sequence.disc_away >= 1.0:
 			assert_bool(rotor.is_equal_approx(Basis(Vector3.BACK, spin))).is_true()
 			_spun = maxf(_spun, spin)
@@ -387,7 +391,7 @@ func _assert_into_the_console(carousel: Carousel) -> void:
 
 ## Once seated and still, the game is on the spindle.
 func _assert_on_the_spindle(launch: GameLaunch, row: ShelfRow) -> void:
-	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	var place: ShelfPlace = row._placed[row.selected_index()]
 	assert_bool(place.transform.is_equal_approx(launch.spindle.transform)).is_true()
 
 
@@ -408,8 +412,8 @@ func _assert_black(launch: GameLaunch) -> void:
 ## A), unturned and faded as laid out; the controls as [param as_it_was]; no spindle, no black.
 func _assert_as_before_the_launch(carousel: Carousel, as_it_was: Dictionary[CanvasItem, float]) -> void:
 	var row := carousel._row
-	assert_bool(row._launched).is_false()
-	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	assert_int(row.standing().mode).is_not_equal(SelectedStand.Mode.OUTSIDE)
+	var place: ShelfPlace = row._placed[row.selected_index()]
 	var offset: float = GamesLayout.offsets(row._games.size(), row._scroll)[row.selected_index()]
 	var model := row._models[row.selected_game().medium]
 	var layout := GamesLayout.new(ConsoleManifest.folder_of(model))
@@ -417,7 +421,7 @@ func _assert_as_before_the_launch(carousel: Carousel, as_it_was: Dictionary[Canv
 	assert_bool(place.shown.transform.is_equal_approx(Transform3D.IDENTITY)).is_true()
 	assert_float(place.transform.origin.x).is_equal_approx(laid_out.origin.x, 0.0001)
 	assert_float(place.transform.origin.z).is_equal_approx(laid_out.origin.z, 0.0001)
-	assert_float(place.shown._fade.amount).is_equal_approx(0.0, 0.0001)
+	assert_float(place.media_view.modulate.a).is_equal(1.0)
 	for control: CanvasItem in carousel._game_launch.controls:
 		assert_float(control.modulate.a).is_equal(as_it_was[control])
 	assert_bool(carousel._game_launch.blackout.visible).is_false()

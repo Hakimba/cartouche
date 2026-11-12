@@ -19,7 +19,7 @@ func test_neighbours_stand_parallel_to_the_screen_for_every_medium_and_distance(
 func test_the_bounded_pool_matches_the_whole_ring_including_small_shelves_and_large_wraps() -> void:
 	var random := RandomNumberGenerator.new()
 	random.seed = 120604
-	for n: int in [1, 2, 3, 4, 5, 6, 7, 8, 50, 1000, 5000]:
+	for n: int in [1, 3, 4, 5, 6, 7, 8, 50, 1000, 5000]:
 		for case in 30:
 			var scroll := random.randf_range(-20000.0, 20000.0)
 			var shown := GamesLayout.offsets(n, scroll)
@@ -38,10 +38,6 @@ func test_the_bounded_pool_matches_the_whole_ring_including_small_shelves_and_la
 				farther = absf(d)
 
 
-func test_a_medium_without_an_entry_stands_as_the_disc() -> void:
-	assert_bool(GamesLayout.new("unlisted_medium").chosen == GamesLayout.new("ps2_dvd").chosen).is_true()
-
-
 func test_a_medium_stands_in_the_row_as_the_others_of_its_kind_whatever_its_name() -> void:
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/carousel/appearance.json"))
 	var kind_media: Dictionary = data["kind_media"]
@@ -52,3 +48,10 @@ func test_a_medium_stands_in_the_row_as_the_others_of_its_kind_whatever_its_name
 		var kind := GamesLayout.new(kind_medium)
 		assert_bool(own.side == kind.side and own.side_size == kind.side_size).override_failure_message(
 			"%s stands unlike its kind %s" % [medium, found[medium].media]).is_true()
+
+
+func test_the_games_ring_shows_small_shelves_once_and_wraps_both_ways() -> void:
+	assert_array(GamesLayout.offsets(1, 0.0).keys()).is_equal([0])
+	assert_array(GamesLayout.offsets(2, 0.0).keys()).contains_exactly_in_any_order([0, 1])
+	assert_float(GamesLayout.offsets(5, 4.0)[0]).is_equal(1.0)
+	assert_float(GamesLayout.offsets(5, 0.0)[4]).is_equal(-1.0)

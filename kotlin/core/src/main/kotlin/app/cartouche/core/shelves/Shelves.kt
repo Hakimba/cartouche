@@ -18,6 +18,7 @@ import arrow.core.serialization.OptionSerializer
 import arrow.core.toNonEmptyListOrNone
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import java.text.CollationKey
 import java.text.Collator
 import java.util.Locale
 
@@ -81,8 +82,12 @@ public data class Shelves(public val shelves: NonEmptyList<Shelf>, public val se
          * Each platform's games of [library] in the order of its shelf, whether or not the catalog has the platform.
          */
         public fun gamesByPlatform(library: Library): Map<PlatformId, List<Game>> {
-            val order = titleOrder()
-            return library.games.groupBy { it.platform }.mapValues { (_, games) -> games.sortedWith(compareBy(order, SelectedGame::of)) }
+            // A collator is not thread-safe: one per call. A key per game, so a comparison is not a collation.
+            val collator = Collator.getInstance(Locale.ROOT)
+            val byTitle = compareBy<Pair<Game, CollationKey>> { it.second }.thenBy { it.first.id.value }
+            return library.games.groupBy { it.platform }.mapValues { (_, games) ->
+                games.map { it to collator.getCollationKey(it.title) }.sortedWith(byTitle).map { it.first }
+            }
         }
 
         /** Titles as a reader sorts them (case and accents count last), then ids: a total order. */

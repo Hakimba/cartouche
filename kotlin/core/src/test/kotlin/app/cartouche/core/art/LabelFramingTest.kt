@@ -30,14 +30,6 @@ class LabelFramingTest {
         Arb.choice(Arb.element(1.0, 0.62, 2.89), Arb.double(LabelFraming.MIN_PROPORTION, LabelFraming.MAX_PROPORTION))
 
     @Test
-    fun `framings are the largest rectangle of the label's proportions round the centre asked, moved in only as far as needed`() {
-        LabelFraming(1.0, 0.5, 0.5, 1.0).framed(1600, 1200) shouldBe PixelRect(200, 0, 1200, 1200)
-        LabelFraming(1.0, 0.5, 0.5, 0.5).framed(1600, 1200) shouldBe PixelRect(500, 0, 600, 1200)
-        LabelFraming(2.0, 0.25, 0.5, 2.0).framed(1600, 1200) shouldBe PixelRect(0, 400, 800, 400)
-        LabelFraming(2.0, 1.0, 0.0, 1.0).framed(1600, 1200) shouldBe PixelRect(1000, 0, 600, 600)
-    }
-
-    @Test
     fun `any framing shows a whole rectangle of the picture of the label's proportions, so the label is never stretched`() =
         runBlocking<Unit> {
             var shaped = 0

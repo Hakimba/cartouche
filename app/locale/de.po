@@ -479,3 +479,12 @@ msgstr "Ein Pixelschleier wogt hinter den Bildschirmen"
 
 msgid "Coming soon: not fully supported yet"
 msgstr "Bald da: noch nicht vollständig unterstützt"
+
+msgid "Games in a line"
+msgstr "Spiele in einer Reihe"
+
+msgid "The games stand in a straight line instead of an arc"
+msgstr "Die Spiele stehen in einer geraden Reihe statt im Bogen"
+
+msgid "Your library could not be read. Add your consoles again."
+msgstr "Deine Bibliothek konnte nicht gelesen werden. Füge deine Konsolen erneut hinzu."

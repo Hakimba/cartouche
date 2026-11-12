@@ -220,27 +220,20 @@ public class ArtSources(
         /**
          * The automatic labels of [after]'s games cut otherwise now than when they were cut as [before]'s same games
          * were (the shell their file's header tells, once known, moves a Game Boy Color exclusive's label): those a
-         * scan looks up again, the image cut anew; a label the user chose is never one.
+         * scan looks up again, the image cut anew; a label the user chose is never one. Read from [catalog]'s
+         * profiles alone: no table is indexed.
          */
-        public fun recut(before: List<Game>, after: List<Game>, sources: (PlatformId) -> ArtSources): Set<GameId> {
+        public fun recut(before: List<Game>, after: List<Game>, catalog: Catalog): Set<GameId> {
             val was = before.associateBy { it.id }
             return after
                 .filter { game ->
                     game.label == LabelChoice.Automatic &&
-                        was.getOrNone(game.id).isSome { !sources(game.platform).cutOf(it).cutsAs(sources(game.platform).cutOf(game)) }
+                        was.getOrNone(game.id).isSome { !cutOf(catalog, it).cutsAs(cutOf(catalog, game)) }
                 }.mapTo(HashSet()) { it.id }
         }
 
-        /**
-         * Which automatic labels of [games] are looked up again from scratch: those a source of their platform's
-         * [sources] may have art for, and those none can, whose image goes; a label the user chose, their own picture
-         * or a region's image, is neither, and stays.
-         */
-        public fun lookAgain(games: List<Game>, sources: (PlatformId) -> ArtSources): LookAgain {
-            val automatic = games.filter { it.label == LabelChoice.Automatic }
-            val (asked, unfound) = automatic.partition { sources(it.platform).requestFor(it).isSome() }
-            return LookAgain(asked.mapTo(HashSet()) { it.id }, unfound.mapTo(HashSet()) { it.id })
-        }
+        /** How [game]'s label is cut from a scan, as its platform's sources cut it, from its profile in [catalog] alone. */
+        public fun cutOf(catalog: Catalog, game: Game): LabelCut = of(catalog, game.platform, PlatformTables()).cutOf(game)
     }
 }
 
@@ -249,9 +242,6 @@ public class ArtSources(
  * with their sources' version: known absent at once, they show their title.
  */
 public data class ArtPlan(public val requests: List<ArtRequest>, public val unfound: Map<GameId, Option<ArtVersion>>)
-
-/** The games whose label is looked up again ([asked]), and those no source can have art for ([unfound]). */
-public data class LookAgain(public val asked: Set<GameId>, public val unfound: Set<GameId>)
 
 /**
  * The scans of [serials] (`SLPM-65688`) at this source, in order, of no stated region; serials of another form, as

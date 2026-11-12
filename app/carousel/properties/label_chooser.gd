@@ -19,7 +19,12 @@ const _ZOOM_SPEED := 1.8
 
 var row: ShelfRow
 var art: GameArt
-var android: AndroidServices
+var android: AndroidServices:
+	set(services):
+		if android:
+			android.label_variant_downloaded.disconnect(_on_label_variant_downloaded)
+		android = services
+		android.label_variant_downloaded.connect(_on_label_variant_downloaded)
 ## The game whose picture, as framed, shows on its disc until its kept image is read.
 var framed_game := ""
 
@@ -52,19 +57,22 @@ func _ready() -> void:
 	_picture_reader.read.connect(func(_key: String, picture: Texture2D) -> void: picture_read.emit(picture))
 
 
-## Lists the images [param game]'s label can show, as cards, its [param kind] shaping them.
-func fill(game: AndroidServices.Game, kind: LabelZone.Shape) -> void:
+## Asks for the images [param game]'s label can show, its [param kind] shaping their cards ([method fill]).
+func ask(game: AndroidServices.Game, kind: LabelZone.Shape) -> AndroidServices.LabelVariants:
 	_game = game
 	_kind = kind
 	_downloaded.clear()
-	if not android.label_variant_downloaded.is_connected(_on_label_variant_downloaded):
-		android.label_variant_downloaded.connect(_on_label_variant_downloaded)
 	var started := Time.get_ticks_msec()
 	var answer := await android.label_variants(_game)
-	if not answer.ok:
-		Diagnostics.trace("properties", "no images listed (%s): %s" % [answer.code, answer.detail])
 	Diagnostics.trace("properties", "%d images of %s listed in %d ms" % [
 		answer.variants.size(), _game.title, Time.get_ticks_msec() - started])
+	return answer
+
+
+## The images [param answer] lists, as cards.
+func fill(answer: AndroidServices.LabelVariants) -> void:
+	if not answer.ok:
+		Diagnostics.trace("properties", "no images listed (%s): %s" % [answer.code, answer.detail])
 	clear()
 	for variant in answer.variants:
 		var card := LabelCard.new(variant.region, variant.source,
@@ -115,18 +123,22 @@ func own_card() -> LabelCard:
 	return _cards.get_child(-1) as LabelCard
 
 
-## Keeps [param card]'s image, downloaded, on the label.
+## Keeps [param card]'s image, downloaded, on the label; kept even once the card is gone.
 func choose(card: LabelCard) -> AndroidServices.Result:
-	var answer := await android.choose_label(_game, card.region, card.source)
+	var game := _game
+	var region := card.region
+	var source := card.source
+	var label := card.label
+	var answer := await android.choose_label(game, region, source)
 	if not answer.ok:
 		Diagnostics.trace("properties", "label not kept (%s): %s" % [answer.code, answer.detail])
 		return answer
-	Diagnostics.trace("properties", "%s: label of region '%s' from %s kept" % [_game.title, card.region, card.source])
-	_game.has_label_region = true
-	_game.label_region = card.region
-	_game.label_source = card.source
-	_game.label_own = false
-	art.add(answer.art, card.label)
+	Diagnostics.trace("properties", "%s: label of region '%s' from %s kept" % [game.title, region, source])
+	game.has_label_region = true
+	game.label_region = region
+	game.label_source = source
+	game.label_own = false
+	art.add(answer.art, label)
 	return answer
 
 
@@ -179,18 +191,22 @@ func pinch(event: InputEventMagnifyGesture) -> void:
 	_preview_framed()
 
 
-## Keeps the picture as framed on the label.
+## Keeps the picture as framed on the label; the disc shows it as framed until the kept one is read, unless it was
+## dropped meanwhile.
 func keep_own() -> AndroidServices.Result:
-	var answer := await android.keep_own_label(_game, _framing)
+	var game := _game
+	var framing := _framing
+	var answer := await android.keep_own_label(game, framing)
 	if not answer.ok:
 		Diagnostics.trace("properties", "own picture not kept (%s): %s" % [answer.code, answer.detail])
 		return answer
-	Diagnostics.trace("properties", "%s: own picture kept, zoom %.2f, centre %s" % [_game.title, _framing.zoom, _framing.centre])
-	_game.label_own = true
-	_game.has_label_region = false
+	Diagnostics.trace("properties", "%s: own picture kept, zoom %.2f, centre %s" % [game.title, framing.zoom, framing.centre])
+	game.label_own = true
+	game.has_label_region = false
 	art.add(answer.art)
-	framed_game = _game.id
-	art.request(_game)
+	if _picture_texture:
+		framed_game = game.id
+	art.request(game)
 	return answer
 
 
@@ -200,10 +216,13 @@ func drop_picture() -> void:
 	_picture_texture = null
 
 
-## The disc shows the image kept for its label, read now, in place of the picture as framed.
-func show_kept_label() -> void:
+## The image kept for its label is read: the picture as framed is let go, and the disc shows the kept one in its place
+## when [param on_disc].
+func show_kept_label(on_disc := true) -> void:
 	framed_game = ""
-	drop_picture()
+	if on_disc:
+		row.show_own_label()
+	_picture_texture = null
 
 
 func _preview(card: LabelCard) -> void:

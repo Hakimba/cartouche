@@ -30,8 +30,9 @@ public class ArtIndex private constructor(
     /** How many games the extract knows. */
     public val size: Int,
 ) {
-    private class Image(val region: String, file: String) {
-        val url: ArtUrl = ArtUrl(IMAGES + file)
+    private class Image(val region: String, private val file: String) {
+        // Built on demand: the prefix is not copied into each of thousands of images.
+        val url: ArtUrl get() = ArtUrl(IMAGES + file)
     }
 
     /** Compared by identity: two lines of the extract are two games, whatever they hold. */

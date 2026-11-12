@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name ConfirmRemoval
-extends Control
+extends Page
 ## "Remove <platform>?": what goes, and that the game files stay, on a satin card as the settings' over the veiled
-## screen. The focus, the settings' ring round a pill, starts on "Cancel"; B cancels too.
-
-## [param remove] is false when cancelled.
-signal answered(remove: bool)
+## screen. The focus, the settings' ring round a pill, starts on "Cancel"; B cancels too. It answers whether to remove
+## (false when cancelled).
 
 ## The card's corners, the focus ring's reach past a pill and its corners, as the settings' card and rows have them.
 const _CARD_RADIUS := 28.16
@@ -43,29 +41,44 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
 		Sounds.play(SoundEffects.Cue.BACK)
-		answered.emit(false)
+		done.emit(false)
 
 
-## Asks about [param platform_name] and its [param games] games, whose folder is on
-## [param volume] (`card`, `internal`, or empty when unknown).
-func open(platform_name: String, games: int, volume: StringName) -> void:
-	_title.text = tr("Remove {platform}?").format({"platform": platform_name})
+## Asks what [param request] (an [Asked]) says.
+func _open(request: Variant) -> void:
+	var asked: Asked = request
+	_title.text = tr("Remove {platform}?").format({"platform": asked.platform_name})
 	var goes := tr_n("Its {count} game, its image and the access to its folder will be removed from Cartouche.",
-		"Its {count} games, their images and the access to its folder will be removed from Cartouche.", games) \
-		if games > 0 else tr("Its choices and the access to its folder will be removed from Cartouche.")
+		"Its {count} games, their images and the access to its folder will be removed from Cartouche.", asked.games) \
+		if asked.games > 0 else tr("Its choices and the access to its folder will be removed from Cartouche.")
 	var stays: String = {
 		&"card": tr("Your game files stay on the SD card."),
 		&"internal": tr("Your game files stay in the internal storage."),
-	}.get(volume, tr("Your game files stay where they are."))
-	_text.text = goes.format({"count": games}) + " " + stays
+	}.get(asked.volume, tr("Your game files stay where they are."))
+	_text.text = goes.format({"count": asked.games}) + " " + stays
 	_cancel.grab_focus()
 
 
 func _on_cancel_pressed() -> void:
 	Sounds.play(SoundEffects.Cue.BACK)
-	answered.emit(false)
+	done.emit(false)
 
 
 func _on_remove_pressed() -> void:
 	Sounds.play(SoundEffects.Cue.REMOVE)
-	answered.emit(true)
+	done.emit(true)
+
+
+## What the page asks about: the platform's name, how many games it has, and the volume its folder is on (`card`,
+## `internal`, or empty when unknown).
+class Asked:
+	extends RefCounted
+
+	var platform_name: String
+	var games: int
+	var volume: StringName
+
+	func _init(platform: String, count: int, on: StringName) -> void:
+		platform_name = platform
+		games = count
+		volume = on

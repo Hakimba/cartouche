@@ -87,7 +87,11 @@ func has_texture(game: AndroidServices.Game) -> bool:
 
 ## The texture of a game that [method has_texture].
 func texture(game: AndroidServices.Game) -> Texture2D:
-	return _textures[game.id]
+	# Shown last: the oldest shown goes first when room is needed.
+	var shown: Texture2D = _textures[game.id]
+	_textures.erase(game.id)
+	_textures[game.id] = shown
+	return shown
 
 
 ## Starts reading [param game]'s image, unless it has no art, has its texture, is being read or
@@ -97,6 +101,20 @@ func request(game: AndroidServices.Game) -> void:
 	if not has_art(game) or id in _textures or _reader.is_reading(id) or id in _unreadable:
 		return
 	_reader.request(id, _art[id].path, game.title)
+
+
+## Whether [param game]'s image is being read.
+func is_reading(game: AndroidServices.Game) -> bool:
+	return _reader.is_reading(game.id)
+
+
+## Stops reading [param game]'s image when it is [param away] games from the one selected: further than half the
+## textures kept, it would be dropped before the row came back to it. Whether it was stopped.
+func cancel_far(game: AndroidServices.Game, away: int) -> bool:
+	if away * 2 <= _KEPT:
+		return false
+	_reader.cancel(game.id)
+	return true
 
 
 func _on_read(game_id: String, read: Texture2D) -> void:

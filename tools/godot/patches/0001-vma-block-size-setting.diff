@@ -1,0 +1,32 @@
+Vulkan: a project setting for the size of the memory blocks
+
+rendering/rendering_device/vulkan/memory_block_size_mb (0 = the allocator's default, 256 MiB) sets
+VmaAllocatorCreateInfo::preferredLargeHeapBlockSize. Against godotengine/godot 4.7.2-stable (ed1daf0).
+
+diff --git a/core/config/project_settings.cpp b/core/config/project_settings.cpp
+index 0e078c32..3957846a 100644
+--- a/core/config/project_settings.cpp
++++ b/core/config/project_settings.cpp
+@@ -1829,6 +1829,7 @@ ProjectSettings::ProjectSettings() {
+ 	GLOBAL_DEF_RST(PropertyInfo(Variant::BOOL, "rendering/rendering_device/pipeline_cache/enable"), true);
+ 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/rendering_device/pipeline_cache/save_chunk_size_mb", PROPERTY_HINT_RANGE, "0.000001,64.0,0.001,or_greater"), 3.0);
+ 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/rendering_device/vulkan/max_descriptors_per_pool", PROPERTY_HINT_RANGE, "1,256,1,or_greater"), 64);
++	GLOBAL_DEF_RST(PropertyInfo(Variant::INT, "rendering/rendering_device/vulkan/memory_block_size_mb", PROPERTY_HINT_RANGE, "0,256,1"), 0);
+ 
+ 	GLOBAL_DEF_RST("rendering/rendering_device/d3d12/max_resource_descriptors", 65536);
+ 	custom_prop_info["rendering/rendering_device/d3d12/max_resource_descriptors"] = PropertyInfo(Variant::INT, "rendering/rendering_device/d3d12/max_resource_descriptors", PROPERTY_HINT_RANGE, "512,1000000");
+diff --git a/drivers/vulkan/rendering_device_driver_vulkan.cpp b/drivers/vulkan/rendering_device_driver_vulkan.cpp
+index 4b1bd9fd..ee125f7d 100644
+--- a/drivers/vulkan/rendering_device_driver_vulkan.cpp
++++ b/drivers/vulkan/rendering_device_driver_vulkan.cpp
+@@ -1562,6 +1562,10 @@ Error RenderingDeviceDriverVulkan::_initialize_allocator() {
+ 	if (buffer_device_address_support) {
+ 		allocator_info.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+ 	}
++	// VMA returns a block to the system only once it is empty, so smaller blocks keep less memory reserved.
++	// 0 keeps VMA's default (256 MiB).
++	const uint64_t block_size_mb = GLOBAL_GET("rendering/rendering_device/vulkan/memory_block_size_mb");
++	allocator_info.preferredLargeHeapBlockSize = block_size_mb * 1024 * 1024;
+ 	VkResult err = vmaCreateAllocator(&allocator_info, &allocator);
+ 	ERR_FAIL_COND_V_MSG(err, ERR_CANT_CREATE, vformat("Couldn't create Vulkan memory allocator (VkResult error %d).", err));
+ 

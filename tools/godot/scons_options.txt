@@ -1,0 +1,30 @@
+# Options of the engine build behind the Android export template, one per line, given to scons by
+# scripts/godot_template.sh. What each one is for: docs/README.md, "The engine template".
+platform=android
+arch=arm64
+production=yes
+lto=thin
+debug_symbols=no
+swappy=yes
+deprecated=no
+disable_xr=yes
+disable_physics_2d=yes
+disable_physics_3d=yes
+disable_navigation_2d=yes
+disable_navigation_3d=yes
+module_camera_enabled=no
+module_csg_enabled=no
+module_enet_enabled=no
+module_fbx_enabled=no
+module_gltf_enabled=no
+module_gridmap_enabled=no
+module_interactive_music_enabled=no
+module_jsonrpc_enabled=no
+module_multiplayer_enabled=no
+module_noise_enabled=no
+module_raycast_enabled=no
+module_theora_enabled=no
+module_upnp_enabled=no
+module_visual_shader_enabled=no
+module_webrtc_enabled=no
+module_zip_enabled=no

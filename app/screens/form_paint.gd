@@ -2,7 +2,8 @@
 class_name FormPaint
 extends RefCounted
 ## What the add-console form draws its own way: the materials of its step chips, switches and pill buttons, the
-## focus card that moves between them, and the plain look of the controls that only hold focus and a press.
+## focus card that moves between them, its rows' separators and chevrons, and the plain look of the controls that
+## only hold focus and a press.
 
 ## One hundredth of the 1280 px frame's width, in px.
 const CQW := 12.8
@@ -16,70 +17,20 @@ const JAKARTA_ASCENT := 1.038
 const TITLE_PX := 4.6 * CQW
 const _COUNT_PX := 1.7 * CQW
 const _COUNT_SHIFT := Vector2(-1.0, -1.0)
+## A row's text and marks end this far from its right edge, in px.
+const PAD_RIGHT := 1.8 * CQW
+## A row's separator: from its step chip's left to this far from its right edge, this far under it, in px.
+const _SEPARATOR_LEFT := 2.2 * CQW
+const _SEPARATOR_RIGHT := 1.4 * CQW
+const _SEPARATOR_GAP := 0.3 * CQW
+## How long a text takes to light up or go back to muted.
+const LIT_S := 0.3
 ## The lines kept, so a text shaped once is not shaped again each time it is drawn.
 const _LINES_KEPT := 96
 
 static var _lines: Dictionary[String, StudioText] = {}
-
-
-## A Studio material of any recipe on a box of its own, drawn behind the canvas item it is made for (as
-## [SatinPanel.Backing] does for the standard looks).
-class Layer:
-	extends RefCounted
-
-	## The material; set again (or [method repaint]) after its colours change.
-	var shown: StudioMaterial:
-		set(value):
-			shown = value
-			repaint()
-	## The colour its tinted shadows take.
-	var tint := StudioTokens.NEUTRAL:
-		set(value):
-			tint = value
-			repaint()
-
-	var _item := RenderingServer.canvas_item_create()
-	var _shader := ShaderMaterial.new()
-	var _grow := 0.0
-	var _box := Rect2()
-	var _radius := -1.0
-
-	func _init(owner: CanvasItem, material: StudioMaterial) -> void:
-		_shader.shader = preload("res://studio/satin_panel.gdshader")
-		RenderingServer.canvas_item_set_parent(_item, owner.get_canvas_item())
-		RenderingServer.canvas_item_set_draw_behind_parent(_item, true)
-		RenderingServer.canvas_item_set_material(_item, _shader.get_rid())
-		shown = material
-
-	func _notification(what: int) -> void:
-		if what == NOTIFICATION_PREDELETE:
-			RenderingServer.free_rid(_item)
-
-	func repaint() -> void:
-		var parameters := SatinPanel.Backing.recipe(shown, tint)
-		for parameter in parameters:
-			_shader.set_shader_parameter(parameter, parameters[parameter])
-		_grow = shown.reach()
-		# Cleared, it stays so: a new colour paints only a layer that is placed.
-		if _box.has_area():
-			place(_box, _radius)
-
-	func clear() -> void:
-		_box = Rect2()
-		RenderingServer.canvas_item_clear(_item)
-
-	## Draws the material on [param box] (the owner's coordinates), its corners rounded by [param radius], or by
-	## the material's own when negative.
-	func place(box: Rect2, radius := -1.0) -> void:
-		_box = box
-		_radius = radius
-		var quad := box.grow(_grow)
-		_shader.set_shader_parameter(&"box_position", box.position - quad.position)
-		_shader.set_shader_parameter(&"box_size", box.size)
-		_shader.set_shader_parameter(&"radius", shown.radius if radius < 0.0 else radius)
-		RenderingServer.canvas_item_clear(_item)
-		RenderingServer.canvas_item_set_transform(_item, Transform2D(0.0, quad.position))
-		RenderingServer.canvas_item_add_rect(_item, Rect2(Vector2.ZERO, quad.size), Color.WHITE)
+## The box of every plain control: none.
+static var _no_box := StyleBoxEmpty.new()
 
 
 ## The card that rests on the focused field, and the bare ring round a pill button: the satin card with the gel's
@@ -101,17 +52,40 @@ class Card:
 			radius = value
 			_layer.place(Rect2(Vector2.ZERO, size), radius)
 
-	var _layer: Layer
+	var _layer: SatinPanel.Backing
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_layer = Layer.new(self, FormPaint.card_material(true))
+		_layer = SatinPanel.Backing.of(self, FormPaint.card_material(true))
 
 	func _notification(what: int) -> void:
 		if what == NOTIFICATION_RESIZED:
 			_layer.place(Rect2(Vector2.ZERO, size), radius)
 		elif what == NOTIFICATION_THEME_CHANGED:
 			_layer.shown = FormPaint.card_material(not bare)
+
+
+## How far a text of [param canvas] is lit, 0 (muted) to 1 (white): eased over [constant LIT_S] when it changes.
+class Lit:
+	extends RefCounted
+
+	var at := 0.0
+	var _canvas: CanvasItem
+	var _lighting: Tween
+
+	func _init(canvas: CanvasItem) -> void:
+		_canvas = canvas
+
+	func light(to: float) -> void:
+		var from := at
+		_lighting = Motion.restart(_canvas, _lighting)
+		_lighting.tween_method(func(t: float) -> void:
+			at = lerpf(from, to, Motion.eased(Motion.Easing.EASE, t))
+			_canvas.queue_redraw(), 0.0, 1.0, LIT_S)
+
+	## The muted ink as lit now.
+	func ink() -> Color:
+		return Backdrop.palette.mute.lerp(Color.WHITE, at)
 
 
 ## The card's material: the focused card (the satin card and its shadow, with no gel ring or glow), or the ring
@@ -146,6 +120,23 @@ static func draw_count(canvas: CanvasItem, number: String, rest: String, rim: Co
 	line(rest, StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08).draw(canvas, _COUNT_SHIFT + Vector2(shown.width, 0.0), Backdrop.palette.mute)
 
 
+## The 1 px line under a row of [param canvas], in its own coordinates.
+static func separator(canvas: Control) -> void:
+	canvas.draw_rect(Rect2(_SEPARATOR_LEFT, canvas.size.y + _SEPARATOR_GAP - 1.0,
+		canvas.size.x - _SEPARATOR_LEFT - _SEPARATOR_RIGHT, 1.0), Backdrop.palette.line)
+
+
+## A chevron on [param canvas] pointing to [param tip]: its arms go [param back] from the tip and [param side] each
+## way across, [param stroke] wide in [param ink]; their ends rounded when [param rounded].
+static func chevron(canvas: CanvasItem, tip: Vector2, back: Vector2, side: Vector2, ink: Color, stroke: float,
+		rounded := true) -> void:
+	var points := PackedVector2Array([tip + back - side, tip, tip + back + side])
+	canvas.draw_polyline(points, ink, stroke, true)
+	if rounded:
+		for point in points:
+			canvas.draw_circle(point, stroke / 2.0, ink)
+
+
 ## A material of [param colors] over [param stops] and [param shadows] (each as [StudioTokens] lists them), on a
 ## box rounded by [param radius]; a radial fill when [param centre] is not (-1, -1).
 static func material(colors: Array[Color], radius: float, shadows: Array, centre := Vector2(-1.0, -1.0),
@@ -166,7 +157,7 @@ static func material(colors: Array[Color], radius: float, shadows: Array, centre
 static func plain(button: Button) -> void:
 	button.flat = true
 	for state: StringName in [&"focus", &"normal", &"hover", &"pressed", &"disabled", &"hover_pressed"]:
-		button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		button.add_theme_stylebox_override(state, _no_box)
 	for colour: StringName in [&"font_color", &"font_focus_color", &"font_hover_color", &"font_pressed_color",
 			&"font_hover_pressed_color", &"font_disabled_color"]:
 		button.add_theme_color_override(colour, Color.TRANSPARENT)

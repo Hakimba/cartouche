@@ -4,6 +4,7 @@ package app.cartouche.android.storage
 import app.cartouche.core.files.ByteSource
 import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.ReadFailure
+import app.cartouche.core.serialName
 import arrow.core.Either
 import arrow.core.raise.catch
 import arrow.core.raise.either
@@ -32,6 +33,6 @@ internal val FileFacts.described: String
     get() =
         when (this) {
             is FileFacts.Serial -> "serial $code"
-            is FileFacts.Print -> "print $hex, shell ${shell.key}"
+            is FileFacts.Print -> "print $hex, shell ${shell.serialName}"
             FileFacts.Silent -> "nothing read"
         }

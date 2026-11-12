@@ -1,0 +1,360 @@
+Mobile renderer: specialized pipelines compiled ahead when ubershaders are off
+
+rendering/shader_compiler/ubershaders/specialized_pipelines (default empty): twelve numbers per pipeline, as
+printed by a run with rendering/shader_compiler/ubershaders/print_specialized_pipelines. With ubershaders off,
+each one is compiled in the background, behind every other task, as soon as a surface it names is known; a frame
+that needs one before its turn compiles it itself. Applies after 0002. Against godotengine/godot 4.7.2-stable
+(ed1daf0).
+
+diff --git a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+index aa312fc..1d74e81 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
++++ b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.cpp
+@@ -2589,7 +2589,15 @@ void RenderForwardMobile::_render_list_template(RenderingDevice::DrawListID p_dr
+ 
+ 			if (shader != prev_shader || pipeline_hash != prev_pipeline_hash) {
+ 				RSE::PipelineSource pipeline_source = pipeline_key.ubershader ? RSE::PIPELINE_SOURCE_DRAW : RSE::PIPELINE_SOURCE_SPECIALIZATION;
+-				pipeline_rd = shader->pipeline_hash_map.get_pipeline(pipeline_key, pipeline_hash, pipeline_key.ubershader == (ubershader_iterations - 1), pipeline_source);
++				if (unlikely(print_specialized_pipelines) && !pipeline_key.ubershader && !shadow_pass) {
++					_print_specialized_pipeline(shader, mesh_surface, surf->owner->mesh_instance.is_valid(), pipeline_key);
++				}
++				if (disable_ubershaders) {
++					// A listed pipeline still in the queue is compiled here, now: the frame does not wait for the ones before it.
++					pipeline_rd = shader->pipeline_hash_map.get_pipeline_compiled_by_caller(pipeline_key, pipeline_hash, pipeline_source);
++				} else {
++					pipeline_rd = shader->pipeline_hash_map.get_pipeline(pipeline_key, pipeline_hash, pipeline_key.ubershader == (ubershader_iterations - 1), pipeline_source);
++				}
+ 
+ 				if (pipeline_rd.is_valid()) {
+ 					pipeline_valid = true;
+@@ -3347,7 +3355,110 @@ void RenderForwardMobile::_mesh_compile_pipeline_for_surface(SceneShaderForwardM
+ 	}
+ }
+ 
++uint64_t RenderForwardMobile::_specialized_pipelines_surface_key(uint32_t p_shader, uint64_t p_format, uint32_t p_surface) {
++	return hash_murmur3_one_64(p_format, hash_murmur3_one_32(p_surface, hash_murmur3_one_32(p_shader))) | (uint64_t(p_shader) << 32);
++}
++
++void RenderForwardMobile::_mesh_compile_specialized_pipelines_for_surface(const SurfacePipelineData &p_surface, const GlobalPipelineData &p_global, RSE::PipelineSource p_source) {
++	if (specialized_pipelines.is_empty()) {
++		return;
++	}
++
++	RendererRD::MeshStorage *mesh_storage = RendererRD::MeshStorage::get_singleton();
++	const RSE::PrimitiveType primitive = mesh_storage->mesh_surface_get_primitive(p_surface.mesh_surface);
++	const uint32_t surface = uint32_t(primitive) | (p_surface.instanced ? uint32_t(SpecializedPipeline::SURFACE_INSTANCED) : 0);
++	const LocalVector<SpecializedPipeline> *listed = specialized_pipelines.getptr(_specialized_pipelines_surface_key(p_surface.shader->code_hash, mesh_storage->mesh_surface_get_format(p_surface.mesh_surface), surface));
++	if (listed == nullptr) {
++		return;
++	}
++
++	const bool emulate_point_size = p_surface.shader->uses_point_size && scene_shader.emulate_point_size;
++	for (const SpecializedPipeline &pipeline : *listed) {
++		const bool use_post_pass = pipeline.words[SpecializedPipeline::WORD_TARGET] & SpecializedPipeline::TARGET_POST_PASS;
++		const bool use_hdr = pipeline.words[SpecializedPipeline::WORD_TARGET] & SpecializedPipeline::TARGET_HDR;
++		const RD::DataFormat buffers_color_format = use_hdr ? RD::DATA_FORMAT_R16G16B16A16_SFLOAT : _render_buffers_get_preferred_color_format();
++		const uint32_t samples = (pipeline.words[SpecializedPipeline::WORD_TARGET] & SpecializedPipeline::TARGET_PROJECT_SAMPLES) ? uint32_t(p_global.texture_samples) : pipeline.words[SpecializedPipeline::WORD_SAMPLES];
++
++		SceneShaderForwardMobile::ShaderData::PipelineKey pipeline_key;
++		pipeline_key.version = SceneShaderForwardMobile::ShaderVersion(pipeline.words[SpecializedPipeline::WORD_VERSION]);
++		pipeline_key.framebuffer_format_id = _get_color_framebuffer_format_for_pipeline(buffers_color_format, _render_buffers_can_be_storage(), RD::TextureSamples(samples), RD::TextureSamples(p_global.target_samples), false, use_post_pass, use_hdr, 1);
++		pipeline_key.vertex_format_id = mesh_storage->mesh_surface_get_vertex_format(p_surface.mesh_surface, p_surface.shader->get_vertex_input_mask(pipeline_key.version, false), p_surface.instanced, false, emulate_point_size);
++		pipeline_key.cull_mode = RD::PolygonCullMode(pipeline.words[SpecializedPipeline::WORD_CULL_MODE]);
++		pipeline_key.primitive_type = primitive;
++		pipeline_key.shader_specialization.packed_0 = pipeline.words[SpecializedPipeline::WORD_PACKED_0];
++		pipeline_key.shader_specialization.packed_1 = pipeline.words[SpecializedPipeline::WORD_PACKED_1];
++		memcpy(&pipeline_key.shader_specialization.packed_2, &pipeline.words[SpecializedPipeline::WORD_PACKED_2], sizeof(float));
++		pipeline_key.render_pass = pipeline.words[SpecializedPipeline::WORD_RENDER_PASS];
++		pipeline_key.wireframe = false;
++		pipeline_key.ubershader = false;
++		// Behind everything else: the frame that needs one first compiles it itself, and nothing waits for the others.
++		p_surface.shader->pipeline_hash_map.compile_pipeline(pipeline_key, pipeline_key.hash(), p_source, false);
++	}
++}
++
++void RenderForwardMobile::_print_specialized_pipeline(SceneShaderForwardMobile::ShaderData *p_shader, void *p_mesh_surface, bool p_instanced_surface, const SceneShaderForwardMobile::ShaderData::PipelineKey &p_pipeline_key) {
++	{
++		MutexLock lock(specialized_pipelines_printed_mutex);
++		const uint64_t printed = uint64_t(p_pipeline_key.hash()) | (uint64_t(p_shader->code_hash) << 32);
++		if (specialized_pipelines_printed.has(printed)) {
++			return;
++		}
++		specialized_pipelines_printed.insert(printed);
++	}
++
++	if (p_pipeline_key.wireframe) {
++		return;
++	}
++
++	// The framebuffer format is a number of this run: which of the formats pipelines are compiled ahead for it is.
++	const RD::TextureSamples samples = RD::get_singleton()->framebuffer_format_get_texture_samples(p_pipeline_key.framebuffer_format_id, 0);
++	uint32_t target = UINT32_MAX;
++	for (uint32_t candidate = 0; candidate < 4; candidate++) {
++		const bool use_post_pass = candidate & SpecializedPipeline::TARGET_POST_PASS;
++		const bool use_hdr = candidate & SpecializedPipeline::TARGET_HDR;
++		const RD::DataFormat buffers_color_format = use_hdr ? RD::DATA_FORMAT_R16G16B16A16_SFLOAT : _render_buffers_get_preferred_color_format();
++		if (p_pipeline_key.framebuffer_format_id == _get_color_framebuffer_format_for_pipeline(buffers_color_format, _render_buffers_can_be_storage(), samples, RD::TextureSamples(global_pipeline_data_required.target_samples), false, use_post_pass, use_hdr, 1)) {
++			target = candidate;
++			break;
++		}
++	}
++	if (target == UINT32_MAX) {
++		return;
++	}
++	if (samples != RD::TEXTURE_SAMPLES_1 && uint32_t(samples) == global_pipeline_data_required.texture_samples) {
++		target |= SpecializedPipeline::TARGET_PROJECT_SAMPLES;
++	}
++
++	const uint64_t format = RendererRD::MeshStorage::get_singleton()->mesh_surface_get_format(p_mesh_surface);
++	uint32_t packed_2 = 0;
++	memcpy(&packed_2, &p_pipeline_key.shader_specialization.packed_2, sizeof(float));
++	const uint32_t words[SpecializedPipeline::WORD_COUNT] = {
++		p_shader->code_hash,
++		uint32_t(format),
++		uint32_t(format >> 32),
++		uint32_t(p_pipeline_key.primitive_type) | (p_instanced_surface ? uint32_t(SpecializedPipeline::SURFACE_INSTANCED) : 0),
++		uint32_t(p_pipeline_key.version),
++		uint32_t(samples),
++		target,
++		uint32_t(p_pipeline_key.cull_mode),
++		p_pipeline_key.shader_specialization.packed_0,
++		p_pipeline_key.shader_specialization.packed_1,
++		packed_2,
++		p_pipeline_key.render_pass,
++	};
++	String line = "Specialized pipeline:";
++	for (uint32_t word : words) {
++		line += " " + itos(int32_t(word));
++	}
++	print_line(line);
++}
++
+ void RenderForwardMobile::_mesh_compile_pipelines_for_surface(const SurfacePipelineData &p_surface, const GlobalPipelineData &p_global, RSE::PipelineSource p_source, Vector<ShaderPipelinePair> *r_pipeline_pairs) {
++	if (disable_ubershaders) {
++		_mesh_compile_specialized_pipelines_for_surface(p_surface, p_global, p_source);
++		return;
++	}
++
+ 	RendererRD::MeshStorage *mesh_storage = RendererRD::MeshStorage::get_singleton();
+ 	bool octmap_use_storage = !copy_effects->get_raster_effects().has_flag(RendererRD::CopyEffects::RASTER_EFFECT_OCTMAP);
+ 
+@@ -3560,8 +3671,19 @@ RenderForwardMobile::RenderForwardMobile() {
+ 	// Without ubershaders, a pipeline is compiled when first drawn instead of ahead of time; some drivers keep
+ 	// a large amount of memory for every ubershader pipeline.
+ 	disable_ubershaders = RD::get_singleton()->get_driver_workarounds().disable_ubershaders || !bool(GLOBAL_DEF_RST("rendering/shader_compiler/ubershaders/enabled", true));
++	// Read even when unused, so that the settings are known whatever the driver decides.
++	const PackedInt32Array listed = GLOBAL_DEF_RST(PropertyInfo(Variant::PACKED_INT32_ARRAY, "rendering/shader_compiler/ubershaders/specialized_pipelines"), PackedInt32Array());
++	print_specialized_pipelines = GLOBAL_DEF_RST("rendering/shader_compiler/ubershaders/print_specialized_pipelines", false);
+ 	if (disable_ubershaders) {
+-		print_verbose("Ubershaders: Disabled");
++		for (int i = 0; i + int(SpecializedPipeline::WORD_COUNT) <= listed.size(); i += SpecializedPipeline::WORD_COUNT) {
++			SpecializedPipeline pipeline;
++			for (uint32_t word = 0; word < SpecializedPipeline::WORD_COUNT; word++) {
++				pipeline.words[word] = uint32_t(listed[i + word]);
++			}
++			const uint64_t format = uint64_t(pipeline.words[SpecializedPipeline::WORD_FORMAT_LOW]) | (uint64_t(pipeline.words[SpecializedPipeline::WORD_FORMAT_HIGH]) << 32);
++			specialized_pipelines[_specialized_pipelines_surface_key(pipeline.words[SpecializedPipeline::WORD_SHADER], format, pipeline.words[SpecializedPipeline::WORD_SURFACE])].push_back(pipeline);
++		}
++		print_verbose(vformat("Ubershaders: Disabled, %d specialized pipelines listed", listed.size() / int(SpecializedPipeline::WORD_COUNT)));
+ 	} else {
+ 		print_verbose("Ubershaders: Enabled");
+ 	}
+diff --git a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h
+index 0b156b0..64b757e 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h
++++ b/servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h
+@@ -75,6 +75,41 @@ private:
+ 	SceneShaderForwardMobile scene_shader;
+ 	bool disable_ubershaders = false;
+ 
++	// The specialized pipelines to compile as soon as their surface is known, when ubershaders are disabled: without
++	// them every pipeline is compiled, and waited for, in the frame that first draws with it.
++	struct SpecializedPipeline {
++		// Words of one entry in "rendering/shader_compiler/ubershaders/specialized_pipelines".
++		enum {
++			WORD_SHADER,
++			WORD_FORMAT_LOW,
++			WORD_FORMAT_HIGH,
++			WORD_SURFACE,
++			WORD_VERSION,
++			WORD_SAMPLES,
++			WORD_TARGET,
++			WORD_CULL_MODE,
++			WORD_PACKED_0,
++			WORD_PACKED_1,
++			WORD_PACKED_2,
++			WORD_RENDER_PASS,
++			WORD_COUNT
++		};
++		enum {
++			SURFACE_INSTANCED = 1 << 8,
++			TARGET_POST_PASS = 1 << 0,
++			TARGET_HDR = 1 << 1,
++			// Drawn at the project's 3D MSAA level, whatever it is in the run that compiles it.
++			TARGET_PROJECT_SAMPLES = 1 << 2,
++		};
++
++		uint32_t words[WORD_COUNT] = {};
++	};
++
++	HashMap<uint64_t, LocalVector<SpecializedPipeline>> specialized_pipelines;
++	bool print_specialized_pipelines = false;
++	HashSet<uint64_t> specialized_pipelines_printed;
++	Mutex specialized_pipelines_printed_mutex;
++
+ 	/* Render Buffer */
+ 
+ 	class RenderBufferDataForwardMobile : public RenderBufferCustomDataRD {
+@@ -706,6 +741,9 @@ public:
+ 	void _geometry_instance_update(RenderGeometryInstance *p_geometry_instance);
+ 	void _mesh_compile_pipeline_for_surface(SceneShaderForwardMobile::ShaderData *p_shader, void *p_mesh_surface, bool p_instanced_surface, RSE::PipelineSource p_source, SceneShaderForwardMobile::ShaderData::PipelineKey &r_pipeline_key, Vector<ShaderPipelinePair> *r_pipeline_pairs = nullptr);
+ 	void _mesh_compile_pipelines_for_surface(const SurfacePipelineData &p_surface, const GlobalPipelineData &p_global, RSE::PipelineSource p_source, Vector<ShaderPipelinePair> *r_pipeline_pairs = nullptr);
++	static uint64_t _specialized_pipelines_surface_key(uint32_t p_shader, uint64_t p_format, uint32_t p_surface);
++	void _mesh_compile_specialized_pipelines_for_surface(const SurfacePipelineData &p_surface, const GlobalPipelineData &p_global, RSE::PipelineSource p_source);
++	void _print_specialized_pipeline(SceneShaderForwardMobile::ShaderData *p_shader, void *p_mesh_surface, bool p_instanced_surface, const SceneShaderForwardMobile::ShaderData::PipelineKey &p_pipeline_key);
+ 	void _mesh_generate_all_pipelines_for_surface_cache(GeometryInstanceSurfaceDataCache *p_surface_cache, const GlobalPipelineData &p_global);
+ 	void _update_dirty_geometry_instances();
+ 	void _update_dirty_geometry_pipelines();
+diff --git a/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp b/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp
+index 0d598bf..9fb4c1c 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp
++++ b/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.cpp
+@@ -44,6 +44,7 @@ void SceneShaderForwardMobile::ShaderData::set_code(const String &p_code) {
+ 	//compile
+ 
+ 	code = p_code;
++	code_hash = p_code.hash();
+ 	ubo_size = 0;
+ 	uniforms.clear();
+ 	_clear_vertex_input_mask_cache();
+diff --git a/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.h b/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.h
+index 78d7c94..85b334b 100644
+--- a/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.h
++++ b/servers/rendering/renderer_rd/forward_mobile/scene_shader_forward_mobile.h
+@@ -234,6 +234,8 @@ public:
+ 		uint32_t ubo_size = 0;
+ 
+ 		String code;
++		// Names the shader in the list of specialized pipelines to compile ahead: the same in every run.
++		uint32_t code_hash = 0;
+ 
+ 		DepthDraw depth_draw;
+ 		DepthTest depth_test;
+diff --git a/servers/rendering/renderer_rd/pipeline_hash_map_rd.h b/servers/rendering/renderer_rd/pipeline_hash_map_rd.h
+index 18a5ef6..a926e33 100644
+--- a/servers/rendering/renderer_rd/pipeline_hash_map_rd.h
++++ b/servers/rendering/renderer_rd/pipeline_hash_map_rd.h
+@@ -55,6 +55,10 @@ private:
+ 	Mutex compiled_queue_mutex;
+ 	RBSet<uint32_t> compilation_set;
+ 	HashMap<uint32_t, WorkerThreadPool::TaskID> compilation_tasks;
++	// The pipelines whose compilation has begun, on a task or on the thread that needed them.
++	RBSet<uint32_t> claimed_set;
++	// Tasks of pipelines their caller compiled first: they do nothing, and are still waited for before the map goes.
++	LocalVector<WorkerThreadPool::TaskID> superseded_tasks;
+ 	Mutex local_mutex;
+ 
+ 	bool _add_new_pipelines_to_map() {
+@@ -84,6 +88,18 @@ private:
+ 		return !hashes_added.is_empty();
+ 	}
+ 
++	void _compile_task(Key p_key) {
++		{
++			MutexLock local_lock(local_mutex);
++			if (claimed_set.has(p_key.hash())) {
++				return;
++			}
++			claimed_set.insert(p_key.hash());
++		}
++
++		(creation_object->*creation_function)(p_key);
++	}
++
+ 	void _wait_for_all_pipelines() {
+ 		thread_local LocalVector<WorkerThreadPool::TaskID> tasks_to_wait;
+ 		tasks_to_wait.clear();
+@@ -92,6 +108,10 @@ private:
+ 			for (KeyValue<uint32_t, WorkerThreadPool::TaskID> key_value : compilation_tasks) {
+ 				tasks_to_wait.push_back(key_value.value);
+ 			}
++			for (WorkerThreadPool::TaskID task_id : superseded_tasks) {
++				tasks_to_wait.push_back(task_id);
++			}
++			superseded_tasks.clear();
+ 		}
+ 
+ 		for (WorkerThreadPool::TaskID task_id : tasks_to_wait) {
+@@ -148,7 +168,7 @@ public:
+ #endif
+ 
+ 		// Queue a background compilation task.
+-		WorkerThreadPool::TaskID task_id = WorkerThreadPool::get_singleton()->add_template_task(creation_object, creation_function, p_key, p_high_priority, "PipelineCompilation");
++		WorkerThreadPool::TaskID task_id = WorkerThreadPool::get_singleton()->add_template_task(this, &PipelineHashMapRD::_compile_task, p_key, p_high_priority, "PipelineCompilation");
+ 		compilation_tasks.insert(p_key_hash, task_id);
+ 	}
+ 
+@@ -210,6 +230,55 @@ public:
+ 		}
+ 	}
+ 
++	// Retrieve a pipeline as get_pipeline() does when it waits for compilation, except that a pipeline whose task has not started is compiled by the caller, at once, instead of waited for behind the tasks queued before it.
++	RID get_pipeline_compiled_by_caller(const Key &p_key, uint32_t p_key_hash, RSE::PipelineSource p_source) {
++		RBMap<uint32_t, RID>::Element *e = hash_map.find(p_key_hash);
++		if (e == nullptr && _add_new_pipelines_to_map()) {
++			e = hash_map.find(p_key_hash);
++		}
++		if (e != nullptr) {
++			return e->value();
++		}
++
++		bool compile = false;
++		{
++			MutexLock local_lock(local_mutex);
++			if (!compilation_set.has(p_key_hash)) {
++				// Never asked for: counted as a compilation of the caller's source.
++				compilation_set.insert(p_key_hash);
++				if (compilations_mutex != nullptr) {
++					MutexLock compilations_lock(*compilations_mutex);
++					compilations[p_source]++;
++				}
++			}
++			if (!claimed_set.has(p_key_hash)) {
++				claimed_set.insert(p_key_hash);
++				compile = true;
++				HashMap<uint32_t, WorkerThreadPool::TaskID>::Iterator task_it = compilation_tasks.find(p_key_hash);
++				if (task_it != compilation_tasks.end()) {
++					superseded_tasks.push_back(task_it->value);
++					compilation_tasks.remove(task_it);
++				}
++			}
++		}
++
++		if (compile) {
++			(creation_object->*creation_function)(p_key);
++		} else {
++			wait_for_pipeline(p_key_hash);
++		}
++
++		_add_new_pipelines_to_map();
++		e = hash_map.find(p_key_hash);
++		if (e != nullptr) {
++			return e->value();
++		}
++
++		// Pipeline could not be compiled due to an internal error. Store an empty RID so compilation is not attempted again.
++		hash_map[p_key_hash] = RID();
++		return RID();
++	}
++
+ 	// Delete all cached pipelines. Can stall if background compilation is in progress.
+ 	void clear_pipelines() {
+ 		_wait_for_all_pipelines();
+@@ -221,6 +290,7 @@ public:
+ 
+ 		hash_map.clear();
+ 		compilation_set.clear();
++		claimed_set.clear();
+ 	}
+ 
+ 	// Set the external pipeline compilations array to increase the counters on every time a pipeline is compiled.

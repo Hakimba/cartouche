@@ -7,7 +7,6 @@ const APPEARANCE := "res://data/carousel/appearance.json"
 const DEFAULTS: Dictionary[String, Dictionary] = {
 	"console": {"px": 0.0, "py": 0.0, "pz": 0.0, "rx": 0.0, "ry": 0.0, "rz": 0.0, "scale": 1.0, "pose": 1.0,
 		"sway": 7.0, "bob": 0.5},
-	"consoles": {"show": 1.0},
 	"parts": {"lid_degrees": 0.0, "flap_cm": 1.5},
 	"disc": {"visible": 1.0, "inRow": 1.0, "lift": 0.0, "dx": 0.0, "dy": 0.0, "rx": 0.0, "ry": 0.0, "spin": 0.0},
 	"row": {"show": 1.0, "x": 0.0, "y": 0.0, "z": 0.0, "scale": 1.0, "pose": 1.0},
@@ -21,7 +20,7 @@ const EPSILON := 0.0001
 ## An animation reads a time this close to a key as the key's own, and goes on from it: a hold is
 ## sampled no closer to its end.
 const KEY_SNAP_S := 0.0001
-func test_each_step_is_reached_exactly_and_held_until_the_next_leaves() -> void:
+func test_each_step_is_reached_exactly_held_until_the_next_leaves_and_the_ends_hold_the_first_and_last_step() -> void:
 	var random := Fixtures.cases(51)
 	for i in 300:
 		var data := Fixtures.launch_steps(random)
@@ -35,14 +34,7 @@ func test_each_step_is_reached_exactly_and_held_until_the_next_leaves() -> void:
 				var held := maxf(times[s].x, times[s].y - KEY_SNAP_S)
 				for at: float in [times[s].x, lerpf(times[s].x, held, random.randf())]:
 					_assert_near(animation.value_track_interpolate(index, at), _expected(track, step), EPSILON, track)
-
-
-func test_before_its_start_and_after_its_end_the_animation_holds_its_first_and_last_step() -> void:
-	var random := Fixtures.cases(53)
-	for i in 200:
-		var data := Fixtures.launch_steps(random)
-		var animation := LaunchAnimation.build(data, _console())
-		var steps: Array = data["steps"]
+		# Before its start and after its end it holds its first and last step.
 		var first: Dictionary = steps[0]
 		var last: Dictionary = steps[-1]
 		for track in _tracks():
@@ -138,8 +130,6 @@ static func _expected(track: String, step: Dictionary) -> Variant:
 			return _read(step, "console", "sway")
 		"Consoles:bob_height":
 			return _read(step, "console", "bob") / 10.0
-		"Consoles:others_opacity":
-			return _read(step, "consoles", "show")
 		"Consoles/Console:lid_degrees":
 			return _read(step, "parts", "lid_degrees")
 		"Consoles/Console:flap_cm":

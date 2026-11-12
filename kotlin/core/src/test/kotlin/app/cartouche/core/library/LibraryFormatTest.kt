@@ -39,29 +39,12 @@ class LibraryFormatTest {
     }
 
     @Test
-    fun `a library of format 1 reads, its hidden and unsupported files counted`() {
-        val stored =
-            """{"version":1,"library":{"setups":{"ps2":{"folder":"content://p/tree/x","player":null,"discs":"grouped",""" +
-                """"depth":"top_level"}},"games":[{"id":"ps2/content://p/document/Dark Cloud (Europe).chd","platform":"ps2",""" +
-                """"title":"Dark Cloud","regions":["Europe"],"languages":[],"version":null,"serials":["SCES-50295"],""" +
-                """"redumpName":null,"discs":[{"number":null,"file":{"name":"Dark Cloud (Europe).chd",""" +
-                """"uri":"content://p/document/Dark Cloud (Europe).chd","path":null,"sizeBytes":1000000000}}],"lastDisc":0}],""" +
-                """"ignored":{"ps2":[{"file":{"name":"bios.bin","uri":"content://p/document/bios.bin","path":null,""" +
-                """"sizeBytes":1000000000},"reason":"not_a_game"},{"file":{"name":"a.json","uri":"content://p/document/a.json",""" +
-                """"path":null,"sizeBytes":1000000000},"reason":"unsupported"}]}}}"""
-        val library =
-            Library()
-                .withSetup(ps2.id, PlatformSetup(Some(uri("content://p/tree/x"))))
-                .withScan(
-                    ps2.id,
-                    Scan.of(
-                        ps2,
-                        contents(listOf(listed("Dark Cloud (Europe).chd"), listed("bios.bin"), listed("a.json"))),
-                        ps2Titles,
-                        DiscGrouping.GROUPED,
-                    ),
-                )
-        LibraryFormat.decode(stored).shouldBeRight() shouldBe StoredLibrary(library.copy(skippedFolders = emptyMap()), version = 1)
+    fun `INV-11 a stored library with a field this build does not know is unreadable, never read in part`() {
+        val stored = LibraryFormat.encode(Library().withSetup(ps2.id, PlatformSetup(Some(uri("content://p/tree/x")))))
+        val later = listOf("\"version\":2" to "\"version\":2,\"later\":1", "\"library\":{" to "\"library\":{\"later\":[],")
+        later.forEach { (field, withLater) ->
+            LibraryFormat.decode(stored.replace(field, withLater)).shouldBeLeft().shouldBeInstanceOf<LibraryError.Unreadable>()
+        }
     }
 
     @Test
@@ -78,6 +61,13 @@ class LibraryFormatTest {
             )
         val edited = LibraryFormat.encode(library.withLastDisc(library.games.single().id, 1)).replace("\"lastDisc\":1", "\"lastDisc\":9")
         LibraryFormat.decode(edited).shouldBeRight().library.games.single().lastDisc shouldBe 0
+    }
+
+    @Test
+    fun `INV-11 a stored library of every field reads back identical`() = runBlocking<Unit> {
+        checkAll(libraries) { library ->
+            LibraryFormat.decode(LibraryFormat.encode(library)).shouldBeRight() shouldBe StoredLibrary(library, LibraryFormat.VERSION)
+        }
     }
 
     @Test

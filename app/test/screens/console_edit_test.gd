@@ -18,7 +18,7 @@ func _focused() -> String:
 ## [param device]'s carousel once it can be used, its selected console edited.
 func _edit(device: Fixtures.NewDevice) -> Carousel:
 	var carousel := Fixtures.fresh_carousel(self, device)
-	await Fixtures.wait(self, func() -> bool: return carousel._shown)
+	await Fixtures.wait(self, func() -> bool: return carousel.is_shown())
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	assert_bool(await Fixtures.on(self, carousel, "AddConsole")).is_true()
 	assert_str(_text(carousel, "AddConsole/%Title")).is_equal("Edit")
@@ -69,7 +69,7 @@ func _open_models(carousel: Carousel) -> ModelSwatches:
 
 ## Whether the screens closed, the carousel taking the controller again.
 func _closed(carousel: Carousel) -> bool:
-	return await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel._shown)
+	return await Fixtures.until(self, func() -> bool: return Fixtures.shown_screen(carousel) == null and carousel.is_shown())
 
 
 ## Whether the consoles show, and A opens the games.
@@ -129,7 +129,7 @@ func test_inv_13_removing_one_of_two_consoles_leaves_the_ring_on_the_other_alone
 
 func test_a_console_that_could_not_be_removed_says_so_and_stays() -> void:
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
-	device.failing = [&"remove"]
+	device.answers[Fixtures.Request.REMOVE] = Fixtures.Answer.FAILS
 	var carousel := await _edit(device)
 	await _ask_removal(carousel)
 	await _confirm(carousel)
@@ -197,7 +197,7 @@ func test_the_form_shows_the_choices_stored_and_saving_keeps_the_new_ones_and_th
 	device.setups["ps2"] = {"folder_uri": "content://tree/card%3AROMs%2Fps2", "player_id": "ps2.other",
 		"disc_grouping": "separate", "folder_depth": "top_level"}
 	var carousel := Fixtures.fresh_carousel(self, device)
-	await Fixtures.wait(self, func() -> bool: return carousel._shown)
+	await Fixtures.wait(self, func() -> bool: return carousel.is_shown())
 	if _selected(carousel) != "ps2":
 		await Fixtures.joypad(self, JOY_BUTTON_DPAD_RIGHT)
 		await Fixtures.settled_consoles(self, carousel)
@@ -295,14 +295,13 @@ func test_presses_while_an_edit_is_saved_change_nothing_and_leave_nothing_open()
 		await Fixtures.action(self, &"ui_down")
 	assert_str(_focused()).is_equal("Subfolders")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
-	device.slow.append(&"scan")
+	device.answers[Fixtures.Request.SCAN] = Fixtures.Answer.HELD
 	await _save(carousel)
 	await Fixtures.action(self, &"ui_up")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	assert_bool(discs.button_pressed).is_equal(grouped)
-	device.slow.clear()
-	device.released.emit()
+	device.release()
 	assert_bool(await _closed(carousel)).is_true()
 	assert_bool((carousel.get_node("%Screens/AddConsole/%Models") as ModelSwatches).is_open()).is_false()
 	assert_int(device.scans).is_equal(1)

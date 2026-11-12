@@ -6,4 +6,4 @@
 script = ExtResource("1")
 media = "dvd"
 scene = "res://carousel/media/dreamcast_gd/dreamcast_gd.tscn"
-triangle_budget = 9000
+triangle_budget = 9500

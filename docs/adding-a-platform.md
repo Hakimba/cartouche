@@ -1,70 +1,42 @@
 # Adding a platform
 
-**You are here.** A platform is a console as Cartouche's data describes it: which emulators can run its games
-(its players), which files are games, what its games come on, and where their labels come from. This page adds a
-platform, or fixes one whose emulators, extensions or art are wrong. It is data only: no Kotlin or GDScript changes,
-unless the platform needs a new medium ([adding-a-medium.md](adding-a-medium.md)). The code that reads this data
-is described in [architecture/core.md](architecture/core.md#platforms-and-launches).
+A platform is a console as Cartouche's data describes it: which emulators run its games (its players), which
+files are games, what its games come on, and where their labels come from. Adding or fixing one is data only,
+unless it needs a new medium ([adding-a-medium.md](adding-a-medium.md)). It shows in the app once it has a console
+model ([adding-a-console.md](adding-a-console.md)).
 
-A platform shows on the consoles screen, and in **Add a console**, only once it has a console model
-([adding-a-console.md](adding-a-console.md)). You can still add its data first and test it on its own.
-
-## What a platform needs
-
-| Piece | File | Required |
+| Step | File | Needed |
 |---|---|---|
-| Definition and players | `app/data/platforms/daijishou/` or `app/data/platforms/cartouche/` | yes |
-| Profile | `app/data/platforms/profiles.json` | yes |
-| Reference list of titles | `app/data/titles/<platform>.tsv` | to identify games |
-| Prints (cartridge checksums) | `app/data/prints/<platform>.tsv` | cartridge platforms |
-| Art extract and texture table | `app/data/art/<platform>.tsv`, `app/data/screenscraper/<platform>.tsv` | to get labels |
-| Curtain time | `app/data/launch/curtains.json` | slow emulators only |
+| [1. Definition and players](#1-the-definition-and-its-players) | `app/data/platforms/daijishou/` or `app/data/platforms/cartouche/` | always |
+| [2. Profile](#2-the-profile) | `app/data/platforms/profiles.json` | always |
+| [3. Titles and prints](#3-titles-and-prints) | `app/data/titles/<platform>.tsv`, `app/data/prints/<platform>.tsv` | to identify games; prints for cartridges |
+| [4. Art](#4-art) | `app/data/art/<platform>.tsv`, `app/data/screenscraper/<platform>.tsv` | to get labels |
+| [5. Curtain time](#5-curtain-time) | `app/data/launch/curtains.json` | slow emulators only |
+| [6. Check](#6-check) | | always |
 
 ## 1. The definition and its players
 
-Definitions use Daijishō's file format: one JSON file per platform, with a `platform` (its `uniqueId`, its name)
-and a `playerList`. A player is one way to run the platform's games, an emulator or a RetroArch core.
+One JSON file per platform: a `platform` (its `uniqueId`, its name) and a `playerList`.
 
-There are two folders:
-
-- `app/data/platforms/daijishou/` is a copy of Daijishō's definitions (MIT). Never edit it. Its `README.md` lists
+- `app/data/platforms/daijishou/` is a copy of Daijishō's definitions (MIT). Never edit it; its `README.md` lists
   what was left out.
-- `app/data/platforms/cartouche/` holds Cartouche's own files, in the same format. Its `README.md` says why each
-  one exists.
+- `app/data/platforms/cartouche/` holds Cartouche's own files in the same format; its `README.md` says why each
+  exists. Write yours there:
+  - **a platform the first folder lacks:** a file name and a `uniqueId` no other file uses;
+  - **a fix of a platform itself** (a renamed console, a dead emulator): a file named exactly like the one it
+    replaces (`AndroidServices.platform_definitions()` merges the two folders, yours last), as `SegaGenesis.json`
+    does. Keep the platform's `uniqueId` and every player's `uniqueId` and template, so libraries stay valid;
+    `CatalogTest` compares the two files.
+- A player right but for its name or the files it opens is corrected in the profile instead (`players`, step 2).
 
-Write your file in `app/data/platforms/cartouche/`, in two cases:
+Each player:
 
-- **A platform Daijishō lacks.** Pick a file name and a `uniqueId` that no Daijishō file uses.
-- **A Daijishō platform that needs a fix** of the platform itself (a renamed console, a dead emulator). Name your file
-  exactly like the Daijishō one: it **replaces** it (`AndroidServices.platform_definitions()` merges the two
-  folders, yours last). Keep the platform's `uniqueId` and every player's `uniqueId` and template, so the users'
-  libraries and choices stay valid. `SegaGenesis.json` does this to name the console Mega Drive. The test of
-  INV-14 in `CatalogTest` compares a replacement with the file it replaces.
-
-A player that is right but for its name or the files it opens (Daijishō names some by their package, and leaves out
-archives some emulators open) is corrected in its platform's profile instead (`players`, section 3): the definition
-stays Daijishō's own.
-
-Each player needs:
-
-| Field | What it holds |
+| Field | Holds |
 |---|---|
 | `name` | `<shortname> - <Emulator>`, such as `switch - Eden` |
 | `uniqueId` | `<platform>.<package>`, unique among all players |
-| `acceptedFilenameRegex` | the game files it opens, written `^(.*)\.(?:ext|ext)$` so the extensions can be read |
-| `amStartArguments` | the launch template, below |
-
-List only files that are games. A data or content file is not a game, even when the emulator opens it (the
-Switch takes `nro|nsp|xci`, never its `.nca` or `.nso` files). A file no player accepts is shown as unsupported.
-Folders where emulators keep their own data are skipped by the scan (`app/data/scan/data_folders.json`).
-
-Keep maintained emulators only. To find an emulator's package, activity and how it takes a game, the systems files
-of ES-DE for Android are a good public source: they list the same facts for most emulators. Check them on a device
-before you trust them.
-
-## 2. The launch template
-
-`amStartArguments` is a subset of the `am start` command's arguments:
+| `acceptedFilenameRegex` | the game files it opens, written `^(.*)\.(?:ext|ext)$` so the extensions can be read. Games only: never a data file, even one the emulator opens (the Switch takes `nro|nsp|xci`, never `.nca`) |
+| `amStartArguments` | the launch template: a subset of `am start`'s arguments |
 
 ```text
 -n dev.eden.eden_emulator/org.yuzu.yuzu_emu.activities.EmulationActivity
@@ -72,18 +44,17 @@ before you trust them.
 -d {file.uri}
 ```
 
-`LaunchTemplate.kt` documents the whole grammar at its top: `-n` component, `-a` action, `-d` data, `-t` type,
-`-c` category, `-f` flags, the typed extras (`-e`, `--ez`, `--ei`, `--eu` and others) and the activity switches.
-`{file.uri}` is the game's content URI and `{file.path}` its file path. `IntentMapper.kt` in the plugin turns the
-result into an Android `Intent`.
+- `LaunchTemplate.kt` documents the grammar at its top: `-n`, `-a`, `-d`, `-t`, `-c`, `-f`, the typed extras
+  (`-e`, `--ez`, `--ei`, `--eu`…) and the activity switches. `{file.uri}` is the game's content URI, `{file.path}`
+  its path.
+- A template never grants permissions: `--grant-*` switches and grant bits in `-f` are refused. The only URI shared
+  is the game's own, read-only, through `{file.uri}` exactly (INV-01, INV-02).
+- Keep maintained emulators only, and check each package, activity and argument on a device.
+- Folders where emulators keep their own data are skipped by the scan (`app/data/scan/data_folders.json`).
 
-A template is third-party data, so it never grants permissions. `--grant-*` switches and grant bits in `-f` are
-refused. The only URI shared with the emulator is the game's own, read-only, through `{file.uri}` exactly
-(INV-01, INV-02).
+## 2. The profile
 
-## 3. The profile
-
-Add an entry to `app/data/platforms/profiles.json`, keyed by the platform's `uniqueId`:
+One entry of `app/data/platforms/profiles.json`, keyed by the platform's `uniqueId`:
 
 ```json
 "gba": {
@@ -96,69 +67,72 @@ Add an entry to `app/data/platforms/profiles.json`, keyed by the platform's `uni
 }
 ```
 
-| Key | What it says |
+| Key | Says |
 |---|---|
 | `media` | the kind of medium: `dvd`, `cartridge` or `minidisc` |
-| `medium` | the medium folder its games are drawn with: `default`, and optionally `ntsc_u` and `ntsc_j` for regions whose medium differs (`MediaRule.kt`) |
-| `minimumGameBytes` | under this size, a file that is not identified is not a game. Pick a value under the smallest real game. |
-| `screenScraperSystem` | the number ScreenScraper gives this system, in its systems list. Optional. |
-| `art` | what its scans show: `disc` for a disc's face, or `cartridge_front` with the shape and label crop of each cartridge (`ArtKind.kt`). Without `art`, no label is looked for. |
+| `medium` | the medium folder its games are drawn with: `default`, and optionally `ntsc_u` and `ntsc_j` (`MediaRule.kt`). One not modelled yet is listed in `AWAITING` of `app/test/assets/media_assets_test.gd` and drawn on a stand-in |
+| `minimumGameBytes` | under this size, a file not identified is not a game. Pick a value under the smallest real game |
+| `minimumBytesByExtension` | optional: a lower floor for a format small by nature or an index file, beside the platform's own, such as `{"wad": 65536, "m3u": 0}` on the Wii under its 16 MB disc floor (see *Each file format* below). Use it only for a format a listed player opens as a game; the extension is written lower-case, without its dot, and matches in any case; a negative floor, or an extension given twice in any case, refuses the profiles file |
+| `screenScraperSystem` | optional: the number ScreenScraper gives this system |
+| `art` | what its scans show: `disc`, or `cartridge_front` with each cartridge's shape and label crop (`ArtKind.kt`). Without it no label is looked for |
 | `scansBySerial` | optional: a site naming disc scans after a game's serial, and the serials' pattern (`SerialScans.kt`) |
-| `players` | optional: corrections to the definition's players, by player `uniqueId`: the `name` shown and the file `extensions` the emulator opens, in place of the definition's (`PlayerFix` in `Catalog.kt`). Only what a device test proved: launch each format, archives included, with the emulator. A correction of a player the platform lacks is reported. |
+| `players` | optional: by player `uniqueId`, the `name` shown and the file `extensions` it opens, in place of the definition's (`PlayerFix`). Only what a device test proved: launch each format, archives included |
 
-A medium not modelled yet is listed in `AWAITING` of `app/test/carousel/media/media_folders_test.gd`, and the
-games are drawn on a stand-in until it is.
+### Each file format
 
-## 4. Titles and prints
+Go through every extension a player of the platform opens, and decide what the scan must do with it:
 
-The reference list lets Cartouche identify a game from its file and give it its real title and region. It comes
-from a DAT of [libretro-database](https://github.com/libretro/libretro-database): Redump for discs, No-Intro for
-cartridges.
+| Kind of file | Examples | Size floor | How the scan groups it | Test |
+|---|---|---|---|---|
+| Whole game image or ROM | `iso`, `gba`, `sfc` | `minimumGameBytes`, under the smallest real game | one game per file; copies and other formats stay separate | a small one dropped |
+| Compressed image | `chd`, `cso`, `rvz` | the platform's | as an image | kept |
+| Archive | `zip`, `7z` | the platform's | one game per archive | kept |
+| Small by nature | Wii `wad` | its own, in `minimumBytesByExtension` | one game per file | a small one kept, an image that small dropped |
+| Index file | `cue`, `ccd`, `toc`, `m3u` | `0`, in `minimumBytesByExtension` | the index is the game; tracks no player opens are set aside; `Game (Disc 1)`, `(Disc 2)` make one game and stand for the `m3u` of their name | one game, its tracks set aside, no double |
+| Homebrew or not a game | `dol`, `elf`, `prx`, `json` | the platform's: never lowered | none | none |
+
+An index file is lowered only where its tracks are not games themselves: no player opens them, or the platform's
+`acceptedFilenameRegex` leaves them out (`(?<!bin)$` on the PlayStation). Where a player also opens the tracks' format
+(`bin` on the Mega Drive), every track would show as a game beside it. Add a scan test on the shipped
+profile for each case (`ScanTest`), and launch one game of each format on a device before saying it works.
+
+## 3. Titles and prints
+
+The reference list identifies a game from its file and gives it its real title and region. It comes from a DAT of
+[libretro-database](https://github.com/libretro/libretro-database): Redump for discs, No-Intro for cartridges. A
+cartridge platform also gets prints, each ROM's CRC32.
 
 ```sh
 scripts/dat_titles.py "Sony - PlayStation 2.dat" > app/data/titles/ps2.tsv
 scripts/dat_titles.py --prints "Nintendo - Game Boy Advance.dat" > app/data/prints/gba.tsv
 ```
 
-A cartridge platform also gets prints: each ROM's CRC32, so a cartridge is identified by its bytes, not its name.
+## 4. Art
 
-## 5. Art
-
-Labels come from two sources, explained in [architecture/core.md](architecture/core.md#art):
-
-- The LaunchBox Games Database: download its public dump (`Metadata.zip`), then extract the platform's scans:
+- **LaunchBox.** Download the Games Database's public dump (`Metadata.zip`), then extract the platform's scans:
 
   ```sh
   scripts/launchbox_art.py Metadata.zip "Sony Playstation 2" > app/data/art/ps2.tsv
   scripts/launchbox_art.py Metadata.zip "Nintendo Game Boy Advance" --type "Cart - Front" > app/data/art/gba.tsv
   ```
 
-- ScreenScraper's texture table, `app/data/screenscraper/<platform>.tsv`. The project rebuilds these tables with
-  its developer key for each release (`app/data/screenscraper/README.md` says what they hold). Open an issue to ask
-  for a new platform's table.
+- **ScreenScraper.** The texture table `app/data/screenscraper/<platform>.tsv` is rebuilt by the project with its
+  developer key for each release (`app/data/screenscraper/README.md`). Open an issue to ask for a new platform's.
 
-## 6. Curtain time
+## 5. Curtain time
 
-While an emulator starts, a black curtain hides its own screens. It stays `default_ms` of
+While an emulator starts, a black curtain hides its own screens for `default_ms` of
 `app/data/launch/curtains.json`. If an emulator takes longer to show its game, add its package under `emulators`
-with the time it needs, measured on a device (`CurtainTimes.kt`).
+with the time measured on a device: 2.5 s at most (`CurtainTimes.LONGEST`), a longer time is refused.
 
-## Tests and checks
+## 6. Check
 
 ```sh
-cd kotlin && ./gradlew :core:test --tests '*CatalogTest'                   # every shipped file loads (INV-14)
-GODOT=$GODOT scripts/test_godot.sh res://test/adapters                     # the merged definitions, as the app reads them
+cd kotlin && ./gradlew :core:test --tests '*CatalogTest'      # every shipped file loads (INV-14)
+GODOT=$GODOT scripts/test_godot.sh res://test/adapters        # the merged definitions, as the app reads them
 ```
 
 `CatalogTest` loads every definition and profile, resolves every player's template against a game, and checks
-that every player's extensions can be read. A template that does not parse fails the build. Add a case to
-`IntentMapperTest` if your template uses a switch or an extra kind no other player uses.
-
-Then try it on a device ([device-testing.md](device-testing.md)): launch one game with each player.
-
-## Neighbours
-
-- [architecture/core.md](architecture/core.md#platforms-and-launches): the code that reads this data.
-- [adding-a-console.md](adding-a-console.md) and [adding-a-medium.md](adding-a-medium.md): the 3D side.
-- [INVARIANTS.md](INVARIANTS.md): INV-01, INV-02, INV-14, INV-16.
-- Back to the entry: [README.md](README.md).
+every player's extensions can be read. Add a case to `IntentMapperTest` if a template uses a switch or an extra
+kind no other player uses. Then launch one game with each player on a device
+([device-testing.md](device-testing.md)).

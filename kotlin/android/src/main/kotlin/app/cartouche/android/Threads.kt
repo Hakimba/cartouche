@@ -6,10 +6,13 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
+import java.util.concurrent.Executors
 
 /**
  * [library] runs every library call one at a time, [planning] plans the art looks one at a time in order,
- * [variants] downloads a label chooser's images a few at a time, [fileReads] reads a scan's game files a few at a time.
+ * [finders] makes the search finders at the lowest priority, [variants] downloads a label chooser's images a few at a
+ * time, [fileReads] reads a scan's game files a few at a time.
  */
 internal class Threads(
     val scope: CoroutineScope,
@@ -17,9 +20,11 @@ internal class Threads(
     val planning: CoroutineDispatcher,
     val variants: CoroutineDispatcher,
     val fileReads: CoroutineDispatcher,
+    val finders: CoroutineDispatcher,
 ) {
     companion object {
-        private const val VARIANT_DOWNLOADS = 3
+        /** The variant downloads at once, and so the decodes of their images the chooser may hold. */
+        const val VARIANT_DOWNLOADS = 3
 
         /** An SD card answers sooner with a few reads waiting than with one. */
         const val FILE_READS = 3
@@ -31,6 +36,9 @@ internal class Threads(
             Dispatchers.IO.limitedParallelism(1),
             Dispatchers.IO.limitedParallelism(VARIANT_DOWNLOADS),
             Dispatchers.IO.limitedParallelism(FILE_READS),
+            Executors
+                .newSingleThreadExecutor { Thread(it, "finders").apply { priority = Thread.MIN_PRIORITY } }
+                .asCoroutineDispatcher(),
         )
     }
 }

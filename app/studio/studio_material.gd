@@ -79,6 +79,11 @@ func fill_at(t: float) -> Color:
 	return color
 
 
+## [param colour] as a shader's vec4.
+static func rgba(colour: Color) -> Vector4:
+	return Vector4(colour.r, colour.g, colour.b, colour.a)
+
+
 ## [param colour] mixed with white in OKLab, [param share] of it; a mix out of the screen's colours is clipped
 ## to them.
 static func whitened(colour: Color, share: float) -> Color:

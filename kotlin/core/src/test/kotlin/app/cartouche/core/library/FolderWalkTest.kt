@@ -96,6 +96,14 @@ class FolderWalkTest {
     }
 
     @Test
+    fun `INV-08 a file the provider lists twice in the folder itself is listed once, at any depth`() = runBlocking<Unit> {
+        checkAll(Arb.enum<FolderDepth>()) { depth ->
+            val twice = listOf(fileEntry("Game.iso"), fileEntry("Game.iso"))
+            FolderWalk.files(depth, testDataFolders) { _, _ -> twice.right() }.shouldBeRight().files shouldBe listOf(listed("Game.iso"))
+        }
+    }
+
+    @Test
     fun `INV-09 failing to list the folder itself fails the walk`() = runBlocking<Unit> {
         checkAll(trees, Arb.enum<FolderDepth>()) { root, depth ->
             walk(InMemoryFolders(root, readable = false), depth).shouldBeLeft() shouldBe WalkFailure.Unlisted(Unit)

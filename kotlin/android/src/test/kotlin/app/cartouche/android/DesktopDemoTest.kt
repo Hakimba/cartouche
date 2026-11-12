@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.android
 
+import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.Coming
 import app.cartouche.core.library.DemoLibrary
 import app.cartouche.core.platforms.Catalog
@@ -27,7 +28,7 @@ class DesktopDemoTest {
     private val app = File(checkNotNull(System.getProperty("cartouche.app")) { "Run the tests through Gradle" })
 
     @Test
-    fun `_5-01 the desktop demo is the catalog and the demo library as the plugin sends them`() {
+    fun `the desktop demo is the catalog and the demo library as the plugin sends them`() {
         val data = File(app, "data/platforms")
         // By file name, as the app sends them: one of Cartouche's replaces Daijishō's of its name.
         val files =
@@ -50,6 +51,13 @@ class DesktopDemoTest {
         fun library(platforms: List<PlatformId>): JsonElement = DemoLibrary.of(DESKTOP_GAMES, platforms).let {
             Json.parseToJsonElement(jsonOf(it.sent(0, Shelves.of(it, platforms, Selection()), catalog)))
         }
+        // One of each answer that crosses the wire and that no other example holds, as the plugin writes it.
+        val shown = catalog.offered.map { it.platform }.filter { it !in coming }
+        val demo = DemoLibrary.of(3, shown)
+        val sentDemo = demo.sent(0, Shelves.of(demo, shown, Selection()), catalog)
+        val (first, second) = demo.games.take(2)
+        val arrivals = Sent.Arrivals(listOf(first.id.value), mapOf(first.platform.value to listOf(first.id.value)))
+        val art = Sent.Art(first.id.value, "/demo/${first.id.value}.jpg")
         val expected =
             buildJsonObject {
                 put("catalog", Json.parseToJsonElement(jsonOf(desktopCatalog.sent(coming))))
@@ -57,6 +65,21 @@ class DesktopDemoTest {
                 put("library_with_coming", library(catalog.offered.map { it.platform }))
                 // The settings of a fresh install, as the plugin sends them: the desktop's until changed.
                 put("settings", Json.parseToJsonElement(jsonOf(Settings().sent(firstLaunch = false))))
+                put("refresh_answer", Json.parseToJsonElement(jsonOf(Sent.RefreshAnswer(arrivals, Some(sentDemo)))))
+                put(
+                    "scan_answer",
+                    Json.parseToJsonElement(jsonOf(Sent.ScanAnswer(sentDemo, Sent.ScanReport(30, 840), arrivals))),
+                )
+                put(
+                    "art_change",
+                    Json.parseToJsonElement(jsonOf(Sent.ArtChange(Sent.ArtProgress(1, 30), Some(art), listOf(second.id.value)))),
+                )
+                put(
+                    "label_variant",
+                    Json.parseToJsonElement(
+                        jsonOf(Sent.LabelVariant(Some(first.id.value), "Europe", ArtSource.SCREENSCRAPER, "ScreenScraper", Some(art.path))),
+                    ),
+                )
                 put("battery", Json.parseToJsonElement(jsonOf(Sent.Battery(Some(100), plugged = true))))
             }
         val fixture = File(app, "dev/demo/desktop.json")

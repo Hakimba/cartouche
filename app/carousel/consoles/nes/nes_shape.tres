@@ -8,3 +8,4 @@ seat_centre = Vector3(-20.05, 46.7718, 34.999996)
 seat_degrees = Vector3(-90, 180, 0)
 carrier = &"tray_degrees"
 pivot = Vector3(-20.05, 46.7718, -31.5)
+housings = Array[StringName]([&"Upper", &"Lower", &"Throat"])

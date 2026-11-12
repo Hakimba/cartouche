@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package app.cartouche.core.files
 
+import app.cartouche.core.FileName
+import app.cartouche.core.platforms.PlatformId
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.boolean
@@ -77,6 +79,14 @@ class CartridgesTest {
             facts("gba", "game.zip", zip("game.gba" to rom, stored = stored, comment = comment)) shouldBe FileFacts.Print(crc32(rom))
             facts("gba", "game.zip", zip("game.gba" to rom, "notes.txt" to rom)) shouldBe FileFacts.Silent
         }
+    }
+
+    @Test
+    fun `a zip without a comment is read at its last 22 bytes only`() {
+        val rom = ByteArray(100_000) { (it * 7).toByte() }
+        val source = InMemoryBytes(zip("game.gba" to rom))
+        readable { FileReading.facts(PlatformId("gba"), FileName("game.zip"), source).bind() } shouldBe FileFacts.Print(crc32(rom))
+        source.requests.map { it.second } shouldBe listOf(22, 46)
     }
 
     @Test

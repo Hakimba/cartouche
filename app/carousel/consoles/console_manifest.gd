@@ -7,7 +7,7 @@ extends Resource
 
 const FOLDERS := "res://carousel/consoles/"
 const FILE := "console.tres"
-const _VERSION := "^[a-z0-9]+(-[a-z0-9]+)*$"
+static var _version := RegEx.create_from_string("^[a-z0-9]+(-[a-z0-9]+)*$")
 
 ## The manifests read so far, by folder (null for none): Godot drops a resource nobody holds, and the form's
 ## Console list asks for one at every step.
@@ -99,7 +99,7 @@ func is_coming() -> bool:
 func problems() -> Array[StringName]:
 	return ModelShape.broken({
 		&"platform_named": not platform.is_empty(),
-		&"version_a_model_code": RegEx.create_from_string(_VERSION).search(version) != null,
+		&"version_a_model_code": _version.search(version) != null,
 		&"names_given": not name.is_empty() and not model_name.is_empty(),
 		&"scene_found": ResourceLoader.exists(scene, "PackedScene"),
 		&"launch_found": launch.is_empty() or FileAccess.file_exists(launch),

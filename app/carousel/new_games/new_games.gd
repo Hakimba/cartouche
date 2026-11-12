@@ -91,9 +91,13 @@ func is_new(game_id: String) -> bool:
 func count(shelf: AndroidServices.Shelf) -> int:
 	if _entering.has(shelf.platform_id) or not _arrivals.announced.has(shelf.platform_id):
 		return 0
-	var announced := _arrivals.announced[shelf.platform_id]
-	return shelf.games.reduce(func(found: int, game: AndroidServices.Game) -> int:
-		return found + int(announced.has(game.id)), 0)
+	var announced: Dictionary[String, bool] = {}
+	for id: String in _arrivals.announced[shelf.platform_id]:
+		announced[id] = true
+	var found := 0
+	for game in shelf.games:
+		found += int(announced.has(game.id))
+	return found
 
 
 ## The user entered [param platform_id]'s console: it announces nothing any more.

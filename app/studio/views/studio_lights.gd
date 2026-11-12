@@ -100,6 +100,13 @@ static func rig_of(model: String, screen: StringName, blank := false) -> Rig:
 	return Rig.read(rig)
 
 
+## Whether [param model] has a light designed for [param screen]; the default one shows otherwise.
+static func has_rig(model: String, screen: StringName) -> bool:
+	var models: Dictionary = _file()["lights"]
+	var screens: Dictionary = models.get(model, {})
+	return screens.has(screen)
+
+
 ## The app's environment for a view of its own world: a copy of the one [param node]'s world has (its
 ## sky shared), whose room light the view's lights set; a plain room of the default colour where there is
 ## none.

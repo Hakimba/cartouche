@@ -59,12 +59,15 @@ static func disagreement(carousel: Carousel) -> String:
 	return "" if wrong.is_empty() else "%s: %s" % [Carousel.Screen.keys()[screen], ", ".join(wrong)]
 
 
-static func _shows(item: CanvasItem) -> bool:
-	if not item.is_visible_in_tree():
-		return false
+## Whether [param item] shows: neither it nor any ancestor fully transparent.
+static func seen(item: CanvasItem) -> bool:
 	var node: Node = item
 	while node is CanvasItem:
 		if (node as CanvasItem).modulate.a <= 0.0 or (node as CanvasItem).self_modulate.a <= 0.0:
 			return false
 		node = node.get_parent()
 	return true
+
+
+static func _shows(item: CanvasItem) -> bool:
+	return item.is_visible_in_tree() and seen(item)

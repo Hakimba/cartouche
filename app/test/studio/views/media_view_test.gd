@@ -33,6 +33,19 @@ func test_a_view_without_a_medium_or_placed_again_where_it_stands_is_not_drawn_a
 	assert_int(view.view().render_target_update_mode).is_equal(SubViewport.UPDATE_DISABLED)
 
 
+func test_a_shown_view_is_drawn_again_when_the_edge_smoothing_changes() -> void:
+	var kept := get_viewport().msaa_3d
+	var view := _view(_camera())
+	view.place(Transform3D.IDENTITY, 0.0)
+	view.place(Transform3D.IDENTITY, 0.0)
+	get_viewport().msaa_3d = Viewport.MSAA_2X if kept != Viewport.MSAA_2X else Viewport.MSAA_4X
+	view._soft_view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	get_tree().call_group(&"edge_smoothing", &"smoothing_changed")
+	assert_int(view._soft_view.render_target_update_mode).is_equal(SubViewport.UPDATE_ONCE)
+	assert_int(view._view.msaa_3d).is_equal(get_viewport().msaa_3d)
+	get_viewport().msaa_3d = kept
+
+
 func _camera() -> Camera3D:
 	var camera: Camera3D = auto_free(Camera3D.new())
 	camera.fov = 32.0

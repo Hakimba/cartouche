@@ -41,7 +41,9 @@ func test_covering_screens_and_an_empty_library_never_show_the_rail_or_its_groun
 	await Screens.wait(self, func() -> bool: return not carousel._shelves.is_empty())
 	for screen_name: String in ["Welcome", "ButtonStyle", "NoConsole", "PreferredRegion"]:
 		var screen := carousel._screens.get_node(screen_name) as Control
-		carousel._screens._show(screen)
+		for child: Control in carousel._screens.get_children():
+			child.visible = child == screen
+		carousel._screens.show()
 		carousel._show_front(true)
 		assert_bool(screen.is_visible_in_tree()).is_true()
 		_no_rail(carousel)

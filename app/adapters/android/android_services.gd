@@ -31,8 +31,8 @@ const _OWN_PLATFORM_DEFINITIONS := "res://data/platforms/cartouche"
 const _PLATFORM_PROFILES := "res://data/platforms/profiles.json"
 const _DATA_FOLDERS := "res://data/scan/data_folders.json"
 const _CURTAINS := "res://data/launch/curtains.json"
-## A start asked now that could only begin after this long is refused (`too_late`), as the carousel
-## stops waiting for it a little later (see [constant GameLaunch.WAIT_TIMEOUT_S]).
+## A start asked now that could only begin after this long is refused (`too_late`); the carousel
+## stops waiting for it half a second later ([constant GameLaunch.WAIT_TIMEOUT_S]).
 const START_WITHIN_S := 4.5
 ## Texts longer than this have their reading traced: a library's.
 const _TRACED_CHARACTERS := 10000
@@ -48,10 +48,7 @@ const Placed := AndroidWire.Placed
 const Pick := AndroidWire.Pick
 const FolderList := AndroidWire.FolderList
 const PlatformSetup := AndroidWire.PlatformSetup
-const Disc := AndroidWire.Disc
 const Game := AndroidWire.Game
-const SkippedFolder := AndroidWire.SkippedFolder
-const IgnoredCount := AndroidWire.IgnoredCount
 const Shelf := AndroidWire.Shelf
 const Browse := AndroidWire.Browse
 const Group := AndroidWire.Group
@@ -64,7 +61,6 @@ const ScanAnswer := AndroidWire.ScanAnswer
 const Arrivals := AndroidWire.Arrivals
 const ArrivalsAnswer := AndroidWire.ArrivalsAnswer
 const RefreshAnswer := AndroidWire.RefreshAnswer
-const RescrapeAnswer := AndroidWire.RescrapeAnswer
 const Art := AndroidWire.Art
 const ArtProgress := AndroidWire.ArtProgress
 const ArtChange := AndroidWire.ArtChange
@@ -104,6 +100,7 @@ func _ready() -> void:
 		(_plugin as DesktopPlugin).load_snapshot(Diagnostics.argument("snapshot"))
 		(_plugin as DesktopPlugin).start_with_backdrop(Diagnostics.argument("backdrop"), Diagnostics.argument("pixel-veil"))
 		(_plugin as DesktopPlugin).start_with_arrivals(Diagnostics.argument("new-games"))
+		(_plugin as DesktopPlugin).start_unreadable(Diagnostics.flag("library-unreadable"))
 	if OS.has_feature("android"):
 		AndroidButtons.follow_android()
 	_load_catalog()
@@ -293,13 +290,6 @@ func use_demo_library(games: int, platform_id := "") -> LibraryAnswer:
 	return _typed(await _request(&"useDemoLibrary", [games, platform_id]))
 
 
-## Debug builds only: scans every console again, reading all of their game files anew, and looks
-## every automatic label up again (never one the user chose: their own picture or a region's
-## image); answers once every label was looked for, so not while offline or while a game is played.
-func rescrape() -> RescrapeAnswer:
-	return RescrapeAnswer.new(await _request(&"rescrape"))
-
-
 ## The images the art sources have for [param game]'s label, every one of both sources, each with
 ## its region and source, in the order they are tried; those not downloaded yet then arrive
 ## through [signal label_variant_downloaded].
@@ -353,14 +343,14 @@ func check_launch(game: Game, disc: int) -> Result:
 	return Result.new(await _request(&"checkLaunch", [{"game_id": game.id, "disc": disc}]))
 
 
-## Launches disc [param disc] (an index into [member Game.discs]) of [param game], hiding the
+## Launches disc [param disc] (0 for the first, as [member Game.last_disc] counts) of [param game], hiding the
 ## emulator under a black curtain until its game shows when [method curtain_allowed]. Debug builds
 ## started with `--launch=rehearse` start nothing and fail with `rehearsed`: the insertion plays
 ## whether an emulator is installed or not, then the carousel shows again. Fails with `too_late`
 ## when the emulator could only start after [constant START_WITHIN_S]: it is not started.
 func launch_game(game: Game, disc: int) -> Result:
 	if _rehearsing():
-		return Result.new({"ok": false, "code": &"rehearsed"})
+		return Result.new({"ok": false, "code": Result.REHEARSED})
 	return Result.new(await _request(&"launchGame", [{"game_id": game.id, "disc": disc, "within_ms": int(START_WITHIN_S * 1000)}]))
 
 
@@ -407,7 +397,7 @@ func _typed(payload: Dictionary) -> LibraryAnswer:
 ## answers later through [signal _answered], the desktop stand-in at once, or fails as unavailable.
 func _request(method: StringName, args: Array = []) -> Dictionary:
 	if not _answers(method):
-		return {"ok": false, "code": &"unavailable", "detail": "Android plugin not loaded"}
+		return {"ok": false, "code": Result.UNAVAILABLE, "detail": "Android plugin not loaded"}
 	_last_request_id += 1
 	var id := _last_request_id
 	var started := Time.get_ticks_msec()
@@ -423,7 +413,8 @@ func _request(method: StringName, args: Array = []) -> Dictionary:
 			shown.erase(key)
 		var sent: Dictionary = payload.get("library", {})
 		var games: Array = sent.get("games", [])
-		var art: Array = payload.get("art", [])
+		# A list of labels, or the one label of an answer about a single game.
+		var art: Array = [payload["art"]] if payload.get("art") is Dictionary else payload.get("art", [])
 		Diagnostics.trace("plugin", "#%d answered in %d ms, %d games, %d labels: %s" % [id, elapsed, games.size(),
 			art.size(), shown])
 	_took(payload)

@@ -1,0 +1,116 @@
+[Android] Add export option for R8 code minification and obfuscation in Gradle builds
+
+Upstream commit f2fbde174af221d3434290fe0c544e943103dab1 (godotengine/godot, author Gustavo Maciel, MIT),
+unchanged. Against 4.7.2-stable (ed1daf0).
+
+diff --git a/platform/android/doc_classes/EditorExportPlatformAndroid.xml b/platform/android/doc_classes/EditorExportPlatformAndroid.xml
+index 2e96deed..3a5186bc 100644
+--- a/platform/android/doc_classes/EditorExportPlatformAndroid.xml
++++ b/platform/android/doc_classes/EditorExportPlatformAndroid.xml
+@@ -62,6 +62,11 @@
+ 		<member name="gradle_build/min_sdk" type="String" setter="" getter="">
+ 			Minimum Android API level required for the application to run (used during Gradle build). See [url=https://developer.android.com/guide/topics/manifest/uses-sdk-element#uses]android:minSdkVersion[/url].
+ 		</member>
++		<member name="gradle_build/minification" type="bool" setter="" getter="">
++			If [code]true[/code], enables R8 code minification and obfuscation for release Gradle builds.
++			This reduces application size, removes unused bytecode, and complies with Google Play Console optimization guidelines.
++			[b]Note:[/b] Only applies to release builds ([b]Export With Debug[/b] unchecked) and requires [member gradle_build/use_gradle_build].
++		</member>
+ 		<member name="gradle_build/target_sdk" type="String" setter="" getter="">
+ 			The Android API level on which the application is designed to run (used during Gradle build). See [url=https://developer.android.com/guide/topics/manifest/uses-sdk-element#uses]android:targetSdkVersion[/url].
+ 		</member>
+diff --git a/platform/android/export/export_plugin.cpp b/platform/android/export/export_plugin.cpp
+index 2e3d91eb..55960af3 100644
+--- a/platform/android/export/export_plugin.cpp
++++ b/platform/android/export/export_plugin.cpp
+@@ -2104,6 +2104,11 @@ String EditorExportPlatformAndroid::get_export_option_warning(const EditorExport
+ 			if (bool(p_preset->get("gradle_build/compress_native_libraries")) && !gradle_build_enabled) {
+ 				return TTR("\"Compress Native Libraries\" is only valid when \"Use Gradle Build\" is enabled.");
+ 			}
++		} else if (p_name == "gradle_build/minification") {
++			bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
++			if (bool(p_preset->get("gradle_build/minification")) && !gradle_build_enabled) {
++				return TTR("\"Minification\" is only valid when \"Use Gradle Build\" is enabled.");
++			}
+ 		} else if (p_name == "gradle_build/export_format") {
+ 			bool gradle_build_enabled = p_preset->get("gradle_build/use_gradle_build");
+ 			if (int(p_preset->get("gradle_build/export_format")) == EXPORT_FORMAT_AAB && !gradle_build_enabled) {
+@@ -2188,6 +2193,7 @@ void EditorExportPlatformAndroid::get_export_options(List<ExportOption> *r_optio
+ 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "gradle_build/gradle_build_directory", PROPERTY_HINT_PLACEHOLDER_TEXT, "res://android"), "", false, false));
+ 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "gradle_build/android_source_template", PROPERTY_HINT_GLOBAL_FILE, "*.zip"), ""));
+ 	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "gradle_build/compress_native_libraries"), false, false, true));
++	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "gradle_build/minification"), false, false, true));
+ 	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "gradle_build/export_format", PROPERTY_HINT_ENUM, "Export APK,Export AAB"), EXPORT_FORMAT_APK, false, true));
+ 	// Using String instead of int to default to an empty string (no override) with placeholder for instructions (see GH-62465).
+ 	// This implies doing validation that the string is a proper int.
+@@ -3666,6 +3672,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
+ 		String sign_flag = bool_to_string(should_sign);
+ 		String zipalign_flag = "true";
+ 		String compress_native_libraries_flag = bool_to_string(p_preset->get("gradle_build/compress_native_libraries"));
++		String minification_flag = bool_to_string(!p_debug && bool(p_preset->get("gradle_build/minification")));
+ 
+ 		Vector<String> android_libraries;
+ 		Vector<String> android_dependencies;
+@@ -3743,6 +3750,7 @@ Error EditorExportPlatformAndroid::export_project_helper(const Ref<EditorExportP
+ 		cmdline.push_back("-Pperform_zipalign=" + zipalign_flag); // argument to specify whether the build should be zipaligned.
+ 		cmdline.push_back("-Pperform_signing=" + sign_flag); // argument to specify whether the build should be signed.
+ 		cmdline.push_back("-Pcompress_native_libraries=" + compress_native_libraries_flag); // argument to specify whether the build should compress native libraries.
++		cmdline.push_back("-Penable_minification=" + minification_flag); // argument to specify whether the build should enable R8 minification/obfuscation.
+ 
+ 		// NOTE: The release keystore is not included in the verbose logging
+ 		// to avoid accidentally leaking sensitive information when sharing verbose logs for troubleshooting.
+diff --git a/platform/android/java/app/build.gradle b/platform/android/java/app/build.gradle
+index 7107c4b5..8eddedd2 100644
+--- a/platform/android/java/app/build.gradle
++++ b/platform/android/java/app/build.gradle
+@@ -222,6 +222,10 @@ android {
+         }
+ 
+         release {
++            minifyEnabled shouldMinify()
++            shrinkResources false
++            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
++
+             // Signing and zip-aligning are skipped for prebuilt builds, but
+             // performed for Godot gradle builds.
+             zipAlignEnabled shouldZipAlign()
+diff --git a/platform/android/java/app/config.gradle b/platform/android/java/app/config.gradle
+index 767d3037..6770dc35 100644
+--- a/platform/android/java/app/config.gradle
++++ b/platform/android/java/app/config.gradle
+@@ -413,3 +413,11 @@ ext.getAddonsDirectory = { ->
+     String addonsDirectory = project.hasProperty("addons_directory") ? project.property("addons_directory") : ""
+     return addonsDirectory
+ }
++
++ext.shouldMinify = { ->
++    String minifyFlag = project.hasProperty("enable_minification") ? project.property("enable_minification") : ""
++    if (minifyFlag == null || minifyFlag.isEmpty()) {
++        minifyFlag = "false"
++    }
++    return Boolean.parseBoolean(minifyFlag)
++}
+diff --git a/platform/android/java/app/proguard-rules.pro b/platform/android/java/app/proguard-rules.pro
+new file mode 100644
+index 00000000..d1c201f3
+--- /dev/null
++++ b/platform/android/java/app/proguard-rules.pro
+@@ -0,0 +1,18 @@
++# Protect Godot Engine Core
++-keep class com.godot.** { *; }
++-keep class org.godotengine.** { *; }
++-keep class ** extends org.godotengine.godot.plugin.GodotPlugin { *; }
++
++# Protect methods exposed to Godot via @UsedByGodot
++-keepattributes *Annotation*
++-keepclassmembers class * {
++    @org.godotengine.godot.plugin.UsedByGodot *;
++}
++
++# Protect JNI bindings
++-keepclasseswithmembernames class * {
++    native <methods>;
++}
++-keep public class * extends android.app.Activity
++-keep public class * extends android.app.Application
++-keep public class * extends android.app.Service

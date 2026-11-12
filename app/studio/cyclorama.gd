@@ -97,8 +97,8 @@ func _lay_out() -> void:
 			_lay_glows()
 		&"mapped":
 			_add(_studio(), _wall)
-			_wall.set_shader_parameter(&"low", _rgba(shown.wall_low))
-			_wall.set_shader_parameter(&"high", _rgba(shown.wall_high))
+			_wall.set_shader_parameter(&"low", StudioMaterial.rgba(shown.wall_low))
+			_wall.set_shader_parameter(&"high", StudioMaterial.rgba(shown.wall_high))
 		&"black":
 			var black := ColorRect.new()
 			black.color = Color.BLACK
@@ -156,7 +156,7 @@ func _lay_glows() -> void:
 		var color: Color = glow[2]
 		centres.append(glow[0])
 		radii.append(glow[1])
-		colors.append(_rgba(color))
+		colors.append(StudioMaterial.rgba(color))
 		stops.append(glow[3])
 	_glows.set_shader_parameter(&"centres", centres)
 	_glows.set_shader_parameter(&"radii", radii)
@@ -174,8 +174,8 @@ func _paint_veil() -> void:
 	var inks: Array[Vector4] = []
 	for colour in _drawn.veil_colours:
 		var paint := veil_paint(_drawn.veil_base, colour)
-		lights.append(_rgba(paint[0]))
-		inks.append(_rgba(paint[1]))
+		lights.append(StudioMaterial.rgba(paint[0]))
+		inks.append(StudioMaterial.rgba(paint[1]))
 	_veil.set_shader_parameter(&"lights", lights)
 	_veil.set_shader_parameter(&"inks", inks)
 	_veil.set_shader_parameter(&"count", lights.size())
@@ -194,10 +194,6 @@ func _add(layer: Control, material_used: ShaderMaterial) -> void:
 	layer.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	layer.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(layer)
-
-
-static func _rgba(colour: Color) -> Vector4:
-	return Vector4(colour.r, colour.g, colour.b, colour.a)
 
 
 ## CIE L* of [param colour], from 0 (black) to 100 (white).

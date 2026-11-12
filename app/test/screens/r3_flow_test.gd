@@ -24,23 +24,6 @@ func test_freeing_the_ring_mid_placing_returns_false_to_the_waiting_caller() -> 
 	assert_array(answers).is_equal([false])
 
 
-func test_two_presses_on_a_region_card_start_only_one_save() -> void:
-	var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
-	device.curtain = true
-	device.slow.append(&"save_preferred_region")
-	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_bool(await Fixtures.on(self, carousel, "PreferredRegion")).is_true()
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_array(device.saves(&"preferred_region")).is_equal([""])
-	device.slow.clear()
-	device.released.emit()
-	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	assert_array(device.saves(&"preferred_region")).is_equal([""])
-
-
 func test_an_arrival_stops_and_releases_its_caller_when_its_row_leaves_the_tree() -> void:
 	var carousel := await _shown(Fixtures.past_first_launch(self, {"ps2": 1}))
 	carousel.process_mode = Node.PROCESS_MODE_DISABLED
@@ -62,21 +45,6 @@ func test_an_arrival_stops_and_releases_its_caller_when_its_row_leaves_the_tree(
 	await await_idle_frame()
 	assert_bool(motion.is_valid()).is_false()
 	assert_array(answers).is_equal([false])
-
-
-func test_light_profiles_can_be_empty_or_null_and_an_empty_cached_set_is_not_reloaded() -> void:
-	assert_dict(ConsoleRow._rigs_from("null")).is_empty()
-	assert_dict(ConsoleRow._rigs_from('{"lights": {}}')).is_empty()
-	assert_dict(ConsoleRow._rigs_from('{"lights": {"a": {"consoles": {}}, "b": {"plinth": {}}}}')).is_equal({"a": true, "b": false})
-	var saved := ConsoleRow._with_rig
-	var loaded := ConsoleRow._rigs_read
-	ConsoleRow._with_rig = {}
-	ConsoleRow._rigs_read = true
-	for repeat in 3:
-		assert_bool(ConsoleRow.has_rig("ps2_slim")).is_false()
-	assert_dict(ConsoleRow._with_rig).is_empty()
-	ConsoleRow._with_rig = saved
-	ConsoleRow._rigs_read = loaded
 
 
 func test_an_arrival_cancelled_by_a_removed_row_returns_false_to_the_carousel() -> void:

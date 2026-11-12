@@ -2,7 +2,7 @@
 class_name Welcome
 extends Control
 ## The title screen of the first launch: "Cartouche" in the middle, a worm of colour going round its
-## outline. It waits for a button, any one; after a moment, a line says so.
+## outline. It waits for a button, any one, or a finger; after a moment, a line says so.
 
 ## Seconds before the line asking for a button fades in, and the time it takes.
 const _HINT_AFTER_S := 1.5
@@ -21,12 +21,22 @@ func _ready() -> void:
 	create_tween().tween_property(_hint, ^"modulate:a", 1.0, _HINT_FADE_S).set_delay(_HINT_AFTER_S)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if is_visible_in_tree() and event.is_pressed() and not event.is_echo() and (event is InputEventJoypadButton or event is InputEventKey):
+# Before the controls behind, which would keep the touches on them.
+func _input(event: InputEvent) -> void:
+	# A finger counts as it lifts: the touch's press would reach the page shown next.
+	var touch := event as InputEventScreenTouch
+	var lifted := touch != null and not touch.pressed and not touch.canceled
+	var pressed := event.is_pressed() and not event.is_echo() and (event is InputEventJoypadButton or event is InputEventKey)
+	if is_visible_in_tree() and (pressed or lifted):
 		get_viewport().set_input_as_handled()
 		_pressed = true
 		Sounds.play(SoundEffects.Cue.SELECT)
 		Diagnostics.trace("screens", "welcome passed")
+
+
+## Whether the screen takes no press now; this one always takes them.
+func holds_presses() -> bool:
+	return false
 
 
 ## Returns once a button is pressed, or at once if one was pressed already.

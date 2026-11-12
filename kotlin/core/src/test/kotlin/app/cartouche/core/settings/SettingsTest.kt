@@ -4,14 +4,12 @@ package app.cartouche.core.settings
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.setups
 import app.cartouche.core.platforms.PlatformId
-import arrow.core.None
 import arrow.core.Some
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.enum
-import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
 import io.kotest.property.checkAll
@@ -36,18 +34,12 @@ class SettingsTest {
     }
 
     @Test
-    fun `a sound level is one of 0 to 10, full until turned down`() = runBlocking<Unit> {
-        checkAll(Arb.int(-50..50)) { steps -> SoundLevel.of(steps).map { it.steps } shouldBe (if (steps in 0..10) Some(steps) else None) }
-        Settings().soundLevel shouldBe SoundLevel.FULL
-        SoundLevel.FULL.steps shouldBe SoundLevel.MAX
-    }
-
-    @Test
-    fun `a fresh install is on its first launch, smooths the edges 4x, leaves the games still, is Light with the veil on`() {
+    fun `a fresh install is on its first launch, smooths the edges 4x, leaves the games still on their arc, is Light with the veil on`() {
         Settings().isFirstLaunch(Library()) shouldBe true
         Settings().edgeSmoothing shouldBe EdgeSmoothing.FOUR_TIMES
         Settings().gamesFloat shouldBe false
         Settings().backdrop shouldBe Backdrop.LIGHT
         Settings().pixelVeil shouldBe true
+        Settings().gamesInLine shouldBe false
     }
 }

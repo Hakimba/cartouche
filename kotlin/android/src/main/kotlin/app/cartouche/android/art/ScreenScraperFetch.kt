@@ -32,16 +32,23 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URLEncoder
-import java.time.LocalDate
+
+/** A password: printed as stars wherever it lands, it is written out only by [reveal], into a request. */
+@JvmInline
+internal value class Secret(private val value: String) {
+    override fun toString(): String = "***"
+
+    fun reveal(): String = value
+}
 
 /** A ScreenScraper member, whose quota and threads the requests count on. */
-internal data class Member(val id: String, val password: String) {
+internal data class Member(val id: String, val password: Secret) {
     /** Never the password: a member may be traced. */
     override fun toString(): String = "Member($id)"
 }
 
 /** The app's developer key and, if any, the member its requests go as: built into the app, never stored or traced. */
-internal data class Credentials(val devId: String, val devPassword: String, val softName: String, val member: Option<Member>) {
+internal data class Credentials(val devId: String, val devPassword: Secret, val softName: String, val member: Option<Member>) {
     override fun toString(): String = "Credentials($devId, $softName, $member)"
 
     companion object {
@@ -51,8 +58,8 @@ internal data class Credentials(val devId: String, val devPassword: String, val 
          */
         fun fromBuild(): Option<Credentials> = Some(BuildConfig.SCREENSCRAPER_DEVID).filter(String::isNotEmpty).map { devId ->
             val ssid = Some(BuildConfig.SCREENSCRAPER_SSID).filter(String::isNotEmpty)
-            val member = ssid.map { Member(it, BuildConfig.SCREENSCRAPER_SSPASSWORD) }
-            Credentials(devId, BuildConfig.SCREENSCRAPER_DEVPASSWORD, BuildConfig.SCREENSCRAPER_SOFTNAME, member)
+            val member = ssid.map { Member(it, Secret(BuildConfig.SCREENSCRAPER_SSPASSWORD)) }
+            Credentials(devId, Secret(BuildConfig.SCREENSCRAPER_DEVPASSWORD), BuildConfig.SCREENSCRAPER_SOFTNAME, member)
         }
     }
 }
@@ -94,7 +101,7 @@ internal class ScreenScraperFetch(
     /** The gate: guards [state], [limits], [member], [checkedOn], [sent] and [underWay]. */
     private val lock = Mutex()
 
-    private val key = KeyHash(ArtStore.sha1("${credentials.devId}:${credentials.devPassword}"))
+    private val key = KeyHash(ArtStore.sha1("${credentials.devId}:${credentials.devPassword.reveal()}"))
 
     private val kept = StateFile(stateFile, KeptClosures.NONE, { KeptClosures.decode(it).orUnreadable() }, KeptClosures::encode)
 
@@ -137,10 +144,10 @@ internal class ScreenScraperFetch(
     }
 
     /**
-     * [texture]'s image, [progress] told as it downloads; skipped at once while ScreenScraper is not open, not found
-     * when the game has no such image.
+     * [texture]'s image, downloaded into [image], [progress] told as it downloads; skipped at once while ScreenScraper
+     * is not open, not found when the game has no such image.
      */
-    suspend fun get(texture: Candidate.Texture, progress: Progress): Either<FetchFailure, ByteArray> {
+    suspend fun get(texture: Candidate.Texture, progress: Progress, image: File): Either<FetchFailure, Unit> {
         checkAccount()
         val sent = admitted().getOrElse { return it.left() }
         val url =
@@ -153,8 +160,15 @@ internal class ScreenScraperFetch(
                 "maxheight" to "$SIZE",
             )
         return try {
-            val result = http.get(url, progress)
-            answered(answerOf(result), result.getOrNone().flatMap { it.body }, sent)
+            val body = TextureSink(image)
+            val result = http.get(url, progress, body)
+            // The image came: ScreenScraper answered well, the device failed to keep it.
+            if (body.unstored) {
+                answered(ScreenScraperAnswer.Image, sent)
+                FetchFailure.Unstored.left()
+            } else {
+                answered(answerOf(result, body.head()), sent)
+            }
         } finally {
             release()
         }
@@ -170,10 +184,10 @@ internal class ScreenScraperFetch(
         }
     }
 
-    private suspend fun answered(answer: ScreenScraperAnswer, body: Option<ByteArray>, sent: Moment): Either<FetchFailure, ByteArray> {
+    private suspend fun answered(answer: ScreenScraperAnswer, sent: Moment): Either<FetchFailure, Unit> {
         val next = lock.withLock { change(state.after(answer, tomorrow(), sent, Moment(now()))) }
         return when (answer) {
-            ScreenScraperAnswer.Image -> body.toEither { FetchFailure.NotFound }
+            ScreenScraperAnswer.Image -> Unit.right()
             ScreenScraperAnswer.NoMedia -> FetchFailure.NotFound.left()
             ScreenScraperAnswer.LoginRefused,
             ScreenScraperAnswer.TimedOut,
@@ -235,15 +249,17 @@ internal class ScreenScraperFetch(
     private suspend fun checkAccount() = checking.withLock {
         if (!due()) return@withLock
         val sent = admitted().getOrElse { return@withLock }
+        val account = MemorySink(ACCOUNT_BYTES)
         val result =
             try {
-                http.get(url(USER, "output" to "json"), Progress.NONE)
+                http.get(url(USER, "output" to "json"), Progress.NONE, account)
             } finally {
                 release()
             }
         lock.withLock {
-            val account = result.getOrNone().flatMap { Account.of(it.status, it.body.map(ByteArray::decodeToString)) }
-            account.fold({ change(state.after(answerOf(result), tomorrow(), sent, Moment(now()))) }) { found ->
+            val body = account.bytes()
+            val told = result.getOrNone().flatMap { Account.of(it.status, Some(it).filter(Answer::kept).map { body.decodeToString() }) }
+            told.fold({ change(state.after(answerOf(result, body), tomorrow(), sent, Moment(now()))) }) { found ->
                 checkedOn = Some(today())
                 limits =
                     when (found) {
@@ -261,12 +277,12 @@ internal class ScreenScraperFetch(
     /**
      * What the server answered, for the state: no answer in time or no server reached count as answers of their own.
      */
-    private fun answerOf(result: Either<Unanswered, Answer>): ScreenScraperAnswer = result.fold({ unanswered ->
+    private fun answerOf(result: Either<Unanswered, Answer>, body: ByteArray): ScreenScraperAnswer = result.fold({ unanswered ->
         when (unanswered) {
             is Unanswered.Offline -> ScreenScraperAnswer.Unreachable
             Unanswered.TimedOut -> ScreenScraperAnswer.TimedOut
         }
-    }, ::read)
+    }) { read(it, body) }
 
     private suspend fun due(): Boolean = lock.withLock { member.isSome() && checkedOn != Some(today()) }
 
@@ -284,11 +300,12 @@ internal class ScreenScraperFetch(
         return next
     }
 
-    private fun tomorrow(): Day = Day(LocalDate.parse(today().iso).plusDays(1).toString())
+    private fun tomorrow(): Day = today().next()
 
     private fun url(script: String, vararg params: Pair<String, String>): String {
-        val key = listOf("devid" to credentials.devId, "devpassword" to credentials.devPassword, "softname" to credentials.softName)
-        val account = member.fold({ emptyList() }) { listOf("ssid" to it.id, "sspassword" to it.password) }
+        val key =
+            listOf("devid" to credentials.devId, "devpassword" to credentials.devPassword.reveal(), "softname" to credentials.softName)
+        val account = member.fold({ emptyList() }) { listOf("ssid" to it.id, "sspassword" to it.password.reveal()) }
         return "$API$script?" + (key + account + params).joinToString("&") { (name, value) -> "$name=${URLEncoder.encode(value, "UTF-8")}" }
     }
 
@@ -311,22 +328,55 @@ internal class ScreenScraperFetch(
 
         private const val DEVELOPER_REFUSED = "identifiants développeur"
 
-        /** What [answer] says: an image only when its bytes are one. */
-        fun read(answer: Answer): ScreenScraperAnswer = when {
-            answer.status != HttpURLConnection.HTTP_OK -> ScreenScraperAnswer.Status(answer.status)
-            else ->
-                answer.body.fold({ ScreenScraperAnswer.Unreadable }) { body ->
-                    when {
-                        body.startsWith(PNG) || body.startsWith(JPEG) -> ScreenScraperAnswer.Image
-                        body.size > LONGEST_TEXT -> ScreenScraperAnswer.Unreadable
-                        body.decodeToString() == NO_MEDIA -> ScreenScraperAnswer.NoMedia
-                        DEVELOPER_REFUSED in body.decodeToString() -> ScreenScraperAnswer.LoginRefused
-                        else -> ScreenScraperAnswer.Unreadable
-                    }
-                }
+        /** What [answer] says, its body starting with [head]: an image only when its bytes are one. */
+        fun read(answer: Answer, head: ByteArray): ScreenScraperAnswer = when {
+            answer.status != HttpURLConnection.HTTP_OK -> ScreenScraperAnswer.ofStatus(answer.status)
+            !answer.kept -> ScreenScraperAnswer.Unreadable
+            isImage(head) -> ScreenScraperAnswer.Image
+            head.size > LONGEST_TEXT -> ScreenScraperAnswer.Unreadable
+            head.decodeToString() == NO_MEDIA -> ScreenScraperAnswer.NoMedia
+            DEVELOPER_REFUSED in head.decodeToString() -> ScreenScraperAnswer.LoginRefused
+            else -> ScreenScraperAnswer.Unreadable
         }
 
         private const val LONGEST_TEXT = 1024
+
+        /** The member's limits are a short JSON text. */
+        private const val ACCOUNT_BYTES = 64 * 1024
+
+        private fun isImage(head: ByteArray): Boolean = head.startsWith(PNG) || head.startsWith(JPEG)
+
+        /** The longest magic, [PNG]'s: enough first bytes to tell an image. */
+        private const val MAGIC = 4
+
+        /**
+         * A texture's answer: written to [file] once its first bytes show an image, held in memory otherwise (an error's text,
+         * which may echo the request and its credentials, never reaches the disk), [LONGEST_TEXT] bytes at most.
+         */
+        private class TextureSink(private val file: File) : Sink {
+            private val text = MemorySink(LONGEST_TEXT)
+            private var start = ByteArray(0)
+            private var image: Option<FileSink> = None
+
+            override fun take(bytes: ByteArray, count: Int): Boolean = image.fold({
+                if (start.size < MAGIC) start += bytes.copyOf(minOf(count, MAGIC - start.size))
+                if (start.size >= MAGIC && isImage(start)) {
+                    FileSink(file).also { image = Some(it) }.let { it.take(text.bytes(), text.bytes().size) && it.take(bytes, count) }
+                } else {
+                    text.take(bytes, count)
+                }
+            }) { it.take(bytes, count) }
+
+            /** The body's first bytes: an image's magic, or the whole text. */
+            fun head(): ByteArray = image.fold({ text.bytes() }) { start }
+
+            /** Whether the image could not be written on the device. */
+            val unstored: Boolean get() = image.isSome(FileSink::unstored)
+
+            override fun close() {
+                image.onSome(FileSink::close)
+            }
+        }
 
         private fun ByteArray.startsWith(prefix: ByteArray): Boolean = size >= prefix.size && prefix.indices.all { this[it] == prefix[it] }
     }

@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 class_name CardChoiceScreen
-extends Control
+extends Page
 ## A setting chosen on a page of its own, among cards of a grid built from the values the plugin takes: the
 ## preferred region of images, the language. The empty value comes first; the one in use now is ticked and has
 ## the focus. Left and right go through the cards in reading order, up and down from row to row. B goes back
-## when [member can_go_back], keeping the value it had.
-
-signal chosen(value: String)
+## when [member can_go_back], keeping the value it had. It answers the value chosen (a String).
 
 const _CARD_FONT_PX := 26
 
@@ -34,15 +32,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	if can_go_back and is_visible_in_tree() and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
 		Sounds.play(SoundEffects.Cue.BACK)
-		chosen.emit(_current)
+		done.emit(_current)
 
 
-## Offers the empty value then [param values], each card reading [param name_of] of its value, the card of
-## [param current] ticked.
-func open(current: String, values: PackedStringArray, name_of: Callable) -> void:
-	_current = current
+## Offers the empty value then the values of [param request] (an [Offer]), each card reading its name, the card of
+## the current one ticked.
+func _open(request: Variant) -> void:
+	var offer: Offer = request
+	_current = offer.current
 	(%Back as Control).visible = can_go_back
-	_choices = PackedStringArray([""]) + values
+	_choices = PackedStringArray([""]) + offer.values
 	for card in _cards.get_children():
 		_cards.remove_child(card)
 		card.queue_free()
@@ -50,12 +49,12 @@ func open(current: String, values: PackedStringArray, name_of: Callable) -> void
 	for value in _choices:
 		var card := Button.new()
 		card.name = value if value else "None"
-		card.text = name_of.call(value)
+		card.text = offer.name_of.call(value)
 		card.custom_minimum_size = card_size
 		card.add_theme_font_size_override(&"font_size", _CARD_FONT_PX)
 		SatinStyle.apply_to(card)
 		card.pressed.connect(_choose.bind(value))
-		if value == current:
+		if value == offer.current:
 			card.add_child(Tick.new())
 		_cards.add_child(card)
 	# Set by index: the grid lays its cards out only on the next frame, too late for a first press.
@@ -68,12 +67,27 @@ func open(current: String, values: PackedStringArray, name_of: Callable) -> void
 		card.focus_neighbor_right = card.get_path_to(_cards.get_child(mini(last, i + 1)))
 		card.focus_neighbor_top = card.get_path_to(_cards.get_child(i - columns if i >= columns else i))
 		card.focus_neighbor_bottom = card.get_path_to(_cards.get_child(below))
-	(_cards.get_child(maxi(_choices.find(current), 0)) as Control).grab_focus()
+	(_cards.get_child(maxi(_choices.find(offer.current), 0)) as Control).grab_focus()
 
 
 func _choose(value: String) -> void:
 	Sounds.play(SoundEffects.Cue.SELECT)
-	chosen.emit(value)
+	done.emit(value)
+
+
+## What the page is opened for: the value in use now, the values to offer after the empty one, and how each reads
+## ([code](value: String) -> String[/code]).
+class Offer:
+	extends RefCounted
+
+	var current: String
+	var values: PackedStringArray
+	var name_of: Callable
+
+	func _init(in_use: String, offered: PackedStringArray, named: Callable) -> void:
+		current = in_use
+		values = offered
+		name_of = named
 
 
 ## The tick on the card of the value chosen now, drawn: fonts rarely have the sign.

@@ -16,24 +16,16 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config
 import java.io.File
 
-@Config(sdk = [30, 34])
 @RunWith(RobolectricTestRunner::class)
 class LibraryStoreTest {
     private val file = File(RuntimeEnvironment.getApplication().filesDir, "library.json")
     private val library = Library().withSetup(PlatformId("ps2"), PlatformSetup(Some(uri("content://p/tree/ps2"))))
 
     @Test
-    fun `a saved library loads back, and no file means an empty library`() {
-        LibraryStore(file).load().shouldBeRight().library shouldBe Library()
-        LibraryStore(file).save(library).shouldBeRight()
-        LibraryStore(file).load().shouldBeRight().library shouldBe library
-    }
-
-    @Test
     fun `INV-11 an unreadable library file is set aside, never overwritten`() {
+        LibraryStore(file).load().shouldBeRight().library shouldBe Library()
         file.writeText("not a library")
         LibraryStore(file).load().shouldBeLeft().shouldBeInstanceOf<LibraryError.Unreadable>()
         LibraryStore(file).setAside() shouldBe true

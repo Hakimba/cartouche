@@ -94,13 +94,16 @@ func test_the_games_screen_at_rest_draws_nothing() -> void:
 	await _assert_still_draws_nothing(carousel)
 
 
-func test_a_game_s_properties_at_rest_draw_nothing() -> void:
+func test_a_game_s_properties_keep_the_app_awake_for_the_way_back() -> void:
 	var carousel := await _carousel()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await _on(carousel, Carousel.Screen.GAMES)
 	await Fixtures.action(self, &"open_properties")
 	await _on(carousel, Carousel.Screen.PROPERTIES)
-	await _assert_still_draws_nothing(carousel)
+	carousel._resting.stays_awake = false
+	carousel._resting._process(Resting.STILL_AFTER_S + Resting.STOPPING_S)
+	assert_float(carousel._resting.pace).is_equal(1.0)
+	assert_bool(OS.low_processor_usage_mode).is_false()
 
 
 func test_the_form_editing_a_console_at_rest_draws_nothing() -> void:

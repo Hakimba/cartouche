@@ -25,13 +25,17 @@ func _move(to: Vector2, index := 0) -> InputEventScreenDrag:
 	return event
 
 
-func test_a_short_press_that_barely_moves_is_a_tap_and_a_slow_one_is_nothing() -> void:
+func test_a_short_press_that_barely_moves_is_a_tap_a_slow_or_far_lifted_one_is_nothing() -> void:
 	var finger := Finger.new()
 	assert_int(finger.read(_down(Vector2(100, 100)), 0)).is_equal(Finger.Gesture.DOWN)
 	assert_int(finger.read(_move(Vector2(110, 105)), 50)).is_equal(Finger.Gesture.NONE)
 	assert_int(finger.read(_up(Vector2(110, 105)), Finger.TAP_MS - 1)).is_equal(Finger.Gesture.TAP)
 	finger.read(_down(Vector2(100, 100)), 1000)
 	assert_int(finger.read(_up(Vector2(100, 100)), 1000 + Finger.TAP_MS + 1)).is_equal(Finger.Gesture.NONE)
+	finger.read(_down(Vector2(100, 100)), 2000)
+	assert_int(finger.read(_up(Vector2(100, 100)), 2000 + Finger.TAP_MS)).is_equal(Finger.Gesture.NONE)
+	finger.read(_down(Vector2(100, 100)), 3000)
+	assert_int(finger.read(_up(Vector2(300, 100)), 3050)).is_equal(Finger.Gesture.NONE)
 
 
 func test_a_finger_moved_past_the_slop_drags_until_released_is_a_flick_if_released_soon_and_never_a_tap() -> void:
@@ -127,16 +131,6 @@ func test_inv_22_whatever_a_finger_does_a_moved_press_is_never_a_tap_and_a_long_
 	# Each kind is reached often.
 	for kind in counted:
 		assert_int(counted[kind]).override_failure_message(kind).is_greater(30)
-
-
-func test_a_finger_lifted_far_from_where_it_came_down_is_no_tap_and_a_tap_is_shorter_than_its_limit() -> void:
-	var finger := Finger.new()
-	finger.read(_down(Vector2(100, 100)), 0)
-	assert_int(finger.read(_up(Vector2(300, 100)), 50)).is_equal(Finger.Gesture.NONE)
-	finger.read(_down(Vector2(100, 100)), 1000)
-	assert_int(finger.read(_up(Vector2(100, 100)), 1000 + Finger.TAP_MS)).is_equal(Finger.Gesture.NONE)
-	finger.read(_down(Vector2(100, 100)), 2000)
-	assert_int(finger.read(_up(Vector2(100, 100)), 2000 + Finger.TAP_MS - 1)).is_equal(Finger.Gesture.TAP)
 
 
 func test_a_first_drag_counts_from_where_the_finger_came_down() -> void:

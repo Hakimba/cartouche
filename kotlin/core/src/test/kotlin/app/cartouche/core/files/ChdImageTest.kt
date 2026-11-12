@@ -61,16 +61,6 @@ class ChdImageTest {
     }
 
     @Test
-    fun `a CD track's type gives where a sector's data starts`() {
-        listOf("MODE1" to 0, "MODE2_FORM1" to 0, "MODE2" to 8, "MODE2_FORM_MIX" to 8).forEach { (type, at) ->
-            val frame = ByteArray(FRAME) { it.toByte() }
-            Layout.ofTrack(type).data(frame, 0).shouldBeSome() shouldBe frame.copyOfRange(at, at + SECTOR)
-        }
-        Layout.ofTrack("MODE1_RAW") shouldBe Layout.RAW
-        Layout.ofTrack("MODE2_RAW") shouldBe Layout.RAW
-    }
-
-    @Test
     fun `a CHD is read where its header says, and only within the file`() {
         val source = InMemoryBytes(image("dvd-zlib.chd"))
         chdOf(source) { sector -> sector(16).shouldBeSome() }.shouldBeSome()

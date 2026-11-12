@@ -22,6 +22,10 @@ func _ready() -> void:
 
 # Runs only while images wait for their texture.
 func _process(_delta: float) -> void:
+	# What waited was cancelled since.
+	if _waiting.is_empty():
+		set_process(false)
+		return
 	var key: String = _waiting.keys()[0]
 	var image := _waiting[key]
 	_waiting.erase(key)

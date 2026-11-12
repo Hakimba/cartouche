@@ -4,11 +4,13 @@ package app.cartouche.core.platforms
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
 import app.cartouche.core.Shipped
+import app.cartouche.core.anyText
 import app.cartouche.core.art.crop
 import app.cartouche.core.art.front
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.launch.RunningInstance
 import app.cartouche.core.launch.TemplateError
+import app.cartouche.core.library.DataFolders
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.game
 import app.cartouche.core.shelves.Selection
@@ -16,12 +18,10 @@ import app.cartouche.core.shelves.Shelves
 import app.cartouche.core.uri
 import arrow.core.None
 import arrow.core.Some
-import arrow.core.getOrElse
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.collections.shouldBeUnique
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -30,8 +30,8 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
+import io.kotest.property.arbitrary.long
 import io.kotest.property.arbitrary.set
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -51,6 +51,8 @@ class CatalogTest {
         }
         val game = GameFile(FileName("Game.chd"), uri("content://x"), Some(FilePath("/storage/x/Game.chd")))
         shippedCatalog.platforms.flatMap { it.players }.forEach { it.template.resolve(game).shouldBeRight() }
+        CurtainTimes.parse(DefinitionSource("curtains.json", Shipped.text("launch/curtains.json"))).shouldBeRight()
+        DataFolders.parse(DefinitionSource("data_folders.json", Shipped.text("scan/data_folders.json"))).shouldBeRight()
     }
 
     @Test
@@ -104,25 +106,27 @@ class CatalogTest {
         val offered = Catalog.parse(shipped, Shipped.profiles, split.keys.map(::PlatformId).toSet()).offered
         offered.associate { it.platform.value to (it.maker to it.model) } shouldBe
             split.mapValues { (_, named) -> Some(named.first) to named.second }
-    }
-
-    @Test
-    fun `offered holds the catalog platforms that have a model and nothing else, whatever the models named`() = runBlocking<Unit> {
-        val known = shippedCatalog.platforms.map { it.id }
-        // The chooser's order: grouped by maker, then the model, compared in lower case, as the rule says.
-        val split = shippedCatalog.platforms.map { OfferedConsole.of(it) }
-        val byName =
-            split
-                .sortedWith(compareBy({ it.maker.isNone() }, { it.maker.getOrElse { "" }.lowercase() }, { it.model.lowercase() }))
-                .map { it.platform }
-        checkAll(Arb.set(Arb.element(known + PlatformId("dreamcast-without-definition")), 0..known.size)) { named ->
-            val catalog = Catalog.parse(shipped, Shipped.profiles, named)
-            catalog.offered.map { it.platform }.toSet() shouldBe named.intersect(known.toSet())
-            // Whatever is named, the ones offered keep the order the whole set has.
-            catalog.offered.map { it.platform } shouldBe byName.filter { it in named }
-            catalog.offered.map { it.platform }.shouldBeUnique()
-            catalog.platforms shouldBe shippedCatalog.platforms
-        }
+        // The chooser's order: grouped by maker, then by model name.
+        offered.map { it.platform.value } shouldBe
+            listOf(
+                "xbox",
+                "xbox360",
+                "gb",
+                "gba",
+                "gbc",
+                "gc",
+                "n64",
+                "nes",
+                "snes",
+                "switch",
+                "wii",
+                "dreamcast",
+                "master",
+                "genesis",
+                "psx",
+                "ps2",
+                "psp",
+            )
     }
 
     @Test
@@ -145,16 +149,12 @@ class CatalogTest {
 
     @Test
     fun `a PS2 disc image is offered to ARMSX2`() {
-        val candidates = shippedCatalog.candidates(FileName("Burnout 3 - Takedown (Europe) (En,Es,Nl,Sv).chd"))
+        val ps2 = shippedCatalog.platform(PlatformId("ps2")).shouldBeSome()
+        val opening = ps2.players.filter { ps2.opens(FileName("Burnout 3 - Takedown (Europe) (En,Es,Nl,Sv).chd"), it) }
+        opening.map { it.template.targetPackage.map { p -> p.value } } shouldContain Some("com.armsx2")
         // A .chd may hold a disc of several platforms: the PS2 is one of them.
-        candidates.map { it.platform.id } shouldContain PlatformId("ps2")
-        candidates.filter { it.platform.id == PlatformId("ps2") }.map {
-            it.player.template.targetPackage.map { p ->
-                p.value
-            }
-        } shouldContain
-            Some("com.armsx2")
-        shippedCatalog.candidates(FileName("GAME.CHD")).map { it.platform.id } shouldContain PlatformId("ps2")
+        val opensIt = shippedCatalog.platforms.filter { platform -> platform.players.any { platform.opens(FileName("GAME.CHD"), it) } }
+        opensIt.map { it.id } shouldContain PlatformId("ps2")
     }
 
     @Test
@@ -268,6 +268,43 @@ class CatalogTest {
     }
 
     @Test
+    fun `a format's own floor stands for its files in any case, the platform's for every other file`() = runBlocking<Unit> {
+        val floors = """"minimumGameBytes": 16000000, "minimumBytesByExtension": {"WAD": 65536}"""
+        val profiles = """{"ps2": {"media": "dvd", "medium": {"default": "ps2_dvd"}, $floors}}"""
+
+        fun read(text: String) = Catalog.parse(listOf(definition()), DefinitionSource("profiles.json", text))
+        val profile = read(profiles).platforms.single().profile
+        checkAll(anyText, Arb.element("w", "W"), Arb.element("a", "A"), Arb.element("d", "D")) { stem, w, a, d ->
+            profile.minimumBytes(FileName("$stem.$w$a$d")) shouldBe 65536
+            profile.minimumBytes(FileName("$stem.$w$a$d.iso")) shouldBe 16000000
+            profile.minimumBytes(FileName("$stem.${w}ad.x")) shouldBe 16000000
+        }
+        profile.minimumBytes(FileName("wad")) shouldBe 16000000
+        // A floor named otherwise than an extension refuses the profiles.
+        listOf(".wad", "", "w-d").forEach { key ->
+            read(profiles.replace("\"WAD\"", "\"$key\"")).rejected.first().shouldBeInstanceOf<CatalogError.InvalidJson>()
+        }
+    }
+
+    @Test
+    fun `floors by extension are read as written, and a negative one or an extension written twice refuses the profiles`() =
+        runBlocking<Unit> {
+            fun read(floors: List<Pair<String, Long>>): Catalog {
+                val written = floors.joinToString { (key, bytes) -> "\"$key\": $bytes" }
+                val profile = """{"media": "dvd", "medium": {"default": "ps2_dvd"}, "minimumGameBytes": 9"""
+                val profiles = """{"ps2": $profile, "minimumBytesByExtension": {$written}}}"""
+                return Catalog.parse(listOf(definition()), DefinitionSource("profiles.json", profiles))
+            }
+            val extensions = Arb.set(Arb.element("wad", "m3u", "cue", "iso", "chd"), 1..5)
+            checkAll(extensions, Arb.long(0L..(1L shl 40)), Arb.long(Long.MIN_VALUE..-1L)) { keys, bytes, negative ->
+                val floors = keys.map { it to bytes }
+                read(floors).platforms.single().profile.minimumBytesByExtension.mapKeys { it.key.value } shouldBe floors.toMap()
+                read(listOf(keys.first() to negative) + floors.drop(1)).rejected.first().shouldBeInstanceOf<CatalogError.InvalidJson>()
+                read(floors + (keys.first().uppercase() to bytes)).rejected.first().shouldBeInstanceOf<CatalogError.InvalidJson>()
+            }
+        }
+
+    @Test
     fun `killPackageProcesses is optional`() {
         val player = """{"uniqueId": "p", "name": "p", "acceptedFilenameRegex": ".*", "amStartArguments": "-n a.b/.C"}"""
         catalog(definition(player)).find(PlayerId("p")).shouldBeSome().player.runningInstance shouldBe RunningInstance.KEEP
@@ -287,15 +324,16 @@ class CatalogTest {
 
     @Test
     fun `hidden files are never offered to a player, whatever the patterns`() = runBlocking<Unit> {
-        val permissive = catalog(definition(playerJson("any", pattern = ".*")))
-        checkAll(Arb.string()) { name -> permissive.candidates(FileName(".$name")).shouldBeEmpty() }
+        val permissive = catalog(definition(playerJson("any", pattern = ".*"))).platforms.single()
+        checkAll(anyText) { name -> permissive.players.filter { permissive.opens(FileName(".$name"), it) }.shouldBeEmpty() }
     }
 
     @Test
     fun `INV-03 catalog parsing and file matching are total`() = runBlocking<Unit> {
-        checkAll(Arb.choice(definitionTexts, Arb.string()), Arb.string()) { text, fileName ->
-            catalog(DefinitionSource("fuzz.json", text)).candidates(FileName(fileName))
-            shippedCatalog.candidates(FileName(fileName))
+        checkAll(Arb.choice(definitionTexts, anyText), anyText) { text, fileName ->
+            (catalog(DefinitionSource("fuzz.json", text)).platforms + shippedCatalog.platforms).forEach { platform ->
+                platform.players.forEach { platform.opens(FileName(fileName), it) }
+            }
         }
     }
 }

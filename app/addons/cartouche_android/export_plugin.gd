@@ -30,6 +30,16 @@ class AndroidExportPlugin extends EditorExportPlugin:
 		var aar := BIN + "cartouche-android-%s.aar" % ("debug" if debug else "release")
 		return PackedStringArray([aar, BIN + "cartouche-core.jar"])
 
+	# Cartouche can be chosen as the device's home screen, as a handheld's launcher is.
+	func _get_android_manifest_activity_element_contents(_platform: EditorExportPlatform, _debug: bool) -> String:
+		return """
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.HOME" />
+				<category android:name="android.intent.category.DEFAULT" />
+			</intent-filter>
+"""
+
 	func _get_android_dependencies(_platform: EditorExportPlatform, _debug: bool) \
 			-> PackedStringArray:
 		# Written by the Gradle build, so dependency versions live only in its version catalog.

@@ -2,6 +2,7 @@
 package app.cartouche.android.art
 
 import android.graphics.BitmapFactory
+import app.cartouche.android.unexpected
 import app.cartouche.core.art.ArtVariant
 import app.cartouche.core.art.ArtVersion
 import app.cartouche.core.art.PS2_DISC
@@ -9,11 +10,14 @@ import app.cartouche.core.art.web
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LabelRegion
 import arrow.core.Either
+import arrow.core.Option
 import arrow.core.Some
+import arrow.core.getOrElse
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -24,6 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLog
 import java.io.File
 import app.cartouche.core.art.texture as candidateTexture
 
@@ -99,7 +104,21 @@ class VariantDownloadsTest {
     }
 
     @Test
-    fun `INV-17 a texture ScreenScraper has none of is remembered so for the sources' version, a scan's absence is not`() {
+    fun `INV-19 a download failing unexpectedly is told unreadable, and nothing logged holds its message`() {
+        ShadowLog.clear()
+        val secret = "https://api.screenscraper.fr/api2/mediaJeu.php?devpassword=DEVSECRET42"
+        val fetch = FakeFetch(emptyMap()).apply { during = { throw IllegalStateException(secret) } }
+        downloads(fetch).download(game, listOf(variant("Europe")), PS2_DISC, version)
+        scope.runCurrent()
+        heard.getValue("Europe").shouldBeLeft(VariantFailure.UNREADABLE)
+        unexpected(IllegalStateException(secret)).detail shouldNotContain "DEVSECRET42"
+        ShadowLog.getLogs().forEach { log ->
+            "${log.msg} ${Option.fromNullable(log.throwable).map(Throwable::toString).getOrElse { "" }}" shouldNotContain "DEVSECRET42"
+        }
+    }
+
+    @Test
+    fun `INV-17 an image a source has none of is remembered so for the sources' version`() {
         val texture = ArtVariant(LabelRegion("Europe"), candidateTexture(58, 1, "support-texture(eu)", "Europe"))
         downloads(FakeFetch(emptyMap())).download(game, listOf(texture, variant("Japan")), PS2_DISC, version)
         scope.runCurrent()
@@ -107,7 +126,7 @@ class VariantDownloadsTest {
         heard.getValue("Japan").shouldBeLeft(VariantFailure.NOT_FOUND)
         store.isMissing(texture.candidate, version) shouldBe true
         store.isMissing(texture.candidate, Some(ArtVersion("2026-09-28 2026-11-01"))) shouldBe false
-        store.isMissing(variant("Japan").candidate, version) shouldBe false
+        store.isMissing(variant("Japan").candidate, version) shouldBe true
     }
 
     @Test
@@ -118,8 +137,26 @@ class VariantDownloadsTest {
         downloads.download(game, listOf(variant("Europe")), PS2_DISC, version)
         scope.runCurrent()
         fetch.asked shouldBe listOf("https://art/Europe.png")
+        fetch.online = false
+        downloads.download(game, listOf(variant("Japan")), PS2_DISC, version)
+        scope.runCurrent()
+        fetch.online = true
+        downloads.download(game, listOf(variant("Japan")), PS2_DISC, version)
+        scope.runCurrent()
+        fetch.asked shouldBe listOf("https://art/Europe.png", "https://art/Japan.png", "https://art/Japan.png")
+    }
+
+    /** The caller read the store before asking: a download that ended in between kept the image already. */
+    @Test
+    fun `INV-17 an image kept since the caller looked is told kept, never downloaded again`() {
+        val fetch = FakeFetch(mapOf("https://art/Europe.png" to scan(diameter = 40, margin = 4)))
+        val downloads = downloads(fetch)
         downloads.download(game, listOf(variant("Europe")), PS2_DISC, version)
         scope.runCurrent()
-        fetch.asked.size shouldBe 2
+        heard.clear()
+        downloads.download(game, listOf(variant("Europe")), PS2_DISC, version)
+        scope.runCurrent()
+        fetch.asked shouldBe listOf("https://art/Europe.png")
+        heard.getValue("Europe").shouldBeRight() shouldBe store.variant(variant("Europe").candidate).shouldBeSome()
     }
 }

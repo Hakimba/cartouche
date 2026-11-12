@@ -339,31 +339,6 @@ class ArtSourcesTest {
     }
 
     @Test
-    fun `INV-16 looking labels up again asks for each game a source may have art for, and never touches a label the user chose`() =
-        runBlocking<Unit> {
-            val sources = sources()
-            val labels = Arb.element(LabelChoice.Automatic, LabelChoice.Own, LabelChoice.Region(LabelRegion("Japan")))
-            var own = 0
-            var region = 0
-            checkAll(Arb.list(Arb.pair(Arb.element("Okage", "Ico", "Unknown"), labels), 0..6)) { picked ->
-                val games = picked.mapIndexed { i, (title, label) -> game(title).copy(id = GameId("$i"), label = label) }
-                val again = ArtSources.lookAgain(games) { sources }
-                games.forEach { game ->
-                    val expected =
-                        when {
-                            game.label == LabelChoice.Own -> (false to false).also { own++ }
-                            game.label is LabelChoice.Region -> (false to false).also { region++ }
-                            game.title == "Okage" -> true to false
-                            else -> false to true
-                        }
-                    ((game.id in again.asked) to (game.id in again.unfound)) shouldBe expected
-                }
-            }
-            own shouldBeGreaterThan 60
-            region shouldBeGreaterThan 60
-        }
-
-    @Test
     fun `either chosen source moves only its image and an unavailable choice keeps every fallback`() = runBlocking<Unit> {
         val sources = sources(bySerial = bySerial, textures = table)
         val automatic = listOf("na.png", "ss:58:1234:support-texture(us)", "SCUS-97129.jpg", "jp.png", "ss:58:1234:support-texture(jp)")

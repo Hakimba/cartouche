@@ -13,7 +13,7 @@ class ProbeScene extends Node3D:
 
 	func _ready() -> void:
 		add_child(row)
-		var model := Model.new()
+		var model := Node3D.new()
 		row.add_child(model)
 		row._items.append(ConsoleRow.Item.new(model, ConsoleRow.Rest.new(), "nes"))
 		row._light_selected()
@@ -54,7 +54,3 @@ class DiagnosticHost extends DiagnosticsScript:
 static func file(path: String, text: String) -> Dictionary:
 	return {"path": path, "data": Marshalls.utf8_to_base64(text)}
 
-
-class Model extends Node3D:
-	func fade(_amount: float) -> void:
-		pass

@@ -21,6 +21,8 @@ class SettingsFormatTest {
             """{"version":2,"settings":{"preferredRegion":"Atlantis"}}""",
             """{"version":2,"settings":{"language":"tlh"}}""",
             """{"version":2,"settings":{"backdrop":"sepia"}}""",
+            """{"version":2,"settings":{"soundLevel":999}}""",
+            """{"version":2,"settings":{"soundLevel":-1}}""",
         ).forEach { SettingsFormat.decode(it).shouldBeLeft() }
     }
 

@@ -97,7 +97,8 @@ public data class PlatformSetup(
 ) {
     /**
      * The player that opens [file]: the chosen one when [available], else the first available one in definition
-     * order.
+     * order. Only the player's own pattern is asked: a stored game its platform's pattern no longer accepts still has
+     * its player, and the launch then names the unsupported file.
      */
     public fun playerFor(platform: Platform, file: FileName, available: (Player) -> Boolean): Option<Player> {
         val candidates = platform.players.filter { it.accepts.matches(file) && available(it) }
@@ -132,14 +133,17 @@ public data class Scan(
             facts: Map<ContentUri, FileFacts> = emptyMap(),
         ): Scan {
             val (ignored, kept) = folder.files.sortedWith(FILE_ORDER).separateEither { classify(platform, titles, facts, it) }
-            val groups =
+            val grouped =
                 when (discs) {
-                    DiscGrouping.GROUPED -> kept.groupBy { it.name.copy(disc = None) }.values.flatMap(::asDiscs)
-                    DiscGrouping.SEPARATE -> kept.map(::listOf)
+                    DiscGrouping.GROUPED -> kept.groupBy { it.name.copy(disc = None) }.values.map(::asDiscs)
+                    DiscGrouping.SEPARATE -> kept.map { Grouped(listOf(listOf(it)), emptyList()) }
                 }
+            val playlists = grouped.flatMap { it.playlists }.map { IgnoredFile(it.file, IgnoreReason.NOT_A_GAME) }
             return Scan(
-                groups.map { it.sortedWith(DISC_ORDER).toNonEmptyListOrNone() }.filterOption().map { game(platform.id, it) },
-                ignored,
+                grouped.flatMap { it.games }.map { it.sortedWith(DISC_ORDER).toNonEmptyListOrNone() }.filterOption().map {
+                    game(platform.id, it)
+                },
+                ignored + playlists,
                 folder.skipped.sortedWith(compareBy({ it.path.value }, { it.reason })),
             )
         }
@@ -155,10 +159,19 @@ public data class Scan(
         private val FILE_ORDER = compareBy<ListedFile>({ it.name.value }, { it.uri.value })
         private val DISC_ORDER = compareBy<Candidate> { it.name.disc.getOrElse { 0 } }.thenBy { it.file.uri.value }
 
-        /** One game when the files are distinct numbered discs; otherwise (copies, other formats) one game each. */
-        private fun asDiscs(files: List<Candidate>): List<List<Candidate>> {
-            val numbers = files.map { it.name.disc }
-            return if (numbers.all { it.isSome() } && numbers.distinct().size == numbers.size) listOf(files) else files.map(::listOf)
+        private data class Grouped(val games: List<List<Candidate>>, val playlists: List<Candidate>)
+
+        /**
+         * Distinct numbered discs make one game, which stands for the `.m3u` playlist of their name (the playlist would
+         * show the same game twice); copies and other formats are one game each.
+         */
+        private fun asDiscs(files: List<Candidate>): Grouped {
+            val (numbered, others) = files.partition { it.name.disc.isSome() }
+            if (numbered.isEmpty() || numbered.distinctBy { it.name.disc }.size != numbered.size) {
+                return Grouped(files.map(::listOf), emptyList())
+            }
+            val (playlists, rest) = others.partition { it.file.name.value.endsWith(".m3u", ignoreCase = true) }
+            return Grouped(listOf(numbered) + rest.map(::listOf), playlists)
         }
 
         private val BIOS = Regex("""(?i)(?<![a-z0-9])(bios|scph-?\d+)(?![a-z0-9])""")
@@ -170,14 +183,14 @@ public data class Scan(
             file: ListedFile,
         ): Either<IgnoredFile, Candidate> = either {
             ensure(!file.name.isHidden) { IgnoredFile(file, IgnoreReason.HIDDEN) }
-            val accepted = platform.accepts.matches(file.name) && platform.players.any { it.accepts.matches(file.name) }
+            val accepted = platform.players.any { platform.opens(file.name, it) }
             ensure(accepted) { IgnoredFile(file, IgnoreReason.UNSUPPORTED) }
             val stem = file.name.value.substringBeforeLast('.')
             val name = GameName.parse(stem)
             val byContent = facts.getOrNone(file.uri).flatMap { titles.identifyByContent(it, name) }
-            val byName = titles.identifyByName(stem)
+            val byName = titles.identifyByName(stem, name)
             val known = byContent.isSome() || byName.isSome()
-            val tooSmall = file.sizeBytes.isSome { it < platform.profile.minimumGameBytes }
+            val tooSmall = file.sizeBytes.isSome { it < platform.profile.minimumBytes(file.name) }
             // A known game is kept whatever its name or size (a Redump title may mention a SCPH accessory).
             ensure(known || !(tooSmall || BIOS.containsMatchIn(file.name.value))) { IgnoredFile(file, IgnoreReason.NOT_A_GAME) }
             val shell = (facts[file.uri] as? FileFacts.Print).toOption().fold({ Shell.UNKNOWN }, FileFacts.Print::shell)
@@ -192,8 +205,8 @@ public data class Scan(
         private fun game(platform: PlatformId, discs: NonEmptyList<Candidate>): Game {
             val first = discs.head
             val known = discs.map(if (first.byContent.isSome()) Candidate::byContent else Candidate::byName)
-            val exact = known.head.flatMap { if (it is Identification.Disc) Some(it.disc) else None }
-            val named = exact.fold({ first.name }, KnownTitle::name)
+            val exact = known.head.flatMap { if (it is Identification.Disc) Some(it) else None }
+            val named = exact.fold({ first.name }, Identification.Disc::title)
             return Game(
                 id = GameId("${platform.value}/${first.file.uri.value}"),
                 platform = platform,
@@ -202,7 +215,7 @@ public data class Scan(
                 languages = named.languages,
                 version = named.version,
                 serials = known.toList().flatMap { disc -> disc.fold({ emptyList() }, Identification::serials) }.distinct(),
-                redumpName = exact.map(KnownTitle::text),
+                redumpName = exact.map { it.disc.text },
                 discs = discs.map { Disc(it.name.disc, it.file) },
                 shell = first.shell,
             )

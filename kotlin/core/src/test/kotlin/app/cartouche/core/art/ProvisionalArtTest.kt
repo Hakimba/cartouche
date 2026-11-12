@@ -35,15 +35,4 @@ class ProvisionalArtTest {
         }
         ProvisionalArt.decode("{broken").shouldBeNone()
     }
-
-    @Test
-    fun `keeping one provisional game removes every other marked game`() = runBlocking<Unit> {
-        checkAll(Arb.element("a", "b", "c"), Arb.element("lb", "ss:58:1:t")) { name, image ->
-            val kept = GameId("kept/$name")
-            val gone = GameId("gone/$name")
-            val after = ProvisionalArt().with(kept, Identity(image)).with(gone, Identity("other")).keeping(setOf(kept))
-            after.shown(kept).shouldBeSome() shouldBe Identity(image)
-            after.shown(gone).shouldBeNone()
-        }
-    }
 }

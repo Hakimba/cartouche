@@ -8,15 +8,11 @@ extends Button
 
 const _SIZE := Vector2(56.0 * FormPaint.CQW, 5.4 * FormPaint.CQW)
 const _PAD_LEFT := 7.2 * FormPaint.CQW
-const _PAD_RIGHT := 1.8 * FormPaint.CQW
 const _GAP := 1.2 * FormPaint.CQW
 const _NAME_PX := 2.05 * FormPaint.CQW
 const _COUNT_PX := 1.3 * FormPaint.CQW
 const _CHEVRON := 1.1 * FormPaint.CQW
 const _CHEVRON_STROKE := 0.22 * _CHEVRON
-const _SEPARATOR_LEFT := 2.2 * FormPaint.CQW
-const _SEPARATOR_RIGHT := 1.4 * FormPaint.CQW
-const _SEPARATOR_GAP := 0.3 * FormPaint.CQW
 
 ## Whether its chooser is open: the chevron points up and the counter shows.
 var open := false:
@@ -55,7 +51,7 @@ func show_model(model: String, choosable: bool) -> void:
 func _draw() -> void:
 	var label := FormPaint.line(tr("Model"), StudioTokens.Face.JAKARTA_700, _NAME_PX)
 	label.draw(self, Vector2(_PAD_LEFT, (size.y - label.height) / 2.0), Backdrop.palette.ink)
-	var right := size.x - _PAD_RIGHT - (0.0 if disabled else _CHEVRON * 1.6 + _GAP)
+	var right := size.x - FormPaint.PAD_RIGHT - (0.0 if disabled else _CHEVRON * 1.6 + _GAP)
 	if open:
 		var number := FormPaint.line("%02d" % (focused + 1), StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
 		var rest := FormPaint.line(" / %02d" % models, StudioTokens.Face.PLEX_600, _COUNT_PX, 0.08)
@@ -69,19 +65,12 @@ func _draw() -> void:
 	value.fit(right - _PAD_LEFT - label.width - _GAP)
 	value.draw(self, Vector2(right - value.width, (size.y - value.height) / 2.0),
 		Backdrop.palette.mute if disabled else Backdrop.palette.ink)
+	# The step field's chevron turned a quarter: a 16 × 10 stroke pointing down, or up while open.
 	if not disabled:
-		_draw_chevron(Vector2(size.x - _PAD_RIGHT - _CHEVRON * 1.6, size.y / 2.0 - _CHEVRON / 2.0))
+		var k := _CHEVRON / 10.0
+		var way := -1.0 if open else 1.0
+		FormPaint.chevron(self, Vector2(size.x - FormPaint.PAD_RIGHT - _CHEVRON * 1.6, size.y / 2.0 - _CHEVRON / 2.0)
+			+ Vector2(8.0, 5.0 + 3.0 * way) * k, Vector2(0.0, -6.0 * way) * k, Vector2(6.0, 0.0) * k, Backdrop.palette.mute,
+			_CHEVRON_STROKE)
 	if not open:
-		draw_rect(Rect2(_SEPARATOR_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _SEPARATOR_LEFT - _SEPARATOR_RIGHT,
-			1.0), Backdrop.palette.line)
-
-
-## The step field's chevron turned a quarter: a 16 × 10 stroke pointing down, or up while open.
-func _draw_chevron(at: Vector2) -> void:
-	var k := _CHEVRON / 10.0
-	var tip := 2.0 if open else 8.0
-	var ends := 8.0 if open else 2.0
-	var points := PackedVector2Array([at + Vector2(2.0, ends) * k, at + Vector2(8.0, tip) * k, at + Vector2(14.0, ends) * k])
-	draw_polyline(points, Backdrop.palette.mute, _CHEVRON_STROKE, true)
-	for point in points:
-		draw_circle(point, _CHEVRON_STROKE / 2.0, Backdrop.palette.mute)
+		FormPaint.separator(self)

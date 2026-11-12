@@ -11,16 +11,10 @@ import arrow.core.getOrNone
 import arrow.core.raise.ensure
 import arrow.core.raise.option
 import arrow.core.toOption
+import java.util.concurrent.ConcurrentHashMap
 
-/**
- * A disc as a reference list knows it: its exact name ([text], read as [name]) and its serials, such as `SLES-53047`.
- * The list files it by its title alone ([filing]): the whole name is read only once a file could be the disc, a few
- * of the list's thousands.
- */
-public data class KnownTitle(public val text: String, public val serials: List<String>) {
-    public val name: GameName by lazy { GameName.parse(text) }
-    internal val filing: GameName.Filing = GameName.filing(text)
-}
+/** A disc as a reference list knows it: its exact name and its serials, such as `SLES-53047`. */
+public data class KnownTitle(public val text: String, public val serials: List<String>)
 
 /** What a file's name or content tells about the disc it is. */
 public sealed interface Identification {
@@ -30,10 +24,10 @@ public sealed interface Identification {
     public val regions: List<String>
     public val serials: List<String>
 
-    /** The file is exactly [disc] of the reference list. */
-    public data class Disc(public val disc: KnownTitle) : Identification {
-        override val title: GameName get() = disc.name
-        override val regions: List<String> get() = disc.name.regions
+    /** The file is exactly [disc] of the reference list, whose name reads as [title]: only its index makes one, so they agree. */
+    @ConsistentCopyVisibility
+    public data class Disc internal constructor(public val disc: KnownTitle, override val title: GameName) : Identification {
+        override val regions: List<String> get() = title.regions
         override val serials: List<String> get() = disc.serials
     }
 
@@ -50,17 +44,19 @@ public sealed interface Identification {
  * The discs of one platform's reference list (`app/data/titles`, one `name<TAB>serials` line per
  * disc), indexed by title so that a file name finds its disc without reading the file, and by
  * serial and cartridge print (`app/data/prints`, one `name<TAB>CRC32` line per ROM) so that what a
- * file holds finds it whatever its name.
+ * file holds finds it whatever its name. A disc is filed by its title alone: its whole name is read
+ * only once a file could be it, a few of the list's thousands, and kept in [names].
  */
 public class TitleIndex private constructor(
     private val titles: List<KnownTitle>,
     private val byText: Map<String, KnownTitle>,
     prints: String,
 ) {
-    private val byTitle = titles.groupBy { it.filing.key }
+    private val byTitle = titles.groupBy { GameName.filing(it.text).key }
+    private val names = ConcurrentHashMap<String, GameName>()
 
     // What only a file's content, a subtitle-less name or a cartridge needs is indexed when first asked.
-    private val byMainTitle by lazy { titles.groupBy { it.filing.mainKey } }
+    private val byMainTitle by lazy { titles.groupBy { GameName.filing(it.text).mainKey } }
     private val bySerial by lazy { indexed { known -> known.serials.map(::serialKey) } }
     private val byDiscId by lazy { indexed { known -> known.serials.map { discIdOf(it) }.filterOption() } }
     private val byPrint by lazy { prints.lines().map { parsePrint(it, byText) }.filterOption().groupBy({ it.first }, { it.second }) }
@@ -69,10 +65,10 @@ public class TitleIndex private constructor(
 
     /**
      * The disc a file named [text] (without its extension) is: the entry written exactly so, else the one its name
-     * designates ([judge]).
+     * designates ([judge]). A caller that parsed [text] already passes its [name].
      */
-    public fun identifyByName(text: String): Option<Identification> =
-        byText.getOrNone(text).fold({ judge(GameName.parse(text)) }) { Some(Identification.Disc(it)) }
+    public fun identifyByName(text: String, name: GameName = GameName.parse(text)): Option<Identification> =
+        byText.getOrNone(text).fold({ judge(name) }) { Some(disc(it)) }
 
     /**
      * The disc or cartridge that [facts] name, whatever [file]'s name says. Versions sharing them are
@@ -85,7 +81,7 @@ public class TitleIndex private constructor(
             versionsOf(facts)
                 .preferring { it.name.written == file.written }
                 .preferring { it.name.regions.any(file.regions::contains) }
-        if (kept.size == 1) return Some(Identification.Disc(kept.single()))
+        if (kept.size == 1) return Some(disc(kept.single()))
         return kept.firstOrNone().filter { first -> kept.all { it.name.displayTitle == first.name.displayTitle } }.map { first ->
             Identification.Release(first.name, first.name.regions.filter { region -> kept.all { region in it.name.regions } }, shared(kept))
         }
@@ -117,12 +113,16 @@ public class TitleIndex private constructor(
                     it.name.versions == file.versions &&
                     it.name.disc == file.disc
             }
-        if (exact.size == 1) return Some(Identification.Disc(exact.single()))
+        if (exact.size == 1) return Some(disc(exact.single()))
         val discs = exact.ifEmpty { possible }
         return discs.firstOrNone().flatMap { first ->
             Some(shared(discs)).filter(List<String>::isNotEmpty).map { Identification.Release(first.name, file.regions, it) }
         }
     }
+
+    private val KnownTitle.name: GameName get() = names.computeIfAbsent(text, GameName::parse)
+
+    private fun disc(known: KnownTitle): Identification = Identification.Disc(known, known.name)
 
     private fun versionsOf(facts: FileFacts): List<KnownTitle> = when (facts) {
         is FileFacts.Serial -> bySerial.getOrElse(facts.key) { byDiscId.getOrElse(facts.key.take(GAME_CODE)) { emptyList() } }
@@ -152,7 +152,8 @@ public class TitleIndex private constructor(
         private fun parseLine(line: String): Option<KnownTitle> = option {
             val fields = line.split('\t')
             ensure(fields.size == 2 && fields[0].isNotBlank())
-            KnownTitle(fields[0], fields[1].split(',').filter(String::isNotBlank))
+            // toList: an exact-size copy, a singleton for the usual one serial, instead of filter's ten slots per line.
+            KnownTitle(fields[0], fields[1].split(',').filter(String::isNotBlank).toList())
         }
 
         private fun parsePrint(line: String, byText: Map<String, KnownTitle>): Option<Pair<UInt, KnownTitle>> = option {
@@ -177,7 +178,7 @@ public class TitleIndex private constructor(
 
         private fun List<KnownTitle>.preferring(closer: (KnownTitle) -> Boolean): List<KnownTitle> = filter(closer).ifEmpty { this }
 
-        private fun oneTitle(titles: List<KnownTitle>): Boolean = titles.map { it.filing.key }.distinct().size == 1
+        private fun oneTitle(titles: List<KnownTitle>): Boolean = titles.map { GameName.filing(it.text).key }.distinct().size == 1
 
         private fun canBe(file: GameName, known: GameName): Boolean =
             file.otherTags.map(String::lowercase).toSet() == known.otherTags.map(String::lowercase).toSet() &&

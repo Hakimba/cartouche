@@ -96,15 +96,10 @@ func test_no_two_boxes_overlap_and_the_room_is_kept_for_any_count_and_order() ->
 	assert_int(tight).is_greater(5)
 
 
-func test_one_or_two_consoles_stand_at_the_cap() -> void:
+func test_one_or_two_consoles_stand_at_the_cap_and_one_has_no_room_to_keep() -> void:
 	var cap := RingFit.WIDEST / _box(0).size.x
-	for picked: Array in [[0], [8], [5, 8], [0, 1]]:
+	for picked: Array in [[0], [3], [8], [5, 8], [0, 1]]:
 		var shapes: Array[int] = []
 		shapes.assign(picked)
 		assert_float(_fit(shapes)).is_equal_approx(cap, 1e-5)
-
-
-func test_one_console_has_no_room_to_keep() -> void:
-	var one: Array[int] = [3]
-	assert_float(_fit(one)).is_equal_approx(RingFit.WIDEST / _box(0).size.x, 1e-5)
 	assert_float(RingFit.least_room([_box(3)], PackedFloat64Array([1.0]), PackedFloat64Array([0.0]), 10.0)).is_equal(INF)

@@ -3,6 +3,7 @@
 
 package app.cartouche.core.art
 
+import app.cartouche.core.ParsedSerializer
 import app.cartouche.core.intOrNone
 import arrow.core.None
 import arrow.core.Option
@@ -10,15 +11,42 @@ import arrow.core.Some
 import arrow.core.filterIsInstance
 import arrow.core.getOrElse
 import arrow.core.serialization.OptionSerializer
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import java.time.LocalDate
 
-/** A day as ISO `2026-10-19`, which compares as text; the shell reads today's. */
-@Serializable @JvmInline
-public value class Day(public val iso: String) : Comparable<Day> {
+/**
+ * A day as ISO `2026-10-19`, in ASCII digits whatever the device's language, which compares as text; the shell reads
+ * today's. Any other text is no day: a stored closure until one would never end.
+ */
+@Serializable(with = DaySerializer::class)
+@JvmInline
+public value class Day private constructor(public val iso: String) : Comparable<Day> {
     override fun compareTo(other: Day): Int = iso.compareTo(other.iso)
+
+    public companion object {
+        // `[0-9]`: Android's `\d` takes any script's digits.
+        private val ISO = Regex("""[0-9]{4}-[0-9]{2}-[0-9]{2}""")
+
+        /** [text] when it is a real date written as ISO does, with a year of four digits. */
+        public fun of(text: String): Option<Day> =
+            Some(text).filter { ISO.matches(it) && Option.catch { LocalDate.parse(it) }.isSome() }.map(::Day)
+
+        /** [date], within the years of four digits that [of] reads back: no day is written that the next start refuses. */
+        public fun of(date: LocalDate): Day = Day(date.coerceIn(FIRST, LAST).toString())
+
+        private val FIRST = LocalDate.of(0, 1, 1)
+        private val LAST = LocalDate.of(9999, 12, 31)
+    }
+
+    /** The day after this one. */
+    public fun next(): Day = of(LocalDate.parse(iso).plusDays(1))
 }
+
+private object DaySerializer : KSerializer<Day> by ParsedSerializer("day", String.serializer(), Day::of, Day::iso)
 
 /** The app's developer key as a hash: what an off state kept across restarts is tied to, never the key itself. */
 @Serializable @JvmInline
@@ -103,7 +131,7 @@ public sealed interface ScreenScraperAnswer {
     /** The image itself: a PNG's or a JPEG's bytes. */
     public data object Image : ScreenScraperAnswer
 
-    /** A 200 whose body is `NOMEDIA`: the game has no such image. */
+    /** A 200 whose body is `NOMEDIA`, or a 404 or 410 ([ofStatus]): the game has no such image. */
     public data object NoMedia : ScreenScraperAnswer
 
     /** A 200 whose body says the developer login is wrong, as a wrong key is answered on an image. */
@@ -120,6 +148,13 @@ public sealed interface ScreenScraperAnswer {
 
     /** A 200 that is neither an image nor a text the app knows. */
     public data object Unreadable : ScreenScraperAnswer
+
+    public companion object {
+        private val NOT_THERE = setOf(404, 410)
+
+        /** The answer of a status other than 200: a 404 or 410 says the game has no such image, closing nothing. */
+        public fun ofStatus(code: Int): ScreenScraperAnswer = if (code in NOT_THERE) NoMedia else Status(code)
+    }
 }
 
 /** Why ScreenScraper is closed for the rest of a run. */

@@ -62,12 +62,18 @@ func test_textures_let_go_are_read_again_when_asked_and_those_kept_stay() -> voi
 	assert_bool(_art.has_texture(games[0])).is_true()
 
 
-func test_a_game_without_art_reads_nothing() -> void:
-	var game := Fixtures.games(1)[0]
-	_art.request(game)
+func test_the_texture_shown_last_is_the_last_to_go_when_room_is_needed() -> void:
+	var games := Fixtures.games(26)
+	for game in games:
+		_art.add(_stored(game, 8, "shared"))
+	for game: AndroidServices.Game in games.slice(0, 24):
+		_art.request(game)
+		await _settled()
+	_art.texture(games[0])
+	_art.request(games[24])
 	await _settled()
-	assert_bool(_art.has_art(game)).is_false()
-	assert_bool(_art.has_texture(game)).is_false()
+	assert_bool(_art.has_texture(games[0])).is_true()
+	assert_bool(_art.has_texture(games[1])).is_false()
 
 
 func test_art_replaced_while_its_old_image_is_read_shows_the_new_one() -> void:
@@ -81,8 +87,9 @@ func test_art_replaced_while_its_old_image_is_read_shows_the_new_one() -> void:
 	assert_that(_art.texture(game).get_size()).is_equal(Vector2(48, 48))
 
 
-func test_an_unreadable_image_gives_no_texture_and_the_carousel_goes_on() -> void:
-	var game := Fixtures.games(1)[0]
+func test_an_unreadable_image_or_none_at_all_gives_no_texture_and_the_carousel_goes_on() -> void:
+	var games := Fixtures.games(2)
+	var game := games[0]
 	var path := ProjectSettings.globalize_path(FOLDER.path_join("broken.jpg"))
 	FileAccess.open(path, FileAccess.WRITE).store_string("not a JPEG")
 	_art.add(AndroidServices.Art.new({"game_id": game.id, "path": path}))
@@ -92,6 +99,11 @@ func test_an_unreadable_image_gives_no_texture_and_the_carousel_goes_on() -> voi
 	# Not read again as its place comes back into view.
 	_art.request(game)
 	assert_bool(_art._reader.is_idle()).is_true()
+	# A game that was never given art reads nothing.
+	_art.request(games[1])
+	await _settled()
+	assert_bool(_art.has_art(games[1])).is_false()
+	assert_bool(_art.has_texture(games[1])).is_false()
 
 
 func test_labels_arriving_together_reach_the_gpu_one_a_frame_and_only_the_latest_are_kept() -> void:
@@ -108,7 +120,7 @@ func test_labels_arriving_together_reach_the_gpu_one_a_frame_and_only_the_latest
 		assert_int(now).is_less_equal(made + 1)
 		made = now
 	assert_int(made).is_equal(games.size())
-	assert_int(games.filter(_art.has_texture).size()).is_equal(24)
+	assert_int(games.filter(_art.has_texture).size()).is_equal(GameArt._KEPT)
 
 
 func test_art_added_with_its_image_is_ready_at_once_and_an_older_read_of_the_same_file_is_dropped() -> void:

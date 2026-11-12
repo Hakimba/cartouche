@@ -7,7 +7,7 @@ const Fixtures := preload("res://test/screens/fixtures.gd")
 func test_the_shelves_sent_by_the_plugin_are_read_as_the_library_games_they_point_to() -> void:
 	# Shelves point into the library's games by index (`Sent.Library`).
 	var game := func(id: String, platform: String) -> Dictionary:
-		return {"id": id, "platform_id": platform, "title": id, "identified": false, "discs": [{"name": id}], "last_disc": 0}
+		return {"id": id, "platform_id": platform, "title": id, "last_disc": 0}
 	var sent: Dictionary = JSON.parse_string(JSON.stringify({
 		"games": [game.call("gba/B", "gba"), game.call("ps2/Z", "ps2"), game.call("ps2/A", "ps2")],
 		"shelves": [
@@ -45,7 +45,7 @@ func test_a_library_without_shelves_has_none() -> void:
 func test_a_picture_picked_is_read_with_its_size_and_a_game_with_its_own_title() -> void:
 	var picture := AndroidServices.LabelPicture.new({"ok": true, "path": "/own/picked.jpg", "width": 640, "height": 480})
 	assert_vector(picture.size).is_equal(Vector2i(640, 480))
-	var game := {"id": "ps2/A", "platform_id": "ps2", "title": "A", "identified": false, "discs": [{"name": "A"}], "last_disc": 0}
+	var game := {"id": "ps2/A", "platform_id": "ps2", "title": "A", "last_disc": 0}
 	game["original_title"] = "A of its own"
 	assert_str(AndroidServices.Game.new(game).own_title()).is_equal("A of its own")
 	game.erase("original_title")
@@ -78,13 +78,24 @@ func test_art_focus_sends_the_ordered_ids_as_a_packed_string_array_to_the_plugin
 	services._plugin = plugin
 	var games: Array[AndroidServices.Game] = []
 	for id: String in ["ps2/B", "ps2/C", "ps2/A"]:
-		games.append(AndroidServices.Game.new({"id": id, "platform_id": "ps2", "title": id, "identified": false,
-			"discs": [{"name": id}], "last_disc": 0}))
+		games.append(AndroidServices.Game.new({"id": id, "platform_id": "ps2", "title": id, "last_disc": 0}))
 	services.art_focus(games)
 	assert_array(plugin.focus_calls).is_equal([PackedStringArray(["ps2/B", "ps2/C", "ps2/A"])])
 
 
 ## Answers as the Kotlin plugin does, as JSON text.
+func test_a_label_chosen_is_answered_with_its_one_label_while_answers_are_traced() -> void:
+	# An answer about one game holds one label where a library's holds a list: the trace reads both.
+	var services: AndroidServices = auto_free(AndroidServices.new())
+	services._plugin = auto_free(FakePlugin.new())
+	var traced := Diagnostics.enabled
+	Diagnostics.enabled = true
+	var answer: AndroidServices.ArtAnswer = await services.choose_label(
+		AndroidServices.Game.new({"id": "ps2/A"}), "Japan", "screenscraper")
+	Diagnostics.enabled = traced
+	assert_bool(answer != null and answer.ok).is_true()
+
+
 class FakePlugin extends Object:
 	var focus_calls: Array[PackedStringArray] = []
 	var loaded_supported := PackedStringArray()
@@ -94,6 +105,9 @@ class FakePlugin extends Object:
 	func launchGame(_id: int, request: Dictionary) -> String:
 		launch_requests.append(request)
 		return """{"ok": true}"""
+
+	func chooseLabel(_id: int, _game_id: String, _region: String, _source: String) -> String:
+		return """{"ok": true, "art": {"game_id": "ps2/A"}}"""
 
 	func artFocus(ids: PackedStringArray) -> void:
 		focus_calls.append(ids)
@@ -111,33 +125,18 @@ class FakePlugin extends Object:
 		return """{"marks": [{"start": 0, "length": 3}, {"start": 13, "length": 4}]}"""
 
 
-func test_inv_21_a_start_is_asked_with_a_deadline_below_the_wait_of_the_carousel_that_gives_up_after_it() -> void:
+func test_inv_21_a_start_is_asked_with_the_deadline_that_ends_before_the_carousel_gives_up() -> void:
 	var services: AndroidServices = auto_free(AndroidServices.new())
 	var plugin: FakePlugin = auto_free(FakePlugin.new())
 	services._plugin = plugin
-	var game := AndroidServices.Game.new({"id": "ps2/a", "platform_id": "ps2", "title": "A", "identified": false,
-		"discs": [{"name": "A"}], "last_disc": 0})
+	var game := AndroidServices.Game.new({"id": "ps2/a", "platform_id": "ps2", "title": "A", "last_disc": 0})
 	assert_bool((await services.launch_game(game, 0)).ok).is_true()
 	assert_int(plugin.launch_requests.size()).is_equal(1)
 	var within_ms: int = plugin.launch_requests[0].get("within_ms", -1)
+	assert_int(within_ms).is_equal(int(AndroidServices.START_WITHIN_S * 1000))
 	assert_int(within_ms).is_greater(0)
 	assert_int(within_ms).is_less(int(GameLaunch.WAIT_TIMEOUT_S * 1000))
 	assert_str(plugin.launch_requests[0]["game_id"]).is_equal("ps2/a")
-
-
-func test_inv_15_a_settings_answer_without_a_value_reads_a_fresh_install_s_as_the_plugin_sends_it() -> void:
-	var fresh := DesktopPlugin.settings_of(DesktopPlugin.demo("settings"))
-	assert_dict(fresh).is_not_empty()
-	var sent := AndroidServices.SettingsAnswer.new({"ok": true}.merged(fresh))
-	var unsaid := AndroidServices.SettingsAnswer.new({"ok": true})
-	var started := AndroidServices.BackdropAnswer.new()
-	for key: String in fresh:
-		# The lists of names are the plugin's to tell: none is known without it.
-		if fresh[key] is not PackedStringArray:
-			var answer: Object = started if key in started else unsaid
-			assert_bool(answer.get(key) == fresh[key]).override_failure_message("%s: %s, sent %s" % [key, answer.get(key),
-				fresh[key]]).is_true()
-	assert_bool(sent.games_float).is_false()
 
 
 func test_without_the_plugin_and_without_a_form_story_the_form_s_operations_are_unavailable() -> void:

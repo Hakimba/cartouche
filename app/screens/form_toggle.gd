@@ -7,15 +7,12 @@ extends Button
 
 const _SIZE := Vector2(56.0 * FormPaint.CQW, 5.4 * FormPaint.CQW)
 const _PAD_LEFT := 7.2 * FormPaint.CQW
-const _PAD_RIGHT := 1.8 * FormPaint.CQW
 const _NAME_PX := 2.05 * FormPaint.CQW
 const _TRACK := Vector2(5.6, 3.0) * FormPaint.CQW
 const _KNOB := 2.4 * FormPaint.CQW
 const _KNOB_INSET := 0.3 * FormPaint.CQW
 const _KNOB_TRAVEL := 2.6 * FormPaint.CQW
 const _KNOB_S := 0.25
-const _SEPARATOR_RIGHT := 1.4 * FormPaint.CQW
-const _SEPARATOR_GAP := 0.3 * FormPaint.CQW
 
 ## The gel's colour now.
 var rim := StudioTokens.NEUTRAL:
@@ -27,8 +24,8 @@ var rim := StudioTokens.NEUTRAL:
 ## How far over the knob is, 0 to 1.
 var _knob_at := 0.0
 var _glide: Tween
-var _track := FormPaint.Layer.new(self, _track_material())
-var _knob := FormPaint.Layer.new(self, _knob_material())
+var _track := SatinPanel.Backing.of(self, _track_material())
+var _knob := SatinPanel.Backing.of(self, _knob_material())
 
 
 func _init() -> void:
@@ -58,14 +55,13 @@ func snap() -> void:
 
 
 func _draw() -> void:
-	var track := Rect2(Vector2(size.x - _PAD_RIGHT - _TRACK.x, (size.y - _TRACK.y) / 2.0), _TRACK)
+	var track := Rect2(Vector2(size.x - FormPaint.PAD_RIGHT - _TRACK.x, (size.y - _TRACK.y) / 2.0), _TRACK)
 	_track.place(track, _TRACK.y / 2.0)
 	_knob.place(Rect2(track.position + Vector2(_KNOB_INSET + _KNOB_TRAVEL * _knob_at, _KNOB_INSET), Vector2.ONE * _KNOB), _KNOB / 2.0)
 	var label := FormPaint.line(tr(text), StudioTokens.Face.JAKARTA_700, _NAME_PX)
 	label.fit(track.position.x - _PAD_LEFT)
 	label.draw(self, Vector2(_PAD_LEFT, (size.y - label.height) / 2.0), Backdrop.palette.ink)
-	draw_rect(Rect2(2.2 * FormPaint.CQW, size.y + _SEPARATOR_GAP - 1.0, size.x - 2.2 * FormPaint.CQW - _SEPARATOR_RIGHT, 1.0),
-		Backdrop.palette.line)
+	FormPaint.separator(self)
 
 
 func _turn(_on: bool) -> void:

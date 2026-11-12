@@ -16,15 +16,12 @@ import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.library.ArtSource
 import app.cartouche.core.library.Coming
-import app.cartouche.core.library.CountedReason
 import app.cartouche.core.library.DiscGrouping
 import app.cartouche.core.library.FolderDepth
 import app.cartouche.core.library.GameId
 import app.cartouche.core.library.LabelChoice
-import app.cartouche.core.library.SkipReason
 import app.cartouche.core.platforms.Catalog
 import app.cartouche.core.platforms.MediaType
-import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.regions.PreferredRegion
 import app.cartouche.core.serialName
 import app.cartouche.core.settings.Backdrop
@@ -64,18 +61,18 @@ import app.cartouche.core.shelves.Shelves as CoreShelves
  */
 internal object Sent {
     @Serializable
-    class CatalogSummary(val platforms: List<Platform>, val offered: List<OfferedConsole>, val rejected: List<String>)
+    class CatalogSummary(val platforms: List<Platform>, val offered: List<OfferedConsole>, val rejected: List<String>) : Wired
 
     /** [medium] is the platform's default medium: the shelf's model can load before its games are known. */
     @Serializable
-    class Platform(val id: String, val name: String, val media: MediaType, val medium: String)
+    class Platform(val id: String, val name: String, val media: MediaType, val medium: String) : Wired
 
     /** A platform of the Type chooser; a [coming] one is shown greyed, never added. */
     @Serializable
-    class OfferedConsole(val id: String, val model: String, val maker: Option<String> = None, val coming: Boolean)
+    class OfferedConsole(val id: String, val model: String, val maker: Option<String> = None, val coming: Boolean) : Wired
 
     @Serializable
-    class Players(val players: List<Player>)
+    class Players(val players: List<Player>) : Wired
 
     /** [extensions] only when the player's definition says them plainly. */
     @Serializable
@@ -84,7 +81,7 @@ internal object Sent {
         val name: String,
         @SerialName("emulator_name") val emulatorName: String,
         val extensions: Option<List<String>> = None,
-    )
+    ) : Wired
 
     /**
      * What the carousel shows of a shelf of [count] games: the positions in the shelf of the [games] shown, their
@@ -92,44 +89,44 @@ internal object Sent {
      * a space).
      */
     @Serializable
-    class Browse(val count: Int, val games: List<Int>, val groups: List<Group>, val keys: Map<String, Int>)
+    class Browse(val count: Int, val games: List<Int>, val groups: List<Group>, val keys: Map<String, Int>) : Wired
 
     @Serializable
-    class Group(val label: String, val start: Int)
+    class Group(val label: String, val start: Int) : Wired
 
     /** Where the words typed are in a title, in characters. */
     @Serializable
-    class Marks(val marks: List<Mark>)
+    class Marks(val marks: List<Mark>) : Wired
 
     @Serializable
-    class Mark(val start: Int, val length: Int)
+    class Mark(val start: Int, val length: Int) : Wired
 
     /** The backdrop stored, read as the app starts. */
     @Serializable
     class BackdropAnswer(
         val backdrop: Backdrop,
         @SerialName("pixel_veil") val pixelVeil: Boolean,
-    )
+    ) : Wired
 
     @Serializable
     class Battery(
         @SerialName("level_percent") val levelPercent: Option<Int> = None,
         val plugged: Boolean,
-    )
+    ) : Wired
 
     /** A scraping run's progress, and what it just learnt: the art [found], or the ids of games no source has art for. */
     @Serializable
-    class ArtChange(val progress: ArtProgress, val found: Option<Art> = None, val absent: List<String> = emptyList())
+    class ArtChange(val progress: ArtProgress, val found: Option<Art> = None, val absent: List<String> = emptyList()) : Wired
 
     @Serializable
-    class ArtProgress(val done: Int, val total: Int, val stall: Option<Stall> = None)
+    class ArtProgress(val done: Int, val total: Int, val stall: Option<Stall> = None) : Wired
 
     /** A game's label image, at an absolute [path] to a JPEG. */
     @Serializable
     class Art(
         @SerialName("game_id") val gameId: String,
         val path: String,
-    )
+    ) : Wired
 
     /** How far a label's download has come: [fraction] from 0 to 1 while [running], -1 when the image's size is unknown. */
     @Serializable
@@ -137,7 +134,7 @@ internal object Sent {
         @SerialName("game_id") val gameId: String,
         val running: Boolean,
         val fraction: Double,
-    )
+    ) : Wired
 
     /**
      * One image a game's label can show: [source]'s for [region], at [path] once downloaded, or the [failure] that kept
@@ -151,10 +148,10 @@ internal object Sent {
         @SerialName("source_name") val sourceName: String,
         val path: Option<String> = None,
         val failure: Option<VariantFailure> = None,
-    )
+    ) : Wired
 
     @Serializable
-    class LabelVariants(val variants: List<LabelVariant>)
+    class LabelVariants(val variants: List<LabelVariant>) : Wired
 
     /** A folder granted through the system picker; [volume] and [folders] say where it is when it is on the device's storage. */
     @Serializable
@@ -164,17 +161,17 @@ internal object Sent {
         val path: Option<String> = None,
         val volume: Option<Volume> = None,
         val folders: List<String> = emptyList(),
-    )
+    ) : Wired
 
     @Serializable
-    class Pick(val folder: Folder)
+    class Pick(val folder: Folder) : Wired
 
     @Serializable
-    class FolderList(val folders: List<Folder>)
+    class FolderList(val folders: List<Folder>) : Wired
 
     /** The platform ids of all the consoles, first to last. */
     @Serializable
-    class Placed(val order: List<String>)
+    class Placed(val order: List<String>) : Wired
 
     /** The choices made for one platform; without a player, the first installed one is used. */
     @Serializable
@@ -184,10 +181,7 @@ internal object Sent {
         @SerialName("folder_uri") val folderUri: Option<String> = None,
         @SerialName("player_id") val playerId: Option<String> = None,
         @SerialName("variant_id") val variantId: Option<String> = None,
-    )
-
-    @Serializable
-    class Disc(val name: String, val number: Option<Int> = None)
+    ) : Wired
 
     /**
      * [medium] is the one its platform gives a game of its regions, none when the platform is unknown; [title] the name
@@ -202,23 +196,11 @@ internal object Sent {
         @SerialName("original_title") val originalTitle: Option<String> = None,
         val regions: List<String>,
         val medium: Option<String> = None,
-        val languages: List<String>,
-        val serials: List<String>,
-        val discs: List<Disc>,
         @SerialName("last_disc") val lastDisc: Int,
-        val identified: Boolean,
-        val version: Option<String> = None,
-        @SerialName("redump_name") val redumpName: Option<String> = None,
         @SerialName("label_region") val labelRegion: Option<String> = None,
         @SerialName("label_source") val labelSource: Option<ArtSource> = None,
         @SerialName("label_own") val labelOwn: Boolean = false,
-    )
-
-    @Serializable
-    class IgnoredCount(val reason: CountedReason, val count: Int, val examples: List<String>)
-
-    @Serializable
-    class SkippedFolder(val path: String, val reason: SkipReason)
+    ) : Wired
 
     /** One platform's games in the carousel's order, as indexes into [Library.games]. */
     @Serializable
@@ -226,7 +208,7 @@ internal object Sent {
         @SerialName("platform_id") val platformId: String,
         @SerialName("game_indexes") val gameIndexes: List<Int>,
         val selected: Int,
-    )
+    ) : Wired
 
     /** The library at [revision]: one shelf per platform with games, [selectedShelf] the one shown first. */
     @Serializable
@@ -234,17 +216,14 @@ internal object Sent {
         val revision: Int,
         val setups: Map<String, PlatformSetup>,
         val games: List<Game>,
-        @SerialName("not_games") val notGames: Map<String, List<String>>,
-        @SerialName("ignored_counts") val ignoredCounts: Map<String, List<IgnoredCount>>,
-        @SerialName("skipped_folders") val skippedFolders: Map<String, List<SkippedFolder>>,
         @SerialName("console_variants") val consoleVariants: Map<String, String>,
         val shelves: List<Shelf>,
         @SerialName("selected_shelf") val selectedShelf: Int,
-    )
+    ) : Wired
 
     /** The games a re-read brought that the user has not seen yet, and those each console announces. */
     @Serializable
-    class Arrivals(val unseen: List<String>, val announced: Map<String, List<String>>)
+    class Arrivals(val unseen: List<String>, val announced: Map<String, List<String>>) : Wired
 
     /** [loadProblem] tells why the stored library could not be read: it then started empty. */
     @Serializable
@@ -254,34 +233,23 @@ internal object Sent {
         val absent: List<String> = emptyList(),
         val arrivals: Option<Arrivals> = None,
         @SerialName("load_problem") val loadProblem: Option<String> = None,
-    )
+    ) : Wired
 
     /** A re-read's answer: the [library] only when the re-read changed it. */
     @Serializable
-    class RefreshAnswer(val arrivals: Arrivals, val library: Option<Library> = None)
+    class RefreshAnswer(val arrivals: Arrivals, val library: Option<Library> = None) : Wired
 
     @Serializable
-    class ArrivalsAnswer(val arrivals: Arrivals)
+    class ArrivalsAnswer(val arrivals: Arrivals) : Wired
 
     @Serializable
-    class ScanReport(
-        val files: Int,
-        val games: Int,
-        val identified: Int,
-        val ignored: Int,
-        @SerialName("skipped_folders") val skippedFolders: Int,
-        val milliseconds: Long,
-    )
+    class ScanReport(val games: Int, val milliseconds: Long) : Wired
 
     @Serializable
-    class ScanAnswer(val library: Library, val report: ScanReport, val arrivals: Arrivals)
+    class ScanAnswer(val library: Library, val report: ScanReport, val arrivals: Arrivals) : Wired
 
     @Serializable
-    class PreviewAnswer(val report: ScanReport)
-
-    /** How scraping again went: the games of the library, the labels looked for that were found, the consoles not scanned and why. */
-    @Serializable
-    class RescrapeAnswer(val library: Library, val games: Int, val labels: Int, val failures: List<String>)
+    class PreviewAnswer(val report: ScanReport) : Wired
 
     /**
      * Each setting of [Setting.all] under its key, a choice not made yet absent, and each choice's names under its key
@@ -298,26 +266,27 @@ internal object Sent {
         val language: Option<Language> = None,
         val backdrop: Backdrop,
         @SerialName("pixel_veil") val pixelVeil: Boolean,
+        @SerialName("games_in_line") val gamesInLine: Boolean,
         @SerialName("button_styles") val buttonStyles: List<String>,
         @SerialName("edge_smoothings") val edgeSmoothings: List<String>,
         @SerialName("preferred_regions") val preferredRegions: List<String>,
         val languages: List<String>,
         val backdrops: List<String>,
-    )
+    ) : Wired
 
     /** What a game is called once renamed, and its own title when the user gave it a name. */
     @Serializable
     class Renamed(
         val title: String,
         @SerialName("original_title") val originalTitle: Option<String> = None,
-    )
+    ) : Wired
 
     /** A picture of the user's own being framed: the app's upright copy at [path]. */
     @Serializable
-    class LabelPicture(val path: String, val width: Int, val height: Int)
+    class LabelPicture(val path: String, val width: Int, val height: Int) : Wired
 
     @Serializable
-    class ArtAnswer(val art: Art)
+    class ArtAnswer(val art: Art) : Wired
 }
 
 internal fun Catalog.sent(coming: Coming): Sent.CatalogSummary = Sent.CatalogSummary(
@@ -373,7 +342,7 @@ internal fun CoreSetup.sent(variant: Option<String>): Sent.PlatformSetup =
 internal fun CoreArrivals.sent(): Sent.Arrivals =
     Sent.Arrivals(unseen.map { it.value }, announced.entries.associate { (platform, games) -> platform.value to games.map { it.value } })
 
-internal fun ScanReport.sent(): Sent.ScanReport = Sent.ScanReport(files, games, identified, ignored, skippedFolders, milliseconds)
+internal fun ScanReport.sent(): Sent.ScanReport = Sent.ScanReport(games, milliseconds)
 
 internal fun CoreSettings.sent(firstLaunch: Boolean): Sent.SettingsAnswer = Sent.SettingsAnswer(
     firstLaunch,
@@ -385,6 +354,7 @@ internal fun CoreSettings.sent(firstLaunch: Boolean): Sent.SettingsAnswer = Sent
     language,
     backdrop,
     pixelVeil,
+    gamesInLine,
     Setting.BUTTON_STYLE.names,
     Setting.EDGE_SMOOTHING.names,
     Setting.PREFERRED_REGION.names,
@@ -400,22 +370,12 @@ internal fun CoreLibrary.sent(revision: Int, shelves: Option<CoreShelves>, catal
         revision,
         setups.entries.associate { (platform, setup) -> platform.value to setup.sent(variantOf(platform).map { it.serialName }) },
         games.map { it.sent(media.getOrNone(it.platform).map { medium -> medium.of(it.regions).value }) },
-        notGames.byPlatform { files -> files.map { it.name.value } },
-        ignoredCounts.byPlatform { counts ->
-            counts.map { (reason, count) -> Sent.IgnoredCount(reason, count.count, count.examples.map { it.value }) }
-        },
-        skippedFolders.byPlatform { folders -> folders.map { Sent.SkippedFolder(it.path.value, it.reason) } },
         setups.keys.flatMap { platform -> variantOf(platform).map { platform.value to it.serialName }.toList() }.toMap(),
         shelves.fold({ emptyList() }) { found ->
             found.shelves.map { shelf -> Sent.Shelf(shelf.platform.value, shelf.games.map { indexes.getValue(it.id) }, shelf.selected) }
         },
         shelves.fold({ 0 }) { it.selected },
     )
-}
-
-private fun <V, T> Map<PlatformId, V>.byPlatform(sent: (V) -> T): Map<String, T> = entries.associate { (platform, value) ->
-    platform.value to
-        sent(value)
 }
 
 private fun CoreGame.sent(medium: Option<String>): Sent.Game {
@@ -431,13 +391,7 @@ private fun CoreGame.sent(medium: Option<String>): Sent.Game {
         displayName.map { title },
         regions,
         medium,
-        languages,
-        serials,
-        discs.map { Sent.Disc(it.file.name.value, it.number) },
         lastDisc,
-        identified,
-        version,
-        redumpName,
         labelRegion = chosen.map { it.region.name },
         labelSource = chosen.map { it.source },
         labelOwn = label == LabelChoice.Own,

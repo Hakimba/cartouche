@@ -13,6 +13,11 @@ extends Node
 
 ## [method enter] or [method leave] is over.
 signal finished
+## Going in, the games are mostly there: what belongs to them comes over them from now on.
+signal games_arrived
+
+## What plays: nothing, the way into the console, or the way back out.
+enum Play { STILL, ENTERING, LEAVING }
 
 const _ANIMATION := &"launch"
 
@@ -47,20 +52,20 @@ var behind_amount := 1.0:
 	set(amount):
 		behind_amount = amount
 		# Playing, the next frame shows it.
-		if not is_processing():
+		if _play == Play.STILL:
 			_look_behind(consoles.behind)
 
 var _animation := Animation.new()
 var _at_s := 0.0
 var _to_s := 0.0
-## Where the animation settles once there: its start, when it goes back out.
-var _settle_s := 0.0
+var _play := Play.STILL
 var _spin := 0.0
 ## The label's blur while it spins: the turn it makes during one frame.
 var _spin_blur := 0.0
 ## Where the chosen disc stood in the row as it left it, while it is out.
 var _left_from := Transform3D.IDENTITY
 var _out := false
+var _arrived := false
 
 
 func _ready() -> void:
@@ -71,15 +76,18 @@ func _process(delta: float) -> void:
 	_seek(move_toward(_at_s, _to_s, delta))
 	# Exactly there, as moving towards it ends.
 	if _at_s == _to_s:
+		# Back out, it settles at its start: the consoles as they rest, before the first step's hold.
+		var settled := _to_s if _play == Play.ENTERING else 0.0
+		_play = Play.STILL
 		set_process(false)
-		_seek(_settle_s)
+		_seek(settled)
 		finished.emit()
 
 
 ## Plays [param animation] from now on, still at its moment [param at] (see the class description
 ## of [LaunchAnimation]), at its start without one; never while going in or out.
 func use(animation: Animation, at := &"") -> void:
-	assert(not is_processing(), "ConsoleSequence: another animation while going in or out")
+	assert(_play == Play.STILL, "ConsoleSequence: another animation while going in or out")
 	_animation = animation
 	var library := AnimationLibrary.new()
 	library.add_animation(_ANIMATION, animation)
@@ -90,21 +98,24 @@ func use(animation: Animation, at := &"") -> void:
 	stand(at)
 
 
-## Still at the animation's moment [param at], at its start without one.
+## Still at the animation's moment [param at], at its start without one; never while going in or out, which
+## would end without [signal finished].
 func stand(at := &"") -> void:
+	assert(_play == Play.STILL, "ConsoleSequence: stood still while going in or out")
+	_play = Play.STILL
 	set_process(false)
 	_seek(_moment(at))
 
 
 ## Into the console, from the consoles screen to the games screen; [signal finished] once there.
 func enter() -> void:
-	_play(_moment(&"consoles"), _moment(&"games"), _moment(&"games"))
+	_start(Play.ENTERING, _moment(&"consoles"), _moment(&"games"))
 
 
 ## Back out, from the games screen to the consoles screen; [signal finished] once there: as soon as
 ## the consoles stand as they rest, before the first step's hold.
 func leave() -> void:
-	_play(_moment(&"games"), _moment(&"consoles"), 0.0)
+	_start(Play.LEAVING, _moment(&"games"), _moment(&"consoles"))
 
 
 ## How long going into the console, or back out of it, takes.
@@ -149,10 +160,10 @@ func black_origin() -> Vector3:
 	return row.global_position
 
 
-func _play(from_s: float, to_s: float, settle_s: float) -> void:
+func _start(play: Play, from_s: float, to_s: float) -> void:
+	_play = play
 	_seek(from_s)
 	_to_s = to_s
-	_settle_s = settle_s
 	set_process(true)
 
 
@@ -164,8 +175,22 @@ func _seek(time: float) -> void:
 	_at_s = time
 	player.seek(time, true)
 	var behind := blur > 0.3 or layer_opacity < 0.97 or saturation < 0.97
+	var trip := _play != Play.STILL
+	if trip:
+		# The games' title and art bar fade in only over the games mostly there, never over the console in close-up,
+		# and leave at once going out.
+		var arrived := _play == Play.ENTERING and row.neighbours >= 0.5
+		if not arrived:
+			for part: NodePath in [^"Pill", ^"ArtProgress"]:
+				(player.get_node(player.root_node).get_node(part) as CanvasItem).modulate.a = 0.0
+		elif not _arrived:
+			games_arrived.emit()
+		_arrived = arrived
 	if behind != consoles.behind:
-		consoles.show_in_layers(ConsoleLayer.BEHIND if behind else ConsoleLayer.FRONT)
+		consoles.draw_behind(behind)
+		# The games switch on this frame too, whichever of the row and this node goes first: no frame without both.
+		if trip:
+			row.arrange()
 	_look_behind(behind)
 	layer.draw_again()
 	consoles.arrange()
@@ -188,7 +213,7 @@ func _place_disc() -> void:
 			_out = false
 			_spin = 0.0
 			_spin_blur = 0.0
-			row.pose_selected()
+			row.stand(SelectedStand.new())
 			if console is ConsoleModel:
 				var emptied: ConsoleModel = console
 				emptied.hold(0.0)
@@ -204,5 +229,5 @@ func _place_disc() -> void:
 	# At its real size on the seat, growing or shrinking to it on its way from the row.
 	var seat := into.global_transform * into.seat() * above * row.selected_real_size()
 	var seated := row.global_transform.affine_inverse() * seat
-	row.stand_selected(_left_from.interpolate_with(seated, disc_away), _spin, _spin_blur)
+	row.stand(SelectedStand.outside(_left_from.interpolate_with(seated, disc_away), _spin, _spin_blur))
 	into.hold(_spin if disc_away >= 1.0 else 0.0)

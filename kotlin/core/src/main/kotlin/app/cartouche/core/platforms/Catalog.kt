@@ -3,7 +3,9 @@
 
 package app.cartouche.core.platforms
 
+import app.cartouche.core.FileExtension
 import app.cartouche.core.FileName
+import app.cartouche.core.ParsedSerializer
 import app.cartouche.core.launch.GameFile
 import app.cartouche.core.launch.LaunchSpec
 import app.cartouche.core.launch.LaunchTemplate
@@ -16,17 +18,22 @@ import arrow.core.Option
 import arrow.core.Some
 import arrow.core.firstOrNone
 import arrow.core.getOrElse
+import arrow.core.getOrNone
 import arrow.core.raise.Raise
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
+import arrow.core.raise.option
 import arrow.core.raise.withError
 import arrow.core.separateEither
 import arrow.core.serialization.OptionSerializer
 import arrow.core.toOption
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -89,7 +96,10 @@ public data class Platform(
     public val players: List<Player>,
     public val accepts: FileNamePattern,
     public val profile: PlatformProfile,
-)
+) {
+    /** Whether [player] opens [file] here: never a hidden file, and the platform and the player both accept its name. */
+    public fun opens(file: FileName, player: Player): Boolean = !file.isHidden && accepts.matches(file) && player.accepts.matches(file)
+}
 
 @Serializable
 public enum class MediaType {
@@ -110,7 +120,7 @@ public value class ScreenScraperSystem(public val id: Int)
 /**
  * What Cartouche adds to a Daijishō platform, from `app/data/platforms/profiles.json`: the kind of
  * medium its games are shown as, the exact medium each game comes in ([MediaRule]), the size under
- * which an unknown file is not taken for a game, what its scans show ([ArtKind]: none when its
+ * which an unknown file is not taken for a game ([minimumBytes]), what its scans show ([ArtKind]: none when its
  * games' images are not looked for), where its scans are named after their serial, if anywhere, and
  * the system ScreenScraper's textures of its games are asked under, when it has a texture table,
  * and what Cartouche corrects in its Daijishō players ([PlayerFix]), by player id.
@@ -124,6 +134,28 @@ public data class PlatformProfile(
     public val scansBySerial: Option<SerialScans> = None,
     public val screenScraperSystem: Option<ScreenScraperSystem> = None,
     public val players: Map<PlayerId, PlayerFix> = emptyMap(),
+    @Serializable(with = FloorsSerializer::class)
+    public val minimumBytesByExtension: Map<FileExtension, Long> = emptyMap(),
+) {
+    /**
+     * The size under which an unknown file named [name] is not a game: its format's own floor when the profile gives
+     * one (a Wii `.wad` channel is far smaller than a Wii disc), else the platform's.
+     */
+    public fun minimumBytes(name: FileName): Long =
+        name.extension.flatMap(minimumBytesByExtension::getOrNone).getOrElse { minimumGameBytes }
+}
+
+/** Floors by extension, each one an extension once, in whatever case it is written, and none negative. */
+private object FloorsSerializer : KSerializer<Map<FileExtension, Long>> by ParsedSerializer(
+    "floor by extension",
+    MapSerializer(String.serializer(), Long.serializer()),
+    { read ->
+        option {
+            ensure(read.values.all { it >= 0 })
+            read.mapKeys { FileExtension.parse(it.key).bind() }.also { ensure(it.size == read.size) }
+        }
+    },
+    { floors -> floors.mapKeys { it.key.value } },
 )
 
 /**
@@ -242,11 +274,7 @@ public data class Catalog(
 ) {
     private val all: List<Candidate> get() = platforms.flatMap { platform -> platform.players.map { Candidate(platform, it) } }
 
-    /** Players able to open [file], in definition order. */
-    public fun candidates(file: FileName): List<Candidate> =
-        if (file.isHidden) emptyList() else all.filter { it.platform.accepts.matches(file) && it.player.accepts.matches(file) }
-
-    public fun find(id: PlayerId): Option<Candidate> = all.firstOrNone { it.player.id == id }
+    internal fun find(id: PlayerId): Option<Candidate> = all.firstOrNone { it.player.id == id }
 
     public fun platform(id: PlatformId): Option<Platform> = platforms.firstOrNone { it.id == id }
 
@@ -263,8 +291,8 @@ public data class Catalog(
 
     /** Resolves how [id] opens [file]. */
     public fun launch(id: PlayerId, file: GameFile): Either<LaunchError, Launch> = either {
-        val player = find(id).getOrElse { raise(LaunchError.UnknownPlayer(id)) }.player
-        ensure(candidates(file.name).any { it.player.id == id }) { LaunchError.UnsupportedFile(id, file.name) }
+        val (platform, player) = find(id).getOrElse { raise(LaunchError.UnknownPlayer(id)) }
+        ensure(platform.opens(file.name, player)) { LaunchError.UnsupportedFile(id, file.name) }
         Launch(withError(LaunchError::InvalidTemplate) { player.template.resolve(file).bind() }, player.runningInstance)
     }
 

@@ -17,7 +17,7 @@ func test_the_first_frame_is_drawn_on_the_stored_background_before_the_library_i
 	var device := Fixtures.past_first_launch(self, {"ps2": 3})
 	device.chosen_backdrop = &"dark"
 	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(carousel._shown).is_false()
+	assert_bool(carousel.is_shown()).is_false()
 	assert_int(Backdrop.palette.scheme).is_equal(StudioTokens.Scheme.DARK)
 	assert_that(RenderingServer.get_default_clear_color()).is_equal(Color.BLACK)
 	assert_bool((carousel.get_node("Backdrop") as CanvasLayer).visible).is_true()

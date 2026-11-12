@@ -26,6 +26,10 @@ static var _faces: Dictionary[StudioTokens.Face, Array] = {}
 ## into memory, which a line without them never pays. None where the system has no font for them.
 static var _japanese: Array[Font] = []
 static var _japanese_looked := false
+## The ellipsis shaped, by face, size, tracking and tabular figures: every line of a kind cuts with the same one.
+static var _ellipses: Dictionary = {}
+## The system's main face as MSDF, the fallback of every face's twin.
+static var _system := _msdf_system()
 static var _kana_or_kanji := RegEx.create_from_string("[\\x{3000}-\\x{9fff}\\x{ff00}-\\x{ffef}]")
 
 var text: String
@@ -97,7 +101,10 @@ func _init(shown: String, face: StudioTokens.Face, px: float, tracking_em := 0.0
 	ascent = roundf(raw_ascent)
 	baseline = (height - (raw_ascent + _display.get_descent(_SHAPE_SIZE) * px / _SHAPE_SIZE)) / 2.0 + raw_ascent
 	_line = _shape(shown, tracking_em, features)
-	_ellipsis = _shape(_ELLIPSIS, tracking_em, features)
+	var key := [face, px, tracking_em, tabular]
+	if key not in _ellipses:
+		_ellipses[key] = _shape(_ELLIPSIS, tracking_em, features)
+	_ellipsis = _ellipses[key]
 	fit(INF)
 
 
@@ -141,16 +148,35 @@ func draw(canvas: CanvasItem, at: Vector2, color: Color, outline_size := 0, outl
 
 
 func _draw_line(canvas: CanvasItem, at: Vector2, color: Color, outline_size: int, outline_color: Color) -> void:
+	# The outlines of every glyph first, then the glyphs over them.
+	if outline_size > 0:
+		_draw_glyphs(canvas, at, color, outline_size, outline_color)
+	_draw_glyphs(canvas, at, color, 0, outline_color)
+
+
+## The glyphs of [method placements], drawn without making one object of each: their outlines when [param outline_size]
+## is above 0, else the glyphs.
+func _draw_glyphs(canvas: CanvasItem, at: Vector2, color: Color, outline_size: int, outline_color: Color) -> void:
 	var ts := TextServerManager.get_primary_interface()
 	var item := canvas.get_canvas_item()
 	var whole := roundi(_px)
 	var oversampling := canvas.get_viewport().get_oversampling()
-	var drawn := placements(at)
-	if outline_size > 0:
-		for placed in drawn:
-			ts.font_draw_glyph_outline(placed.font, item, whole, outline_size, placed.at, placed.index, outline_color, oversampling)
-	for placed in drawn:
-		ts.font_draw_glyph(placed.font, item, whole, placed.at, placed.index, color, oversampling)
+	var on_line := roundf(at.y + baseline)
+	var display := _display.get_rids()[0]
+	var measure := _measure.get_rids()[0]
+	for pass_index in 2 if _shown < _line.glyphs.size() else 1:
+		var run := _line if pass_index == 0 else _ellipsis
+		var count := _shown if pass_index == 0 else run.glyphs.size()
+		var start := 0.0 if pass_index == 0 else _line.x[_shown]
+		for i in count:
+			var glyph := run.glyphs[i]
+			var face: RID = display if glyph.font_rid == measure else glyph.font_rid
+			var place := Vector2(at.x + start + run.x[i], on_line)
+			var index: int = glyph.index
+			if outline_size > 0:
+				ts.font_draw_glyph_outline(face, item, whole, outline_size, place, index, outline_color, oversampling)
+			else:
+				ts.font_draw_glyph(face, item, whole, place, index, color, oversampling)
 
 
 ## Each glyph drawn with the box's top left at [param at], the ellipsis's after the glyphs shown: its face (the
@@ -196,6 +222,12 @@ func _shape(shown: String, tracking_em: float, features: Dictionary) -> _Run:
 	return run
 
 
+static func _msdf_system() -> SystemFont:
+	var system := SystemFont.new()
+	system.multichannel_signed_distance_field = true
+	return system
+
+
 ## The raster font and its MSDF twin of [param face], loaded the first time.
 static func _face(face: StudioTokens.Face) -> Array:
 	if face not in _faces:
@@ -208,9 +240,7 @@ static func _face(face: StudioTokens.Face) -> Array:
 		# A letter the face lacks comes from the system's fonts, as MSDF too, and is drawn from that font: its main
 		# face, then its Japanese one once a line needs it, as a system's main face has no kana nor kanji.
 		measure.allow_system_fallback = false
-		var fallback := SystemFont.new()
-		fallback.multichannel_signed_distance_field = true
-		measure.fallbacks = [fallback] + _japanese
+		measure.fallbacks = [_system] + _japanese
 		_faces[face] = [display, measure]
 	return _faces[face]
 
@@ -218,6 +248,7 @@ static func _face(face: StudioTokens.Face) -> Array:
 ## Adds the system's Japanese face after the other fallbacks of every face, once.
 static func _add_japanese() -> void:
 	_japanese_looked = true
+	_ellipses.clear()
 	var paths := OS.get_system_font_path_for_text("sans-serif", "日本語", "ja")
 	var font := FontFile.new()
 	if paths.is_empty() or font.load_dynamic_font(paths[0]) != OK or not font.has_char("日".unicode_at(0)):

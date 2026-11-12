@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://carousel/consoles/console_order.gd" id="1"]
 [ext_resource type="Shader" path="res://carousel/consoles/sticker.gdshader" id="2"]
@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" path="res://studio/hint_row.tscn" id="hint_row"]
 [ext_resource type="Script" path="res://carousel/consoles/console_sticker.gd" id="4"]
 [ext_resource type="Script" path="res://studio/logo_view.gd" id="5"]
+[ext_resource type="Script" path="res://carousel/consoles/ring_marks.gd" id="6"]
+[ext_resource type="Script" path="res://carousel/consoles/console_placing.gd" id="7"]
 
 [sub_resource type="ShaderMaterial" id="sticker_material"]
 shader = ExtResource("2")
@@ -50,6 +52,7 @@ anchors_preset = 0
 offset_right = 1280.0
 offset_bottom = 960.0
 mouse_filter = 2
+script = ExtResource("6")
 
 [node name="Arrow" type="Control" parent="Frame"]
 unique_name_in_owner = true
@@ -138,3 +141,6 @@ script = ExtResource("3")
 button = &"b"
 text = "Cancel"
 
+[node name="Placing" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("7")

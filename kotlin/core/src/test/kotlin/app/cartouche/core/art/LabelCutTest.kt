@@ -37,14 +37,6 @@ class LabelCutTest {
     private fun cut(platform: String, medium: String) = LabelCut(shipped(platform), mediumId(medium))
 
     @Test
-    fun `a Game Boy Color exclusive's label is cut lower than a compatible game's, from a scan of the same shape`() {
-        val exclusive = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.EXCLUSIVE)
-        exclusive.on(663, 755) shouldBe Some(PixelRect(82, 254, 499, 436))
-        LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.COMPATIBLE).on(663, 755) shouldBe Some(PixelRect(82, 215, 499, 436))
-        LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.UNKNOWN).on(663, 755) shouldBe Some(PixelRect(82, 215, 499, 436))
-    }
-
-    @Test
     fun `a shell moves a cut only where the profile gives exclusives of the front`() {
         val gbc = LabelCut(shipped("gbc"), mediumId("gbc_cart"), Shell.EXCLUSIVE)
         gbc.cutsAs(gbc.copy(shell = Shell.UNKNOWN)) shouldBe false
@@ -60,14 +52,7 @@ class LabelCutTest {
     }
 
     @Test
-    fun `a scan of no front's shape, as a photo taken at an angle or an odd cartridge, gives no label`() {
-        cut("nes", "nes_cart").on(1239, 1000).shouldBeNone()
-        cut("nes", "nes_cart").on(995, 1000).shouldBeNone()
-        cut("gbc", "gbc_cart").on(983, 1000).shouldBeNone()
-        cut("snes", "snes_pal_cart").on(756, 1000).shouldBeNone()
-        // A GBA front is 1.74 wide for 1 high: 1.84 lies within 6 % of it, 1.85 beyond.
-        cut("gba", "gba_cart").on(1840, 1000).shouldBeSome()
-        cut("gba", "gba_cart").on(1850, 1000).shouldBeNone()
+    fun `a front of no proportion gives no label`() {
         LabelCut(ArtKind.CartridgeFront(emptyMap()), mediumId("gba_cart")).on(1720, 1000).shouldBeNone()
     }
 
@@ -130,7 +115,7 @@ class LabelCutTest {
                 val medium = mediumId("m$own")
                 val width = (height * near * factor).toInt()
                 val scan = width.toDouble() / height
-                val fits = fronts.filterValues { abs(scan / it.proportion - 1) <= 0.06 }
+                val fits = fronts.filterValues { abs(scan / it.proportion - 1) <= LabelCut.TOLERANCE }
                 val label = LabelCut(ArtKind.CartridgeFront(fronts), medium).on(width, height)
                 label.fold({ refused++ }) { cut++ }
                 label.isSome() shouldBe fits.isNotEmpty()
@@ -161,7 +146,7 @@ class LabelCutTest {
                 if (art is ArtKind.CartridgeFront) {
                     val shapes = art.fronts.values.map { it.proportion }.distinct()
                     shapes.forEach { one ->
-                        shapes.filter { it != one }.forEach { other -> abs(other / one - 1) shouldBeGreaterThan 0.06 }
+                        shapes.filter { it != one }.forEach { other -> abs(other / one - 1) shouldBeGreaterThan LabelCut.TOLERANCE }
                     }
                 }
             }

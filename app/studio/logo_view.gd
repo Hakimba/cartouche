@@ -44,6 +44,12 @@ func show_logo(slot: Slot, console: String) -> bool:
 	return true
 
 
+## Lets go of the logos no view shows, as a chooser that went through every console closes: a logo shown stays, held
+## by its view, and one needed again is read again.
+static func drop_unseen() -> void:
+	_read.clear()
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_THEME_CHANGED and _console:
 		show_logo(_slot, _console)

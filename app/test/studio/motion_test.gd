@@ -45,3 +45,15 @@ func test_every_curve_starts_where_it_starts_and_ends_on_its_end() -> void:
 		var named: String = Motion.Easing.find_key(curve)
 		assert_float(Motion.eased(curve, 0.0)).override_failure_message(named).is_equal_approx(0.0, 1e-4)
 		assert_float(Motion.eased(curve, 1.0)).override_failure_message(named).is_equal_approx(1.0, 1e-4)
+
+
+func test_a_motion_waited_for_says_it_finished_and_one_killed_meanwhile_says_it_did_not() -> void:
+	var node: Node = auto_free(Node.new())
+	add_child(node)
+	var whole := node.create_tween()
+	whole.tween_interval(0.05)
+	assert_bool(await Motion.played(whole)).is_true()
+	var cut := node.create_tween()
+	cut.tween_interval(10.0)
+	get_tree().process_frame.connect(cut.kill, CONNECT_ONE_SHOT)
+	assert_bool(await Motion.played(cut)).is_false()

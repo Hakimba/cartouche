@@ -86,7 +86,10 @@ internal class Payload private constructor(private val write: (Envelope) -> Stri
     fun answer(envelope: Envelope): String = write(envelope)
 }
 
-internal inline fun <reified T> payload(value: T): Payload = Payload.of(serializer<T>(), value)
+/** A type the plugin sends: each of [Sent] and [Failed]. Only those can be an answer's [payload]. */
+internal interface Wired
+
+internal inline fun <reified T : Wired> payload(value: T): Payload = Payload.of(serializer<T>(), value)
 
 /** What every answer says before its own fields: the request it answers, the library's revision for a library call, and whether it succeeded. */
 internal class Envelope(private val requestId: Int, private val revision: Option<Int>, private val ok: Boolean) {
@@ -120,7 +123,7 @@ internal class Envelope(private val requestId: Int, private val revision: Option
 
 /** Why an operation failed, as GDScript tells failures apart; [detail] is English, for logs. */
 @Serializable
-internal class Failed(val code: Code, val detail: String)
+internal class Failed(val code: Code, val detail: String) : Wired
 
 @Serializable
 internal enum class Code {
@@ -203,10 +206,13 @@ internal fun answered(requestId: Int, revision: Option<Int>, result: Either<Fail
     { it.answer(Envelope(requestId, revision, ok = true)) },
 )
 
-/** Where unexpected exceptions stop: logged, answered as a failure. */
+/**
+ * Where unexpected exceptions stop: logged, answered as a failure. Their class and frames only: a message may hold a
+ * URL with the credentials.
+ */
 internal fun unexpected(e: Throwable): Failed {
-    Log.e(TAG, "Unexpected failure", e)
-    return Failed(Code.UNEXPECTED, e.toString())
+    Log.e(TAG, "Unexpected failure: ${e.javaClass.name}\n" + e.stackTrace.joinToString("\n") { "\tat $it" })
+    return Failed(Code.UNEXPECTED, e.javaClass.name)
 }
 
 internal fun invalid(detail: String): Failed = Failed(Code.INVALID_REQUEST, detail)

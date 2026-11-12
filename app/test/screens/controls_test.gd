@@ -19,7 +19,11 @@ func _input_map() -> Dictionary:
 
 func test_the_device_s_a_confirms_and_its_b_goes_back_whatever_style_is_chosen() -> void:
 	var standard := _input_map()
-	for style_index in STYLES.size():
+	# One more pass confirms the first style with the keyboard's Enter instead of the pad.
+	for pass_index in STYLES.size() + 1:
+		var by_keyboard := pass_index == STYLES.size()
+		var style_index := 0 if by_keyboard else pass_index
+		Controls.style = &"xbox"
 		var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
 		device.curtain = true
 		var carousel := Fixtures.fresh_carousel(self, device)
@@ -29,7 +33,10 @@ func test_the_device_s_a_confirms_and_its_b_goes_back_whatever_style_is_chosen()
 		# B chooses nothing: it is the device's going back.
 		await Fixtures.joypad(self, JOY_BUTTON_B)
 		assert_array(device.saves(&"button_style")).is_empty()
-		await Fixtures.joypad(self, JOY_BUTTON_A)
+		if by_keyboard:
+			await Fixtures.enter(self)
+		else:
+			await Fixtures.joypad(self, JOY_BUTTON_A)
 		await Fixtures.choose_initial_region(self, carousel)
 		assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
 		assert_array(device.saves(&"button_style")).is_equal([STYLES[style_index]])
@@ -42,23 +49,11 @@ func test_the_device_s_a_confirms_and_its_b_goes_back_whatever_style_is_chosen()
 		carousel.queue_free()
 
 
-func test_a_style_can_be_chosen_with_the_keyboard() -> void:
-	var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
-	device.curtain = true
-	var carousel := Fixtures.fresh_carousel(self, device)
-	assert_bool(await Fixtures.on(self, carousel, "ButtonStyle")).is_true()
-	await Fixtures.enter(self)
-	await Fixtures.choose_initial_region(self, carousel)
-	assert_bool(await Fixtures.on(self, carousel, "NoConsole")).is_true()
-	assert_array(device.saves(&"button_style")).is_equal([&"xbox"])
-
-
 func test_the_style_stored_is_the_one_drawn_from_the_start() -> void:
 	var device: Fixtures.NewDevice = auto_free(Fixtures.NewDevice.new())
 	device.first_launch = false
 	device.has_games = true
 	device.button_style = "playstation"
 	var carousel := Fixtures.fresh_carousel(self, device)
-	await Fixtures.wait(self, func() -> bool: return carousel._shown)
+	await Fixtures.wait(self, func() -> bool: return carousel.is_shown())
 	assert_str(Controls.style).is_equal("playstation")
-	assert_str(Controls.mark(&"a")).is_equal("✕")

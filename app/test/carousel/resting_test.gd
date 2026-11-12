@@ -162,10 +162,6 @@ func test_inv_20_a_press_through_the_window_wakes_it() -> void:
 	_send(release)
 
 
-## A node moving by itself, as the backdrop or the rows are, counting the paces it is given.
+## A node moving by itself, as the backdrop or the rows are.
 class Paced extends Node:
-	var given := 0
-	var pace := 1.0:
-		set(value):
-			pace = value
-			given += 1
+	var pace := 1.0

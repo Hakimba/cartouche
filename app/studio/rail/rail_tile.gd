@@ -30,27 +30,22 @@ class Face:
 class Plain:
 	extends Control
 
-	var _material := ShaderMaterial.new()
+	var _backing := SatinPanel.Backing.of(self, Plain._material())
 
 	func _init() -> void:
 		mouse_filter = MOUSE_FILTER_IGNORE
-		_material.shader = preload("res://studio/satin_panel.gdshader")
-		_material.set_shader_parameter(&"box_position", Vector2.ZERO)
-		_material.set_shader_parameter(&"box_size", SIZE)
-		material = _material
 		size = SIZE
+		_backing.place(Rect2(Vector2.ZERO, SIZE))
 
 	func _notification(what: int) -> void:
 		if what == NOTIFICATION_THEME_CHANGED:
-			var shown := StudioMaterial.new(StudioTokens.Look.SATIN)
-			shown.radius = RADIUS
-			shown.shadows = shown.shadows.filter(func(shadow: StudioMaterial.Shadow) -> bool: return shadow.inset)
-			var parameters := SatinPanel.Backing.recipe(shown)
-			for parameter in parameters:
-				_material.set_shader_parameter(parameter, parameters[parameter])
+			_backing.shown = Plain._material()
 
-	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, SIZE), Color.WHITE)
+	static func _material() -> StudioMaterial:
+		var shown := StudioMaterial.new(StudioTokens.Look.SATIN)
+		shown.radius = RADIUS
+		shown.shadows = shown.shadows.filter(func(shadow: StudioMaterial.Shadow) -> bool: return shadow.inset)
+		return shown
 
 
 func _init(mirrored := false) -> void:

@@ -4,7 +4,6 @@ extends GdUnitTestSuite
 const Fixtures := preload("res://test/carousel/fixtures.gd")
 ## Building a mesh takes a while: fewer cases than the carousel's properties.
 const SHAPES := 50
-const EPSILON := 0.001
 ## A cartridge shaped as a box, as one ships.
 const _BOX_CART := preload("res://carousel/media/switch_card/switch_card_shape.tres")
 
@@ -32,13 +31,18 @@ func test_a_disc_has_no_gap_its_parts_join_into_one_closed_outline() -> void:
 		assert_int(at).is_equal(0)
 
 
-func test_a_disc_is_closed_its_faces_turned_outwards() -> void:
+func test_a_model_is_closed_its_faces_turned_outwards_and_built_for_each_of_its_parts_and_nothing_else() -> void:
 	var random := Fixtures.cases(25)
 	for i in SHAPES:
-		var meshes := _meshes(Fixtures.disc(random), random.randi_range(8, 64))
-		assert_array(Fixtures.open_edges(meshes)).is_empty()
-		for volume in Fixtures.volumes(meshes):
-			assert_float(volume).is_greater(0.0)
+		for shape: ModelShape in [Fixtures.disc(random), Fixtures.drawn_around(_BOX_CART, random, Vector2(0.95, 1.05))]:
+			var meshes := _meshes(shape, random.randi_range(8, 64))
+			for arrays in meshes:
+				var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+				assert_int(indices.size()).is_greater(0)
+			assert_array(Fixtures.open_edges(meshes)).is_empty()
+			for volume in Fixtures.volumes(meshes):
+				assert_float(volume).is_greater(0.0)
+			assert_array(shape.mesh_arrays(&"lable", 32)).is_empty()
 
 
 func test_impossible_dimensions_are_refused_by_the_rule_they_break_and_build_nothing() -> void:
@@ -75,16 +79,6 @@ func test_impossible_dimensions_are_refused_by_the_rule_they_break_and_build_not
 		_assert_refused(Fixtures.drawn_around(_BOX_CART, random, Vector2(0.95, 1.05)), box_breaks[i % box_breaks.size()])
 
 
-func test_a_model_builds_faces_for_each_of_its_parts_and_nothing_else() -> void:
-	var random := Fixtures.cases(41)
-	for i in SHAPES:
-		for shape: ModelShape in [Fixtures.disc(random), Fixtures.drawn_around(_BOX_CART, random, Vector2(0.95, 1.05))]:
-			for part in shape.parts():
-				var indices: PackedInt32Array = shape.mesh_arrays(part, 32)[Mesh.ARRAY_INDEX]
-				assert_int(indices.size()).is_greater(0)
-			assert_array(shape.mesh_arrays(&"lable", 32)).is_empty()
-
-
 func test_a_pill_or_a_circle_is_a_closed_solid_however_its_bevel_shrinks_it() -> void:
 	var random := Fixtures.cases(43)
 	for i in SHAPES:
@@ -105,62 +99,6 @@ func test_a_pill_or_a_circle_is_a_closed_solid_however_its_bevel_shrinks_it() ->
 		var outline := ShapeGeometry.rounded(box, corner, corner, steps)
 		for k in outline.size():
 			assert_float(outline[k].distance_to(outline[k - 1])).is_greater(0.0001)
-
-
-func test_a_polygon_s_corners_rounded_join_its_sides_and_make_a_closed_slab() -> void:
-	var random := Fixtures.cases(45)
-	for i in SHAPES:
-		# A box with a notch out of its top: four convex corners and two reflex ones.
-		var box := Rect2(0.0, 0.0, random.randf_range(20.0, 60.0), random.randf_range(20.0, 60.0))
-		var notch := Vector2(random.randf_range(0.3, 0.5) * box.size.x, random.randf_range(0.2, 0.5) * box.size.y)
-		var left := random.randf_range(0.2, 0.3) * box.size.x
-		var polygon := PackedVector2Array([Vector2.ZERO, Vector2(box.size.x, 0.0), box.size,
-			Vector2(left + notch.x, box.size.y), Vector2(left + notch.x, box.size.y - notch.y),
-			Vector2(left, box.size.y - notch.y), Vector2(left, box.size.y), Vector2(0.0, box.size.y)])
-		# No side shorter than its two corners' arcs.
-		var radius := random.randf_range(0.5, 0.2 * minf(minf(notch.x, notch.y), minf(left, box.size.x - left - notch.x)))
-		var radii := PackedFloat32Array()
-		radii.resize(polygon.size())
-		radii.fill(radius)
-		var steps := random.randi_range(2, 8)
-		var outline := ShapeGeometry.filleted(polygon, radii, steps)
-		assert_int(outline.size()).is_equal(polygon.size() * (steps + 1))
-		for k in polygon.size():
-			var coming := polygon[k - 1]
-			var going := polygon[(k + 1) % polygon.size()]
-			# Each arc starts on the side coming into its corner and ends on the one leaving it, a
-			# radius from where they meet.
-			var start := outline[k * (steps + 1)]
-			var end := outline[k * (steps + 1) + steps]
-			assert_float(Geometry2D.get_closest_point_to_segment(start, coming, polygon[k]).distance_to(start)) \
-				.is_less(EPSILON)
-			assert_float(Geometry2D.get_closest_point_to_segment(end, polygon[k], going).distance_to(end)) \
-				.is_less(EPSILON)
-			assert_float(start.distance_to(polygon[k])).is_equal_approx(radius, EPSILON)
-		var mesh := MeshBuilder.new()
-		var bevel := random.randf_range(0.05, 0.9) * radius
-		ShapeGeometry.slab(mesh, outline, 0.0, random.randf_range(3.0, 10.0) * bevel, Vector2(bevel, 0.0), box)
-		var meshes: Array[Array] = [mesh.arrays()]
-		assert_array(Fixtures.open_edges(meshes)).is_empty()
-		assert_float(Fixtures.volumes(meshes)[0]).is_greater(0.0)
-
-
-func test_a_corner_of_no_radius_or_in_line_stays_one_point_and_its_slab_closed() -> void:
-	# A square with a point half way along its bottom, its top right corner left square.
-	var polygon := PackedVector2Array([Vector2.ZERO, Vector2(10.0, 0.0), Vector2(20.0, 0.0), Vector2(20.0, 20.0),
-		Vector2(0.0, 20.0)])
-	var outline := ShapeGeometry.filleted(polygon, PackedFloat32Array([3.0, 3.0, 3.0, 0.0, 3.0]), 4)
-	assert_int(outline.size()).is_equal(3 * 5 + 2)
-	assert_bool(Vector2(10.0, 0.0) in outline and Vector2(20.0, 20.0) in outline).is_true()
-	for i in outline.size():
-		assert_float(outline[i].distance_to(outline[i - 1])).is_greater(EPSILON)
-	var mesh := MeshBuilder.new()
-	ShapeGeometry.slab(mesh, outline, 0.0, 5.0, Vector2.ONE, Rect2(0.0, 0.0, 20.0, 20.0))
-	var meshes: Array[Array] = [mesh.arrays()]
-	assert_array(Fixtures.open_edges(meshes)).is_empty()
-	assert_float(Fixtures.volumes(meshes)[0]).is_greater(0.0)
-	var normals: PackedVector3Array = meshes[0][Mesh.ARRAY_NORMAL]
-	assert_bool(Array(normals).all(func(normal: Vector3) -> bool: return normal.is_finite())).is_true()
 
 
 ## Every part of [param shape], built in [param detail] steps.

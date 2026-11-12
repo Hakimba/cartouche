@@ -56,7 +56,6 @@ internal object WireScript {
             Root(Sent.ArrivalsAnswer.serializer(), answer = true),
             Root(Sent.ScanAnswer.serializer(), answer = true),
             Root(Sent.PreviewAnswer.serializer(), answer = true),
-            Root(Sent.RescrapeAnswer.serializer(), answer = true),
             Root(Sent.SettingsAnswer.serializer(), answer = true),
             Root(Sent.LabelVariants.serializer(), answer = true),
             Root(Sent.Renamed.serializer(), answer = true),
@@ -165,11 +164,13 @@ internal object WireScript {
         """
         |## An operation's answer: [member ok], or the [member code] of its failure.
         |class Result:
+        ${codes.joinToString("") { "|\tconst ${it.uppercase()} := &\"$it\"\n" }}|	## Without the plugin.
+        |	const UNAVAILABLE := &"unavailable"
+        |	## A launch rehearsed.
+        |	const REHEARSED := &"rehearsed"
+        |
         |	var ok: bool
-        |	## ${wrapped(
-            "One of ${codes.joinToString(", ") { "`$it`" }}; `unavailable` without the plugin, `rehearsed` for a launch rehearsed.",
-            "\t## ",
-        )}
+        |	## One of the constants above.
         |	var code: StringName
         |	## English, for logs.
         |	var detail: String
@@ -320,17 +321,6 @@ internal object WireScript {
         if (descriptor.isInline) unwrapped(descriptor.getElementDescriptor(0)) else descriptor
 
     private fun name(descriptor: SerialDescriptor): String = descriptor.serialName.removeSuffix("?").substringAfterLast('.')
-
-    private fun wrapped(text: String, prefix: String): String {
-        val lines = mutableListOf("")
-        text.split(' ').forEach { word ->
-            if (lines.last().isNotEmpty() && prefix.length + lines.last().length + word.length + 1 > MAX_LINE) lines += ""
-            lines[lines.size - 1] = if (lines.last().isEmpty()) word else "${lines.last()} $word"
-        }
-        return lines.joinToString("\n$prefix")
-    }
-
-    private const val MAX_LINE = 116
 
     /** Every property written, a [None] as null. */
     private val everything = Json { encodeDefaults = true }

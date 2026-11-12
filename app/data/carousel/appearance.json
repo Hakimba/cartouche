@@ -16,9 +16,7 @@
   "pose": {
     "tilt_degrees": 0,
     "turn_degrees": 0,
-    "sway_degrees": 3.5,
-    "sway_period_s": 7,
-    "bob_height": 0.025
+    "sway_period_s": 7
   },
   "insertions": {
     "dvd": {

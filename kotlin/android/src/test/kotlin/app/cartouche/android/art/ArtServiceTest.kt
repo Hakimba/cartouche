@@ -5,16 +5,21 @@ import android.net.ConnectivityManager
 import app.cartouche.android.DebugOptions
 import app.cartouche.android.Reference
 import app.cartouche.android.Table
+import app.cartouche.android.TableFiles
 import app.cartouche.android.Threads
+import app.cartouche.android.VARIANT_SIGNAL
 import app.cartouche.android.library.LibraryService
+import app.cartouche.android.library.Shown
 import app.cartouche.android.storage.FactsStore
 import app.cartouche.android.storage.Folders
 import app.cartouche.android.storage.LibraryStore
 import app.cartouche.android.tableTexts
 import app.cartouche.core.art.ArtVersion
+import app.cartouche.core.art.Candidate
 import app.cartouche.core.art.Day
 import app.cartouche.core.art.ExtractGame
 import app.cartouche.core.art.extract
+import app.cartouche.core.art.web
 import app.cartouche.core.library.Game
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.game
@@ -24,6 +29,7 @@ import app.cartouche.core.platforms.PlatformId
 import app.cartouche.core.platforms.definition
 import app.cartouche.core.platforms.playerJson
 import app.cartouche.core.regions.PreferredRegion
+import app.cartouche.core.serialName
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
@@ -32,12 +38,14 @@ import arrow.core.right
 import io.kotest.assertions.arrow.core.shouldBeNone
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.arrow.core.shouldBeSome
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -50,6 +58,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.io.File
+import java.time.LocalDate
 import java.util.concurrent.Executor
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -60,7 +69,11 @@ class ArtServiceTest {
     private val ps2 = PlatformId("ps2")
     private val profile =
         """{"media": "dvd", "medium": {"default": "ps2_dvd"}, "minimumGameBytes": 1, "art": {"kind": "disc"}, "screenScraperSystem": 58}"""
-    private val catalog = Catalog.parse(listOf(definition(playerJson("p"))), DefinitionSource("profiles.json", """{"ps2": $profile}"""))
+    private val catalog =
+        Catalog.parse(
+            listOf(definition(playerJson("p")), definition(playerJson("p"), platform = "psx", name = "psx.json")),
+            DefinitionSource("profiles.json", """{"ps2": $profile, "psx": $profile}"""),
+        )
 
     /** A European game whose release ScreenScraper has a texture for. */
     private fun european(title: String) = game(title).copy(regions = listOf("Europe"), redumpName = Some("$title (Europe)"))
@@ -80,9 +93,10 @@ class ArtServiceTest {
         val scope: TestScope = TestScope(StandardTestDispatcher()),
         extract: String = "",
         textureTable: String = "",
-        fetch: Fetch = FakeFetch(emptyMap()),
+        val fetch: Fetch = FakeFetch(emptyMap()),
         textures: Textures = Textures.NONE,
         planning: CoroutineDispatcher? = null,
+        scraperDecoding: Semaphore = Semaphore(ArtImages.SCRAPER_DECODES),
     ) {
         val store = ArtStore(File(context.filesDir, "art"))
         val signals = mutableListOf<Pair<String, String>>()
@@ -105,14 +119,15 @@ class ArtServiceTest {
         private val scheduled = StandardTestDispatcher(scope.testScheduler)
         val art =
             ArtService(
-                Threads(scope, scheduled, planning ?: scheduled, scheduled, Dispatchers.IO),
+                Threads(scope, scheduled, planning ?: scheduled, scheduled, Dispatchers.IO, scheduled),
                 store,
-                { library },
+                { Shown.Users(lazyOf(library)) },
                 { reference },
                 { preferred },
                 fetch,
                 textures,
                 { context.getSystemService(ConnectivityManager::class.java) },
+                scraperDecoding,
             ) { signal, payload -> signals += signal to payload }
 
         fun run() = scope.advanceUntilIdle()
@@ -134,22 +149,22 @@ class ArtServiceTest {
         val http =
             FakeHttp { url ->
                 when {
-                    quota -> Answer(430, None).right()
+                    quota -> Served(430, None).right()
                     "ssuserInfos" in url ->
-                        Answer(
+                        Served(
                             200,
                             Some("""{"response":{"ssuser":{"maxthreads":"2","maxrequestspermin":"3"}}}""".encodeToByteArray()),
                         ).right()
-                    else -> Answer(200, Some("NOMEDIA".encodeToByteArray())).right()
+                    else -> Served(200, Some("NOMEDIA".encodeToByteArray())).right()
                 }
             }.also { it.now = { scope.testScheduler.currentTime } }
         val fetch =
             ScreenScraperFetch(
                 http,
-                Credentials("dev", "fake", "Cartouche", if (member) Some(Member("member", "fake")) else None),
+                Credentials("dev", Secret("fake"), "Cartouche", if (member) Some(Member("member", Secret("fake"))) else None),
                 File(context.filesDir, "art/gate.json"),
                 { scope.testScheduler.currentTime },
-                { Day("2026-10-18") },
+                { Day.of(LocalDate.of(2026, 10, 18)) },
             ) {}
     }
 
@@ -257,6 +272,40 @@ class ArtServiceTest {
     }
 
     @Test
+    fun `a variant card's images are decoded while the scraper's decodes are all taken`() {
+        val scraperDecoding = Semaphore(ArtImages.SCRAPER_DECODES)
+        val rig = Rig(okage, extract = okageExtract, scraperDecoding = scraperDecoding)
+        rig.art.stop()
+        val images = variants(rig)
+        (rig.fetch as FakeFetch).images = images.associate { it.candidate.identity.value to scan(diameter = 40, margin = 4) }
+        repeat(ArtImages.SCRAPER_DECODES) { scraperDecoding.tryAcquire() shouldBe true }
+        rig.art.labelVariants(okage)
+        rig.run()
+        rig.signals.count { it.first == VARIANT_SIGNAL } shouldBe 0
+        rig.art.start()
+        rig.run()
+        rig.signals.count { it.first == VARIANT_SIGNAL } shouldBe images.size
+        images.forEach { rig.store.variant(it.candidate).shouldBeSome() }
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun `the chooser's images not yet downloaded when the app leaves the screen wait for it to come back`() {
+        val rig = Rig(okage, extract = okageExtract)
+        val images = variants(rig)
+        val fetch = rig.fetch as FakeFetch
+        fetch.images = images.associate { it.candidate.identity.value to scan(diameter = 40, margin = 4) }
+        rig.art.labelVariants(okage)
+        rig.art.stop()
+        rig.run()
+        fetch.asked shouldBe emptyList()
+        rig.art.start()
+        rig.run()
+        images.forEach { rig.store.variant(it.candidate).shouldBeSome() }
+        rig.scope.cancel()
+    }
+
+    @Test
     fun `a game no source can have art for is known absent at the look's planning, and listed so with the library`() {
         val stored = game("Stored")
         val rig = Rig(okage, unknown, stored, extract = okageExtract)
@@ -267,30 +316,112 @@ class ArtServiceTest {
         rig.signals
             .flatMap { (_, payload) -> Option.fromNullable(Json.parseToJsonElement(payload).jsonObject["absent"]).toList() }
             .map { absent -> absent.jsonArray.map { it.jsonPrimitive.content } } shouldBe listOf(listOf(unknown.id.value))
-        rig.store.labelsOf(listOf(okage, unknown, stored)) { rig.reference.artVersion(it) }.second shouldBe listOf(unknown.id.value)
+        val (labels, absent) = rig.store.labelsOf(listOf(okage, unknown, stored)) { rig.reference.artVersion(it) }
+        labels.map { it.game } shouldBe listOf(stored.id)
+        absent shouldBe listOf(unknown.id.value)
         rig.reference = Reference(catalog, files = tableTexts(Table.ART to ps2 to okageExtract.replace("2026-10-18", "2026-10-19")))
         rig.store.labelsOf(listOf(unknown)) { rig.reference.artVersion(it) }.second shouldBe emptyList()
         rig.scope.cancel()
     }
 
+    private val psx = PlatformId("psx")
+    private val ape = game("Ape", platform = "psx")
+    private val apeExtract = extractOf(ExtractGame("Ape", emptySet(), listOf("USA=na.png")))
+
+    /** Points [rig] at the ps2 and psx art tables, and counts each open of one: its version's first line once, then each indexing. */
+    private fun countedArt(rig: Rig): Map<PlatformId, Int> {
+        val files = tableTexts(Table.ART to ps2 to okageExtract, Table.ART to psx to apeExtract)
+        val opened = mutableMapOf<PlatformId, Int>()
+        val counted = TableFiles { table, platform -> files.open(table, platform).onSome { opened.merge(platform, 1, Int::plus) } }
+        rig.reference = Reference(catalog, files = counted)
+        return opened
+    }
+
     @Test
-    fun `the library's stored and absent art is what looking each game up twice gave, in the same order`() {
-        val games = (0 until 90).map { game("G$it", platform = if (it % 4 == 0) "gba" else "ps2") }
-        val rig = Rig(*games.toTypedArray(), extract = okageExtract)
+    fun `once the run is over every art table but the open chooser's is forgotten, and indexed again when next needed`() {
+        val rig = Rig(okage, ape)
+        val opened = countedArt(rig)
+        rig.art.lookForArt()
+        rig.run()
+        opened shouldBe mapOf(ps2 to 2, psx to 2)
+        rig.art.labelVariants(okage)
+        opened[ps2] shouldBe 3
+        rig.art.lookForArt()
+        rig.run()
+        val psxPlanned = opened.getValue(psx)
+        rig.art.labelVariants(okage)
+        opened[ps2] shouldBe 3
+        rig.art.labelVariants(ape)
+        opened[psx] shouldBe psxPlanned + 1
         rig.art.stop()
-        games.forEachIndexed { at, game ->
-            if (at % 3 == 0) rig.store.save(game.id, byteArrayOf(at.toByte())).shouldBeRight()
-            if (at % 5 == 0) rig.store.markAbsent(game.id, rig.reference.artVersion(game.platform)).shouldBeRight()
-        }
-        val (stored, absent) = rig.store.labelsOf(games) { rig.reference.artVersion(it) }
-        stored shouldBe games.flatMap { game -> rig.store.stored(game.id).map { FoundArt(game.id, it) }.toList() }
-        absent shouldBe
-            games.groupBy { it.platform }.flatMap { (platform, ofPlatform) ->
-                val version = rig.reference.artVersion(platform)
-                ofPlatform.filter { rig.store.stored(it.id).isNone() && rig.store.isAbsent(it.id, version) }.map { it.id.value }
-            }
-        stored.size shouldBe 30
-        (absent.isNotEmpty()) shouldBe true
+        rig.run()
+        rig.art.labelVariants(okage)
+        opened[ps2] shouldBe 4
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun `no art table is forgotten while the run is under way`() {
+        val rig = Rig(okage, ape)
+        val opened = countedArt(rig)
+        rig.art.stop()
+        rig.art.lookForArt()
+        rig.run()
+        rig.art.labelVariants(ape)
+        opened shouldBe mapOf(ps2 to 2, psx to 2)
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun `a re-read after the run indexes no art table of a console whose labels are all there`() {
+        val rig = Rig(okage, ape)
+        listOf(okage, ape).forEach { rig.store.save(it.id, byteArrayOf(1)).shouldBeRight() }
+        val opened = countedArt(rig)
+        rig.art.lookForArt()
+        rig.run()
+        rig.art.recutAfterScan(listOf(okage, ape))
+        rig.run()
+        opened shouldBe mapOf(ps2 to 1, psx to 1)
+        rig.scope.cancel()
+    }
+
+    /** ScreenScraper open or closed as the test says. */
+    private class Switched(override var open: Boolean) : Textures {
+        override suspend fun newRun() = Unit
+
+        override suspend fun networkBack() = Unit
+    }
+
+    @Test
+    fun `a texture shown in the chooser can be chosen after ScreenScraper closed`() {
+        File(context.filesDir, "art").deleteRecursively()
+        val textures = Switched(open = true)
+        val rig = Rig(a, textureTable = textures("A"), textures = textures)
+        rig.art.stop()
+        val texture = rig.reference.sources(ps2, None).variantsOf(a) { true }.first { it.candidate is Candidate.Texture }
+        rig.store.saveVariant(texture.candidate, scan(diameter = 40, margin = 4)).shouldBeRight()
+        rig.art.labelVariants(a).variants.map { it.region } shouldContain texture.region.name
+        textures.open = false
+        rig.art.chooseLabel(a, texture.region.name, texture.candidate.source.serialName).shouldBeRight()
+        rig.store.stored(a.id).shouldBeSome()
+        rig.scope.cancel()
+    }
+
+    @Test
+    fun `the images of the chooser just opened are kept however many images are downloaded after them`() {
+        File(context.filesDir, "art").deleteRecursively()
+        val rig = Rig(okage, extract = okageExtract)
+        rig.art.stop()
+        val shown = variants(rig).map { it.candidate }
+        shown.forEach { rig.store.saveVariant(it, byteArrayOf(1)).shouldBeRight() }
+        val others = (1 until ArtStore.VARIANTS_KEPT - shown.size + 1).map { web("https://art/other/$it.png") }
+        others.forEach { rig.store.saveVariant(it, byteArrayOf(2)).shouldBeRight() }
+        // The chooser's images are the oldest kept.
+        val day = 24 * 60 * 60 * 1000L
+        shown.forEach { rig.store.variant(it).shouldBeSome().file.setLastModified(System.currentTimeMillis() - 2 * day) shouldBe true }
+        rig.art.labelVariants(okage)
+        rig.store.saveVariant(web("https://art/other/new.png"), byteArrayOf(3)).shouldBeRight()
+        shown.forEach { rig.store.variant(it).shouldBeSome() }
         rig.scope.cancel()
     }
 }

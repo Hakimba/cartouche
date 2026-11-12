@@ -1,5 +1,5 @@
 {
- "model_hash": "85932a69a924b90c812dda1ff8bf1fc8a7ae2275825bbdb73d9acdee9f89146c",
+ "model_hash": "af51d222213673ce8174483994bd60b4484fa603c72d9fe4c8a83c70476b64a4",
  "choice": 2,
  "steps": [
   {
@@ -10,7 +10,8 @@
     "eject_degrees": 0,
     "flaps_degrees": 0,
     "power_mm": 0,
-    "reset_mm": 0
+    "reset_mm": 0,
+    "light_energy": 0
    },
    "disc": {
     "dx": 0,
@@ -29,9 +30,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 1
    },
    "look": {
     "blur": 0,
@@ -69,7 +67,8 @@
     "eject_degrees": 0,
     "flaps_degrees": 0,
     "power_mm": 0,
-    "reset_mm": 0
+    "reset_mm": 0,
+    "light_energy": 0
    },
    "disc": {
     "dx": 0,
@@ -88,9 +87,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,
@@ -128,7 +124,8 @@
     "eject_degrees": 0,
     "flaps_degrees": 0,
     "power_mm": 0,
-    "reset_mm": 0
+    "reset_mm": 0,
+    "light_energy": 0
    },
    "disc": {
     "dx": 0,
@@ -147,9 +144,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 8.848,
@@ -187,7 +181,8 @@
     "eject_degrees": 0,
     "flaps_degrees": 90,
     "power_mm": 0,
-    "reset_mm": 0
+    "reset_mm": 0,
+    "light_energy": 0
    },
    "disc": {
     "dx": 0,
@@ -206,9 +201,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,
@@ -246,7 +238,8 @@
     "eject_degrees": 0,
     "flaps_degrees": 90,
     "power_mm": 0,
-    "reset_mm": 0
+    "reset_mm": 0,
+    "light_energy": 0
    },
    "disc": {
     "dx": 0,
@@ -265,9 +258,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,
@@ -305,7 +295,8 @@
     "eject_degrees": 0,
     "flaps_degrees": 90,
     "power_mm": 4.5,
-    "reset_mm": 0
+    "reset_mm": 0,
+    "light_energy": 2
    },
    "disc": {
     "dx": 0,
@@ -324,9 +315,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,
@@ -364,7 +352,8 @@
     "eject_degrees": 0,
     "flaps_degrees": 90,
     "power_mm": 4.5,
-    "reset_mm": 0
+    "reset_mm": 0,
+    "light_energy": 2
    },
    "disc": {
     "dx": 0,
@@ -383,9 +372,6 @@
     "x": 0,
     "y": 0,
     "z": 0
-   },
-   "consoles": {
-    "show": 0
    },
    "look": {
     "blur": 0,

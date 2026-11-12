@@ -21,7 +21,7 @@ MEDIA = APP / "carousel/media"
 POSES = APP / "data/media_poses.json"
 APPEARANCE = APP / "data/carousel/appearance.json"
 PROFILES = APP / "data/platforms/profiles.json"
-FOLDERS_TEST = APP / "test/carousel/media/media_folders_test.gd"
+FOLDERS_TEST = APP / "test/assets/media_assets_test.gd"
 DISC_TEMPLATE = MEDIA / "ps2_dvd/ps2_dvd.tscn"
 
 

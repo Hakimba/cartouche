@@ -1,0 +1,15 @@
+Android Gradle build: R8 shrinks without renaming
+
+Applies after 0003. Against godotengine/godot 4.7.2-stable (ed1daf0).
+
+diff --git a/platform/android/java/app/proguard-rules.pro b/platform/android/java/app/proguard-rules.pro
+index d1c201f3..0a385b05 100644
+--- a/platform/android/java/app/proguard-rules.pro
++++ b/platform/android/java/app/proguard-rules.pro
+@@ -16,3 +16,6 @@
+ -keep public class * extends android.app.Activity
+ -keep public class * extends android.app.Application
+ -keep public class * extends android.app.Service
++
++# Stack traces and the names the engine looks up stay readable.
++-dontobfuscate

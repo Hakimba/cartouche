@@ -110,10 +110,11 @@ public class Setting private constructor(
             }
         public val BACKDROP: Setting = setting("backdrop", choice(), Settings::backdrop) { copy(backdrop = it) }
         public val PIXEL_VEIL: Setting = setting("pixel_veil", switch, Settings::pixelVeil) { copy(pixelVeil = it) }
+        public val GAMES_IN_LINE: Setting = setting("games_in_line", switch, Settings::gamesInLine) { copy(gamesInLine = it) }
 
         /** Every setting, each field of [Settings] once. */
         public val all: List<Setting> =
-            listOf(BUTTON_STYLE, EDGE_SMOOTHING, PREFERRED_REGION, GAMES_FLOAT, SOUND_LEVEL, LANGUAGE, BACKDROP, PIXEL_VEIL)
+            listOf(BUTTON_STYLE, EDGE_SMOOTHING, PREFERRED_REGION, GAMES_FLOAT, SOUND_LEVEL, LANGUAGE, BACKDROP, PIXEL_VEIL, GAMES_IN_LINE)
 
         /** [settings] with the setting named [key] set to the value [written] as text, when there is one and it takes it. */
         public fun change(settings: Settings, key: String, written: String): Either<SettingRefused, Settings> =

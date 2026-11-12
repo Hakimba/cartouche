@@ -52,7 +52,28 @@ public value class FilePath(public val value: String)
 public value class FileName(public val value: String) {
     /** Dot files and macOS `._` resource forks: never games. */
     public val isHidden: Boolean get() = value.startsWith('.')
+
+    /** What follows the last dot, lower-case: none without one or after an odd one (`Game.`, `Game.d-1`). */
+    public val extension: Option<FileExtension> get() = FileExtension.parse(value.substringAfterLast('.', ""))
 }
+
+/** A file name's extension, lower-case and without its dot, such as `wad`; read in any case. */
+@Serializable(with = FileExtensionSerializer::class)
+@JvmInline
+public value class FileExtension private constructor(public val value: String) {
+    public companion object {
+        private val SYNTAX = Regex("[a-z0-9]+")
+
+        public fun parse(text: String): Option<FileExtension> = Some(text.lowercase()).filter(SYNTAX::matches).map(::FileExtension)
+    }
+}
+
+private object FileExtensionSerializer : KSerializer<FileExtension> by ParsedSerializer(
+    "file extension",
+    String.serializer(),
+    FileExtension::parse,
+    FileExtension::value,
+)
 
 private object ContentUriSerializer : KSerializer<ContentUri> by ParsedSerializer(
     "content URI",

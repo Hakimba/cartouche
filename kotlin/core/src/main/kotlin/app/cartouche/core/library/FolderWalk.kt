@@ -141,10 +141,13 @@ public object FolderWalk {
         }
 
         val entries = listing(None, None).mapLeft(WalkFailure<E>::Unlisted).bind()
-        when (depth) {
-            FolderDepth.TOP_LEVEL -> FolderContents(entries.filterIsInstance<FolderEntry.File>().map { it.file }, emptyList())
-            // A provider that is not a tree (a folder inside itself, one folder in two places) lists files again.
-            FolderDepth.SUBFOLDERS -> walk(entries, prefix = "", level = 1).let { it.copy(files = it.files.distinctBy(ListedFile::uri)) }
-        }
+        val contents =
+            when (depth) {
+                FolderDepth.TOP_LEVEL -> FolderContents(entries.filterIsInstance<FolderEntry.File>().map { it.file }, emptyList())
+                FolderDepth.SUBFOLDERS -> walk(entries, prefix = "", level = 1)
+            }
+        // A provider may list a file twice, and one that is not a tree (a folder inside itself, one folder in two
+        // places) lists files again.
+        contents.copy(files = contents.files.distinctBy(ListedFile::uri))
     }
 }

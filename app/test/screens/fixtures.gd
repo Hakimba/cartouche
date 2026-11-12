@@ -4,12 +4,11 @@ extends RefCounted
 ## it, the presses the screens take, and where the flow stands.
 
 const CarouselFixtures := preload("res://test/carousel/fixtures.gd")
+const Request := CarouselFixtures.Request
+const Answer := CarouselFixtures.Answer
 ## The rule every screen settles whole by (INV-20), shared with the bridge.
 const ScreenAgreement := preload("res://dev/screen_agreement.gd")
 const NAVIGATION: Array[StringName] = [&"ui_up", &"ui_down", &"ui_left", &"ui_right"]
-## The flags a screen sets while it takes no press (a screen without one, or a signal of that name, is not guarded),
-## and must have cleared once it is shown and still.
-const _GUARDS: Array[StringName] = [&"_busy", &"_leaving", &"_closing", &"saving"]
 const _FRAME_MS := 16
 
 static var clock := Clock.new()
@@ -39,7 +38,7 @@ static func past_first_launch(suite: GdUnitTestSuite, consoles: Dictionary[Strin
 ## selected console's shelf is shown behind.
 static func settled_consoles(suite: GdUnitTestSuite, carousel: Carousel) -> void:
 	suite.assert_bool(await until(suite, func() -> bool:
-		return not carousel._consoles.is_settling() and not carousel._order._busy \
+		return not carousel._consoles.is_settling() and not carousel._order.is_busy() \
 			and not (carousel.get_node("%Screens/Settings") as SettingsMenu).is_processing())).is_true()
 	await suite.await_idle_frame()
 
@@ -54,7 +53,7 @@ static func fresh_carousel(suite: GdUnitTestSuite, device: NewDevice) -> Carouse
 ## [method fresh_carousel], once it shows its consoles.
 static func shown(suite: GdUnitTestSuite, device: NewDevice) -> Carousel:
 	var carousel := fresh_carousel(suite, device)
-	await wait(suite, func() -> bool: return carousel._shown)
+	await wait(suite, func() -> bool: return carousel.is_shown())
 	return carousel
 
 
@@ -72,7 +71,7 @@ static func press_to(suite: GdUnitTestSuite, carousel: Carousel, button: JoyButt
 ## Frames until [param carousel] stops moving: no screen coming or going, no properties or launch under way.
 static func settled(suite: GdUnitTestSuite, carousel: Carousel) -> void:
 	await wait(suite, func() -> bool:
-		return not carousel._properties._busy and not carousel._game_launch.is_busy() \
+		return not carousel._properties._holding() and not carousel._game_launch.is_busy() \
 			and carousel.screen() not in [Carousel.Screen.ENTERING, Carousel.Screen.LEAVING])
 	await suite.await_idle_frame()
 
@@ -164,10 +163,15 @@ static func until(suite: GdUnitTestSuite, condition: Callable) -> bool:
 
 
 ## Forty moves drawn by [param random] on [param carousel]'s screen [param screen_name], once it
-## shows: after each, exactly one control of that screen has the focus, visible and whole in view (INV-20).
+## shows and nothing of the carousel shows over it (the page is one the under-page oracle evaluates): after each,
+## exactly one control of that screen has the focus, visible and whole in view (INV-20).
 static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: String, random: RandomNumberGenerator) -> void:
 	suite.assert_bool(await on(suite, carousel, screen_name)).is_true()
 	await until(suite, func() -> bool: return focus(suite) != null and in_view(focus(suite)))
+	# Nothing of the carousel shows over the page, and the check really looked at this page.
+	await until(suite, func() -> bool: return shown_under_page(carousel).is_empty())
+	suite.assert_str(shown_under_page(carousel)).is_empty()
+	suite.assert_str(checked_page(carousel)).is_equal(screen_name)
 	for move in 40:
 		await action(suite, NAVIGATION[random.randi() % NAVIGATION.size()])
 		var focused := focus(suite)
@@ -180,26 +184,45 @@ static func wander(suite: GdUnitTestSuite, carousel: Carousel, screen_name: Stri
 
 
 ## Whether a person can act on [param carousel] now (INV-20): the focus is on a control seen (no ancestor fully
-## faded) that takes presses, inside the screen in front when one shows, and no input guard of that screen is left set;
+## faded) that takes presses, inside the screen in front when one shows, and the screen holding no press;
 ## or no screen is in front and the carousel, shown, no game in the air and processing, or its ring takes the presses.
 static func alive(carousel: Carousel) -> bool:
 	if not (carousel.get_node("Backdrop") as CanvasLayer).visible:
 		return false
 	var screen := shown_screen(carousel)
 	var focused := carousel.get_viewport().gui_get_focus_owner()
-	if focused != null and focused.is_visible_in_tree() and focused.can_process() and _seen(focused):
-		return screen == null or (screen.is_ancestor_of(focused) and not _guarded(screen))
-	return screen == null and ((carousel._shown and not carousel._toss.is_busy() and carousel.is_visible_in_tree()
+	if focused != null and focused.is_visible_in_tree() and focused.can_process() and ScreenAgreement.seen(focused):
+		return screen == null or (screen.is_ancestor_of(focused) and not screen.call(&"holds_presses"))
+	return screen == null and ((carousel.is_shown() and not carousel._toss.is_busy() and carousel.is_visible_in_tree()
 		and carousel.can_process()) or carousel._order.is_open())
 
 
-## Whether an input guard of [param screen] is set.
-static func _guarded(screen: Control) -> bool:
-	for guard in _GUARDS:
-		var flag: Variant = screen.get(guard)
-		if flag is bool and flag:
-			return true
-	return false
+## What [param carousel] still draws of its own screens while a page is in front of it and settled (INV-20): the rail (any
+## of it), the console's name, the games' logo, title pill and hints are under the page, not drawn beside it; empty when
+## none, or when no page is in front, or it still moves.
+static func shown_under_page(carousel: Carousel) -> String:
+	var page := checked_page(carousel)
+	if page.is_empty():
+		return ""
+	var parts := ScreenAgreement.shown(carousel)
+	var stray: Array[String] = []
+	# The rail is in the way as soon as any of it is drawn: a rail half sunk by an interrupted transition is stray too.
+	var rail := carousel._rail
+	if rail.is_visible_in_tree() and (rail.sunk < 1.0 or rail.ground_alpha > 0.0):
+		stray.append("rail")
+	for part: String in ["console_title", "games_logo", "title_pill", "games_hints"]:
+		if parts[part]:
+			stray.append(part)
+	return "" if stray.is_empty() else "%s over %s" % [", ".join(stray), page]
+
+
+## The name of the page [method shown_under_page] checks now: one in front of [param carousel], settled; empty when none is, it
+## takes no press yet, or the carousel still moves, and nothing is checked.
+static func checked_page(carousel: Carousel) -> String:
+	var page := shown_screen(carousel)
+	if page == null or page.call(&"holds_presses") or carousel._sequence.is_processing():
+		return ""
+	return page.name
 
 
 ## Whether [param control] shows whole: inside the screen and inside every scrolling container holding it.
@@ -211,16 +234,6 @@ static func in_view(control: Control) -> bool:
 			return false
 		node = node.get_parent()
 	return control.get_viewport_rect().encloses(rect)
-
-
-## Whether [param item] shows: neither it nor any ancestor fully transparent.
-static func _seen(item: CanvasItem) -> bool:
-	var node: Node = item
-	while node is CanvasItem:
-		if (node as CanvasItem).modulate.a <= 0.0 or (node as CanvasItem).self_modulate.a <= 0.0:
-			return false
-		node = node.get_parent()
-	return true
 
 
 ## Chooses the platform or player [param id] in the chooser the form of [param carousel] shows now.
@@ -359,17 +372,16 @@ static func _send(suite: GdUnitTestSuite, event: InputEvent, pressed: bool) -> v
 ## A device just installed on: no settings, no library, the curtain not allowed, one PS2
 ## emulator installed (none for any other platform, unless [member players_everywhere]), and a
 ## folder of [member games] games to pick ([member scanned_games] once added). Its library holds
-## the [member consoles] set up. Counts what it is asked. The requests named in [member slow]
-## answer only once [signal released]; those in [member failing] fail.
-class NewDevice extends AndroidServices:
-	signal released
-
+## the [member consoles] set up. Counts what it is asked; answers as [member answers] and [member failures] script.
+class NewDevice extends CarouselFixtures.Scripted:
 	var first_launch := true
 	## The button style and the preferred region stored, as the settings send them; none when empty.
 	var button_style := ""
 	var preferred_region := ""
 	## Whether the selected game floats, as the settings send it.
 	var games_float := false
+	## Whether the games stand in a straight line on a screen whose shelf is an arc, as the settings send it.
+	var games_in_line := false
 	## The backdrop and whether its pixel veil moves, as the plugin reads them at start: a fresh install's by default.
 	var chosen_backdrop := &"light"
 	var pixel_veil := true
@@ -380,6 +392,8 @@ class NewDevice extends AndroidServices:
 	var languages := PackedStringArray(Locale.NAMES.keys())
 	## Whether the library already has games (the desktop demo's, set up nowhere).
 	var has_games := false
+	## Why the stored library could not be read, as the plugin tells it at start; none when it could.
+	var load_problem := ""
 	## The platforms set up, by id, with how many games each has.
 	var consoles: Dictionary[String, int] = {}
 	## Choices of [member consoles] other than the usual ones (sub-folders, discs grouped, ARMSX2), by id.
@@ -393,8 +407,6 @@ class NewDevice extends AndroidServices:
 	var scanned_games := 55
 	var players: Array[Dictionary] = [{"id": "ps2.armsx2", "name": "ps2 - ARMSX2 (Refresh/GitHub)",
 		"emulator_name": "ARMSX2 (Refresh/GitHub)", "extensions": PackedStringArray(["iso", "chd", "bin"])}]
-	var slow: Array[StringName] = []
-	var failing: Array[StringName] = []
 	## The values saved for each setting, by its key, in order ([method saves]).
 	var saved: Dictionary[StringName, Array] = {}
 	## The consoles placed, each as `[platform id, gap]`.
@@ -415,7 +427,7 @@ class NewDevice extends AndroidServices:
 	## The images chosen for a label, in order, each as `source/region`.
 	var chosen_labels: Array[String] = []
 	## The picture of the user's own [method pick_label_picture] answers with: this size, drawn in
-	## two halves (red, then blue) at [member picture_path]; when it is [member failing], none, for
+	## two halves (red, then blue) at [member picture_path]; when its request is scripted to fail, none, for
 	## [member picture_failure].
 	var picture_size := Vector2i(64, 48)
 	var picture_failure := &"cancelled"
@@ -455,7 +467,7 @@ class NewDevice extends AndroidServices:
 	func settings() -> AndroidServices.SettingsAnswer:
 		await _frames(1)
 		var answer := {"ok": true, "first_launch": first_launch, "games_float": games_float, "pixel_veil": pixel_veil,
-			"preferred_regions": preferred_regions, "languages": languages}
+			"games_in_line": games_in_line, "preferred_regions": preferred_regions, "languages": languages}
 		if button_style:
 			answer["button_style"] = button_style
 		if preferred_region:
@@ -471,10 +483,13 @@ class NewDevice extends AndroidServices:
 		await _frames(1)
 		if has_games:
 			return AndroidServices.LibraryAnswer.new({"ok": true, "library": DesktopPlugin.demo("library")})
-		return AndroidServices.LibraryAnswer.new(_told({"ok": true, "library": _library(), "arrivals": arrivals.duplicate(true)}))
+		var answer := {"ok": true, "library": _library(), "arrivals": arrivals.duplicate(true)}
+		if load_problem:
+			answer["load_problem"] = load_problem
+		return AndroidServices.LibraryAnswer.new(_told(answer))
 
 	func current_library() -> AndroidServices.LibraryAnswer:
-		var answer := await _later(&"current_library")
+		var answer := await _answer(Request.CURRENT_LIBRARY, 3)
 		if answer["ok"]:
 			answer["library"] = _library()
 		return AndroidServices.LibraryAnswer.new(_told(answer))
@@ -484,14 +499,13 @@ class NewDevice extends AndroidServices:
 
 	func request_curtain_permission() -> AndroidServices.Result:
 		setting_opened = true
-		return AndroidServices.Result.new(_payload(&"curtain"))
+		return AndroidServices.Result.new(await _answer(Request.CURTAIN))
 
-	## Kept as the plugin keeps it, in the field of its key, unless its `save_<key>` is [member failing]; once
-	## [signal released] when it is [member slow].
+	## Kept as the plugin keeps it, in the field of its key, unless the save of that key is scripted to fail.
 	func save_setting(key: StringName, value: Variant) -> AndroidServices.Result:
 		saved.get_or_add(key, [])
 		saved[key].append(value)
-		var answer := await _answer(&"save_" + key)
+		var answer := await _answer(save_of(key))
 		if answer["ok"]:
 			set(&"chosen_backdrop" if key == &"backdrop" else key, value)
 		return AndroidServices.Result.new(answer)
@@ -501,7 +515,7 @@ class NewDevice extends AndroidServices:
 		return saved.get(key, [])
 
 	## Places as the plugin does, answering as it sends it: `not_in_library` for a console not set up or without games,
-	## `gap_out_of_range`, else the whole order.
+	## `gap_out_of_range`, else the whole order and the library's revision one more, as the placing writes it.
 	func place_console(platform_id: String, gap: int) -> AndroidServices.Placed:
 		placed.append([platform_id, gap])
 		var others := Array(order).filter(func(id: String) -> bool: return id != platform_id)
@@ -514,7 +528,7 @@ class NewDevice extends AndroidServices:
 			others.insert(gap, platform_id)
 			order = PackedStringArray(others)
 			answer["order"] = order
-		return AndroidServices.Placed.new(answer)
+		return AndroidServices.Placed.new(_told(answer, true))
 
 	func installed_players(platform_id: String) -> Array[AndroidServices.Player]:
 		var found: Array[AndroidServices.Player] = []
@@ -525,8 +539,11 @@ class NewDevice extends AndroidServices:
 		return found
 
 	func pick_folder() -> AndroidServices.Pick:
-		return AndroidServices.Pick.new({"ok": true, "folder": {"uri": "content://tree/card%3AROMs%2Fps2", "name": "ps2",
-			"volume": "card", "folders": PackedStringArray(["ROMs", "ps2"])}})
+		var answer := await _answer(Request.PICK_FOLDER)
+		if answer["ok"]:
+			answer["folder"] = {"uri": "content://tree/card%3AROMs%2Fps2", "name": "ps2", "volume": "card",
+				"folders": PackedStringArray(["ROMs", "ps2"])}
+		return AndroidServices.Pick.new(answer)
 
 	func prepare_tables(platform_id: String) -> void:
 		tables_prepared.append(platform_id)
@@ -534,13 +551,14 @@ class NewDevice extends AndroidServices:
 	func preview_platform(platform_id: String, setup: AndroidServices.PlatformSetup) -> AndroidServices.PreviewAnswer:
 		previewed_platforms.append(platform_id)
 		previews.append(setup)
-		while &"preview" in slow:
-			await released
-		return AndroidServices.PreviewAnswer.new({"ok": true, "report": {"games": games, "files": games}})
+		var answer := await _answer(Request.PREVIEW)
+		if answer["ok"]:
+			answer["report"] = {"games": games}
+		return AndroidServices.PreviewAnswer.new(answer)
 
 	func set_up_platform(platform_id: String, setup: AndroidServices.PlatformSetup) -> AndroidServices.LibraryAnswer:
 		set_up.append(setup)
-		var answer := _payload(&"set_up")
+		var answer := await _answer(Request.SET_UP)
 		if answer["ok"]:
 			consoles[platform_id] = consoles.get(platform_id, 0)
 			setups[platform_id] = setup.to_wire()
@@ -551,16 +569,15 @@ class NewDevice extends AndroidServices:
 
 	func scan_platform(platform_id: String) -> AndroidServices.ScanAnswer:
 		scans += 1
-		while &"scan" in slow:
-			await released
-		if &"scan" in failing:
-			return AndroidServices.ScanAnswer.new(_payload(&"scan"))
+		var answer := await _answer(Request.SCAN)
+		if not answer["ok"]:
+			return AndroidServices.ScanAnswer.new(answer)
 		consoles[platform_id] = scanned_games
 		return AndroidServices.ScanAnswer.new(_told({"ok": true, "library": _library(), "report": {"games": scanned_games},
 			"arrivals": arrivals.duplicate(true)}, true))
 
 	func remove_platform(platform_id: String) -> AndroidServices.LibraryAnswer:
-		var answer := _payload(&"remove")
+		var answer := await _answer(Request.REMOVE)
 		if answer["ok"]:
 			removed.append(platform_id)
 			consoles.erase(platform_id)
@@ -592,20 +609,21 @@ class NewDevice extends AndroidServices:
 
 	# Both answer a few frames later, as the plugin does.
 	func label_variants(_game: AndroidServices.Game) -> AndroidServices.LabelVariants:
-		await _frames(3)
-		return AndroidServices.LabelVariants.new({"ok": true, "variants": variants})
+		var answer := await _answer(Request.LABEL_VARIANTS, 3)
+		if answer["ok"]:
+			answer["variants"] = variants
+		return AndroidServices.LabelVariants.new(answer)
 
 	func choose_label(game: AndroidServices.Game, region: String, source: String) -> AndroidServices.ArtAnswer:
 		chosen_labels.append(source + "/" + region)
-		await _frames(3)
-		var answer := _payload(&"choose_label")
+		var answer := await _answer(Request.CHOOSE_LABEL, 3)
 		if answer["ok"]:
 			answer["art"] = {"game_id": game.id, "path": "chosen.jpg"}
 		return AndroidServices.ArtAnswer.new(answer)
 
 	func pick_label_picture() -> AndroidServices.LabelPicture:
-		await _frames(3)
-		if &"pick_label_picture" in failing:
+		var answer := await _answer(Request.PICK_LABEL_PICTURE, 3)
+		if not answer["ok"]:
 			return AndroidServices.LabelPicture.new({"ok": false, "code": picture_failure, "detail": "no picture"})
 		var image := Image.create_empty(picture_size.x, picture_size.y, false, Image.FORMAT_RGB8)
 		image.fill(Color.RED)
@@ -618,21 +636,20 @@ class NewDevice extends AndroidServices:
 
 	func keep_own_label(game: AndroidServices.Game, framing: LabelFraming) -> AndroidServices.ArtAnswer:
 		kept_framings.append({"zoom": framing.zoom, "centre": framing.centre, "proportion": framing.proportion})
-		await _frames(3)
-		var answer := _payload(&"keep_own_label")
+		var answer := await _answer(Request.KEEP_OWN_LABEL, 3)
 		if answer["ok"]:
 			# The kept image: the picture itself will do.
 			answer["art"] = {"game_id": game.id, "path": ProjectSettings.globalize_path(picture_path)}
-		return AndroidServices.ArtAnswer.new(answer)
+		return AndroidServices.ArtAnswer.new(_told(answer, true))
 
 	func check_launch(_game: AndroidServices.Game, _disc: int) -> AndroidServices.Result:
 		launches += 1
-		return AndroidServices.Result.new({"ok": false, "code": &"unavailable"})
+		return AndroidServices.Result.new({"ok": false, "code": AndroidServices.Result.UNAVAILABLE})
 
 	## Puts [member consoles] in [param platform_ids]' order, as the library sends them from then on.
 	func order_consoles(platform_ids: PackedStringArray) -> AndroidServices.Result:
 		orders.append(platform_ids)
-		var answer := await _later(&"order_consoles")
+		var answer := await _answer(Request.ORDER_CONSOLES, 3)
 		if answer["ok"]:
 			var ordered: Dictionary[String, int] = {}
 			for platform_id in platform_ids:
@@ -645,7 +662,7 @@ class NewDevice extends AndroidServices:
 	## trimmed, 80 characters at most; blank or the game's own title, no name.
 	func rename_game(game: AndroidServices.Game, shown: String) -> AndroidServices.Renamed:
 		names_given.append(shown)
-		var answer := await _later(&"rename_game")
+		var answer := await _answer(Request.RENAME_GAME, 3)
 		if answer["ok"]:
 			var kept := _display_name(shown)
 			var original := game.own_title()
@@ -660,7 +677,7 @@ class NewDevice extends AndroidServices:
 	## [member consoles] as they now stand, with the library only when it changed since last sent, and [member arrivals].
 	func refresh_platform(platform_id: String) -> AndroidServices.RefreshAnswer:
 		refreshed.append(platform_id)
-		var answer := await _later(&"refresh_platform")
+		var answer := await _answer(Request.REFRESH_PLATFORM, 3)
 		var changed := false
 		if answer["ok"]:
 			var before := _sent
@@ -673,7 +690,7 @@ class NewDevice extends AndroidServices:
 
 	func enter_console(platform_id: String) -> AndroidServices.ArrivalsAnswer:
 		entered.append(platform_id)
-		var answer := await _later(&"enter_console")
+		var answer := await _answer(Request.ENTER_CONSOLE, 3)
 		if answer["ok"]:
 			var announced: Dictionary = arrivals["announced"]
 			announced.erase(platform_id)
@@ -682,7 +699,7 @@ class NewDevice extends AndroidServices:
 
 	func leave_game(game: AndroidServices.Game) -> AndroidServices.ArrivalsAnswer:
 		left.append(game.id)
-		var answer := await _later(&"leave_game")
+		var answer := await _answer(Request.LEAVE_GAME, 3)
 		if answer["ok"]:
 			var unseen: PackedStringArray = arrivals["unseen"]
 			unseen.erase(game.id)
@@ -702,20 +719,9 @@ class NewDevice extends AndroidServices:
 		_took(answer)
 		return answer
 
-	## [param request]'s answer, a few frames later, once [signal released] when it is [member slow].
-	func _later(request: StringName) -> Dictionary:
-		await _frames(3)
-		return await _answer(request)
-
-	## [param request]'s answer, once [signal released] when it is [member slow].
-	func _answer(request: StringName) -> Dictionary:
-		while request in slow:
-			await released
-		return _payload(request)
-
 	## [param shown] as `DisplayName.of` keeps it.
 	static func _display_name(shown: String) -> String:
-		return RegEx.create_from_string("\\s+").sub(shown, " ", true).strip_edges().left(80).strip_edges()
+		return RegEx.create_from_string("[\\s\\p{Z}\\p{Cc}]+").sub(shown, " ", true).strip_edges().left(80).strip_edges()
 
 	## An image [method label_variants] listed arrives for [param game_id]: at [param path], or
 	## not, for [param failure].
@@ -727,10 +733,6 @@ class NewDevice extends AndroidServices:
 		else:
 			told["failure"] = failure
 		label_variant_downloaded.emit(AndroidServices.LabelVariant.new(told))
-
-	static func _frames(count: int) -> void:
-		for frame in count:
-			await (Engine.get_main_loop() as SceneTree).process_frame
 
 	## [member consoles] as the plugin sends a library: each set up with its folder, then its games; kept as the one sent.
 	func _library() -> Dictionary:
@@ -749,8 +751,7 @@ class NewDevice extends AndroidServices:
 				indices.append(listed.size())
 				var id := "%s/%d" % [platform_id, i]
 				var game := {"id": id, "platform_id": platform_id, "title": "%s %d" % [platform_id, i],
-					"regions": [], "medium": CarouselFixtures.media(platform_id)[0], "languages": [], "serials": [],
-					"discs": [{"name": "%d.iso" % i}], "last_disc": 0, "identified": false}
+					"regions": [], "medium": CarouselFixtures.media(platform_id)[0], "last_disc": 0}
 				if names.has(id):
 					game["original_title"] = game["title"]
 					game["title"] = names[id]
@@ -763,7 +764,3 @@ class NewDevice extends AndroidServices:
 
 	static func _folder_uri(platform_id: String) -> String:
 		return "content://tree/card%3AROMs%2F" + platform_id
-
-	## A failure for [param request] if it is one of [member failing], a success otherwise.
-	func _payload(request: StringName) -> Dictionary:
-		return {"ok": false, "code": &"unexpected"} if request in failing else {"ok": true}

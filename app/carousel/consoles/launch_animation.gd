@@ -24,7 +24,7 @@ const EASES: Dictionary[String, float] = {"linear": 1.0, "in": 3.0, "out": 1.0 /
 const BAKED_KEYS := 12
 const TRACKS: Array[String] = [
 	"Consoles:console_position", "Consoles:console_rotation", "Consoles:console_scale",
-	"Consoles:pose_amount", "Consoles:sway_degrees", "Consoles:bob_height", "Consoles:others_opacity",
+	"Consoles:pose_amount", "Consoles:sway_degrees", "Consoles:bob_height",
 	"Row:position", "Row:scale", "Row:neighbours", "Row:pose_amount", "Row:selected_presence",
 	"Sequence:disc_away", "Sequence:disc_lift", "Sequence:disc_offset", "Sequence:disc_tilt",
 	"Sequence:disc_turns_per_s", "Sequence:blur", "Sequence:layer_opacity", "Sequence:saturation",
@@ -49,7 +49,7 @@ const _REBOUND := "outBack"
 const _PLACEHOLDER: Array[Dictionary] = [
 	{"hold": 0.5, "console": {"py": 1.8, "scale": 0.55, "sway": 0.0, "bob": 0.0},
 		"disc": {"visible": 0.0}, "row": {"show": 0.0}, "ui": {"pill": 0.0, "tabs": 0.0, "art": 1.0}},
-	{"dur": 0.7, "console": {"px": 3.9, "py": 1.0, "scale": 1.0, "pose": 0.0}, "consoles": {"show": 0.0},
+	{"dur": 0.7, "console": {"px": 3.9, "py": 1.0, "scale": 1.0, "pose": 0.0},
 		"ui": {"art": 0.0}},
 	{"dur": 0.5, "ease": "outBack"},
 	{"dur": 0.5, "ease": "out", "disc": {"visible": 1.0}, "row": {"show": 1.0},
@@ -283,8 +283,6 @@ static func _value(track: String, step: Dictionary) -> Variant:
 			return _number(console, "sway", CarouselLayout.SWAY_DEGREES)
 		"Consoles:bob_height":
 			return _number(console, "bob", CarouselLayout.BOB_HEIGHT * _CM_PER_UNIT) / _CM_PER_UNIT
-		"Consoles:others_opacity":
-			return _number(_group(step, "consoles"), "show", 1.0)
 		"Row:position":
 			return (_vector(row, "x", "y", "z") + Vector3.UP * _ROW_HEIGHT_CM) / _CM_PER_UNIT
 		"Row:scale":

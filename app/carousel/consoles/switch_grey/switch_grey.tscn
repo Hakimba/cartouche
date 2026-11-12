@@ -2,7 +2,24 @@
 
 [ext_resource type="Script" path="res://carousel/consoles/console_model.gd" id="1"]
 [ext_resource type="Resource" path="res://carousel/consoles/switch/switch_shape.tres" id="2"]
-[ext_resource type="PackedScene" path="res://carousel/consoles/switch_grey/switch_grey.glb" id="3"]
+[ext_resource type="PackedScene" path="res://carousel/consoles/switch/switch.glb" id="3"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/switch_grey/switch_grey_color.png" id="4"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/switch/switch_orm.png" id="5"]
+[ext_resource type="Texture2D" path="res://carousel/consoles/switch/switch_normal.png" id="6"]
+
+[sub_resource type="StandardMaterial3D" id="grey"]
+resource_name = "switch_grey"
+cull_mode = 2
+albedo_texture = ExtResource("4")
+metallic = 1.0
+metallic_texture = ExtResource("5")
+metallic_texture_channel = 2
+roughness_texture = ExtResource("5")
+roughness_texture_channel = 1
+normal_enabled = true
+normal_texture = ExtResource("6")
+ao_enabled = true
+ao_texture = ExtResource("5")
 
 [node name="SwitchGrey" type="Node3D"]
 script = ExtResource("1")
@@ -11,3 +28,8 @@ way_in = Vector3(0, 1, 0)
 pose_degrees = Vector3(15, 0, 0)
 
 [node name="Model" parent="." instance=ExtResource("3")]
+
+[editable path="Model"]
+
+[node name="body" parent="Model/switch" index="0"]
+surface_material_override/0 = SubResource("grey")

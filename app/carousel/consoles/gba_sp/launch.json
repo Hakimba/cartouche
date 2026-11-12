@@ -15,9 +15,6 @@
     "scale": 1.05118036505319,
     "sway": 0
    },
-   "consoles": {
-    "show": 1
-   },
    "disc": {
     "dx": 0,
     "dy": 0,
@@ -72,9 +69,6 @@
     "rz": -9.33213710784912,
     "scale": 1.05118036505319,
     "sway": 0
-   },
-   "consoles": {
-    "show": 1
    },
    "disc": {
     "dx": 0,
@@ -131,9 +125,6 @@
     "scale": 0.6,
     "sway": 3.5
    },
-   "consoles": {
-    "show": 0
-   },
    "disc": {
     "dx": 0,
     "dy": 0,
@@ -188,9 +179,6 @@
     "rz": 0,
     "scale": 0.6,
     "sway": 3.5
-   },
-   "consoles": {
-    "show": 0
    },
    "disc": {
     "dx": 0,
@@ -247,9 +235,6 @@
     "scale": 0.55,
     "sway": 3.5
    },
-   "consoles": {
-    "show": 0
-   },
    "disc": {
     "dx": 0,
     "dy": 0,
@@ -304,9 +289,6 @@
     "rz": 0,
     "scale": 0.55,
     "sway": 3.5
-   },
-   "consoles": {
-    "show": 0
    },
    "disc": {
     "dx": 0,
@@ -363,9 +345,6 @@
     "scale": 0.5583,
     "sway": 3.5
    },
-   "consoles": {
-    "show": 0
-   },
    "disc": {
     "dx": 0,
     "dy": 0,
@@ -420,9 +399,6 @@
     "rz": 0,
     "scale": 0.5617,
     "sway": 3.5
-   },
-   "consoles": {
-    "show": 0
    },
    "disc": {
     "dx": 0,
@@ -479,9 +455,6 @@
     "scale": 3.2,
     "sway": 3.5
    },
-   "consoles": {
-    "show": 0
-   },
    "disc": {
     "dx": 0,
     "dy": 0,
@@ -536,9 +509,6 @@
     "rz": 0,
     "scale": 3.2,
     "sway": 3.5
-   },
-   "consoles": {
-    "show": 0
    },
    "disc": {
     "dx": 0,

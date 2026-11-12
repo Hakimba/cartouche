@@ -28,8 +28,8 @@ var _moving := false
 
 
 func _enter_tree() -> void:
-	# Once everything moved this frame, before it is drawn.
-	RenderingServer.frame_pre_draw.connect(_follow)
+	if is_visible_in_tree():
+		_follow_frames(true)
 
 
 func _ready() -> void:
@@ -44,19 +44,26 @@ func _ready() -> void:
 	add_child(_view)
 	texture = _view.get_texture()
 	# Once the carousel's camera has followed the window.
-	get_viewport().size_changed.connect(_frame, CONNECT_DEFERRED)
+	get_viewport().size_changed.connect(_follow_window, CONNECT_DEFERRED)
 
 
 func _exit_tree() -> void:
-	RenderingServer.frame_pre_draw.disconnect(_follow)
+	_follow_frames(false)
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED and is_inside_tree():
-		_frame()
-	# Hidden, the console stops moving: the form keeps its view between openings.
-	elif what == NOTIFICATION_VISIBILITY_CHANGED and _row:
-		_row.set_process(is_visible_in_tree())
+	if what == NOTIFICATION_RESIZED:
+		_follow_window()
+	elif what == NOTIFICATION_VISIBILITY_CHANGED and is_inside_tree():
+		var shown := is_visible_in_tree()
+		_follow_frames(shown)
+		if _row:
+			_row.set_process(shown)
+		# Hidden, the view holds no picture: the next showing frames it again.
+		if shown:
+			_frame()
+		else:
+			_view.size = Vector2i.ZERO
 
 
 ## Shows the console of [param platform_id] as the model in [param folder]; [param framed], measured to fill the
@@ -87,6 +94,21 @@ func still() -> Texture2D:
 	_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	await RenderingServer.frame_post_draw
 	return Still.of(_view)
+
+
+## Whether [method _follow] runs before each drawn frame: once everything moved, while shown.
+func _follow_frames(on: bool) -> void:
+	if on != RenderingServer.frame_pre_draw.is_connected(_follow):
+		if on:
+			RenderingServer.frame_pre_draw.connect(_follow)
+		else:
+			RenderingServer.frame_pre_draw.disconnect(_follow)
+
+
+## The view framed again as the window or the node changed, while shown.
+func _follow_window() -> void:
+	if is_inside_tree() and is_visible_in_tree():
+		_frame()
 
 
 ## The view drawn again when the console moved, while shown.

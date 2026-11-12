@@ -4,7 +4,7 @@ extends RefCounted
 ## Placing a console just added on the ring of the others. The state machine of the flow (which press each state takes
 ## and which it ignores, what each timed state moves on to) and the ring's geometry while a gap is chosen. The ring
 ## holds the [member others] already there ("m" below); the gap [member gap] is the one after console g of them, between
-## g and (g + 1) mod m. Pure: [ConsoleOrder] plays it.
+## g and (g + 1) mod m. Pure: [ConsolePlacing] plays it.
 
 ## Where the flow stands. A press only counts in the states that name it below.
 enum State {
@@ -15,7 +15,7 @@ enum State {
 	ARRIVING,
 	## The same, the console in the middle.
 	CHOOSING,
-	## The console flies into its gap, then bounces, then a pause, then the morph: every press is ignored.
+	## The console flies into its gap, lands with no bounce, then a pause, then the morph: every press is ignored.
 	FLYING,
 	LANDING,
 	MORPHING,
@@ -39,7 +39,6 @@ const PLINTH := Vector2(263.68, 588.8)
 const PLINTH_WIDTH := 40.0
 ## How high (px) the console is lifted along its flight, at the most.
 const FLY_LIFT := 64.0
-const BOUNCE := 0.12
 ## The room the middle's text keeps under the console (px).
 const TEXT_GAP := 20.48
 
@@ -164,8 +163,3 @@ static func flight(from: Vector2, to: Vector2, progress: float, lift: float) -> 
 	var at := from.lerp(to, Motion.eased(Motion.Easing.IN_OUT, progress))
 	at.y -= sin(PI * progress) * lift
 	return at
-
-
-## How much larger the console stands [param progress] (0 to 1) through its bounce: 1 + .12 sin(pi b).
-static func bounce(progress: float) -> float:
-	return 1.0 + BOUNCE * sin(PI * progress)

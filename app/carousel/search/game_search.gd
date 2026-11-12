@@ -13,16 +13,14 @@ extends Control
 ## top, which B on the games screen clears. A key tapped is typed.
 ##
 ## The carousel hands its presses over while the ribbon is open ([method take]), and B while what
-## is found is kept ([method clear]).
+## is found is kept ([method clear]). What the ribbon is on and what each press does to it is [SearchModel]'s: this
+## scene draws it, holds a direction, and plays what the model answers on the row.
 
 ## The ribbon opened or closed: the carousel makes room for it.
 signal opened(open: bool)
 ## What the carousel shows changed: its title's marks and the hints follow.
 signal changed
 
-## The ribbon's keys, as the core reads them.
-const KEYS := "abcdefghijklmnopqrstuvwxyz0123456789 "
-const SPACE := " "
 ## The ribbon rises from this far below in this time.
 const RISE_S := 0.18
 const _RISE_PX := 140.0
@@ -32,10 +30,9 @@ const _INDEX_SLIDE := 0.6
 ## The big letter shows this long, then fades in this time.
 const _BIG_S := 0.7
 const _BIG_FADE_S := 0.12
-## The size of the big letter for a leap among the keys typed, against its own.
-const _BIG_TYPED_SCALE := 0.25
-## Its right edge then, from the screen's, in pixels: across from the keys typed.
-const _BIG_TYPED_RIGHT := 40.0
+## The size of the big letter, against its theme's: it tells the start of the words a leap among the keys typed
+## reaches, small, at the right above the keys, clear of the title in the middle and of the keys typed at the left.
+const _BIG_SCALE := 0.25
 
 var android: AndroidServices = Android
 ## The carousel's row, which shows what is found.
@@ -43,17 +40,7 @@ var row: ShelfRow
 
 var _platform_id := ""
 var _shelf: Array[AndroidServices.Game] = []
-## What the row shows, and the index by title, asked for once per shelf.
-var _view := AndroidServices.Browse.new({})
-var _letters := AndroidServices.Browse.new({})
-var _open := false
-var _by_region := false
-var _typed := ""
-## The key (or, by region, the group) the ribbon's cursor is on.
-var _cursor := 0
-## Shelf positions of the game shown when the ribbon opened, and when the first key was typed.
-var _before := 0
-var _home := 0
+var _model := SearchModel.new(_browse)
 var _held := 0
 var _repeat := CarouselLayout.Repeat.new()
 var _rise: Tween
@@ -80,7 +67,6 @@ var _hints_shown: Array[PackedStringArray] = []
 @onready var _hints: HintRow = %Hints
 ## The ribbon's place, kept to the screen's bottom.
 @onready var _ribbon_place := Vector2(_ribbon.offset_top, _ribbon.offset_bottom)
-@onready var _big_size := _big_text.get_theme_font_size(&"font_size")
 
 
 func _ready() -> void:
@@ -89,13 +75,14 @@ func _ready() -> void:
 	_lowered = _RISE_PX
 	_ribbon.modulate.a = 0.0
 	_big.modulate.a = 0.0
+	_big_text.add_theme_font_size_override(&"font_size", roundi(_big_text.get_theme_font_size(&"font_size") * _BIG_SCALE))
 	set_process(false)
 
 
 # Runs while a direction is held on the ribbon: its cursor goes on, faster and faster.
 func _process(delta: float) -> void:
 	if _repeat.due(delta):
-		_move(_held)
+		_act(_model.move(_held))
 
 
 ## Searches [param games], [param platform_id]'s shelf in its order, from now on: nothing typed,
@@ -103,12 +90,9 @@ func _process(delta: float) -> void:
 func use_shelf(platform_id: String, games: Array[AndroidServices.Game]) -> void:
 	_platform_id = platform_id
 	_shelf = games
-	_letters = AndroidServices.Browse.new({})
-	_view = _letters
-	_typed = ""
-	_by_region = false
-	if _open:
-		_open = false
+	var was_open := _model.open
+	_model.use_shelf(games.size())
+	if was_open:
 		opened.emit(false)
 	let_go()
 	_ribbon.hide()
@@ -116,31 +100,24 @@ func use_shelf(platform_id: String, games: Array[AndroidServices.Game]) -> void:
 
 
 func is_open() -> bool:
-	return _open
+	return _model.open
 
 
 ## Whether what the row shows is not the whole shelf in title order, the ribbon open or not.
 func is_filtered() -> bool:
-	return not _typed.is_empty() or _by_region
-
-
-## What is typed, as the core reads it: lowercase letters, digits and spaces.
-func typed() -> String:
-	return _typed
+	return _model.is_filtered()
 
 
 ## The shelf position of the game the row shows, whatever it shows.
 func shown_position() -> int:
-	if _by_region:
-		return _view.games[_view.groups[_cursor].start + row.selected_index()]
-	return _view.games[row.selected_index()] if is_filtered() else row.selected_index()
+	return _model.shown_position(row.selected_index())
 
 
 ## Where the words typed are in the shown game's title, as (start, length) in characters.
 func marks() -> Array[Vector2i]:
-	if _typed.is_empty():
+	if _model.typed.is_empty():
 		return []
-	return android.title_marks(_platform_id, shown_position(), _typed)
+	return android.title_marks(_platform_id, shown_position(), _model.typed)
 
 
 ## Forgets a direction held on the ribbon: a screen opening over it leaves nothing pending.
@@ -151,14 +128,10 @@ func let_go() -> void:
 
 ## Opens the ribbon: on the letter of the game shown, or as it was left with what is typed.
 func open() -> void:
-	_open = true
-	if not is_filtered():
-		_before = row.selected_index()
-		_view = _letters_view()
-		_cursor = _nearest_lit(_letter_key())
+	_model.open_at(row.selected_index())
 	_ribbon.show()
 	_animate_ribbon(true)
-	Diagnostics.trace("search", "opened on '%s'" % _typed)
+	Diagnostics.trace("search", "opened on '%s'" % _model.typed)
 	opened.emit(true)
 	_refresh()
 
@@ -166,21 +139,13 @@ func open() -> void:
 ## Closes the ribbon; keeping what it found and where the carousel is when [param keep], else back on
 ## the whole shelf, on the game shown when it opened.
 func close(keep: bool) -> void:
-	Sounds.play(SoundEffects.Cue.BACK)
-	_open = false
-	let_go()
-	if not keep:
-		_show_shelf(_before)
-	_animate_ribbon(false)
-	Diagnostics.trace("search", "closed, %s '%s'" % ["keeping" if keep else "leaving", _typed])
-	opened.emit(false)
-	_refresh()
+	_act(_model.close(keep))
 
 
 ## Back to the whole shelf in title order, on the game shown when the first key was typed (or, by
 ## region, the one shown).
 func clear() -> void:
-	_show_shelf(_home if not _typed.is_empty() else shown_position())
+	_play(_model.clear(row.selected_index()))
 	_refresh()
 
 
@@ -192,234 +157,69 @@ func take(event: InputEvent, held: HeldDirection, moved: bool) -> void:
 			_hold(held.direction)
 		elif _held == held.direction:
 			let_go()
-	elif event.is_action_pressed(&"ui_accept"):
-		if _by_region:
-			close(true)
-		else:
-			_type(KEYS[_cursor])
-	elif event.is_action_pressed(&"screen_back"):
-		_back()
-	elif event.is_action_pressed(&"ui_up") or event.is_action_pressed(&"form_submit"):
-		close(true)
-	elif event.is_action_pressed(&"ui_down") and _typed.is_empty():
-		_switch_index()
-	elif event.is_action_pressed(&"previous_letter"):
-		_leap(-1)
-	elif event.is_action_pressed(&"next_letter"):
-		_leap(1)
-	elif event.is_action_pressed(&"open_settings") and not _by_region:
-		_type(SPACE)
+		return
+	for action in SearchModel.PRESSES:
+		if event.is_action_pressed(action):
+			# Read before the press: the search it traces is timed from here.
+			var started := Time.get_ticks_usec()
+			_act(_model.press(action, row.selected_index()), started)
+			return
 
 
 func _hold(direction: int) -> void:
-	_move(direction)
+	_act(_model.move(direction))
 	_held = direction
 	_repeat.start()
 	set_process(true)
 
 
-## The cursor to the next key (or region) that leads somewhere towards [param direction], heard as
-## [param sound]; with nothing typed, the carousel jumps there.
-func _move(direction: int, sound := SoundEffects.Cue.MOVE) -> void:
-	Sounds.play(sound)
-	var count := _view.groups.size() if _by_region else KEYS.length()
-	for step in range(1, count + 1):
-		var next := posmod(_cursor + direction * step, count)
-		if _by_region or _is_lit(KEYS[next]):
-			_cursor = next
-			break
-	if _by_region:
-		_show_region(0)
-	elif _typed.is_empty() and _is_lit(KEYS[_cursor]):
-		row.jump(_view.keys[KEYS[_cursor]], direction, _INDEX_SLIDE)
+## The shelf's view the model asks for (see [method AndroidServices.browse]).
+func _browse(order: StringName, typed: String) -> AndroidServices.Browse:
+	return android.browse(_platform_id, order, typed)
+
+
+## Plays what a press did, then shows the ribbon as the model now is; nothing for a press that led nowhere. A search
+## is traced with the time since [param started], in microseconds.
+func _act(effects: Array[SearchModel.Effect], started := 0) -> void:
+	if effects.is_empty():
+		return
+	_play(effects, started)
 	_refresh()
 
 
-func _type(key: String) -> void:
-	if not _is_lit(key):
-		return
-	if _typed.is_empty():
-		_home = shown_position()
-	_find(_typed + key)
-
-
-func _back() -> void:
-	if _by_region or _typed.is_empty():
-		close(false)
-		return
-	# Back on the key erased, as if it were about to be typed again.
-	_cursor = KEYS.find(_typed[-1])
-	if _typed.length() == 1:
-		Sounds.play_narrowing(SoundEffects.Cue.ERASE, _view.games.size(), _shelf.size(), _shelf.size())
-		_show_shelf(_home)
-		_refresh()
-	else:
-		_find(_typed.left(-1))
-
-
-## The games found for [param search], the row on the game shown if it is one of them, else on the
-## first after it on the shelf.
-func _find(search: String) -> void:
-	var started := Time.get_ticks_usec()
-	var found := android.browse(_platform_id, &"title", search)
-	if not _usable(found):
-		return
-	var anchor := shown_position()
-	var before := _view.games.size() if not _typed.is_empty() else _shelf.size()
-	Sounds.play_narrowing(SoundEffects.Cue.TYPE if search.length() > _typed.length() else SoundEffects.Cue.ERASE, before, found.games.size(),
-		_shelf.size())
-	_typed = search
-	_show(found, anchor)
-	_cursor = _nearest_lit(_cursor)
-	if Diagnostics.enabled:
-		Diagnostics.trace("search", "'%s': %d games, shown in %.1f ms" % [search, found.games.size(),
-			(Time.get_ticks_usec() - started) / 1000.0])
-	_refresh()
-
-
-## Down with nothing typed: from the letters to the regions, and back.
-func _switch_index() -> void:
-	var index := _letters_view() if _by_region else android.browse(_platform_id, &"region", "")
-	if not _usable(index):
-		return
-	var anchor := shown_position()
-	_by_region = not _by_region
-	Sounds.play(SoundEffects.Cue.REGIONS if _by_region else SoundEffects.Cue.LETTERS)
-	if _by_region:
-		_view = index
-		var at := maxi(index.games.find(anchor), 0)
-		_cursor = _group_at(at, index.groups)
-		_show_region(at - index.groups[_cursor].start)
-	else:
-		_show(index, anchor)
-		_cursor = _nearest_lit(_letter_key())
-	_refresh()
-
-
-## The games of the region the cursor is on alone, on the [param at]-th of them.
-func _show_region(at: int) -> void:
-	var games: Array[AndroidServices.Game] = []
-	for i: int in _region():
-		games.append(_shelf[_view.games[i]])
-	row.show_games(games, at)
-
-
-## Shows [param view] on the row, on the game at shelf position [param anchor] if it shows it, else
-## on the first one after it, else the last.
-func _show(view: AndroidServices.Browse, anchor: int) -> void:
-	if not _usable(view):
-		return
-	_view = view
-	var games: Array[AndroidServices.Game] = []
-	for shelf_position in view.games:
-		games.append(_shelf[shelf_position])
-	var at := view.games.find(anchor)
-	if at < 0:
-		at = mini(view.games.bsearch(anchor), games.size() - 1)
-	row.show_games(games, at)
-
-
-## The whole shelf in title order again, nothing typed, on the game at shelf position [param anchor].
-func _show_shelf(anchor: int) -> void:
-	_typed = ""
-	_by_region = false
-	_show(_letters_view(), anchor)
-
-
-## Whether [param view] is for the shelf shown and shows a game: a view of another library (asked
-## for as it was being changed) is set aside.
-func _usable(view: AndroidServices.Browse) -> bool:
-	return view.count == _shelf.size() and not view.games.is_empty()
-
-
-## The index by title, asked for once per shelf (until the plugin's answer is for it).
-func _letters_view() -> AndroidServices.Browse:
-	if not _usable(_letters):
-		_letters = android.browse(_platform_id, &"title", "")
-	return _letters
-
-
-## L1 ([param direction] -1) or R1 (1): to the previous or next letter of the index, or once keys are
-## typed to the previous or next key that still finds a game.
-func _leap(direction: int) -> void:
-	if _typed.is_empty():
-		_move(direction, SoundEffects.Cue.LETTER)
-		return
-	var leap_to := _leap_target(direction)
-	if leap_to.at < 0:
-		return
-	_cursor = leap_to.key
-	Sounds.play(SoundEffects.Cue.LETTER)
-	row.jump(leap_to.at, direction, _INDEX_SLIDE)
-	_show_big(leap_to.label)
-	_refresh()
-
-
-## Where L1 or R1 lead once keys are typed: the next key that still finds a game.
-func _leap_target(direction: int) -> Leap:
-	var word := _typed.get_slice(SPACE, _typed.get_slice_count(SPACE) - 1)
-	# Every key but the space.
-	var letters := KEYS.length() - 1
-	for step in range(1, letters + 1):
-		var key := posmod(_cursor + direction * step, letters)
-		if _is_lit(KEYS[key]):
-			return Leap.new(_view.keys[KEYS[key]], (word + KEYS[key]).to_upper(), key)
-	return Leap.new()
-
-
-## The indices in the index by region of the games of the region the cursor is on.
-func _region() -> Array:
-	var start := _view.groups[_cursor].start
-	return range(start, _view.groups[_cursor + 1].start if _cursor + 1 < _view.groups.size() else _view.games.size())
-
-
-## The index in [param groups] of the group holding row index [param at].
-func _group_at(at: int, groups: Array[AndroidServices.Group]) -> int:
-	var found := 0
-	for i in groups.size():
-		if groups[i].start <= at:
-			found = i
-	return found
-
-
-## The key of the shown game's letter: its own, or the first digit for `#`.
-func _letter_key() -> int:
-	var groups := _letters_view().groups
-	if groups.is_empty():
-		return 0
-	var label := groups[_group_at(shown_position(), groups)].label.to_lower()
-	return KEYS.find("0") if label == "#" else maxi(0, KEYS.find(label))
-
-
-## [param key] if it leads somewhere, else the nearest key that does, the next one first.
-func _nearest_lit(key: int) -> int:
-	for step in KEYS.length():
-		for at: int in [key + step, key - step]:
-			if at >= 0 and at < KEYS.length() and _is_lit(KEYS[at]):
-				return at
-	return key
-
-
-func _is_lit(key: String) -> bool:
-	return key in _view.keys
+func _play(effects: Array[SearchModel.Effect], started := 0) -> void:
+	for effect in effects:
+		match effect.kind:
+			SearchModel.Kind.SOUND:
+				Sounds.play(effect.cue)
+			SearchModel.Kind.NARROWING:
+				Sounds.play_narrowing(effect.cue, effect.before, effect.found, _shelf.size())
+			SearchModel.Kind.SHOW:
+				var games: Array[AndroidServices.Game] = []
+				for shelf_position in effect.games:
+					games.append(_shelf[shelf_position])
+				row.show_games(games, effect.at)
+				if Diagnostics.enabled and not effect.text.is_empty():
+					Diagnostics.trace("search", "'%s': %d games, shown in %.1f ms" % [effect.text, games.size(),
+						(Time.get_ticks_usec() - started) / 1000.0])
+			SearchModel.Kind.JUMP:
+				row.jump(effect.at, effect.direction, _INDEX_SLIDE)
+				if not effect.text.is_empty():
+					_show_big(effect.text)
+			SearchModel.Kind.CLOSED:
+				let_go()
+				_animate_ribbon(false)
+				Diagnostics.trace("search", "closed, %s '%s'" % ["keeping" if effect.keep else "leaving", _model.typed])
+				opened.emit(false)
 
 
 func _show_big(label: String) -> void:
 	_big_text.text = label
-	# Once keys are typed, the leap tells the start of the words it reaches, small, at the right above the keys, clear
-	# of the title in the middle and of the keys typed at the left.
-	var keys_typed := not _typed.is_empty()
-	_big_text.add_theme_font_size_override(&"font_size", roundi(_big_size * (_BIG_TYPED_SCALE if keys_typed else 1.0)))
-	_big.anchor_left = 1.0 if keys_typed else 0.5
-	_big.anchor_right = _big.anchor_left
-	_big.grow_horizontal = Control.GROW_DIRECTION_BEGIN if keys_typed else Control.GROW_DIRECTION_BOTH
-	_big.offset_right = -_BIG_TYPED_RIGHT if keys_typed else 0.0
+	# As wide as what it now tells, its right edge where the scene puts it, across from the keys typed.
 	_big.offset_left = _big.offset_right
 	_big.reset_size()
-	if _big_fade:
-		_big_fade.kill()
 	_big.modulate.a = 1.0
-	_big_fade = create_tween()
+	_big_fade = Motion.restart(self, _big_fade)
 	_big_fade.tween_interval(_BIG_S)
 	_big_fade.tween_property(_big, ^"modulate:a", 0.0, _BIG_FADE_S)
 
@@ -433,63 +233,65 @@ func _animate_ribbon(up: bool) -> void:
 
 
 func _refresh() -> void:
-	var found := _region().size() if _by_region else _view.games.size()
-	_chip.visible = _open and is_filtered()
+	var found := _model.found()
+	_chip.visible = _model.open and is_filtered()
 	# By region, the ribbon names the region: the count alone.
-	(_typed_text.get_parent() as Control).visible = not _by_region
-	_typed_text.text = _typed
+	(_typed_text.get_parent() as Control).visible = not _model.by_region
+	_typed_text.text = _model.typed
 	_count.text = tr_n("{count} game", "{count} games", found).format({"count": found})
-	_filter.visible = not _open and is_filtered()
-	_filter_text.text = tr("By region") if _by_region else tr("“{typed}” — {found} of {total}").format(
-		{"typed": _typed.strip_edges(), "found": found, "total": _shelf.size()})
-	_hints.visible = _open
-	if _open:
+	_filter.visible = not _model.open and is_filtered()
+	_filter_text.text = tr("By region") if _model.by_region else tr("“{typed}” — {found} of {total}").format(
+		{"typed": _model.typed.strip_edges(), "found": found, "total": _shelf.size()})
+	_hints.visible = _model.open
+	if _model.open:
 		_draw_keys()
 		_show_hints()
 	changed.emit()
 
 
 func _draw_keys() -> void:
+	var by_region := _model.by_region
 	var labels := PackedStringArray()
-	if _by_region:
-		for group in _view.groups:
+	if by_region:
+		for group in _model.view.groups:
 			labels.append(tr(group.label))
 	else:
-		for i in KEYS.length():
-			labels.append(KEYS[i].to_upper())
-	if _strip.get_child_count() != labels.size() or _strip.get_meta(&"regions", false) != _by_region:
+		for i in SearchModel.KEYS.length():
+			labels.append(SearchModel.KEYS[i].to_upper())
+	if _strip.get_child_count() != labels.size() or _strip.get_meta(&"regions", false) != by_region:
 		for key in _strip.get_children():
 			key.free()
 		for i in labels.size():
 			_strip.add_child(RibbonKey.new(labels[i], _tap.bind(i)))
-		_strip.set_meta(&"regions", _by_region)
+		_strip.set_meta(&"regions", by_region)
 	for i in labels.size():
 		var key: RibbonKey = _strip.get_child(i)
-		key.show_as(i == _cursor, _by_region or _is_lit(KEYS[i]))
+		key.show_as(i == _model.cursor, by_region or _model.is_lit(SearchModel.KEYS[i]))
 	_centre_strip()
 
 
 ## The strip under the ribbon's middle, the key with the cursor as near it as the strip's ends allow.
 func _centre_strip() -> void:
-	if _cursor >= _strip.get_child_count():
+	if _model.cursor >= _strip.get_child_count():
 		return
 	var room := _window.size.x
 	var width := _strip.get_combined_minimum_size().x
-	var key: Control = _strip.get_child(_cursor)
+	var key: Control = _strip.get_child(_model.cursor)
 	_strip.position.x = (room - width) / 2.0 if width <= room \
 		else clampf(room / 2.0 - key.position.x - key.size.x / 2.0, room - width, 0.0)
 
 
 func _show_hints() -> void:
+	var by_region := _model.by_region
 	var shown: Array[PackedStringArray] = []
-	if _by_region or _typed.is_empty():
-		shown.append(PackedStringArray(["← →", tr("Region") if _by_region else tr("Letter")]))
-		shown.append(PackedStringArray(["a", tr("Enter") if _by_region else tr("Type the key")]))
+	if by_region or _model.typed.is_empty():
+		shown.append(PackedStringArray(["← →", tr("Region") if by_region else tr("Letter")]))
+		shown.append(PackedStringArray(["a", tr("Enter") if by_region else tr("Type the key")]))
 		shown.append(PackedStringArray(["↓", tr("Other index")]))
 		shown.append(PackedStringArray(["b", tr("Go back")]))
 	else:
 		shown.append(PackedStringArray(["a", tr("Type the key")]))
-		if _is_lit(SPACE):
+		if _model.is_lit(SearchModel.SPACE):
 			shown.append(PackedStringArray(["y", tr("Space")]))
 		shown.append(PackedStringArray(["b", tr("Erase")]))
 		shown.append(PackedStringArray(["↑", tr("Enter")]))
@@ -510,29 +312,11 @@ func _show_hints() -> void:
 
 ## A key tapped: typed, or on the regions, jumped to.
 func _tap(key: int) -> void:
-	if not _open:
+	if not _model.open:
 		return
 	Diagnostics.trace("touch", "ribbon key %d" % key)
-	if _by_region:
-		_cursor = key
-		_show_region(0)
-		_refresh()
-	elif _is_lit(KEYS[key]):
-		_cursor = key
-		_type(KEYS[key])
-
-
-## Where L1 or R1 lead: the row's index [member at], told by [member label], on the ribbon's key
-## [member key] once keys are typed; nowhere for an index below 0.
-class Leap:
-	var at := -1
-	var label := ""
-	var key := 0
-
-	func _init(row_index := -1, told := "", ribbon_key := 0) -> void:
-		at = row_index
-		label = told
-		key = ribbon_key
+	var started := Time.get_ticks_usec()
+	_act(_model.tap(key, row.selected_index()), started)
 
 
 ## One key of the ribbon: its letter (a space drawn as a bracket), lit or dimmed, the cursor on it or
@@ -554,7 +338,7 @@ class RibbonKey extends PanelContainer:
 		_text.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		_text.text = label.strip_edges()
 		add_child(_text)
-		_space.visible = label == SPACE
+		_space.visible = label == SearchModel.SPACE
 		add_child(_space)
 
 	func show_as(current: bool, lit: bool) -> void:

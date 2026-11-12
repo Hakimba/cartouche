@@ -3,14 +3,14 @@ class_name ConsoleOrder
 extends Control
 ## The screen putting the consoles in order. They leave the rail for an ellipse where all of them show
 ## ([RingFit]: each at its real size, none touching another), the ring having no end ([ConsoleWheel]). A cursor,
-## a small arrow outside the pointed console, jumps from one console to the next with left and right, its logo
-## in the middle. A takes that console: it peels off like a sticker ([ConsoleSticker]: a white border, a shadow,
-## leaning a little) and goes with the cursor, taking at once the place of each console it passes, which slides
+## a small arrow outside the pointed console ([RingMarks]), jumps from one console to the next with left and right,
+## its logo in the middle. A takes that console: it peels off like a sticker ([ConsoleSticker]: a white border, a
+## shadow, leaning a little) and goes with the cursor, taking at once the place of each console it passes, which slides
 ## into its own; the middle tells where it would go, in logos. A then puts it down, the order kept from then on;
 ## B lets go of it, the order as it was. B closes the ring, the consoles screen back on the console the cursor is
-## on. By touch, dragging sideways moves the cursor, tapping a console takes it, and a tap puts it down.
-## The same ring places a console just added ([method place], [Placing]): it comes to the middle, an arrow moves between
-## two consoles of the others, A flies it into that gap and the consoles screen opens on it, B flies it back.
+## on. By touch, dragging sideways moves the cursor, tapping a console takes it, and a tap puts it down; the console
+## placed goes the same way.
+## The same ring places a console just added ([method place], [ConsolePlacing]).
 
 ## The ring starts closing: the consoles screen comes back as it does.
 signal closing(duration: float)
@@ -22,8 +22,11 @@ signal ordered(order: Array[String])
 signal order_failed
 ## The console placed flies back: the form it came from is wanted back.
 signal form_wanted
-## The placing is over: placed (true), or given up for the form (false).
-signal placing_over(placed: bool)
+
+## Where the ring is: not shown; coming in, taking no press; taking presses, a console held or not
+## ([ConsoleWheel] says which); the plugin keeping an order; going; or placing a console ([ConsolePlacing] says where
+## that is, and takes every press).
+enum Flow { CLOSED, OPENING, CHOOSING, SAVING, CLOSING, PLACING }
 
 ## Opening the ring, the hints come in from this moment, in this time (seconds).
 const _HINTS_AFTER_S := 0.25
@@ -32,19 +35,6 @@ const _HINTS_S := 0.15
 const _SINK_S := 0.372
 const _MARKS_OUT_S := 0.186
 const _HINTS_OUT_S := 0.15
-## The middle's top (px) and how far lower it starts when it comes in.
-const _MIDDLE_Y := 419.2
-const _MIDDLE_RISE_PX := 12.8
-## Placing a console, the ring comes in as the form goes: the others one after another from this moment, each in this
-## time (seconds), the arrow and the hints in theirs, the middle after it all.
-const _COMING_AFTER_S := 0.06
-const _COMING_EACH_S := 0.018
-const _COMING_S := 0.3
-const _PLACE_IN_S := 0.32
-const _PLACE_MIDDLE_AFTER_S := 0.252
-## Flying into the gap, the middle goes in this time; flying back, the ring fades in this time.
-const _MIDDLE_OUT_S := 0.16
-const _BACK_FADE_S := 0.32
 ## A console peels off, and is put back down, in these times, springing a little.
 const _PEEL_S := 0.24
 const _PUT_DOWN_S := 0.26
@@ -52,20 +42,6 @@ const _PUT_DOWN_S := 0.26
 ## console whose box is nearest it, this far from the box at most (in pixels of the reference frame).
 const _DRAG_STEP := 160.0
 const _TAP_REACH := 110.0
-## The arrow stands this far (px) beyond the pointed console's box, further while it is held; a unit of its
-## drawing in px (it is 28 × 36 units), its shadow's offset, the glow's centre and radii, and its colours.
-const _ARROW_OUT_PX := 14.08
-const _ARROW_HELD_PX := 20.48
-const _ARROW_UNIT := 1.28
-## How far the white edge reaches past the ink: half of a stroke of 3 units shows outside it.
-const _ARROW_EDGE_PX := 1.5 * _ARROW_UNIT
-const _ARROW_SHADOW := Vector2(0.0, 3.2)
-## The coloured glow round the arrow: its layers' alphas, from the nearest
-## to the farthest, each reaching 2 px further out than the one before; a Gaussian's edge laid in steps.
-const _GLOW_ALPHAS: Array[float] = [0.0856, 0.0668, 0.0472, 0.0302, 0.0173, 0.0089, 0.0041, 0.0025]
-const _GLOW_STEP_PX := 2.0
-
-static var _sentence_slots := RegEx.create_from_string("\\{(before|after|name)\\}")
 
 var android: AndroidServices = Android
 ## Milliseconds since the start, as fingers are read (see [member Carousel.clock]).
@@ -76,50 +52,15 @@ var consoles: ConsoleRow
 var _wheel: ConsoleWheel
 ## The platform ids in the order of the row: where each console of the row stands on the ring.
 var _row: Array[String] = []
-var _open := false
-## No press counts while the ring comes or goes, nor while the plugin keeps an order.
-var _busy := false
-## The ring's way in, which B rewinds.
+var _flow := Flow.CLOSED
+## The ring's way in.
 var _opening := Motion.Timeline.new(_place_opening, self)
 var _peeling: Tween
 var _finger := Finger.new()
 var _drag_steps := 0
-var _arrow_angle := 0.0
-var _arrow_out := 0.0
-var _arrow_to := 0.0
-var _arrow_out_to := 0.0
-## The gel of the console pointed at, which the arrow's glow takes.
-var _rim := Color.WHITE
-## How far the middle has risen, from 0 (gone, lower) to 1; how opaque the arrow is.
-var _middle_in := 0.0:
-	set(value):
-		_middle_in = value
-		_place_middle()
-var _marks := 0.0:
-	set(value):
-		_marks = value
-		_tint_marks()
-## Where the middle's top stands (px): the ordering ring's, or under the console placed.
-var _middle_y := _MIDDLE_Y
-var _placing: Placing
-var _placed_id := ""
-var _angle: Dictionary[String, float] = {}
-var _angle_to: Dictionary[String, float] = {}
-var _coming := 0.0
-var _others_in := 1.0
-var _move := 0.0
-var _bounce := 0.0
-var _from := ConsoleRow.Stand.new()
-var _arriving: Tween
-var _tweens: Array[Tween] = []
 @onready var _sticker: ConsoleSticker = %Sticker
-@onready var _frame: Control = %Frame
-@onready var _arrow: Control = %Arrow
-@onready var _middle: Control = %Middle
-@onready var _logo: LogoView = %Logo
-@onready var _where: Control = %Where
-@onready var _before: LogoView = %Before
-@onready var _after: LogoView = %After
+@onready var _marks: RingMarks = %Frame
+@onready var _placer: ConsolePlacing = %Placing
 @onready var _choosing: Control = %Choosing
 @onready var _moving: Control = %Moving
 
@@ -130,50 +71,50 @@ func _ready() -> void:
 	# Before the consoles, which stand where the placing says this frame.
 	process_priority = -1
 	get_viewport().size_changed.connect(_fit_view)
-	_arrow.draw.connect(_draw_arrow)
+	_placer.ring_out = _tween_out
+	_placer.closing.connect(closing.emit)
+	_placer.ordered.connect(ordered.emit)
+	_placer.form_wanted.connect(form_wanted.emit)
+	_placer.over.connect(_on_placing_over)
 
 
 func _process(delta: float) -> void:
 	var follow := RingFit.share(delta)
-	_arrow_angle = RingFit.turn_toward(_arrow_angle, _arrow_to, follow)
-	_arrow_out = RingFit.toward(_arrow_out, _arrow_out_to, follow)
-	if _placing:
-		_follow_placing(follow)
-	_place_marks()
+	if _flow == Flow.PLACING:
+		_placer.follow(follow)
+	_marks.follow(follow)
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _open or event.is_echo():
+	if _flow in [Flow.CLOSED, Flow.CLOSING] or event.is_echo():
 		return
 	var direction := int(event.is_action_pressed(&"carousel_right")) - int(event.is_action_pressed(&"carousel_left"))
 	var accept := event.is_action_pressed(&"ui_accept")
 	if not direction and not accept and not event.is_action_pressed(&"screen_back"):
 		return
 	get_viewport().set_input_as_handled()
-	if _placing:
-		_press_placing(direction, accept)
-		return
-	if _busy:
-		if _opening.is_playing() and event.is_action_pressed(&"screen_back") and StudioTokens.TR_REVERSE:
-			_close()
-		return
-	if direction:
-		_step(direction)
-	elif accept and _wheel.is_holding():
-		_put_down()
-	elif accept:
-		_take()
-	elif _wheel.is_holding():
-		_let_go()
-	else:
-		_close()
+	match _flow:
+		Flow.PLACING:
+			_placer.press(direction, accept)
+		Flow.CHOOSING:
+			if direction:
+				_step(direction)
+			elif accept and _wheel.is_holding():
+				_put_down()
+			elif accept:
+				_take()
+			elif _wheel.is_holding():
+				_let_go()
+			else:
+				_close()
 
 
-## The first finger: a drag steps the cursor round, a tap takes or puts down; a drag made while
-## the ring is busy moves nothing, even once it no longer is. Taken before the controls over the
-## ring (the top bar, the hints), which would keep the touches on them.
+## The first finger: a drag steps the cursor round, a tap takes or puts down; placing a console, held from the start,
+## a drag moves the gap and a tap flies it there, as ← → and A. A drag made while the ring is busy moves nothing, even
+## once it no longer is. Taken before the controls over the ring (the top bar, the hints), which would keep the touches
+## on them.
 func _input(event: InputEvent) -> void:
-	if not _open or not (event is InputEventScreenTouch or event is InputEventScreenDrag):
+	if _flow in [Flow.CLOSED, Flow.CLOSING] or not (event is InputEventScreenTouch or event is InputEventScreenDrag):
 		return
 	get_viewport().set_input_as_handled()
 	var was_down := _finger.is_down
@@ -181,20 +122,44 @@ func _input(event: InputEvent) -> void:
 	var gesture := _finger.read(event, now)
 	if _finger.is_down and not was_down:
 		_drag_steps = 0
-	if gesture == Finger.Gesture.TAP and not _busy and not _placing:
+	if gesture == Finger.Gesture.TAP and _flow == Flow.CHOOSING:
 		_tap(_finger.at)
+	elif gesture == Finger.Gesture.TAP and _flow == Flow.PLACING:
+		_placer.press(0, true)
 	elif gesture == Finger.Gesture.DRAG:
 		var steps := int((_finger.at.x - _finger.start.x) / _DRAG_STEP)
 		while _drag_steps != steps:
 			var direction := signi(steps - _drag_steps)
-			if not _busy and not _placing:
+			if _flow == Flow.CHOOSING:
 				_step(direction)
+			elif _flow == Flow.PLACING:
+				_placer.press(direction, false)
 			_drag_steps += direction
 
 
 ## Whether the ring shows, or is coming or going.
 func is_open() -> bool:
-	return _open or _busy
+	return _flow != Flow.CLOSED
+
+
+## Whether the ring is coming, going or keeping an order: no press counts.
+func is_busy() -> bool:
+	return _flow in [Flow.OPENING, Flow.SAVING, Flow.CLOSING]
+
+
+## Whether a console just added is being placed among the others.
+func is_placing() -> bool:
+	return _flow == Flow.PLACING
+
+
+## Where the placing stands; [constant Placing.State.FORM] when none is under way.
+func placing_state() -> Placing.State:
+	return _placer.state()
+
+
+## The gap chosen in the placing, 0 when none is under way.
+func placing_gap() -> int:
+	return _placer.gap()
 
 
 ## Opens the ring on the consoles of [param platform_ids] (those of the row, in its order), the cursor on the one at
@@ -202,51 +167,72 @@ func is_open() -> bool:
 func open(platform_ids: Array[String], at: int) -> void:
 	_row = platform_ids.duplicate()
 	_wheel = ConsoleWheel.new(_row, at)
-	_open = true
+	_flow = Flow.OPENING
 	_finger = Finger.new()
 	_sticker.consoles = consoles
 	_sticker.watch(true)
 	_show()
 	consoles.snap_ring()
-	_arrow_angle = _arrow_to
-	_arrow_out = _arrow_out_to
+	_marks.snap()
 	consoles.ring_scale = consoles.ring_target
 	_hints().modulate.a = 0.0
-	_marks = 0.0
-	_middle_in = 0.0
+	# A placing leaves them faded out; they show at once when a console is taken.
+	_moving.modulate.a = 1.0
+	_marks.arrow_in = 0.0
+	_marks.middle_in = 0.0
 	show()
 	set_process(true)
 	Diagnostics.trace("order", "ring open on %s" % _wheel.selected())
-	_busy = true
 	# The console pointed at glides from the hero's place, the others rise from the rail, the arrow, the middle and the
 	# hints come in after them.
 	_opening.stand(0.0)
 	_opening.play(_opening_length())
 	await _opening.arrived
 	# Rewound by B, the ring is closing.
-	if _open:
-		_busy = false
+	if _flow == Flow.OPENING:
+		_flow = Flow.CHOOSING
+
+
+## Places the console [param platform_id], just added to the row of [param platform_ids] (the platforms shown, in
+## their order), on the ring of the others: it comes to the middle, ← → move the arrow between two of them, A flies it
+## there and the consoles screen opens on it (true), B flies it back (false, [signal form_wanted] as it goes).
+func place(platform_ids: Array[String], platform_id: String) -> bool:
+	assert(platform_ids.has(platform_id), "ConsoleOrder: a console placed that is not in the row")
+	var ring: Array[String] = []
+	ring.assign(platform_ids.filter(func(other: String) -> bool: return other != platform_id))
+	_row = platform_ids.duplicate()
+	_wheel = ConsoleWheel.new(ring, 0)
+	_flow = Flow.PLACING
+	_finger = Finger.new()
+	_sticker.consoles = consoles
+	_choosing.hide()
+	_moving.show()
+	_moving.modulate.a = 0.0
+	_fit_view()
+	show()
+	set_process(true)
+	return await _placer.place(consoles, android, platform_ids, platform_id)
+
+
+func _on_placing_over(_placed: bool) -> void:
+	set_process(false)
+	hide()
+	_flow = Flow.CLOSED
 
 
 func _close() -> void:
 	Sounds.play(SoundEffects.Cue.RING_CLOSE)
-	var rewind := _opening.is_playing()
-	_open = false
-	_busy = true
+	_flow = Flow.CLOSING
 	Diagnostics.trace("order", "ring closed on %s" % _wheel.selected())
 	consoles.select(_row.find(_wheel.selected()))
-	closing.emit(maxf(_opening.seconds, 0.001) if rewind else StudioTokens.TR_RING_CLOSE_S)
-	if rewind:
-		_opening.play(0.0)
-		await _opening.arrived
-	else:
-		await _tween_out().finished
-	consoles.pointed = -1
-	consoles.held = -1
+	closing.emit(StudioTokens.TR_RING_CLOSE_S)
+	await _tween_out().finished
+	consoles.pointed = null
+	consoles.held = null
 	_sticker.watch(false)
 	set_process(false)
 	hide()
-	_busy = false
+	_flow = Flow.CLOSED
 	closed.emit()
 
 
@@ -265,8 +251,8 @@ func _place_opening() -> void:
 	consoles.wheel = Motion.phase(t, 0.0, StudioTokens.TR_RING_OPEN_S, StudioTokens.TR_RING_OPEN_S_CURVE)
 	consoles.others_wheel = Motion.phase(t, StudioTokens.TR_RING_RISE_AT_S, StudioTokens.TR_RING_RISE_S,
 		StudioTokens.TR_RING_RISE_S_CURVE)
-	_marks = Motion.phase(t, StudioTokens.TR_RING_MARKS_AT_S, StudioTokens.TR_RING_MARKS_S)
-	_middle_in = Motion.phase(t, StudioTokens.TR_RING_MIDDLE_AT_S, StudioTokens.TR_RING_MIDDLE_S, StudioTokens.TR_RING_MIDDLE_S_CURVE)
+	_marks.arrow_in = Motion.phase(t, StudioTokens.TR_RING_MARKS_AT_S, StudioTokens.TR_RING_MARKS_S)
+	_marks.middle_in = Motion.phase(t, StudioTokens.TR_RING_MIDDLE_AT_S, StudioTokens.TR_RING_MIDDLE_S, StudioTokens.TR_RING_MIDDLE_S_CURVE)
 	_hints().modulate.a = Motion.phase(t, _HINTS_AFTER_S, _HINTS_S)
 
 
@@ -277,338 +263,24 @@ func _tween_out() -> Tween:
 	moves.tween_property(consoles, ^"wheel", 0.0,
 		StudioTokens.TR_RING_CLOSE_S).set_custom_interpolator(Motion.curve(StudioTokens.TR_RING_CLOSE_S_CURVE))
 	moves.tween_property(consoles, ^"others_wheel", 0.0, _SINK_S).set_custom_interpolator(Motion.curve(Motion.Easing.SINK))
-	moves.tween_property(self, ^"_marks", 0.0, _MARKS_OUT_S)
-	moves.tween_property(self, ^"_middle_in", 0.0, _HINTS_OUT_S)
+	moves.tween_property(_marks, ^"arrow_in", 0.0, _MARKS_OUT_S)
+	moves.tween_property(_marks, ^"middle_in", 0.0, _HINTS_OUT_S)
 	moves.tween_property(_hints(), ^"modulate:a", 0.0, _HINTS_OUT_S)
 	return moves
 
 
-## Places the console [param platform_id], just added to the row of [param platform_ids] (the platforms shown, in
-## their order), on the ring of the others: it comes to the middle, ← → move the arrow between two of them, A flies it
-## there and the consoles screen opens on it (true), B flies it back (false, [signal form_wanted] as it goes).
-func place(platform_ids: Array[String], platform_id: String) -> bool:
-	var ring: Array[String] = []
-	ring.assign(platform_ids.filter(func(other: String) -> bool: return other != platform_id))
-	_row = platform_ids.duplicate()
-	_placed_id = platform_id
-	_placing = Placing.new(ring)
-	_wheel = ConsoleWheel.new(ring, 0)
-	_open = true
-	_busy = false
-	_finger = Finger.new()
-	_sticker.consoles = consoles
-	_rim = ConsoleManifest.gel_of(_folder_of(platform_id))
-	consoles.wheel_slots = _ring_slots()
-	consoles.pointed = -1
-	consoles.held = -1
-	consoles.flier = _row.find(platform_id)
-	consoles.wheel = 1.0
-	consoles.others_wheel = 1.0
-	_others_in = 1.0
-	_coming = 0.0
-	_middle_y = _MIDDLE_Y
-	_angle.clear()
-	_angle_to.clear()
-	var opened := Placing.angles(ring.size(), _placing.gap)
-	for k in ring.size():
-		_angle[ring[k]] = opened[k]
-		_angle_to[ring[k]] = opened[k]
-	_angle[platform_id] = 0.0
-	_angle_to[platform_id] = 0.0
-	_aim_placing()
-	consoles.ring_scale = consoles.ring_target
-	_arrow_angle = _arrow_to
-	_arrow_out = _arrow_out_to
-	_from = _plinth_stand()
-	_move = 0.0
-	_marks = 0.0
-	_middle_in = 0.0
-	_choosing.hide()
-	_moving.show()
-	_moving.modulate.a = 0.0
-	_fit_view()
-	_write_ring()
-	show()
-	set_process(true)
-	_placing.start()
-	Diagnostics.trace("order", "placing %s among %d" % [platform_id, ring.size()])
-	_play_arrival()
-	return await placing_over
-
-
-## Each console of the row's place on the ring while a console is placed: the others', the one placed at the first.
-func _ring_slots() -> Array[int]:
-	var slots: Array[int] = []
-	for id in _row:
-		slots.append(maxi(_placing.others.find(id), 0))
-	return slots
-
-
-## A tween of the placing, let go with it.
-func _tween() -> Tween:
-	var made := create_tween()
-	_tweens.append(made)
-	return made
-
-
-func _exit_tree() -> void:
-	_kill_tweens()
-	if _placing:
-		placing_over.emit(false)
-
-
-func _kill_tweens() -> void:
-	for made in _tweens:
-		made.kill()
-	_tweens.clear()
-
-
-## What the ring plays as the form goes: the console flies from the plinth to the middle, the others come onto
-## the ring one after another, the arrow and the hints fade in, then the middle.
-func _play_arrival() -> void:
-	var motion := _tween().set_parallel()
-	motion.tween_property(self, ^"_coming", 1.0, 1.0).from(0.0)
-	var in_out := Motion.curve(Motion.Easing.EASE_OUT)
-	motion.tween_property(self, ^"_marks", 1.0, _PLACE_IN_S).from(0.0).set_custom_interpolator(in_out)
-	motion.tween_property(_moving, ^"modulate:a", 1.0, _PLACE_IN_S).from(0.0).set_custom_interpolator(in_out)
-	motion.tween_property(self, ^"_middle_in", 1.0, StudioTokens.TR_RING_MIDDLE_S).from(0.0).set_delay(_PLACE_MIDDLE_AFTER_S) \
-		.set_custom_interpolator(in_out)
-	_arriving = _tween()
-	_arriving.tween_property(self, ^"_move", 1.0, StudioTokens.ARRIVE_S).from(0.0)
-	_arriving.tween_callback(_placing.done)
-
-
-func _press_placing(direction: int, accept: bool) -> void:
-	var pressed := Placing.Press.A if accept else Placing.Press.B
-	if direction:
-		pressed = Placing.Press.RIGHT if direction > 0 else Placing.Press.LEFT
-	# Where the console stands now, before the press changes what the state makes of it.
-	var stood := _flier_stand()
-	match _placing.press(pressed):
-		Placing.Action.MOVE:
-			Sounds.play(SoundEffects.Cue.CARRY)
-			_aim_placing()
-		Placing.Action.FLY:
-			_fly_in(stood)
-		Placing.Action.LEAVE:
-			_fly_back(stood)
-
-
-## Where every console of the ring, the arrow and the middle go for the gap chosen: the others on the ring with that
-## gap open, the scale fitted again, the arrow in the middle of the gap.
-func _aim_placing() -> void:
-	var ring := _placing.others
-	var angles := Placing.angles(ring.size(), _placing.gap)
-	for k in ring.size():
-		_angle_to[ring[k]] = angles[k]
-	_fit_placing(ring, angles)
-	var before := ring[_placing.gap]
-	var after := ring[(_placing.gap + 1) % ring.size()]
-	_arrow_to = Placing.arrow_angle(ring.size(), _placing.gap)
-	_arrow_out_to = (_reach_of(before, angles[_placing.gap]) + _reach_of(after, angles[(_placing.gap + 1) % ring.size()])) \
-		/ 2.0 + _ARROW_OUT_PX
-	_tint_marks()
-	_arrow.queue_redraw()
-	var folder := _folder_of(_placed_id)
-	_logo.show_logo(LogoView.Slot.RING_MIDDLE, folder)
-	var alone := ring.size() == 1
-	_sentence(tr("next to {name}", "ring") if alone else tr("between {before} and {after}", "ring"),
-		_folder_of(before), _folder_of(after))
-	_middle_y = Placing.MIDDLE.y + _middle_height() / 2.0 + Placing.TEXT_GAP
-	_place_middle()
-
-
-## How tall the console placed stands in the middle, in px.
-func _middle_height() -> float:
-	var width := RingFit.width(RingFit.weight_of(_folder_of(_placed_id)), consoles.ring_target, 0.0) * Placing.MIDDLE_GROWTH
-	return width * 0.75 * consoles.silhouette(_row.find(_placed_id)).size.y * FormPaint.CQW
-
-
-func _fit_placing(ids: Array[String], angles: PackedFloat64Array) -> void:
-	var boxes: Array[Rect2] = []
-	var weights := PackedFloat64Array()
-	for id in ids:
-		boxes.append(consoles.silhouette(_row.find(id)))
-		weights.append(RingFit.weight_of(_folder_of(id)))
-	consoles.ring_target = RingFit.scale(boxes, weights, angles, RingFit.WIDEST / RingFit.PS2_BOX.size.x)
-	Diagnostics.trace("order", "placing fit scale=%.2f gap=%d" % [consoles.ring_target, _placing.gap])
-
-
-## How far (px) from console [param id]'s place at [param angle] its box reaches along the radial.
-func _reach_of(id: String, angle: float) -> float:
-	return RingFit.ext(consoles.silhouette(_row.find(id)), RingFit.weight_of(_folder_of(id)), consoles.ring_target, angle)
+## The console of [param platform_id] in the row, null when the row has none.
+func _console_of(platform_id: String) -> ConsoleRow.Item:
+	var index := _row.find(platform_id)
+	return consoles.console_at(index) if index >= 0 else null
 
 
 func _folder_of(platform_id: String) -> String:
 	return consoles.console_at(_row.find(platform_id)).folder
 
 
-## The console on its way from the plinth: standing there as big as the form's model.
-func _plinth_stand() -> ConsoleRow.Stand:
-	var stand := ConsoleRow.Stand.new()
-	stand.centre = Placing.PLINTH
-	stand.size = Placing.PLINTH_WIDTH / (CarouselLayout.FRAME.x / FormPaint.CQW)
-	return stand
-
-
-## The console placed standing at [param angle] of the ring, [param growth] times its size there, its silhouette's
-## centre at [param centre].
-func _stand_of_placed(centre: Vector2, angle: float, growth: float) -> ConsoleRow.Stand:
-	var stand := ConsoleRow.Stand.new()
-	stand.centre = centre
-	stand.size = RingFit.width(RingFit.weight_of(_folder_of(_placed_id)), consoles.ring_scale, angle) * growth \
-		/ (CarouselLayout.FRAME.x / FormPaint.CQW)
-	return stand
-
-
-## The ring's angles and arrivals, and the console placed, written where the consoles read them.
-func _write_ring() -> void:
-	var angles := PackedFloat64Array()
-	var arrivals := PackedFloat64Array()
-	for k in _row.size():
-		angles.append(_angle[_row[k]] if _row[k] in _angle else 0.0)
-		var after := _COMING_AFTER_S + _COMING_EACH_S * k
-		arrivals.append(_others_in * Motion.eased(Motion.Easing.APPEAR, clampf((_coming - after) / _COMING_S, 0.0, 1.0)))
-	consoles.ring_angles = angles
-	consoles.ring_arrival = arrivals
-	if consoles.flier >= 0:
-		consoles.flier_stand = _flier_stand()
-
-
-func _follow_placing(follow: float) -> void:
-	for id in _angle:
-		_angle[id] = RingFit.turn_toward(_angle[id], _angle_to[id], follow)
-	_write_ring()
-
-
-## Where the console placed stands this frame for the state the flow is in.
-func _flier_stand() -> ConsoleRow.Stand:
-	var angle := _angle_to[_placed_id]
-	var landed := _stand_of_placed(RingFit.place(angle), angle, 1.0)
-	var to := _stand_of_placed(Placing.MIDDLE, 0.0, Placing.MIDDLE_GROWTH)
-	var easing := Motion.Easing.IN_OUT
-	var lift := StudioTokens.TR_PLACE_ARC_PX
-	match _placing.state:
-		Placing.State.ARRIVING, Placing.State.CHOOSING:
-			easing = Motion.Easing.OUT_BACK
-		Placing.State.FLYING:
-			to = landed
-			lift = Placing.FLY_LIFT
-		Placing.State.LANDING:
-			landed.size *= Placing.bounce(_bounce)
-			return landed
-		Placing.State.BACK:
-			to = _plinth_stand()
-	var stand := ConsoleRow.Stand.new()
-	stand.centre = Placing.flight(_from.centre, to.centre, _move, lift)
-	stand.size = lerpf(_from.size, to.size, Motion.eased(easing, _move))
-	return stand
-
-
-## A: the console flies from where it is into the gap, bounces, rests a moment, then the consoles screen opens on it.
-func _fly_in(stood: ConsoleRow.Stand) -> void:
-	_arriving.kill()
-	_from = stood
-	var ring := _placing.others
-	# Library.withConsoleAt counts its gap from before the first console of the ring.
-	var gap := _placing.gap + 1
-	Diagnostics.trace("order", "placing gap=%d" % gap)
-	var landed := Placing.landed(ring.size(), _placing.gap)
-	var slot := 0
-	var ids: Array[String] = []
-	for k in landed.size():
-		var id := _placed_id if k == _placing.gap + 1 else ring[slot]
-		slot += int(id != _placed_id)
-		_angle_to[id] = landed[k]
-		ids.append(id)
-	_fit_placing(ids, landed)
-	_arrow_to = _angle_to[_placed_id]
-	_move = 0.0
-	_bounce = 0.0
-	var flight := _tween()
-	flight.tween_property(self, ^"_move", 1.0, StudioTokens.FLY_S)
-	flight.tween_callback(_placing.done)
-	flight.tween_property(self, ^"_bounce", 1.0, StudioTokens.BOUNCE_S)
-	flight.tween_callback(_landed.bind(gap))
-	var out := _tween()
-	out.tween_property(self, ^"_middle_in", 0.0, _MIDDLE_OUT_S)
-
-
-## The console is in its gap: the order is saved with it, then, after the pause, the morph onto the consoles screen.
-func _landed(gap: int) -> void:
-	Sounds.play(SoundEffects.Cue.PLACE)
-	var pause := get_tree().create_timer(StudioTokens.PAUSE_S)
-	var answer := await android.place_console(_placed_id, gap)
-	if not answer.ok:
-		# The ring stays as it was: the console flies back to the form, as on B.
-		Diagnostics.trace("order", "not placed (%s): %s" % [answer.code, answer.detail])
-		var stood := _flier_stand()
-		_placing.refuse()
-		_fly_back(stood)
-		return
-	Diagnostics.trace("order", "placed %s at %d" % [_placed_id, gap])
-	var order: Array[String] = []
-	order.assign(Array(answer.order))
-	ordered.emit(order)
-	_row = order
-	consoles.wheel_slots = _ring_slots()
-	if pause.time_left > 0.0:
-		await pause.timeout
-	_placing.done()
-	_morph()
-
-
-## The consoles screen comes: the console placed glides to the hero's place as the ring does closing, the others sink
-## into the rail, the rail and the consoles screen's parts come in.
-func _morph() -> void:
-	consoles.wheel_slots = _ring_slots()
-	consoles.flier = -1
-	consoles.pointed = _row.find(_placed_id)
-	_write_ring()
-	closing.emit(StudioTokens.TR_RING_CLOSE_S)
-	await _tween_out().finished
-	_placing.done()
-	_end_placing(true)
-
-
-## B: the console flies back to the plinth, the ring goes, the form is wanted back.
-func _fly_back(stood: ConsoleRow.Stand) -> void:
-	_arriving.kill()
-	_from = stood
-	_move = 0.0
-	var motion := _tween().set_parallel()
-	var ease_in := Motion.curve(Motion.Easing.EASE_IN)
-	motion.tween_property(self, ^"_move", 1.0, StudioTokens.TR_PLACE_BACK_S)
-	motion.tween_property(self, ^"_others_in", 0.0, StudioTokens.TR_PLACE_OTHERS_S).set_custom_interpolator(ease_in)
-	motion.tween_property(self, ^"_marks", 0.0, StudioTokens.TR_PLACE_MARKS_S)
-	motion.tween_property(self, ^"_middle_in", 0.0, StudioTokens.TR_PLACE_MARKS_S)
-	motion.tween_property(_moving, ^"modulate:a", 0.0, _BACK_FADE_S).set_delay(StudioTokens.TR_PLACE_AT_S).set_custom_interpolator(ease_in)
-	get_tree().create_timer(StudioTokens.TR_PLACE_AT_S).timeout.connect(form_wanted.emit)
-	await motion.finished
-	_placing.done()
-	_end_placing(false)
-
-
-## The placing is over: the ring is let go, whichever way it ended.
-func _end_placing(placed: bool) -> void:
-	consoles.pointed = -1
-	consoles.flier = -1
-	consoles.ring_angles = PackedFloat64Array()
-	consoles.ring_arrival = PackedFloat64Array()
-	if not placed:
-		consoles.wheel = 0.0
-		consoles.others_wheel = 0.0
-	_kill_tweens()
-	_middle_y = _MIDDLE_Y
-	set_process(false)
-	hide()
-	_open = false
-	_placing = null
-	placing_over.emit(placed)
-
-
 func _hints() -> Control:
-	return _moving if _placing or _wheel.is_holding() else _choosing
+	return _moving if _flow == Flow.PLACING or _wheel.is_holding() else _choosing
 
 
 ## One step round the ring towards [param direction] (-1 or 1), the console held with the cursor.
@@ -636,10 +308,10 @@ func _put_down() -> void:
 	_show()
 	if not moved:
 		return
-	_busy = true
+	_flow = Flow.SAVING
 	var order: Array[String] = _wheel.order.duplicate()
 	var answer := await android.order_consoles(PackedStringArray(order))
-	_busy = false
+	_flow = Flow.CHOOSING
 	if answer.ok:
 		ordered.emit(order)
 		_row = order
@@ -691,12 +363,10 @@ func _peel(amount: float, seconds: float) -> void:
 
 ## Shows where the consoles are on the ring, what the cursor is on and what the buttons do.
 func _show() -> void:
-	var slots: Array[int] = []
-	for platform_id in _row:
-		slots.append(_wheel.order.find(platform_id))
-	consoles.wheel_slots = slots
-	consoles.pointed = _row.find(_wheel.selected())
-	consoles.held = consoles.pointed if _wheel.is_holding() else -1
+	for k in _row.size():
+		consoles.console_at(k).on_ring.slot = _wheel.order.find(_row[k])
+	consoles.pointed = _console_of(_wheel.selected())
+	consoles.held = consoles.pointed if _wheel.is_holding() else null
 	_refit()
 	_aim()
 	_describe()
@@ -707,7 +377,7 @@ func _show() -> void:
 
 ## The ring's parts stand in the reference frame, on the stage.
 func _fit_view() -> void:
-	_frame.position = consoles.view_origin()
+	_marks.position = consoles.view_origin()
 
 
 ## The scale every console stands on, for the order the ring is in.
@@ -722,7 +392,7 @@ func _refit() -> void:
 		boxes.append(consoles.silhouette(index))
 		weights.append(RingFit.weight_of(consoles.console_at(index).folder))
 		angles.append(float(slot) / count * TAU)
-	consoles.ring_target = RingFit.scale(boxes, weights, angles, RingFit.WIDEST / RingFit.PS2_BOX.size.x)
+	consoles.ring_target = RingFit.scale(boxes, weights, angles, RingFit.CAP)
 	Diagnostics.trace("order", "fit scale=%.2f room=%.2f in %.2f ms" % [consoles.ring_target,
 		minf(RingFit.least_room(boxes, weights, angles, consoles.ring_target), RingFit.ROOM * FormPaint.CQW),
 		(Time.get_ticks_usec() - started) / 1000.0])
@@ -735,139 +405,29 @@ func _aim() -> void:
 	var item := consoles.console_at(_row.find(_wheel.selected()))
 	var reach := RingFit.ext(consoles.silhouette(_row.find(_wheel.selected())), RingFit.weight_of(item.folder),
 		consoles.ring_target, angle)
-	_arrow_to = angle
-	_arrow_angle = angle
-	_arrow_out_to = reach + (_ARROW_HELD_PX if _wheel.is_holding() else _ARROW_OUT_PX)
-	_rim = ConsoleManifest.gel_of(item.folder)
-	_tint_marks()
-	_arrow.queue_redraw()
-	_logo.show_logo(LogoView.Slot.RING_MIDDLE, item.folder)
+	_marks.arrow_to = angle
+	_marks.arrow_angle = angle
+	_marks.arrow_out_to = reach + (RingMarks.ARROW_HELD_PX if _wheel.is_holding() else RingMarks.ARROW_OUT_PX)
+	_marks.rim = ConsoleManifest.gel_of(item.folder)
+	_marks.redraw()
+	_marks.show_logo(item.folder)
 
 
 ## What the line under the logo says: nothing at rest; while a console is held, that it stands in its place, or
 ## between the logos of the two next to it (next to the one, when there are two consoles).
 func _describe() -> void:
 	if not _wheel.is_holding():
-		_sentence("")
+		_marks.say("")
 	elif not _wheel.is_moved():
-		_sentence(tr("in its place", "ring"))
+		_marks.say(tr("in its place", "ring"))
 	else:
 		var around := _wheel.neighbours()
-		var between := around.size() == 2 and around[0] != around[1]
-		_sentence(tr("between {before} and {after}", "ring") if between else tr("next to {name}", "ring"),
-			_folder_of(around[0]), _folder_of(around[1]))
-
-
-## Logo placeholders follow the complete translated sentence, including languages with a different order.
-func _sentence(text: String, before_folder := "", after_folder := "") -> void:
-	for child in _where.get_children():
-		_where.remove_child(child)
-		if child is not LogoView:
-			child.queue_free()
-	_before.hide()
-	_after.hide()
-	_before.show_logo(LogoView.Slot.BETWEEN_MINI, before_folder)
-	_after.show_logo(LogoView.Slot.BETWEEN_MINI, after_folder)
-	var logos: Dictionary[String, LogoView] = {"before": _before, "after": _after, "name": _before}
-	var at := 0
-	for slot in _sentence_slots.search_all(text):
-		_word(text.substr(at, slot.get_start() - at))
-		var logo := logos[slot.get_string(1)]
-		_where.add_child(logo)
-		logo.show()
-		at = slot.get_end()
-	_word(text.substr(at))
-	for logo: LogoView in [_before, _after]:
-		if not logo.get_parent():
-			_where.add_child(logo)
-
-
-func _word(text: String) -> void:
-	var words := text.strip_edges()
-	if not words.is_empty():
-		_where.add_child(Word.new(words))
+		_marks.say_between(_folder_of(around[0]), _folder_of(around[1]), around.size() != 2 or around[0] == around[1])
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
-		if _placing:
-			_aim_placing()
+		if _flow == Flow.PLACING:
+			_placer.aim()
 		elif _wheel:
 			_describe()
-
-
-func _place_middle() -> void:
-	_middle.modulate.a = _middle_in
-	_middle.position.y = _middle_y + (1.0 - _middle_in) * _MIDDLE_RISE_PX
-
-
-func _tint_marks() -> void:
-	_arrow.modulate.a = _marks
-
-
-func _place_marks() -> void:
-	var radial := Vector2(RingFit.RADII.x * sin(_arrow_angle), RingFit.RADII.y * cos(_arrow_angle)).normalized()
-	_arrow.position = RingFit.place(_arrow_angle) + radial * _arrow_out - Vector2(_arrow.pivot_offset.x, 0.0)
-	_arrow.rotation = atan2(-radial.x, radial.y)
-
-
-## The arrow: an ink head with a white edge and a shine, a shadow and a glow of the pointed
-## console's gel.
-func _draw_arrow() -> void:
-	var head := _arrow_shape([Vector2(0, 0), Vector2(12, 28), Vector2(0, 21), Vector2(-12, 28)])
-	var shine := _arrow_shape([Vector2(0, 4), Vector2(7, 22), Vector2(0, 18)])
-	for k in range(_GLOW_ALPHAS.size(), 0, -1):
-		_stroke_arrow(head, _ARROW_EDGE_PX + k * _GLOW_STEP_PX, Color(_rim, _GLOW_ALPHAS[k - 1]), true)
-	_arrow.draw_colored_polygon(_shifted(head, _ARROW_SHADOW), Backdrop.palette.arrow_drop)
-	_stroke_arrow(head, _ARROW_EDGE_PX, Backdrop.palette.arrow_stroke, false)
-	_arrow.draw_colored_polygon(head, Backdrop.palette.ink)
-	_arrow.draw_colored_polygon(shine, Backdrop.palette.arrow_shine)
-
-
-## The head's outline [param reach] px out, with round corners: edge by edge with a disc on each corner (a
-## polyline's own corners are mitred), the inside filled when [param filled].
-func _stroke_arrow(head: PackedVector2Array, reach: float, colour: Color, filled: bool) -> void:
-	if filled:
-		_arrow.draw_colored_polygon(head, colour)
-	for k in head.size():
-		_arrow.draw_line(head[k], head[(k + 1) % head.size()], colour, 2.0 * reach, true)
-		_arrow.draw_circle(head[k], reach, colour)
-
-
-## The points [param units] (in arrow units, tip at the origin) in the arrow control's pixels.
-func _arrow_shape(units: Array[Vector2]) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	for unit in units:
-		points.append(Vector2(_arrow.pivot_offset.x + unit.x * _ARROW_UNIT, (unit.y + 3.0) * _ARROW_UNIT))
-	return points
-
-
-func _shifted(points: PackedVector2Array, by: Vector2) -> PackedVector2Array:
-	var moved := PackedVector2Array()
-	for point in points:
-		moved.append(point + by)
-	return moved
-
-
-## A word of the line under the logo, in the mono face and the muted ink.
-class Word:
-	extends Control
-
-	const _PX := 20.48
-
-	var _text: String
-	var _line: StudioText
-
-	func _init(text: String) -> void:
-		_text = text
-		mouse_filter = MOUSE_FILTER_IGNORE
-		_line = StudioText.new(text, StudioTokens.Face.PLEX_500, _PX, 0.0, false)
-
-	func shown() -> String:
-		return _text
-
-	func _get_minimum_size() -> Vector2:
-		return Vector2(_line.width, _line.height)
-
-	func _draw() -> void:
-		_line.draw(self, Vector2(0.0, (size.y - _line.height) / 2.0), Backdrop.palette.mute)

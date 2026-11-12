@@ -4,6 +4,7 @@ package app.cartouche.core.launch
 import app.cartouche.core.ContentUri
 import app.cartouche.core.FileName
 import app.cartouche.core.FilePath
+import app.cartouche.core.anyText
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Some
@@ -18,7 +19,6 @@ import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -157,7 +157,7 @@ class LaunchTemplateTest {
     @Test
     fun `INV-02 placeholder values are inserted verbatim in every kind of value`() = runBlocking<Unit> {
         val template = parse("-n a.b/.C -d {file.uri} -e ROM {file.path} --eu U {file.uri} --esa L x,{file.path},y")
-        checkAll(Arb.string().map { "content://$it" }, Arb.string()) { uri, path ->
+        checkAll(anyText.map { "content://$it" }, anyText) { uri, path ->
             val spec = template.resolve(GameFile(FileName("g"), ContentUri.parse(uri).shouldBeSome(), Some(FilePath(path)))).shouldBeRight()
             spec.data shouldBe Some(uri)
             spec.extras.map { it.value } shouldBe
@@ -167,15 +167,15 @@ class LaunchTemplateTest {
 
     @Test
     fun `INV-03 parsing and resolving are total`() = runBlocking<Unit> {
-        checkAll(Arb.choice(templates, Arb.string())) { text -> LaunchTemplate.parse(text).onRight { it.resolve(sdGame) } }
+        checkAll(Arb.choice(templates, anyText)) { text -> LaunchTemplate.parse(text).onRight { it.resolve(sdGame) } }
     }
 
     @Test
     fun `INV-02 quoted tokens tokenize back to themselves`() = runBlocking<Unit> {
-        checkAll(Arb.list(Arb.string().filter { '\'' !in it })) { tokens ->
+        checkAll(Arb.list(anyText.filter { '\'' !in it })) { tokens ->
             LaunchTemplate.tokenize(tokens.joinToString(" ") { "'$it'" }).shouldBeRight() shouldBe tokens
         }
-        checkAll(Arb.list(Arb.string())) { tokens ->
+        checkAll(Arb.list(anyText)) { tokens ->
             val quoted = tokens.joinToString(" ") { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" }
             LaunchTemplate.tokenize(quoted).shouldBeRight() shouldBe tokens
         }

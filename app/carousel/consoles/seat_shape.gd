@@ -13,6 +13,9 @@ extends Resource
 ## it about [member pivot].
 @export var carrier: StringName
 @export var pivot := Vector3.ZERO
+## The parts a seated medium lies in, drawn solid, by node name: its way in is open through the others; and, on a
+## console without moving parts yet, the parts its stand-in medium passes through. Read by the asset checks.
+@export var housings: Array[StringName] = []
 
 
 ## Where a seated medium stands, every moving part at 0 (see [method ConsoleModel.seat]).

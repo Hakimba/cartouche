@@ -41,7 +41,7 @@ var ring: ConsoleRow
 var sun: DirectionalLight3D
 ## Whether each model is not fully supported yet, read as the chooser opens.
 var _coming: Array[bool] = []
-var _card: FormPaint.Layer
+var _card: SatinPanel.Backing
 var _card_at := Vector2.ZERO
 var _scroll := 0.0
 ## Each model's picture once drawn, by its folder; the openings so far, so that the pictures still drawn for a
@@ -60,10 +60,11 @@ func _init() -> void:
 	clip_contents = true
 	mouse_filter = MOUSE_FILTER_STOP
 	hide()
+	set_process(false)
 
 
 func _ready() -> void:
-	_card = FormPaint.Layer.new(self, FormPaint.card_material(true))
+	_card = SatinPanel.Backing.of(self, FormPaint.card_material(true))
 
 
 func _notification(what: int) -> void:
@@ -88,6 +89,7 @@ func open(platform_id: String, shown: Array[ConsoleManifest], kept: int) -> void
 	_scroll = _scroll_for(focused, 0.0)
 	_card_at = _cell(focused).position
 	show()
+	set_process(true)
 	grab_focus()
 	_glide(0.0)
 	_paint(platform_id)
@@ -120,8 +122,6 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
-	if not visible:
-		return
 	if _held != Vector2i.ZERO and _repeat.due(delta):
 		_go(_target(_held, true))
 	_glide(delta)
@@ -203,6 +203,7 @@ func _close(index: int) -> void:
 	_openings += 1
 	_pictures.clear()
 	hide()
+	set_process(false)
 	closed.emit(index)
 
 

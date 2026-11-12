@@ -17,12 +17,13 @@ signal welcome_closed
 signal covering
 ## The form adding a console, given up, starts to go.
 signal form_leaving
-## The form editing the console of the ring, saved or given up, starts to go.
-signal edit_leaving
 ## The console edited is shown as the model in [param folder] on the ring, for a look or back.
 signal model_shown(folder: String)
 ## The form adding a console has its type chosen.
 signal platform_chosen(platform_id: String)
+## A switch of the games row ([member ShelfRow.games_float], [member ShelfRow.games_in_line]) is kept [param on]: the row
+## shows so from now on.
+signal row_switch_kept(switch: StringName, on: bool)
 
 ## Whether the first launch's welcome waits for a button; off to measure starts.
 @export var welcome_waits := true
@@ -33,6 +34,8 @@ var android: AndroidServices = Android:
 		if is_node_ready():
 			_permission.android = services
 			_add_console.android = services
+## Milliseconds since the start, as a held save's two seconds are counted: the engine's clock, a fake one in tests.
+var clock := Callable(Time, &"get_ticks_msec")
 ## Brings the added console to the hero, through the placing ring from the third console
 ## ([code](library, platform_id) -> bool[/code]): true once placed, false when the user goes back to the form, which
 ## comes back ([method bring_back_form]) as the console flies to it. Required before [method run].
@@ -47,11 +50,14 @@ var arrived := false
 
 ## Whether the settings open now left no console with games at some point.
 var _emptied := false
-var _holding_presses := false
 ## The settings as stored: the start's answer, each value saved since kept in it.
 var _stored: AndroidServices.SettingsAnswer
-## Counts the switches' saves: an answer that comes once the settings closed is let go.
-var _switch_save := 0
+## The save of the settings under way: its one owner, the card reading it.
+var _held := HeldSave.new(func() -> int: return clock.call())
+## Counts the sounds' level saves: only the last one's refusal puts the level back, the others' are past.
+var _level_saves := 0
+## The page in front, the last one opened.
+var _page: Page
 
 @onready var _welcome: Welcome = %Welcome
 @onready var _button_style: ButtonStyleScreen = %ButtonStyle
@@ -68,13 +74,14 @@ var _switch_save := 0
 
 
 func _ready() -> void:
+	_settings.held = _held
 	_settings.sound_level_changed.connect(_change_sound_level)
-	_add_console.leaving.connect(func() -> void: (edit_leaving if _add_console.is_editing() else form_leaving).emit())
+	_add_console.leaving.connect(func() -> void:
+		if not _add_console.is_editing():
+			form_leaving.emit())
 	_add_console.model_shown.connect(model_shown.emit)
 	_add_console.platform_chosen.connect(platform_chosen.emit)
-	_add_console.saving.connect(func(pending: bool) -> void:
-		_pending.visible = pending
-		_holding_presses = pending)
+	_add_console.phase_changed.connect(func() -> void: _pending.visible = _add_console.phase == Page.Phase.BUSY)
 
 
 ## Goes on until the library can be used, completing setup on first launch, the welcome first.
@@ -95,9 +102,7 @@ func run(settings: AndroidServices.SettingsAnswer) -> void:
 		await _choose_preferred_region(true)
 		await _save(&"button_style", Controls.style)
 		if not android.curtain_allowed():
-			_show(_permission)
-			_permission.focus()
-			await _permission.done
+			await _present(_permission)
 	if not _has_games():
 		await _add_first_console()
 	_close()
@@ -118,14 +123,16 @@ func open_settings() -> bool:
 
 ## The form adding one more console, over the carousel, until it is added and placed, or given up; whether one was.
 func add_console() -> bool:
-	_show(_add_console)
-	_add_console.open(library.on_ring())
 	var added := false
-	while not added and await _form_closed() == AddConsole.Outcome.DONE:
+	var outcome := await _form_closed(library.on_ring())
+	while outcome == AddConsole.Outcome.DONE:
 		library = _add_console.library
 		var platform_id := _add_console.platform_id
 		added = await place.call(library, platform_id)
-		_holding_presses = false
+		_add_console.came_back()
+		if added:
+			break
+		outcome = await _form_closed_again()
 	_close()
 	return added
 
@@ -156,15 +163,19 @@ func edit_console(platform_id: String) -> bool:
 ## The form shows again, filled as it was, as the console flies back to it; it takes no press until the console is back.
 func bring_back_form() -> void:
 	show()
-	_holding_presses = true
-	_add_console.resume()
+	_add_console.come_back()
 
 
-## The form's presses are held while the console flies back to it.
+## The presses of a page coming back in, or with something it started under way, are held; the settings' page held by
+## its save, and no other, is let go by B two seconds on, the save going on.
 func _input(event: InputEvent) -> void:
-	if _holding_presses and (event is InputEventKey or event is InputEventJoypadButton or event is InputEventAction
-			or event is InputEventScreenTouch or event is InputEventMouseButton):
+	if _page != null and (_page.phase == Page.Phase.ENTERING or _page.phase == Page.Phase.BUSY) \
+			and (event is InputEventKey or event is InputEventJoypadButton or event is InputEventJoypadMotion
+			or event is InputEventAction or event is InputEventScreenTouch or event is InputEventMouseButton):
 		get_viewport().set_input_as_handled()
+		if _page.phase == Page.Phase.BUSY and _page == _held.page and event.is_action_pressed(&"screen_back") \
+				and _held.lasted():
+			_page.phase = Page.Phase.LIVE
 
 
 ## Whether the form is leaving while its save or scan is pending.
@@ -184,17 +195,17 @@ func _has_games() -> bool:
 
 ## The button style, saved once chosen; with [param can_go_back], B leaves it as it was.
 func _choose_button_style(can_go_back := false, keep := true) -> void:
-	_show(_button_style)
 	_button_style.can_go_back = can_go_back
-	_button_style.focus()
-	var style: StringName = await _button_style.chosen
+	var style: StringName = await _present(_button_style)
 	if style.is_empty():
 		return
 	var kept := Controls.style
 	_draw_buttons(style)
 	# The button style marks the setup complete: the first launch saves it after the region's choice.
-	if keep and not await _save(&"button_style", style):
-		_draw_buttons(kept)
+	if keep:
+		await _save_held(&"button_style", style, func(saved: bool) -> void:
+			if not saved:
+				_draw_buttons(kept))
 
 
 func _draw_buttons(style: StringName) -> void:
@@ -202,98 +213,114 @@ func _draw_buttons(style: StringName) -> void:
 	get_tree().call_group(ButtonGlyph.GROUP, &"queue_redraw")
 
 
-## Saves [param value] as the setting [param key], the presses held meanwhile when [param holding]; whether it was kept
-## (a refusal is traced).
-func _save(key: StringName, value: Variant, holding := false) -> bool:
-	_holding_presses = _holding_presses or holding
+## Saves [param value] as the setting [param key]; whether it was kept (a refusal is traced).
+func _save(key: StringName, value: Variant) -> bool:
 	var saved := await android.save_setting(key, value)
-	if holding:
-		_holding_presses = false
 	if not saved.ok:
 		Diagnostics.trace("screens", "%s not saved (%s): %s" % [key, saved.code, saved.detail])
 	return saved.ok
 
 
+## Saves [param value] as the setting [param key] from the settings, which hold their presses until the plugin
+## answers: [param kept] then takes whether it was kept, whenever that is. Returns once it answered, or, from a page,
+## once B let the page go two seconds on ([method _input]); at once from the card, which holds its own.
+func _save_held(key: StringName, value: Variant, kept: Callable) -> void:
+	_held.start(key, null if _page == _settings else _page)
+	var answered := func() -> void:
+		var saved := await _save(key, value)
+		_held.end()
+		kept.call(saved)
+		_settings.show_choices(_stored.preferred_region, _stored.language)
+	if _page == _settings:
+		answered.call()
+	else:
+		await _page.busy_while(answered)
+
+
 ## The edges' smoothing, drawn and saved once chosen; B leaves it as it was.
 func _choose_edge_smoothing() -> void:
-	_show(_edge_smoothing)
-	_edge_smoothing.focus()
-	var smoothing: StringName = await _edge_smoothing.chosen
+	var smoothing: StringName = await _present(_edge_smoothing)
 	if smoothing.is_empty():
 		return
-	get_viewport().msaa_3d = EdgeSmoothingScreen.MSAA[smoothing]
-	await _save(&"edge_smoothing", smoothing)
+	var kept := EdgeSmoothingScreen.of(get_viewport())
+	_smooth(smoothing)
+	await _save_held(&"edge_smoothing", smoothing, func(saved: bool) -> void:
+		if not saved:
+			_smooth(kept))
+
+
+func _smooth(smoothing: StringName) -> void:
+	EdgeSmoothingScreen.smooth(get_viewport(), EdgeSmoothingScreen.MSAA[smoothing])
+	get_tree().call_group(&"edge_smoothing", &"smoothing_changed")
 
 
 ## The backdrops' cards: each one chosen shows at once on every screen and is kept, the cards staying on screen, the
 ## focus on it, to compare; one the plugin does not keep shows no more. B goes back.
 func _choose_backdrop() -> void:
-	_show(_backdrop)
-	_backdrop.focus()
-	var choice: StringName = await _backdrop.chosen
+	var choice: StringName = await _present(_backdrop)
 	while not choice.is_empty():
 		var shown := Backdrop.choice
 		Diagnostics.trace("backdrop", Backdrop.show(choice, Backdrop.veil))
-		if not await _save(&"backdrop", choice, true):
-			Diagnostics.trace("backdrop", Backdrop.show(shown, Backdrop.veil))
-			_backdrop.focus()
-		choice = await _backdrop.chosen
+		await _save_held(&"backdrop", choice, func(saved: bool) -> void:
+			if not saved:
+				Diagnostics.trace("backdrop", Backdrop.show(shown, Backdrop.veil))
+				if _page == _backdrop:
+					_backdrop.focus())
+		# Let go by B while its save goes on: back to the card.
+		if _held.pending():
+			return
+		choice = await _backdrop.done
 
 
 ## The region labels' images prefer, saved once another is chosen, and shown once saved: the plugin
 ## looks again for the labels it changes.
 func _choose_preferred_region(first_launch := false) -> void:
-	_show(_region_screen)
 	_region_screen.can_go_back = not first_launch
-	_region_screen.open(_stored.preferred_region, _stored.preferred_regions, SettingsMenu.region_name)
-	var region: String = await _region_screen.chosen
+	var region: String = await _present(_region_screen,
+		CardChoiceScreen.Offer.new(_stored.preferred_region, _stored.preferred_regions, SettingsMenu.region_name))
 	if region == _stored.preferred_region and not first_launch:
 		return
-	if await _save(&"preferred_region", region, true) or first_launch:
-		_stored.preferred_region = region
+	await _save_held(&"preferred_region", region, func(saved: bool) -> void:
+		if saved or first_launch:
+			_stored.preferred_region = region)
 
 
 ## "No console" until the form adds one and it glides to the carousel. Returns at once when a console of
 ## the settings finds games.
 func _add_first_console() -> void:
 	while true:
-		_show(_no_console)
-		_no_console.focus()
-		if await _no_console.chosen == &"settings":
+		var choice: StringName = await _present(_no_console)
+		if choice == &"settings":
 			await _settings_menu()
 			if _has_games():
 				return
 			continue
-		_show(_add_console)
-		_add_console.open(library.on_ring())
-		if await _form_closed() == AddConsole.Outcome.DONE:
+		if await _form_closed(library.on_ring()) == AddConsole.Outcome.DONE:
 			break
 	library = _add_console.library
 	var platform_id := _add_console.platform_id
 	arrived = await place.call(library, platform_id)
 
 
-## "Settings" until B.
+## "Settings" until B; a switch whose save is still under way shows as asked, and holds the card until answered.
 func _settings_menu() -> void:
 	var switches := SettingsMenu.switches()
 	for key in switches:
-		_settings.snap_switch(key, _switched(key))
+		_settings.snap_switch(key, _switched(key) != (key == _held.key))
 	_settings.sound_level = Sounds.level
 	var focus := &"button_style"
 	while true:
-		if focus not in switches:
-			_show(_settings)
-			_settings.open(focus, _stored.preferred_region, _stored.language)
-		focus = await _settings.chosen
+		if focus in switches:
+			focus = await _settings.done
+		else:
+			focus = await _present(_settings, SettingsMenu.Shown.new(focus, _stored.preferred_region, _stored.language))
 		if focus in switches:
 			_turn_switch(focus)
 			continue
 		match focus:
 			&"close":
-				_switch_save += 1
 				for key in switches:
 					_settings.slide_switch(key, _switched(key))
-				_settings.saving = false
 				return
 			&"button_style":
 				await _choose_button_style(true)
@@ -314,70 +341,81 @@ func _switched(key: StringName) -> bool:
 
 ## The language the app's text is written in, chosen from its own page: applied once saved.
 func _choose_language() -> void:
-	_show(_language_screen)
 	_language_screen.can_go_back = true
-	_language_screen.open(_stored.language, _stored.languages, Locale.name_of)
-	var language: String = await _language_screen.chosen
-	if language != _stored.language and await _save(&"language", language, true):
-		_stored.language = language
-		Locale.apply(language)
+	var language: String = await _present(_language_screen,
+		CardChoiceScreen.Offer.new(_stored.language, _stored.languages, Locale.name_of))
+	if language != _stored.language:
+		await _save_held(&"language", language, func(saved: bool) -> void:
+			if saved:
+				_stored.language = language
+				Locale.apply(language))
 
 
-## The sounds at [param steps] at once, heard so, and kept.
+## The sounds at [param steps] at once, heard so, and kept; refused, back to the level kept, unless changed since.
 func _change_sound_level(steps: int) -> void:
 	Sounds.level = steps
 	Sounds.play(SoundEffects.Cue.VOLUME)
-	await _save(&"sound_level", steps)
+	_level_saves += 1
+	var asked := _level_saves
+	if await _save(&"sound_level", steps):
+		_stored.sound_level = steps
+	elif asked == _level_saves:
+		Sounds.level = _stored.sound_level
+		_settings.sound_level = Sounds.level
 
 
 ## Turns the settings' switch [param switch] (a setting's key) over from what is stored: slid there at once, saved,
-## then kept once saved, the pixel veil shown so at once (the others are read as the settings close); slid back to
-## what is stored when not. An answer that comes once the settings closed is let go.
+## then kept once saved, the pixel veil shown and the games row showing so; slid back to what is stored when not.
+## The answer is applied whenever it comes, the settings closed meanwhile or not.
 func _turn_switch(switch: StringName) -> void:
-	_switch_save += 1
-	var request := _switch_save
 	var target := not _switched(switch)
 	Sounds.play(SoundEffects.Cue.TOGGLE if target else SoundEffects.Cue.UNTOGGLE)
-	_settings.saving = true
 	_settings.slide_switch(switch, target)
-	var saved := await _save(switch, target)
-	if request != _switch_save:
-		return
-	if saved:
-		_stored.set(switch, target)
-		if switch == &"pixel_veil":
-			Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, target))
-		Diagnostics.trace("settings", "%s=%s" % [switch, str(target)])
-	_settings.slide_switch(switch, _switched(switch))
-	_settings.saving = false
+	_save_held(switch, target, func(saved: bool) -> void:
+		if saved:
+			_stored.set(switch, target)
+			if switch == &"pixel_veil":
+				Diagnostics.trace("backdrop", Backdrop.show(Backdrop.choice, target))
+			else:
+				row_switch_kept.emit(switch, target)
+			Diagnostics.trace("settings", "%s=%s" % [switch, str(target)])
+		_settings.slide_switch(switch, _switched(switch)))
 
 
 ## The form editing [param platform], until it is saved, given up, or the console removed.
 func _edit_platform(platform: AndroidServices.Platform) -> void:
 	var setup := library.setup_of(platform.id)
 	var folder := await _folder_of(setup)
-	_show(_add_console)
-	_add_console.edit(platform.id, setup, folder)
-	while await _form_closed() == AddConsole.Outcome.REMOVE:
-		_show(_confirm)
-		_confirm.open(platform.name, library.games_of(platform.id).size(), folder.volume if folder.has_volume else &"")
-		if await _confirm.answered:
+	var outcome := await _form_closed(AddConsole.Edit.new(platform.id, setup, folder))
+	while outcome == AddConsole.Outcome.REMOVE:
+		var remove: bool = await _present(_confirm, ConfirmRemoval.Asked.new(platform.name,
+			library.games_of(platform.id).size(), folder.volume if folder.has_volume else &""))
+		var failed := false
+		if remove:
 			var removed := await android.remove_platform(platform.id)
 			if removed.ok:
 				_edited(removed.library)
 				return
 			Diagnostics.trace("screens", "%s not removed (%s): %s" % [platform.id, removed.code, removed.detail])
-			_show(_add_console)
-			_add_console.back_from_removal(true)
-		else:
-			_show(_add_console)
-			_add_console.back_from_removal(false)
+			failed = true
+		# Back from the confirmation: the form as it was left.
+		outcome = await _form_closed(AddConsole.Kept.new(failed))
 
 
-## How the form closed, once what it saved is taken: a console added is shown by the caller (its
-## arrival on the carousel, or the consoles coming back on it).
-func _form_closed() -> AddConsole.Outcome:
-	var outcome: AddConsole.Outcome = await _add_console.closed
+## How the form, opened for [param request] ([method AddConsole._open]), closed, once what it saved is taken: a
+## console added is shown by the caller (its arrival on the carousel, or the consoles coming back on it).
+func _form_closed(request: Variant) -> AddConsole.Outcome:
+	var outcome: AddConsole.Outcome = await _present(_add_console, request)
+	return _closed_with(outcome)
+
+
+## The same of the form the ring sent back, which shows as it was left.
+func _form_closed_again() -> AddConsole.Outcome:
+	var outcome: AddConsole.Outcome = await _add_console.done
+	return _closed_with(outcome)
+
+
+func _closed_with(outcome: AddConsole.Outcome) -> AddConsole.Outcome:
 	if _add_console.library != null and (outcome != AddConsole.Outcome.DONE or _add_console.is_editing()):
 		_edited(_add_console.library)
 	return outcome
@@ -399,9 +437,43 @@ func _edited(changed: AndroidServices.Library) -> void:
 	library_edited.emit(changed)
 
 
-func _show(screen: Control) -> void:
+## Shows [param page] alone, opened for [param request], and returns its answer: the only way a page opens.
+func _present(page: Page, request: Variant = null) -> Variant:
 	for child: Control in get_children():
-		child.visible = child == screen
+		child.visible = child == page
+	_page = page
 	show()
 	covering.emit()
-	Diagnostics.trace("screens", "showing %s" % screen.name)
+	Diagnostics.trace("screens", "showing %s" % page.name)
+	return await page.present(request)
+
+
+## A save of the settings under way, one at a time: the settings hold their presses until it is answered or, once it
+## has lasted [constant ESCAPE_MS], B; its answer is applied whenever it comes.
+class HeldSave:
+	const ESCAPE_MS := 2000
+
+	## The setting saved, empty when none; the page it holds, null for the card, which holds its own.
+	var key := &""
+	var page: Page
+	var _started_ms := 0
+	var _clock: Callable
+
+	func _init(clock: Callable) -> void:
+		_clock = clock
+
+	func start(saved: StringName, holding: Page) -> void:
+		key = saved
+		page = holding
+		_started_ms = _clock.call()
+
+	func end() -> void:
+		key = &""
+		page = null
+
+	func pending() -> bool:
+		return not key.is_empty()
+
+	## Whether the save under way has lasted [constant ESCAPE_MS]: B lets its presses go then.
+	func lasted() -> bool:
+		return pending() and _clock.call() - _started_ms >= ESCAPE_MS

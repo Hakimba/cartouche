@@ -19,6 +19,7 @@ import arrow.core.left
 import arrow.core.right
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -35,6 +36,7 @@ import io.kotest.property.arbitrary.map
 import io.kotest.property.checkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -51,23 +53,38 @@ import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URLDecoder
+import java.time.LocalDate
+import java.util.Locale
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ScreenScraperFetchTest {
     private val folder = File(RuntimeEnvironment.getApplication().filesDir, "art")
     private val stateFile = File(folder, "screenscraper.json")
-    private val key = Credentials("cartouche-dev", "DEVSECRET42", "Cartouche", None)
-    private val member = Member("someone", "MEMBERSECRET42")
+    private val key = Credentials("cartouche-dev", Secret("DEVSECRET42"), "Cartouche", None)
+    private val member = Member("someone", Secret("MEMBERSECRET42"))
     private val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3)
     private val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 9)
 
-    private fun ok(body: ByteArray) = Answer(HttpURLConnection.HTTP_OK, Some(body)).right()
+    private fun ok(body: ByteArray) = Served(HttpURLConnection.HTTP_OK, Some(body)).right()
 
-    private fun status(code: Int) = Answer(code, None).right()
+    private fun status(code: Int) = Served(code, None).right()
 
-    private fun limits(threads: Int, perMinute: Int) =
-        ok("""{"response":{"ssuser":{"maxthreads":"$threads","maxrequestspermin":"$perMinute"}}}""".encodeToByteArray())
+    /** The member's limits, the answer echoing [url] as ScreenScraper's header may. */
+    private fun limits(threads: Int, perMinute: Int, url: String = "") = ok(
+        """{"header":{"url":"$url"},"response":{"ssuser":{"maxthreads":"$threads","maxrequestspermin":"$perMinute"}}}"""
+            .encodeToByteArray(),
+    )
+
+    /** The files under [folder] that hold a credential. */
+    private fun storedSecrets(): List<String> = folder
+        .walk()
+        .filter(File::isFile)
+        .map { it.name to it.readText() }
+        .filter { (_, text) ->
+            listOf("DEVSECRET42", "MEMBERSECRET42", "devpassword").any { it in text }
+        }.map { (name, _) -> name }
+        .toList()
 
     /** A fetch on [scope]'s clock, whose day changes every [DAY] of it, told the states it goes through. */
     private class Harness(folder: File, credentials: Credentials, http: FakeHttp, val scope: TestScope) {
@@ -81,12 +98,13 @@ class ScreenScraperFetchTest {
         }
     }
 
-    private val answers: Arb<(String) -> Either<Unanswered, Answer>> =
+    private val answers: Arb<(String) -> Either<Unanswered, Served>> =
         Arb.choice(
             Arb.constant { _ -> ok(png) },
             Arb.constant { _ -> ok(jpeg) },
             Arb.constant { _ -> ok("NOMEDIA".encodeToByteArray()) },
             Arb.constant { _ -> ok(ScreenScraperFetch.LOGIN_REFUSED.encodeToByteArray()) },
+            Arb.constant { url -> ok("<html>$url</html>".encodeToByteArray()) },
             Arb.element(401, 423, 429, 430, 431, 500).map { code -> { _: String -> status(code) } },
             Arb.element(430, 431).map { code -> { _: String -> status(code) } },
             Arb.constant { _ -> Unanswered.TimedOut.left() },
@@ -109,11 +127,14 @@ class ScreenScraperFetchTest {
                 val http =
                     FakeHttp { url ->
                         if ("ssuserInfos" in url) {
-                            threads.fold({ status(HttpURLConnection.HTTP_FORBIDDEN) }) { limits(it, perMinute) }
+                            threads.fold({ status(HttpURLConnection.HTTP_FORBIDDEN) }) { limits(it, perMinute, url) }
                         } else {
                             script[served++ % script.size](url)
                         }
                     }
+                // While a request is under way too: an answer may echo its URL, and so the credentials.
+                val leaks = mutableListOf<String>()
+                http.during = { leaks += storedSecrets() }
                 val credentials = key.copy(member = if (threads.isSome()) Some(member) else None)
                 val harness = Harness(folder, credentials, http, scope)
                 var restartFrom = 0
@@ -171,12 +192,7 @@ class ScreenScraperFetchTest {
                         closed++
                     }
                 }
-                folder.walk().filter(File::isFile).forEach { file ->
-                    val text = file.readText()
-                    text shouldNotContain "DEVSECRET42"
-                    text shouldNotContain "MEMBERSECRET42"
-                    text shouldNotContain "devpassword"
-                }
+                (leaks + storedSecrets()).shouldBeEmpty()
                 ShadowLog.getLogs().map { it.msg }.forEach { line ->
                     line shouldNotContain "DEVSECRET42"
                     line shouldNotContain "MEMBERSECRET42"
@@ -186,6 +202,92 @@ class ScreenScraperFetchTest {
             closed shouldBeGreaterThan 10
             paced shouldBeGreaterThan 5
         }
+
+    @Test
+    fun `INV-17 a spent quota is kept until the next day, written in ASCII digits whatever the device's language`() {
+        val before = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("ar-EG"))
+        try {
+            val scope = TestScope(StandardTestDispatcher())
+            val harness = Harness(folder, key, FakeHttp { status(430) }, scope)
+            val got = scope.async { harness.fetch.get(texture(1), Progress.NONE) }
+            scope.advanceUntilIdle()
+            got.getCompleted().shouldBeLeft(FetchFailure.Skipped(ScreenScraperState.ClosedUntil(day(DAY))))
+            stateFile.readText() shouldContain "2026-10-19"
+        } finally {
+            Locale.setDefault(before)
+        }
+    }
+
+    @Test
+    fun `an account answer too long to keep is unreadable, the member kept and the day checked again`() {
+        val scope = TestScope(StandardTestDispatcher())
+        val long = """{"response":{"ssuser":{"maxthreads":"2","maxrequestspermin":"60"}}}""" + " ".repeat(70_000)
+        val http = FakeHttp { url -> if ("ssuserInfos" in url) ok(long.encodeToByteArray()) else ok(png) }
+        val harness = Harness(folder, key.copy(member = Some(member)), http, scope)
+        val first = scope.async { harness.fetch.get(texture(1), Progress.NONE) }
+        scope.advanceUntilIdle()
+        first.getCompleted().shouldBeLeft(FetchFailure.Skipped(ScreenScraperState.ClosedForRun(Closure.UNREADABLE)))
+        scope.launch { harness.fetch.newRun() }
+        scope.advanceUntilIdle()
+        scope.async { harness.fetch.get(texture(2), Progress.NONE) }
+        scope.advanceUntilIdle()
+        http.asked.count { "ssuserInfos" in it } shouldBe 2
+        http.asked.all { "sspassword=MEMBERSECRET42" in it } shouldBe true
+    }
+
+    @Test
+    fun `a texture whose first bytes come apart is written whole to its file`() {
+        val scope = TestScope(StandardTestDispatcher())
+        val http =
+            Http { _, _, body ->
+                val kept = body.use { it.take(png, 2) && it.take(png.copyOfRange(2, png.size), png.size - 2) }
+                Answer(HttpURLConnection.HTTP_OK, kept).right()
+            }
+        val fetch = ScreenScraperFetch(http, key, stateFile, { 0L }, { day(0) }) {}
+        val image = File.createTempFile("image", ".part")
+        try {
+            val got = scope.async { fetch.get(texture(1), Progress.NONE, image) }
+            scope.advanceUntilIdle()
+            got.getCompleted().shouldBeRight()
+            image.readBytes() shouldBe png
+        } finally {
+            image.delete()
+        }
+    }
+
+    @Test
+    fun `a texture that cannot be written on the device leaves ScreenScraper open`() {
+        val scope = TestScope(StandardTestDispatcher())
+        val harness = Harness(folder, key, FakeHttp { ok(png) }, scope)
+        val nowhere = File(File(folder, "gone"), "image.part")
+        val got = scope.async { harness.fetch.get(texture(1), Progress.NONE, nowhere) }
+        scope.advanceUntilIdle()
+        got.getCompleted().shouldBeLeft(FetchFailure.Unstored)
+        harness.fetch.open shouldBe true
+    }
+
+    @Test
+    fun `INV-19 an account answer cut by a cancellation leaves no file holding its request`() {
+        val scope = TestScope(StandardTestDispatcher())
+        val http =
+            Http { url, _, body ->
+                if ("ssuserInfos" in url) {
+                    val echo = """{"header":{"url":"$url""".encodeToByteArray()
+                    body.take(echo, echo.size)
+                    awaitCancellation()
+                } else {
+                    Answer(HttpURLConnection.HTTP_OK, kept = false).right()
+                }
+            }
+        val fetch = ScreenScraperFetch(http, key.copy(member = Some(member)), stateFile, { 0L }, { day(0) }) {}
+        val got = scope.launch { fetch.get(texture(1), Progress.NONE) }
+        scope.runCurrent()
+        storedSecrets().shouldBeEmpty()
+        got.cancel()
+        scope.runCurrent()
+        storedSecrets().shouldBeEmpty()
+    }
 
     @Test
     fun `INV-17 INV-19 an image is asked for as the table names it, with the key and the member, and never which game a file is`() {
@@ -383,11 +485,11 @@ class ScreenScraperFetchTest {
     @Test
     fun `an answer is an image only when its bytes are one, no image means not found, and anything else skips the texture`() {
         val scope = TestScope(StandardTestDispatcher())
-        var body: Either<Unanswered, Answer> = ok(png)
+        var body: Either<Unanswered, Served> = ok(png)
         val http = FakeHttp { body }
         val harness = Harness(folder, key, http, scope)
 
-        fun got(answer: Either<Unanswered, Answer>): Either<FetchFailure, ByteArray> {
+        fun got(answer: Either<Unanswered, Served>): Either<FetchFailure, ByteArray> {
             body = answer
             val got = scope.async { harness.fetch.get(texture(1), Progress.NONE) }
             scope.advanceUntilIdle()
@@ -409,8 +511,27 @@ class ScreenScraperFetchTest {
         got(
             ok(ScreenScraperFetch.LOGIN_REFUSED.encodeToByteArray()),
         ).shouldBeLeft(FetchFailure.Skipped(ScreenScraperState.ClosedUntil(day(DAY))))
-        ScreenScraperFetch.read(Answer(200, None)) shouldBe ScreenScraperAnswer.Unreadable
-        ScreenScraperFetch.read(Answer(404, None)) shouldBe ScreenScraperAnswer.Status(404)
+        ScreenScraperFetch.read(Answer(200, kept = false), ByteArray(0)) shouldBe ScreenScraperAnswer.Unreadable
+        ScreenScraperFetch.read(Answer(500, kept = false), ByteArray(0)) shouldBe ScreenScraperAnswer.Status(500)
+    }
+
+    @Test
+    fun `a texture the server has not, a 404 or a 410, is not found and leaves ScreenScraper open, a 5xx closes the run`() {
+        val scope = TestScope(StandardTestDispatcher())
+        var code = HttpURLConnection.HTTP_NOT_FOUND
+        val harness = Harness(folder, key, FakeHttp { status(code) }, scope)
+
+        fun got(): Either<FetchFailure, ByteArray> {
+            val got = scope.async { harness.fetch.get(texture(1), Progress.NONE) }
+            scope.advanceUntilIdle()
+            return got.getCompleted()
+        }
+        got().shouldBeLeft(FetchFailure.NotFound)
+        code = HttpURLConnection.HTTP_GONE
+        got().shouldBeLeft(FetchFailure.NotFound)
+        harness.fetch.open shouldBe true
+        code = HttpURLConnection.HTTP_UNAVAILABLE
+        got().shouldBeLeft(FetchFailure.Skipped(ScreenScraperState.ClosedForRun(Closure.UNREADABLE)))
     }
 
     @Test
@@ -432,7 +553,7 @@ class ScreenScraperFetchTest {
         scope.launch { again.fetch.get(texture(9), Progress.NONE) }
         scope.advanceUntilIdle()
         http.asked.size shouldBe 1
-        Harness(folder, key.copy(devPassword = "NEWSECRET"), http, scope).fetch.open shouldBe true
+        Harness(folder, key.copy(devPassword = Secret("NEWSECRET")), http, scope).fetch.open shouldBe true
     }
 
     @Test
@@ -443,7 +564,7 @@ class ScreenScraperFetchTest {
     @Test
     fun `a busy server makes the next request wait the back-off, and a server out of reach closes the run, never stalling it`() {
         val scope = TestScope(StandardTestDispatcher())
-        var body: Either<Unanswered, Answer> = status(429)
+        var body: Either<Unanswered, Served> = status(429)
         val http = FakeHttp { body }
         val harness = Harness(folder, key, http, scope)
         scope.launch { harness.fetch.get(texture(1), Progress.NONE) }
@@ -472,6 +593,6 @@ class ScreenScraperFetchTest {
         const val DAY = 24 * 60 * MINUTE
 
         /** The day of the test clock's [millis]: the 18th of October 2026 and the days after. */
-        fun day(millis: Long): Day = Day("2026-10-%02d".format(18 + millis / DAY))
+        fun day(millis: Long): Day = Day.of(LocalDate.of(2026, 10, 18).plusDays(millis / DAY))
     }
 }

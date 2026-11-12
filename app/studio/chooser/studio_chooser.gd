@@ -50,21 +50,12 @@ class Row:
 	var _number_on: StudioText
 
 	func _init(entry: Entry, index: int) -> void:
-		flat = true
-		for state: StringName in [&"focus", &"normal", &"hover", &"pressed"]:
-			add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		FormPaint.plain(self)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		focus_neighbor_left = NodePath(".")
-		focus_neighbor_right = NodePath(".")
-		auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 		custom_minimum_size = _ROW
 		size = _ROW
 		text = entry.name
 		_coming = entry.coming
-		# The row draws its own text: the button's stays for the tests and the screen readers.
-		for colour: StringName in [&"font_color", &"font_focus_color", &"font_hover_color", &"font_pressed_color",
-				&"font_hover_pressed_color", &"font_disabled_color"]:
-			add_theme_color_override(colour, Color.TRANSPARENT)
 		_kick = StudioText.new(entry.kicker.to_upper(), StudioTokens.Face.PLEX_600, _KICK_PX, 0.14)
 		_name = StudioText.new(entry.name, StudioTokens.Face.JAKARTA_700, _NAME_PX, 0.0)
 		_name_on = StudioText.new(entry.name, StudioTokens.Face.JAKARTA_800, _NAME_PX, 0.0)
@@ -82,7 +73,7 @@ class Row:
 
 	func _draw() -> void:
 		var number := _number_on if on else _number
-		var room := size.x - _PAD_LEFT - _PAD_RIGHT - _GAP - number.width
+		var room := size.x - _PAD_LEFT - FormPaint.PAD_RIGHT - _GAP - number.width
 		var top := (size.y - _KICK_LINE - _NAME_LINE) / 2.0
 		var greyed := _COMING_INK if _coming else 1.0
 		_kick.draw(self, Vector2(_PAD_LEFT, top + _KICK_ASCENT - _kick.baseline - _KICK_RAISE),
@@ -92,17 +83,14 @@ class Row:
 		var ink := Color(Backdrop.palette.mute, greyed) if _coming else Color(Backdrop.palette.ink, 1.0 if on else 0.82)
 		name_text.draw(self, Vector2(_PAD_LEFT, top + _KICK_LINE + _NAME_ASCENT - name_text.baseline), ink)
 		var number_top := (size.y - _NUMBER_LINE) / 2.0 + _NUMBER_ASCENT - number.baseline
-		number.draw(self, Vector2(size.x - _PAD_RIGHT - number.width, number_top), rim if on else Backdrop.palette.mute)
-		draw_rect(Rect2(_PAD_LEFT, size.y + _SEPARATOR_GAP - 1.0, size.x - _PAD_LEFT - _SEPARATOR_RIGHT, 1.0), Backdrop.palette.line)
+		number.draw(self, Vector2(size.x - FormPaint.PAD_RIGHT - number.width, number_top), rim if on else Backdrop.palette.mute)
+		FormPaint.separator(self)
 
 
 const _CQW := FormPaint.CQW
 const _ROW := Vector2(56.0 * _CQW, 6.4 * _CQW)
 const _PITCH := 7.0 * _CQW
 const _PAD_LEFT := 2.2 * _CQW
-const _PAD_RIGHT := 1.8 * _CQW
-const _SEPARATOR_RIGHT := 1.4 * _CQW
-const _SEPARATOR_GAP := 0.3 * _CQW
 const _GAP := 1.6 * _CQW
 const _KICK_PX := 1.35 * _CQW
 const _NAME_PX := 2.35 * _CQW
@@ -161,9 +149,8 @@ var _plate_kick: StudioText
 ## The note shown under a console not fully supported yet; none for one that is.
 var _note: StudioText
 var _title: StudioText
-## The screen's way in, which B rewinds.
+## The screen's way in.
 var _opening := Motion.Timeline.new(_place_opening, self)
-var _returning := false
 var _choosing := false
 ## Where each line of the screen rests, and the one the plate's ink is drawn on.
 var _rests: Rests
@@ -251,7 +238,7 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if visible and event.is_action_pressed(&"screen_back"):
 		get_viewport().set_input_as_handled()
-		_answer(-1, true)
+		_answer(-1)
 
 
 ## Shows the Type chooser over [param offered] (the consoles a person may add, in order), the cursor on
@@ -418,7 +405,8 @@ func _focus(i: int) -> void:
 ## The cursor is on row [member _index]: what follows it, eased into place when [param moving].
 func _show_focus(moving: bool) -> void:
 	var entry := _entries[_index]
-	Diagnostics.trace("console form", "%s focus=%s" % ["type" if _is_type else "emulator", entry.id])
+	if Diagnostics.enabled:
+		Diagnostics.trace("console form", "%s focus=%s" % ["type" if _is_type else "emulator", entry.id])
 	var gel := _gel_of(_index)
 	for i in _rows.size():
 		_rows[i].on = i == _index
@@ -457,7 +445,6 @@ func _show_focus(moving: bool) -> void:
 ## The chooser's half of the form to chooser transition: the screen fades in, its lines, title and count come
 ## from the right and from below, the model rises (the plinth's own).
 func _open() -> void:
-	_returning = false
 	_opening.stand(0.0)
 	_opening.play(maxf(StudioTokens.TR_CHOOSER_AT_S + StudioTokens.TR_CHOOSER_LAYER_S,
 		StudioTokens.TR_CHOOSER_LINES_AT_S + StudioTokens.TR_CHOOSER_IN_S))
@@ -507,22 +494,12 @@ func _tap(at: Vector2) -> void:
 		_answer(row)
 
 
-func _answer(picked: int, turn_back := false) -> void:
-	if not visible or _returning:
+func _answer(picked: int) -> void:
+	if not visible:
 		return
 	if picked >= 0 and _entries[picked].coming:
 		_refuse(picked)
 		return
-	if turn_back and picked < 0 and _opening.is_playing() and StudioTokens.TR_REVERSE:
-		_returning = true
-		_opening.play(0.0)
-		await _opening.arrived
-		# Opened again meanwhile: that opening goes on.
-		if not _returning:
-			return
-		_returning = false
-		if not visible or not _choosing:
-			return
 	_opening.stop()
 	for motion: Tween in _motions.values():
 		motion.kill()
@@ -536,6 +513,7 @@ func _answer(picked: int, turn_back := false) -> void:
 	_dragging = false
 	_choosing = false
 	hide()
+	LogoView.drop_unseen()
 	Sounds.play(SoundEffects.Cue.SELECT if picked >= 0 else SoundEffects.Cue.BACK)
 	chosen.emit(picked)
 

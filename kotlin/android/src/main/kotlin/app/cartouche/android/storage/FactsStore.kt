@@ -7,6 +7,7 @@ import app.cartouche.core.files.FileFacts
 import app.cartouche.core.files.Shell
 import app.cartouche.core.longOrNone
 import app.cartouche.core.platforms.PlatformId
+import app.cartouche.core.serialName
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
@@ -14,7 +15,6 @@ import arrow.core.Some
 import arrow.core.filterOption
 import arrow.core.firstOrNone
 import arrow.core.getOrElse
-import arrow.core.left
 import arrow.core.raise.SingletonRaise
 import arrow.core.raise.option
 import arrow.core.right
@@ -47,10 +47,6 @@ internal class FactsStore(private val folder: File) {
         atomic(platform).delete()
     }
 
-    /** Forgets what every file told: each is read again at its platform's next scan. */
-    fun forget(): Either<StorageFailure, Unit> =
-        if (folder.deleteRecursively()) Unit.right() else StorageFailure.Unavailable("what the game files told cannot be forgotten").left()
-
     private fun atomic(platform: PlatformId) = AtomicFile(File(folder, "${platform.value}.tsv"))
 
     private val Option<Long>.text: String get() = fold({ "" }, Long::toString)
@@ -59,7 +55,7 @@ internal class FactsStore(private val folder: File) {
         get() =
             when (this) {
                 is FileFacts.Serial -> "serial:$code"
-                is FileFacts.Print -> "print:$hex:${shell.key}"
+                is FileFacts.Print -> "print:$hex:${shell.serialName}"
                 FileFacts.Silent -> "silent"
             }
 
@@ -89,7 +85,7 @@ internal class FactsStore(private val folder: File) {
 
     /** The shell a print's text tells: a Game Boy print without one is none, to be read again. */
     private fun shellOf(platform: PlatformId, print: String): Option<Shell> = when {
-        ':' in print -> Shell.entries.firstOrNone { it.key == print.substringAfter(':') }
+        ':' in print -> Shell.entries.firstOrNone { it.serialName == print.substringAfter(':') }
         platform in GAME_BOYS -> None
         else -> Some(Shell.UNKNOWN)
     }

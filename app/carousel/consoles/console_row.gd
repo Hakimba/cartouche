@@ -12,10 +12,10 @@ extends Node3D
 ##
 ## To be put in order ([ConsoleOrder]), the consoles leave the row for an ellipse where all of them
 ## show ([RingFit]): [member wheel] takes the one [member pointed] at there, [member others_wheel] the
-## others, [member wheel_slots] says where each one stands round it (-1 for a console that has no
-## place: the others while one arrives alone from the form), and each one slides to a new place. Each stands at its real
-## size on the shared [member ring_scale], as its picture stands in the consoles screen's frame. The one
-## pointed at grows a little; the one [member held] peels off as [member peel] has it, drawn as a sticker
+## others, each console's [member Item.on_ring] says where it stands round it ([member OnRing.slot], -1 for a console
+## that has no place: the others while one arrives alone from the form), and each one slides to a new place. Each
+## stands at its real size on the shared [member ring_scale], as its picture stands in the consoles screen's frame.
+## The one pointed at grows a little; the one [member held] peels off as [member peel] has it, drawn as a sticker
 ## only ([ConsoleSticker]) until it lies flat again.
 
 signal selection_changed(index: int)
@@ -44,13 +44,14 @@ const RAISE_PX := 83.2
 ## The render layer of the selected console when it has its own light rig on this screen: only that rig's
 ## lights are culled to it, the Sun leaves it alone.
 const HERO := 1 << 3
+## The picture's width in the consoles screen's frame, in [constant FormPaint.CQW] units.
+const PICTURE_CQW := CarouselLayout.FRAME.x / FormPaint.CQW
 ## One pixel of the 1280 × 960 reference frame, in world units a unit of depth away (the camera's field of view
 ## being 32°).
 const _WORLD_PER_PX := 0.000597386
+## The room light the rig writes to: the carousel's own is set by the carousel, so no world uses this one.
+static var _unseen_room := Environment.new()
 
-
-static var _with_rig: Dictionary[String, bool] = {}
-static var _rigs_read := false
 
 ## Where the selected console stands, turned (radians, about X then Y then Z) and sized.
 var console_position := Vector3.ZERO
@@ -60,7 +61,6 @@ var console_scale := 1.0
 var pose_amount := 1.0
 var sway_degrees := CarouselLayout.SWAY_DEGREES
 var bob_height := CarouselLayout.BOB_HEIGHT
-var others_opacity := 1.0
 ## How fast the consoles float and sway, from 1 down to 0, still ([Resting]).
 var pace := 1.0
 ## How far the row has come in on screen, from 0 (a point) to 1 (beyond, as it overshoots): every
@@ -74,18 +74,12 @@ var others_wheel := 0.0
 ## The scale every console stands on ([method RingFit.scale]), and the one it is following.
 var ring_scale := 0.0
 var ring_target := 0.0
-## Each console's place round the ring, by its index in the row, -1 for none; the consoles pointed at and
-## held there, by the same index, -1 for none.
-var wheel_slots: Array[int] = []
-## While a console is placed on the ring: each console's angle round it in radians (instead of its slot's), how far
-## each has come in (0 gone, smaller, to 1 at rest; any number of them, none for all at rest), and the console flying
-## free of the ring, none -1, standing as [member flier_stand] says.
-var ring_angles := PackedFloat64Array()
-var ring_arrival := PackedFloat64Array()
-var flier := -1
+## The consoles pointed at and held on the ring, none null; the console flying free of the ring while it is
+## placed, none null, standing as [member flier_stand] says.
+var pointed: Item
+var held: Item
+var flier: Item
 var flier_stand := Stand.new()
-var pointed := -1
-var held := -1
 var peel := 0.0
 var pose := ShelfRow.Pose.new()
 ## Whether the consoles are drawn apart, behind the games ([ConsoleLayer]): there, they move only in
@@ -94,8 +88,8 @@ var behind := false
 
 
 var _items: Array[Item] = []
-## The console lit by its own rig, the rig's lights, and the middle of its box in its own space; -1 for none.
-var _lit := -1
+## The console lit by its own rig, the rig's lights, and the middle of its box in its own space; none null.
+var _lit: Item
 var _lights: StudioLights
 var _lit_centre := Vector3.ZERO
 ## The position shown, unbounded on an endless row (see [CarouselLayout]).
@@ -105,14 +99,11 @@ var _scroll := 0.0
 var _pose_s := 0.0
 var _stick := Vector2.ZERO
 var _turn := StickTurn.new(true)
-var _slid: Array[float] = []
 var _ring_places := 0
-## How far each console's pop has gone, from 0 (as placed) to 1 (grown).
-var _pop: Array[float] = []
 ## The console peeled off: the one held, or the one put down until it lies flat again; and the one
-## drawn as a sticker. -1 for none.
-var _peeled := -1
-var _stuck := -1
+## drawn as a sticker. None null.
+var _peeled: Item
+var _stuck: Item
 ## Whether they were arranged since this node's last frame: then, behind the games too, they are
 ## arranged again as the clock moves on.
 var _arranged := false
@@ -120,7 +111,6 @@ var _arranged := false
 ## once it arrived.
 var _way := 0
 var _swap_s := _IN_S
-var _screen_presence := 1.0
 
 
 ## Whether the row is still between two positions or in a swap; [method settle] ends it at once.
@@ -130,12 +120,6 @@ func is_settling() -> bool:
 
 func settle() -> void:
 	_scroll = float(_position)
-	arrange()
-
-
-## Fades the whole row to [param presence], from 0 (gone) to 1.
-func fade_to(presence: float) -> void:
-	_screen_presence = presence
 	arrange()
 
 
@@ -150,10 +134,10 @@ func _process(delta: float) -> void:
 	_swap_s += delta
 	_turn.follow(_stick, selected_index(), delta)
 	_slide(delta)
-	for i in _pop.size():
-		_pop[i] = move_toward(_pop[i], 1.0 if i == pointed else 0.0, delta / _POP_S)
+	for item in _items:
+		item.on_ring.pop = move_toward(item.on_ring.pop, 1.0 if item == pointed else 0.0, delta / _POP_S)
 	# The one put down stays peeled off until it lies flat.
-	if held >= 0 or peel <= 0.0:
+	if held != null or peel <= 0.0:
 		_peeled = held
 	_stick_on()
 	if not behind or _arranged:
@@ -171,14 +155,17 @@ func show_consoles(items: Array[Item], from: int) -> void:
 	_items = items
 	for item in _items:
 		_adopt(item)
-	_peeled = -1
-	_stuck = -1
+	pointed = null
+	held = null
+	flier = null
+	_peeled = null
+	_stuck = null
 	_stop_swap()
 	behind = false
-	wheel_slots.assign(range(_items.size()))
-	_slid.assign(wheel_slots)
-	_pop.resize(_items.size())
-	_pop.fill(0.0)
+	_number_slots()
+	for item in _items:
+		item.on_ring.slid = float(item.on_ring.slot)
+		item.on_ring.pop = 0.0
 	_position = from
 	_scroll = from
 	_turn = StickTurn.new(true)
@@ -186,7 +173,8 @@ func show_consoles(items: Array[Item], from: int) -> void:
 	arrange()
 
 
-## The selected console shown by [param item] instead, where it stands: another model of it.
+## The selected console shown by [param item] instead, where it stands: another model of it, in the same place on
+## the ring and in the same roles.
 func replace_selected(item: Item) -> void:
 	var gone := selected()
 	_unlight()
@@ -194,7 +182,13 @@ func replace_selected(item: Item) -> void:
 	gone.model.queue_free()
 	_items[selected_index()] = item
 	_adopt(item)
-	_lit = -1
+	item.on_ring = gone.on_ring
+	pointed = item if pointed == gone else pointed
+	held = item if held == gone else held
+	flier = item if flier == gone else flier
+	_peeled = item if _peeled == gone else _peeled
+	_stuck = item if _stuck == gone else _stuck
+	_lit = null
 	arrange()
 
 
@@ -210,6 +204,26 @@ func console_at(index: int) -> Item:
 	return _items[index]
 
 
+## Each console's place round the ring, in the row's order, -1 for none.
+func slots() -> Array[int]:
+	var places: Array[int] = []
+	for item in _items:
+		places.append(item.on_ring.slot)
+	return places
+
+
+## Where [param item] is in the row, -1 for none.
+func index_of(item: Item) -> int:
+	return _items.find(item)
+
+
+## Every console at its slot's angle again, fully come in: the placing's angles are let go.
+func forget_angles() -> void:
+	for item in _items:
+		item.on_ring.angle = NAN
+		item.on_ring.arrival = 1.0
+
+
 ## The console at [param index] selected at once, in the middle of the row.
 func select(index: int) -> void:
 	if index == selected_index():
@@ -222,38 +236,25 @@ func select(index: int) -> void:
 
 
 ## The consoles in a new order: the one at [param order]'s first index first, and so on. Each one
-## stays as it is (selected, turned, pointed at, held, flying, at its angle on the ring) wherever it goes.
+## stays as it is (selected, turned, pointed at, held, flying, at its angle on the ring) wherever it goes. One the
+## order leaves out (a placing's answer, its games gone meanwhile) is out at once, never drawn again.
 func reorder(order: Array[int]) -> void:
 	var items: Array[Item] = []
-	var slid: Array[float] = []
-	var popped: Array[float] = []
-	var angles := PackedFloat64Array()
-	var arrivals := PackedFloat64Array()
-	# The ring writes an angle and an arrival for every console, or none.
-	var ringed := ring_angles.size() == _items.size()
 	for index in order:
 		items.append(_items[index])
-		slid.append(_slid[index])
-		popped.append(_pop[index])
-		if ringed:
-			angles.append(ring_angles[index])
-			arrivals.append(ring_arrival[index])
-	_items = items
-	_slid = slid
-	_pop = popped
-	if ringed:
-		ring_angles = angles
-		ring_arrival = arrivals
-	wheel_slots.assign(range(_items.size()))
+	for item in _items:
+		if item not in items:
+			if item == _lit:
+				_unlight()
+			pointed = null if pointed == item else pointed
+			held = null if held == item else held
+			remove_child(item.model)
+			item.model.queue_free()
 	_position = order.find(selected_index())
 	_scroll = _position
 	_turn.index = order.find(_turn.index)
-	flier = order.find(flier)
-	pointed = order.find(pointed)
-	held = order.find(held)
-	_peeled = order.find(_peeled)
-	_stuck = order.find(_stuck)
-	_lit = order.find(_lit)
+	_items = items
+	_number_slots()
 	_stop_swap()
 
 
@@ -274,24 +275,23 @@ func step(direction: int, places := 1) -> void:
 func begin_arrival(centre: Vector2, width: float) -> Stand:
 	arrival = 1.0
 	face_front()
-	flier = selected_index()
+	flier = selected()
 	pointed = flier
-	wheel_slots.fill(-1)
-	wheel_slots[flier] = 0
+	for item in _items:
+		item.on_ring.slot = -1
+	flier.on_ring.slot = 0
 	wheel = 1.0
-	flier_stand = Stand.new()
-	flier_stand.centre = centre
-	flier_stand.size = width
+	flier_stand = Stand.new(centre, width)
 	arrange()
 	return flier_stand
 
 
 ## Restores the selected hero and the row's normal slots after a direct arrival.
 func end_arrival() -> void:
-	flier = -1
-	pointed = -1
+	flier = null
+	pointed = null
 	wheel = 0.0
-	wheel_slots.assign(range(_items.size()))
+	_number_slots()
 	flier_stand = Stand.new()
 	arrange()
 
@@ -318,11 +318,11 @@ func let_go() -> void:
 	_turn.let_go()
 
 
-func show_in_layers(mask: int) -> void:
-	behind = mask == ConsoleLayer.BEHIND
-	for i in _items.size():
-		for geometry in _items[i].geometry:
-			geometry.layers = HERO if mask == ConsoleLayer.FRONT and i == _lit else mask
+## Draws the consoles apart, behind the games ([ConsoleLayer]), when [param on]; in front otherwise.
+func draw_behind(on: bool) -> void:
+	behind = on
+	for item in _items:
+		_draw_in(item)
 
 
 ## Stands every console as the properties above have it; each frame does (behind the games, only
@@ -332,39 +332,36 @@ func arrange() -> void:
 	var on_ring := wheel > 0.0 or others_wheel > 0.0
 	_light_selected()
 	var arrived := Motion.eased(Motion.Easing.ARRIVE, clampf(_swap_s / _IN_S, 0.0, 1.0))
+	var layout: ScreenLayout = ScreenLayout.at(get_viewport()) if on_ring else null
 	for i in _items.size():
 		var item := _items[i]
 		var chosen := i == selected_index()
-		item.model.visible = chosen or on_ring and wheel_slots[i] >= 0
+		var shown := chosen or on_ring and item.on_ring.slot >= 0
+		var ringed: Stand = _stand(item) if on_ring and shown else null
+		# A console coming to or leaving the ring grows from a point, opaque: none is drawn at no size.
+		item.model.visible = shown and (ringed == null or ringed.size > 0.0)
 		if not item.model.visible:
 			continue
-		var offset := 0.0 if chosen else CarouselLayout.nearest(_position, i, _items.size()) - _scroll
-		var rest := item.rest
-		var at_position := console_position if chosen else rest.console_position
-		var amount := pose_amount if chosen else rest.pose_amount
-		var centred := CarouselLayout.centred(offset) * amount
-		var place := CarouselLayout.place(offset)
-		pose.sway = sway_degrees if chosen else rest.sway_degrees
-		var bob := CarouselLayout.float_height(_pose_s, bob_height if chosen else rest.bob_height, centred)
-		var turned := _three_euler(console_rotation if chosen else rest.console_rotation)
-		var size := (console_scale * lerpf(_IN_SCALE, 1.0, arrived) if chosen else rest.console_scale) * maxf(arrival, 0.001)
-		var posed := place.basis * pose.at(_pose_s, centred) * _turn.of(i)
-		var stand := posed * turned.scaled(Vector3.ONE * size)
-		var lift := Vector3.UP * bob
-		var shift_px := lerpf(_way * _IN_PX, 0.0, arrived) if chosen else 0.0
-		var slid := Vector3.RIGHT * shift_px * _WORLD_PER_PX * (3.7 - at_position.z - global_position.z)
-		var in_row := Transform3D(stand, at_position + place.origin + lift + slid)
-		if chosen and _lights:
-			_lights.place(Transform3D(stand, at_position + place.origin + lift) * _lit_centre)
-		var ringed: Stand = _stand(i) if on_ring else null
-		var moved := _on_ring(i, ringed) if on_ring else in_row
+		var in_row := _selected_in_row(i, arrived) if chosen else Transform3D.IDENTITY
+		var moved := _on_ring(item, ringed, layout) if on_ring else in_row
 		if chosen and _lights and on_ring:
 			_lights.place(moved * _lit_centre)
 		# Set again, even unchanged, it would be sent to every part of the console.
 		if item.model.transform != moved:
 			item.model.transform = moved
-		var presence := 1.0 if chosen else others_opacity
-		item.fade.call(1.0 - ringed.opacity if on_ring else CarouselLayout.faded(offset, presence * _screen_presence))
+
+
+## Where the selected console stands in the row, posed and floating, and its lights with it. Off the ring it is
+## the only console shown.
+func _selected_in_row(index: int, arrived: float) -> Transform3D:
+	pose.sway = sway_degrees
+	var size := console_scale * lerpf(_IN_SCALE, 1.0, arrived) * maxf(arrival, 0.001)
+	var stand := pose.at(_pose_s, pose_amount) * _turn.of(index) * _three_euler(console_rotation).scaled(Vector3.ONE * size)
+	var lift := Vector3.UP * CarouselLayout.float_height(_pose_s, bob_height, pose_amount)
+	var slid := Vector3.RIGHT * lerpf(_way * _IN_PX, 0.0, arrived) * _WORLD_PER_PX * (3.7 - console_position.z - global_position.z)
+	if _lights:
+		_lights.place(Transform3D(stand, console_position + lift) * _lit_centre)
+	return Transform3D(stand, console_position + lift + slid)
 
 
 ## The lights of the selected console, for the debug bridge to tune live.
@@ -375,35 +372,8 @@ func lights() -> StudioLights:
 ## The selected console lit again from the light file as it now reads (the debug bridge reloaded it).
 func relight() -> void:
 	_unlight()
-	_lit = -1
+	_lit = null
 	_light_selected()
-
-
-## Drops what was read of the light file, so that the next read sees a file the debug bridge reloaded.
-static func forget() -> void:
-	_rigs_read = false
-	_with_rig.clear()
-
-
-## Whether the console in [param folder] has its own light rig on this screen (`consoles`).
-static func has_rig(folder: String) -> bool:
-	if not _rigs_read:
-		_with_rig = _rigs_from(FileAccess.get_file_as_string(StudioLights.FILE))
-		_rigs_read = true
-	return _with_rig.get(folder, false)
-
-
-static func _rigs_from(text: String) -> Dictionary[String, bool]:
-	var found: Dictionary[String, bool] = {}
-	var parsed: Variant = JSON.parse_string(text)
-	if parsed is not Dictionary:
-		return found
-	var data: Dictionary = parsed
-	var models: Dictionary = data.get("lights", {})
-	for model: String in models:
-		var screens: Dictionary = models[model]
-		found[model] = screens.has("consoles")
-	return found
 
 
 func _adopt(item: Item) -> void:
@@ -416,84 +386,84 @@ func _adopt(item: Item) -> void:
 ## The lights of the selected console's own rig stand about it, the console alone drawn in their layer; a
 ## console without a rig keeps the Sun and the room as they are.
 func _light_selected() -> void:
-	var wanted := selected_index() if not _items.is_empty() and has_rig(selected().folder) else -1
-	if wanted == _lit and (wanted < 0 or _lights):
+	var wanted: Item = selected() if not _items.is_empty() and StudioLights.has_rig(selected().folder, &"consoles") else null
+	if wanted == _lit and (wanted == null or _lights):
 		return
 	var was := _lit
 	_unlight()
 	_lit = wanted
-	if wanted >= 0:
-		var model := _items[wanted].model
+	if wanted:
+		var model := wanted.model
 		_lit_centre = Plinth.bounds(model, model).get_center()
-		_lights = StudioLights.new(self, StudioLights.rig_of(_items[wanted].folder, &"consoles"), Vector3.ZERO,
-			StudioLights.environment_of(self))
+		_lights = StudioLights.new(self, StudioLights.rig_of(wanted.folder, &"consoles"), Vector3.ZERO,
+			_unseen_room)
 		for light in _lights.lights():
 			light.light_cull_mask = HERO
-	for i: int in [was, wanted]:
-		if i >= 0 and i < _items.size():
-			for geometry in _items[i].geometry:
-				geometry.layers = _front_layer(i) if not behind else ConsoleLayer.BEHIND
+	for item: Item in [was, wanted]:
+		if item:
+			_draw_in(item)
 
 
 func _unlight() -> void:
 	if _lights:
-		for light in _lights.lights():
-			light.queue_free()
+		_lights.dispose()
 	_lights = null
-	_lit = -1
+	_lit = null
 
 
-func _front_layer(index: int) -> int:
-	return HERO if index == _lit else ConsoleLayer.FRONT
+## [param item] drawn in its render layer: the sticker's while it is the one stuck, else behind the games when the
+## consoles are, else the hero's when its own rig lights it, else the front.
+func _draw_in(item: Item) -> void:
+	var layer := HERO if item == _lit else ConsoleLayer.FRONT
+	if item == _stuck:
+		layer = ConsoleLayer.STICKER
+	elif behind:
+		layer = ConsoleLayer.BEHIND
+	for geometry in item.geometry:
+		geometry.layers = layer
 
 
 func _stop_swap() -> void:
 	_swap_s = _IN_S
 
 
-## Where console [param index] stands on the ring: its silhouette's centre ([member Stand.centre]) at its place,
-## [member Stand.size] times its size in the consoles screen's frame, as opaque as [member Stand.opacity]. The one
-## pointed at glides from the hero's place as [member wheel] has it; the others come from the rail as
-## [member others_wheel] has it.
-func _stand(index: int) -> Stand:
-	if index == flier:
+## Where [param item] stands on the ring: its silhouette's centre ([member Stand.centre]) at its place,
+## [member Stand.size] times its size in the consoles screen's frame. The one pointed at glides from the hero's place
+## as [member wheel] has it; the others come from the rail as [member others_wheel] has it, growing from a point,
+## opaque all along: a 3D model faded shows its insides.
+func _stand(item: Item) -> Stand:
+	if item == flier:
 		return flier_stand
-	var item := _items[index]
-	var angle := ring_angles[index] if index < ring_angles.size() else _slid[index] / _ring_places * TAU
-	var peeled := peel if index == _peeled else 0.0
-	var growth := Motion.eased(Motion.Easing.POP, _pop[index]) * lerpf(_POINTED_GROWTH, _PEEL_GROWTH, peeled)
-	var size := RingFit.width(RingFit.weight_of(item.folder), ring_scale, angle) * (1.0 + growth) / (CarouselLayout.FRAME.x / FormPaint.CQW)
+	var on := item.on_ring
+	var angle := on.slid / _ring_places * TAU if is_nan(on.angle) else on.angle
+	var peeled := peel if item == _peeled else 0.0
+	var growth := Motion.eased(Motion.Easing.POP, on.pop) * lerpf(_POINTED_GROWTH, _PEEL_GROWTH, peeled)
+	var size := RingFit.width(RingFit.weight_of(item.folder), ring_scale, angle) * (1.0 + growth) / PICTURE_CQW
 	var place := RingFit.place(angle) - Vector2(0.0, _PEEL_LIFT_PX * peeled)
-	var stand := Stand.new()
-	if index == pointed:
-		stand.centre = _hero_of(item).centre.lerp(place, wheel)
-		stand.size = lerpf(1.0, size, wheel)
-		stand.opacity = 1.0
-		return stand
+	if item == pointed:
+		return Stand.new(_hero_of(item).centre.lerp(place, wheel), lerpf(1.0, size, wheel))
 	var from := Vector2(lerpf(place.x, _RAIL_POINT.x, _RAIL_PULL.x), lerpf(place.y, _RAIL_POINT.y, _RAIL_PULL.y))
-	var arrived := ring_arrival[index] if index < ring_arrival.size() else 1.0
-	stand.centre = from.lerp(place, others_wheel)
-	stand.size = size * lerpf(_RAIL_SIZE, 1.0, others_wheel) * lerpf(_COMING_SIZE, 1.0, arrived)
-	stand.opacity = others_wheel * clampf(arrived, 0.0, 1.0)
-	return stand
+	var come := maxf(others_wheel, 0.0) * clampf(on.arrival, 0.0, 1.0)
+	return Stand.new(from.lerp(place, others_wheel),
+		size * lerpf(_RAIL_SIZE, 1.0, others_wheel) * lerpf(_COMING_SIZE, 1.0, on.arrival) * come)
 
 
-## How console [param index] stands in the model's frame for [param stand]: as in the consoles screen but sized and
+## How [param item] stands in the model's frame for [param stand]: as in the consoles screen but sized and
 ## moved, leaning when held; its place is found from where its silhouette's centre stands in the hero's frame.
-func _on_ring(index: int, stand: Stand) -> Transform3D:
-	var rest := _items[index].rest
-	var hero := _hero_of(_items[index])
-	var peeled := peel if index == _peeled else 0.0
+func _on_ring(item: Item, stand: Stand, layout: ScreenLayout) -> Transform3D:
+	var rest := item.rest
+	var hero := _hero_of(item)
+	var peeled := peel if item == _peeled else 0.0
 	var leaning := Basis(Vector3.BACK, _PEEL_LEAN * peeled)
-	var origin := to_view(stand.centre - stand.size * (hero.centre - hero.origin))
+	var origin := layout.on_stage(stand.centre - stand.size * (hero.centre - hero.origin))
 	# The console flying free of the ring is nearer the camera, and as much smaller, so that it is drawn over the others.
-	var nearer := _FLIER_NEARER if index == flier else 1.0
+	var nearer := _FLIER_NEARER if item == flier else 1.0
 	var at := to_local(get_viewport().get_camera_3d().project_position(origin, hero.depth * nearer))
 	return Transform3D(leaning * _three_euler(rest.console_rotation).scaled(Vector3.ONE * rest.console_scale * stand.size * nearer), at)
 
 
 func ring_stand(index: int) -> Stand:
-	return _stand(index)
+	return _stand(_items[index])
 
 
 ## The silhouette box of console [param index] in its picture's frame, as fractions of it: the box of what it
@@ -517,18 +487,13 @@ func to_view(design: Vector2) -> Vector2:
 	return ScreenLayout.at(get_viewport()).on_stage(design)
 
 
-## The point [param view] of the viewport, in px of the reference frame.
-func to_design(view: Vector2) -> Vector2:
-	return ScreenLayout.at(get_viewport()).from_stage(view)
-
-
 ## The console's look in the hero's place, measured once, the first time it is wanted: the boxes of its visible parts
 ## in its rest basis (the lid and the trays move in the launch, whose steps start from this very rest) drawn through
 ## the camera.
 func _hero_of(item: Item) -> Hero:
 	if item.hero == null:
 		var started := Time.get_ticks_usec()
-		item.hero = Hero.of(self, item)
+		item.hero = Hero.of(self, item, ScreenLayout.at(get_viewport()))
 		Diagnostics.trace("order", "silhouette of %s measured in %.2f ms" % [item.folder, (Time.get_ticks_usec() - started) / 1000.0])
 	return item.hero
 
@@ -536,20 +501,29 @@ func _hero_of(item: Item) -> Hero:
 ## What draws the console peeled off, none when no console is.
 func peeled_geometry() -> Array[VisualInstance3D]:
 	var geometry: Array[VisualInstance3D] = []
-	if _peeled >= 0:
-		geometry = _items[_peeled].geometry
+	if _peeled:
+		geometry = _peeled.geometry
 	return geometry
 
 
 ## Every console stands in its slot at once, the ring's places counted again.
 func snap_ring() -> void:
 	_count_places()
-	for i in mini(_items.size(), wheel_slots.size()):
-		_slid[i] = float(maxi(wheel_slots[i], 0))
+	for item in _items:
+		item.on_ring.slid = float(maxi(item.on_ring.slot, 0))
 
 
 func _count_places() -> void:
-	_ring_places = maxi(wheel_slots.filter(func(slot: int) -> bool: return slot >= 0).size(), 1)
+	var places := 0
+	for item in _items:
+		places += int(item.on_ring.slot >= 0)
+	_ring_places = maxi(places, 1)
+
+
+## The consoles' slots as the row has them: the first at the first place, and so on.
+func _number_slots() -> void:
+	for i in _items.size():
+		_items[i].on_ring.slot = i
 
 
 ## Each console slides towards its slot round the ring, the shorter way.
@@ -557,23 +531,24 @@ func _slide(delta: float) -> void:
 	_count_places()
 	var follow := RingFit.share(delta)
 	ring_scale = RingFit.toward(ring_scale, ring_target, follow)
-	for i in mini(_items.size(), wheel_slots.size()):
-		if wheel_slots[i] < 0:
+	for item in _items:
+		var on := item.on_ring
+		if on.slot < 0:
 			continue
-		var gap := wrapf(wheel_slots[i] - _slid[i], -_ring_places / 2.0, _ring_places / 2.0)
-		var slid := _slid[i] + gap * follow
-		_slid[i] = float(wheel_slots[i]) if absf(gap) < 0.001 else fposmod(slid, _ring_places)
+		var gap := wrapf(on.slot - on.slid, -_ring_places / 2.0, _ring_places / 2.0)
+		var slid := on.slid + gap * follow
+		on.slid = float(on.slot) if absf(gap) < 0.001 else fposmod(slid, _ring_places)
 
 
 ## The console peeled off drawn as a sticker only, the others as usual.
 func _stick_on() -> void:
 	if _peeled == _stuck:
 		return
-	for i: int in [_stuck, _peeled]:
-		if i >= 0:
-			for geometry in _items[i].geometry:
-				geometry.layers = ConsoleLayer.STICKER if i == _peeled else _front_layer(i)
+	var was := _stuck
 	_stuck = _peeled
+	for item: Item in [was, _stuck]:
+		if item:
+			_draw_in(item)
 
 
 ## Turned about X, then Y, then Z, each about the axes the previous turns left, as the steps of a
@@ -583,25 +558,36 @@ static func _three_euler(angles: Vector3) -> Basis:
 		* Basis(Vector3.BACK, angles.z)
 
 
-## One console of the row: its model, how to fade it, and where it rests.
+## One console of the row: its model, where it rests and where it stands on the ring.
 class Item:
 	var model: Node3D
 	## Its folder under res://carousel/consoles.
 	var folder: String
-	## Takes how transparent the model is, from 0 (opaque) to 1 (gone).
-	var fade: Callable
 	var rest: Rest
 	## What draws it, once in the row.
 	var geometry: Array[VisualInstance3D] = []
 	## How it looks in the hero's place, once known (see [method ConsoleRow._hero_of]).
 	var hero: Hero
+	var on_ring := OnRing.new()
 
-	## [param shown] has a `fade(amount)` method.
 	func _init(shown: Node3D, resting: Rest, from := "") -> void:
 		model = shown
-		fade = Callable(shown, &"fade")
 		rest = resting
 		folder = from
+
+
+## Where a console stands on the ring ([ConsoleOrder] writes [member slot], [member angle] and [member arrival]).
+class OnRing:
+	## Its place round the ring, -1 for none.
+	var slot := -1
+	## Where it has slid to, on its way to its slot.
+	var slid := 0.0
+	## How far its pop has gone, from 0 (as placed) to 1 (grown).
+	var pop := 0.0
+	## While a console is placed: its angle round the ring in radians; NAN for its slot's.
+	var angle := NAN
+	## While a console is placed: how far it has come in, from 0 (gone, smaller) to 1 (at rest).
+	var arrival := 1.0
 
 
 ## Where a console rests: its launch animation's first values.
@@ -625,11 +611,14 @@ class Rest:
 
 
 ## Where a console's silhouette stands on the ring: its centre in px of the reference frame, its size against
-## the picture in the consoles screen (1 there), its opacity.
+## the picture in the consoles screen (1 there).
 class Stand:
-	var centre := Vector2.ZERO
-	var size := 1.0
-	var opacity := 1.0
+	var centre: Vector2
+	var size: float
+
+	func _init(at := Vector2.ZERO, wide := 1.0) -> void:
+		centre = at
+		size = wide
 
 
 ## How a console looks in the hero's place, drawn through the camera: where its origin and the centre of its
@@ -641,7 +630,7 @@ class Hero:
 	var depth := 1.0
 	var box := Rect2()
 
-	static func of(row: ConsoleRow, item: Item) -> Hero:
+	static func of(row: ConsoleRow, item: Item, layout: ScreenLayout) -> Hero:
 		var camera := row.get_viewport().get_camera_3d()
 		var rest := item.rest
 		var posed := row.global_transform * Transform3D(
@@ -655,11 +644,11 @@ class Hero:
 			var to_world := posed * (inverse * part.global_transform)
 			var aabb := part.get_aabb()
 			for corner in 8:
-				var seen := row.to_design(camera.unproject_position(to_world * aabb.get_endpoint(corner)))
+				var seen := layout.from_stage(camera.unproject_position(to_world * aabb.get_endpoint(corner)))
 				low = low.min(seen)
 				high = high.max(seen)
 		var hero := Hero.new()
-		hero.origin = row.to_design(camera.unproject_position(posed.origin))
+		hero.origin = layout.from_stage(camera.unproject_position(posed.origin))
 		hero.centre = (low + high) / 2.0
 		hero.depth = -(camera.global_transform.affine_inverse() * posed.origin).z
 		hero.box = Rect2((low + Vector2(0.0, RAISE_PX)) / CarouselLayout.FRAME, (high - low) / CarouselLayout.FRAME)

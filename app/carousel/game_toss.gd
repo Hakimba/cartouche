@@ -98,9 +98,7 @@ func _at(seconds: float) -> Dictionary[Part, float]:
 func _show(parts: Dictionary[Part, float]) -> void:
 	row.pose_amount = parts[Part.POSE]
 	row.neighbours = parts[Part.NEIGHBOURS]
-	row.selected_lift = parts[Part.LIFT]
-	row.selected_flip = parts[Part.FLIP]
-	row.selected_squash = parts[Part.SQUASH]
+	row.stand(SelectedStand.tossed(parts[Part.LIFT], parts[Part.FLIP], parts[Part.SQUASH]))
 	pill.modulate.a = parts[Part.PILL]
 	logo.modulate.a = parts[Part.LOGO]
 

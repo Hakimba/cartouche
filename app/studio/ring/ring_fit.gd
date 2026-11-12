@@ -18,6 +18,8 @@ const ROOM := 1.2
 ## its silhouette, a fraction of its picture.
 const WIDEST := 12.5
 const PS2_BOX := Rect2(0.256, 0.298, 0.552, 0.376)
+## The widest a console may stand, as a multiple of its weight: the PS2's box at [constant WIDEST].
+const CAP := WIDEST / PS2_BOX.size.x
 ## How fast everything on the ring follows its target, per second.
 const _FOLLOW := 14.0
 const _BISECTIONS := 26

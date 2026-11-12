@@ -4,15 +4,17 @@ extends Node
 const Packs := preload("res://dev/bridge/packs.gd")
 const LaunchView := preload("res://dev/bridge/launch_view.gd")
 const Views := preload("res://dev/bridge/views.gd")
+const Values := preload("res://dev/bridge/values.gd")
 const BridgeSounds := preload("res://dev/bridge/sounds.gd")
 const RouteFixture := preload("res://dev/bridge/route_fixture.gd")
 const ScreenAgreement := preload("res://dev/screen_agreement.gd")
 const _PLINTH := preload("res://studio/views/plinth.gd")
 const CACHE_FILES := {
 	"res://data/studio_lights.json":
-		[preload("res://studio/views/studio_lights.gd"), preload("res://carousel/consoles/console_row.gd"), _PLINTH],
+		[preload("res://studio/views/studio_lights.gd"), _PLINTH],
 	"res://data/turntable.json": [_PLINTH],
 	"res://data/media_poses.json": [preload("res://studio/games/games_layout.gd")],
+	"res://data/screen_formats.json": [preload("res://studio/screen_layout.gd")],
 }
 ## Files read once as the app starts: a change reaches the app only by a restart.
 const START_FILES: Array[String] = ["res://data/platforms/", "res://data/titles/", "res://data/scan/", "res://data/launch/",
@@ -64,7 +66,7 @@ func run(message: Dictionary) -> Dictionary:
 		"go":
 			var steps: Variant = message.get("route")
 			if not _valid_route(steps):
-				result = _error("invalid route")
+				result = Values.error("invalid route")
 			else:
 				var validated_steps: Array = steps
 				route = validated_steps.duplicate(true)
@@ -79,8 +81,8 @@ func run(message: Dictionary) -> Dictionary:
 		"pick":
 			if message.get("all", false) == true:
 				result = {"controls": _views.controls(_scene())}
-			elif not _number(message.get("x")) or not _number(message.get("y")):
-				result = _error("invalid point")
+			elif not Values.number(message.get("x")) or not Values.number(message.get("y")):
+				result = Values.error("invalid point")
 			else:
 				result = _views.pick(_scene(), _point(message))
 		"sound": result = _sounds.play(message)
@@ -88,8 +90,8 @@ func run(message: Dictionary) -> Dictionary:
 		"snapshot": result = await _snapshot()
 		"window":
 			var wanted := _size(message.get("size"))
-			result = await _window(wanted) if wanted.x >= 1.0 and wanted.y >= 1.0 else _error("invalid size")
-		_: result = _error("unknown command")
+			result = await _window(wanted) if wanted.x >= 1.0 and wanted.y >= 1.0 else Values.error("invalid size")
+		_: result = Values.error("unknown command")
 	answer.merge(result, true)
 	Diagnostics.trace("bridge", "%s %s" % [command, "ok" if answer["ok"] else answer.get("error", "failed")])
 	return answer
@@ -100,27 +102,27 @@ func _tune(message: Dictionary) -> Dictionary:
 	if message.get("target") == "input":
 		var raw_input: Variant = message.get("values")
 		if raw_input is not Dictionary:
-			return _error("invalid input")
+			return Values.error("invalid input")
 		var input: Dictionary = raw_input
 		if input.get("action") is not String or input.get("pressed") is not bool or not InputMap.has_action(str(input["action"])):
-			return _error("invalid input")
+			return Values.error("invalid input")
 		var pressed: bool = input["pressed"]
 		_act(StringName(str(input["action"])), pressed)
 		return {"ok": true}
 	if message.get("target") == "speed":
 		var speed: Variant = message.get("value")
-		if not _number(speed) or speed <= 0.0 or speed > 20.0:
-			return _error("invalid speed")
+		if not Values.number(speed) or speed <= 0.0 or speed > 20.0:
+			return Values.error("invalid speed")
 		if paused:
-			_previous_scale = _float(speed)
+			_previous_scale = Values.float_of(speed)
 		else:
-			Engine.time_scale = _float(speed)
+			Engine.time_scale = Values.float_of(speed)
 		return {"speed": speed}
 	if message.get("target") != "launch":
 		return _views.tune(_scene(), message)
 	var values: Variant = message.get("values")
 	if values is not Dictionary:
-		return _error("invalid values")
+		return Values.error("invalid values")
 	var launch_values: Dictionary = values
 	var carousel := _scene() as Carousel
 	if launch_values.get("stop") == true:
@@ -164,9 +166,9 @@ func _lifecycle(message: Dictionary) -> Dictionary:
 	var event: Variant = message.get("event")
 	var arrive: Variant = message.get("arrive", "")
 	if android.is_available():
-		return _error("lifecycle is the desktop's: on a device, leave the app and come back")
+		return Values.error("lifecycle is the desktop's: on a device, leave the app and come back")
 	if event not in ["pause", "resume"] or arrive is not String:
-		return _error("invalid lifecycle")
+		return Values.error("invalid lifecycle")
 	(android._plugin as DesktopPlugin).start_with_arrivals(str(arrive))
 	get_tree().root.propagate_notification(
 		NOTIFICATION_APPLICATION_PAUSED if event == "pause" else NOTIFICATION_APPLICATION_RESUMED)
@@ -183,15 +185,15 @@ func _screen_name() -> String:
 func _shot(message: Dictionary) -> Dictionary:
 	var format: Variant = message.get("format", "png")
 	var quality: Variant = message.get("quality", 0.85)
-	if format not in ["jpg", "png"] or not _number(quality) or quality < 0 or quality > 1:
-		return _error("invalid picture format or quality")
+	if format not in ["jpg", "png"] or not Values.number(quality) or quality < 0 or quality > 1:
+		return Values.error("invalid picture format or quality")
 	var without_model: Callable = _views.hide_model(_scene()) if message.get("hide") == "model" else Callable()
 	var image := capture()
 	if without_model.is_valid():
 		without_model.call()
 	if image == null or image.is_empty():
-		return _error("renderer has no picture")
-	var bytes := image.save_jpg_to_buffer(_float(quality)) if format == "jpg" else image.save_png_to_buffer()
+		return Values.error("renderer has no picture")
+	var bytes := image.save_jpg_to_buffer(Values.float_of(quality)) if format == "jpg" else image.save_png_to_buffer()
 	return {"size": bytes.size(), "w": image.get_width(), "h": image.get_height(), "_bytes": bytes}
 
 
@@ -205,26 +207,26 @@ func capture() -> Image:
 func _overlay(message: Dictionary, restart: bool) -> Dictionary:
 	var files: Variant = message.get("files")
 	if files is not Array:
-		return _error("invalid files")
+		return Values.error("invalid files")
 	var started := Time.get_ticks_usec()
 	var validated_files: Array = files
 	# The engine compiles every named script before the first one runs: no pack can replace a script.
 	for item: Variant in validated_files:
 		var entry: Dictionary = item if item is Dictionary else {}
 		if str(entry.get("path", "")).get_extension() == "gd":
-			return _error("a script cannot be replaced while the app runs or as it starts")
+			return Values.error("a script cannot be replaced while the app runs or as it starts")
 	if not restart:
 		for item: Variant in validated_files:
 			var entry: Dictionary = item if item is Dictionary else {}
 			var path := str(entry.get("path", ""))
 			if START_FILES.any(func(start: String) -> bool: return path.begins_with(start)) \
 					or path.get_extension() in _FONT_EXTENSIONS:
-				return _error("%s is read at start or cached with its shapes: use restart" % path)
+				return Values.error("%s is read at start or cached with its shapes: use restart" % path)
 	var result := _packs.write(validated_files, restart)
 	if not result["ok"] or restart:
 		return result
 	if not ProjectSettings.load_resource_pack(str(result["pack"]), true):
-		return _error("cannot load overlay")
+		return Values.error("cannot load overlay")
 	for item: Dictionary in validated_files:
 		var path: String = item["path"]
 		for script: GDScript in CACHE_FILES.get(path, []):
@@ -259,7 +261,7 @@ static func _valid_route(value: Variant) -> bool:
 		for key: String in ["press", "push", "release"]:
 			if step.has(key) and (step[key] is not String or not InputMap.has_action(str(step[key]))):
 				return false
-		if step.has("wait") and (not _number(step["wait"]) or step["wait"] < 0 or step["wait"] > 36000):
+		if step.has("wait") and (not Values.number(step["wait"]) or step["wait"] < 0 or step["wait"] > 36000):
 			return false
 		if step.has("hold") and step["hold"] is not bool:
 			return false
@@ -295,7 +297,7 @@ func _go() -> Dictionary:
 				# The frame that still sees the direction held runs at the recorded speed too.
 				await get_tree().process_frame
 			Engine.time_scale = 1.0 if not _held.is_empty() else _REPLAY_SPEED
-			await _wait(_float(item.get("wait", 80)))
+			await _wait(Values.float_of(item.get("wait", 80)))
 		RenderingServer.force_draw()
 	# A last step marked `hold` leaves the app paused on the first frame of what it started: the press registers
 	# with the clock stopped, then `step` plays on frame by frame.
@@ -340,7 +342,7 @@ func _settle_start() -> Dictionary:
 		if (scene._shown or waiting) and not scene._screens.is_playing() and (scene._arrival == null or not scene._arrival.is_running()):
 			return {"ok": true}
 		await get_tree().process_frame
-	return _error("the scene did not settle after 600 frames")
+	return Values.error("the scene did not settle after 600 frames")
 
 
 func _reload_scene() -> Dictionary:
@@ -366,7 +368,7 @@ func _reload_scene() -> Dictionary:
 		await tree.process_frame
 		return {"ok": true}
 	if _scene() == null or get_tree().reload_current_scene() != OK:
-		return _error("cannot reload current scene")
+		return Values.error("cannot reload current scene")
 	await get_tree().scene_changed
 	return {"ok": true}
 
@@ -417,12 +419,12 @@ func _resume() -> void:
 
 func _step(message: Dictionary) -> Dictionary:
 	var frames: Variant = message.get("frames")
-	if not _number(frames) or frames < 1 or frames > 3600 or frames != int(_float(frames)):
-		return _error("invalid frame count")
+	if not Values.number(frames) or frames < 1 or frames > 3600 or frames != int(Values.float_of(frames)):
+		return Values.error("invalid frame count")
 	_pause()
 	# While the tree stays paused, advance the same frame-driven shell and its tweens at a fixed delta. A node
 	# that processes while paused also gets the engine's own call that frame, with a delta of 0.
-	for frame in int(_float(frames)):
+	for frame in int(Values.float_of(frames)):
 		_step_node(_scene())
 		for tween in get_tree().get_processed_tweens():
 			if not tween.is_running():
@@ -430,7 +432,7 @@ func _step(message: Dictionary) -> Dictionary:
 			tween.custom_step(1.0 / 60.0)
 		await get_tree().process_frame
 	RenderingServer.force_draw()
-	return {"frames": int(_float(frames))}
+	return {"frames": int(Values.float_of(frames))}
 
 
 func _step_node(node: Node) -> void:
@@ -447,13 +449,13 @@ func _step_node(node: Node) -> void:
 
 func _scrub(message: Dictionary) -> Dictionary:
 	var time: Variant = message.get("t")
-	if not _number(time) or time < 0:
-		return _error("invalid animation time")
+	if not Values.number(time) or time < 0:
+		return Values.error("invalid animation time")
 	var sequence := _find_sequence(_scene())
 	if sequence == null or not sequence.player.has_animation(&"launch"):
-		return _error("no launch animation")
+		return Values.error("no launch animation")
 	_pause()
-	sequence._seek(clampf(_float(time), 0.0, sequence.player.get_animation(&"launch").length))
+	sequence._seek(clampf(Values.float_of(time), 0.0, sequence.player.get_animation(&"launch").length))
 	var scene := _scene() as Carousel
 	if scene:
 		var launch := scene._game_launch
@@ -477,7 +479,7 @@ func _snapshot() -> Dictionary:
 	var library := await android._request(&"library")
 	var settings := await android._request(&"settings")
 	if not library.get("ok", false) or not settings.get("ok", false):
-		return _error("snapshot request failed")
+		return Values.error("snapshot request failed")
 	var content: Dictionary = library.get("library", {})
 	# The letters and regions of each shelf as the core orders them: the desktop has no core to ask.
 	var browsed := {}
@@ -504,7 +506,8 @@ func _window(wanted: Vector2) -> Dictionary:
 	var deadline := Time.get_ticks_msec() + _RESIZE_MS
 	while DisplayServer.window_get_size() != size and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
-	return {"size": [window.size.x, window.size.y]} if window.size == size else _error("the window kept %s, not %s" % [window.size, size])
+	return {"size": [window.size.x, window.size.y]} if window.size == size \
+			else Values.error("the window kept %s, not %s" % [window.size, size])
 
 
 ## A [code][width, height][/code] pair as a size; zero when it is not one.
@@ -512,7 +515,9 @@ static func _size(value: Variant) -> Vector2:
 	if not value is Array:
 		return Vector2.ZERO
 	var pair: Array = value
-	return Vector2(_float(pair[0]), _float(pair[1])) if pair.size() == 2 and _number(pair[0]) and _number(pair[1]) else Vector2.ZERO
+	if pair.size() != 2:
+		return Vector2.ZERO
+	return Vector2(Values.float_of(pair[0]), Values.float_of(pair[1])) if Values.number(pair[0]) and Values.number(pair[1]) else Vector2.ZERO
 
 
 ## [param wanted] scaled to fit in [param room] (never enlarged), its shape kept.
@@ -520,19 +525,7 @@ static func fitted(wanted: Vector2, room: Vector2) -> Vector2i:
 	return Vector2i((wanted * minf(1.0, minf(room.x / wanted.x, room.y / wanted.y))).round())
 
 
-static func _number(value: Variant) -> bool:
-	return (value is float or value is int) and is_finite(_float(value))
-
-
-static func _float(value: Variant) -> float:
-	return value
-
-
 static func _point(message: Dictionary) -> Vector2:
 	var x: float = message["x"]
 	var y: float = message["y"]
 	return Vector2(x, y)
-
-
-static func _error(reason: String) -> Dictionary:
-	return {"ok": false, "error": reason}

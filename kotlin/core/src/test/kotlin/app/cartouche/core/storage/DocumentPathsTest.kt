@@ -2,6 +2,7 @@
 package app.cartouche.core.storage
 
 import app.cartouche.core.FilePath
+import app.cartouche.core.anyText
 import arrow.core.None
 import arrow.core.Some
 import io.kotest.matchers.shouldBe
@@ -9,7 +10,6 @@ import io.kotest.property.Arb
 import io.kotest.property.arbitrary.choice
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.filter
-import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -45,7 +45,7 @@ class DocumentPathsTest {
     fun `reading where a folder is never fails, gives a place only on the device's storage, and no empty folder name`() =
         runBlocking<Unit> {
             val authorities = Arb.element(DocumentPaths.EXTERNAL_STORAGE_AUTHORITY, "com.android.providers.downloads.documents")
-            val ids = Arb.choice(Arb.string(0..30), Arb.element("primary:ROMs//ps2", ":ROMs", "primary", "home:", "1A2B-3C4D:/"))
+            val ids = Arb.choice(anyText, Arb.element("primary:ROMs//ps2", ":ROMs", "primary", "home:", "1A2B-3C4D:/"))
             checkAll(authorities, ids) { authority, id ->
                 val place = DocumentPaths.placeOf(authority, DocumentId(id))
                 place.isSome() shouldBe (authority == DocumentPaths.EXTERNAL_STORAGE_AUTHORITY && id.substringBefore(':', "").isNotEmpty())
@@ -68,7 +68,7 @@ class DocumentPathsTest {
 
     @Test
     fun `INV-04 documents of any other provider never get a path`() = runBlocking<Unit> {
-        checkAll(Arb.string().filter { it != DocumentPaths.EXTERNAL_STORAGE_AUTHORITY }, Arb.string()) { authority, id ->
+        checkAll(anyText.filter { it != DocumentPaths.EXTERNAL_STORAGE_AUTHORITY }, anyText) { authority, id ->
             pathOf(id, authority) shouldBe None
         }
     }

@@ -6,6 +6,7 @@ extends RefCounted
 ## moves for one unit of each value, so that a part dragged in the picture gives the value to set.
 
 const Views := preload("res://dev/bridge/views.gd")
+const Values := preload("res://dev/bridge/values.gd")
 ## A centimetre in the animation's world units.
 const _CM := 0.1
 ## The smallest travel of a part, in world units, that a hand can grab.
@@ -23,33 +24,33 @@ static func tune(carousel: Carousel, values: Dictionary) -> Dictionary:
 			if carousel._consoles.console_at(i).folder == folder:
 				index = i
 		if index < 0:
-			return _error("this console is not in the library")
+			return Values.error("this console is not in the library")
 		carousel._consoles.select(index)
 	var model := _console(carousel)
 	var steps: Variant = values.get("steps")
-	if model == null or steps is not Array or not _number(values.get("t")) or not _number(values.get("choice", 1)):
-		return _error("no console or invalid launch")
+	if model == null or steps is not Array or not Values.number(values.get("t")) or not Values.number(values.get("choice", 1)):
+		return Values.error("no console or invalid launch")
 	var data := {"steps": steps, "choice": values.get("choice", 1)}
 	if not LaunchAnimation.problems(data, model).is_empty():
-		return _error("the console has no such part")
+		return Values.error("the console has no such part")
 	var animation := LaunchAnimation.build(data, model)
 	var sequence := carousel._sequence
 	var launch := carousel._game_launch
 	if launch.is_busy() and not (launch.is_previewing() and launch.is_inserting()):
-		return _error("a launch is running")
+		return Values.error("a launch is running")
 	if animation.get_track_count() == 0 or sequence.is_processing():
-		return _error("no launch animation to play")
+		return Values.error("no launch animation to play")
 	sequence.use(animation)
 	var moments := {}
 	for named: StringName in [&"consoles", &"games", &"launch", &"seated", &"black"]:
 		moments[named] = LaunchAnimation.moment(animation, named, -1.0)
-	var at := clampf(_float(values["t"]), 0.0, animation.length)
+	var at := clampf(Values.float_of(values["t"]), 0.0, animation.length)
 	# The carousel is in a launch, as the engine's time resumes it: the launch then plays on its own.
 	if not launch.is_inserting():
 		carousel._row.freeze()
 		sequence.behind_amount = 1.0
-	launch.preview(at - _float(moments[&"launch"]))
-	carousel._row._arrange()
+	launch.preview(at - Values.float_of(moments[&"launch"]))
+	carousel._row.arrange()
 	RenderingServer.force_draw()
 	var parts: Array[Dictionary] = []
 	for part in model.moving_parts():
@@ -80,7 +81,7 @@ static func handles(carousel: Carousel) -> Dictionary:
 	if sequence.disc_away > 0.0:
 		var offset := sequence.disc_offset
 		var lift := sequence.disc_lift
-		var disc_at := func() -> Vector2: return camera.unproject_position(row.to_global(row._launch_stand.origin))
+		var disc_at := func() -> Vector2: return camera.unproject_position(row.to_global(row.standing().at.origin))
 		found["disc"] = _grab(disc_at, [
 			func(by: float) -> void: sequence.disc_offset = offset + Vector2(by * _CM, 0.0),
 			func(by: float) -> void: sequence.disc_offset = offset + Vector2(0.0, by * _CM),
@@ -158,22 +159,10 @@ static func _console(carousel: Carousel) -> ConsoleModel:
 	return carousel._consoles.selected().model as ConsoleModel
 
 
-static func _number(value: Variant) -> bool:
-	return (value is float or value is int) and is_finite(_float(value))
-
-
-static func _float(value: Variant) -> float:
-	return value
-
-
-static func _error(reason: String) -> Dictionary:
-	return {"ok": false, "error": reason}
-
-
 ## Ends only a bridge preview; an actual launch cannot be cancelled by this command.
 static func stop(carousel: Carousel) -> Dictionary:
 	if carousel == null:
-		return _error("no carousel")
+		return Values.error("no carousel")
 	var launch := carousel._game_launch
 	if launch.is_previewing():
 		launch.end_preview()

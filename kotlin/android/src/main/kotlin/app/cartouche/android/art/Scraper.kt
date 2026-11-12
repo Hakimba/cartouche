@@ -11,6 +11,7 @@ import app.cartouche.core.art.Identity
 import app.cartouche.core.art.Scraping
 import app.cartouche.core.art.Stall
 import app.cartouche.core.library.GameId
+import app.cartouche.core.serialName
 import arrow.core.Either
 import arrow.core.None
 import arrow.core.Option
@@ -20,11 +21,13 @@ import arrow.core.getOrElse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /** What a run learnt of games' labels. */
@@ -59,6 +62,9 @@ internal class Scraper(
     private val fetch: Fetch,
     private val scope: CoroutineScope,
     private val textures: Textures = Textures.NONE,
+    /** Whether the device has a network it validated: a failure without one is the network's, not a server's. */
+    private val online: () -> Boolean = { true },
+    private val decoding: Semaphore = Semaphore(ArtImages.SCRAPER_DECODES),
     private val downloading: (GameId, LabelDownload) -> Unit,
     private val changed: (Scraping, Option<LabelNews>) -> Unit,
 ) {
@@ -81,6 +87,9 @@ internal class Scraper(
 
         /** Stopped before its end: the request waits again. */
         data object SetAside : Outcome
+
+        /** Its game left the library while it was looked for: nothing stored. */
+        data object Gone : Outcome
     }
 
     private sealed interface Tried {
@@ -90,6 +99,8 @@ internal class Scraper(
         data class Found(val art: StoredArt) : Tried
 
         data class Stalled(val why: Stall) : Tried
+
+        data object Gone : Tried
     }
 
     /** Guards [run], [working], [retrying] and [began]. */
@@ -105,10 +116,11 @@ internal class Scraper(
 
     private var began = TimeSource.Monotonic.markNow()
 
+    /** The hosts of web images that failed this run with the device online: passed over until the next plan. */
+    private val closedHosts: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
     /** The games looked for first, as the carousel last said ([focus]); kept through a new plan, read by the downloads too. */
     @Volatile private var focused: List<GameId> = emptyList()
-
-    private val over = MutableStateFlow(true)
 
     /**
      * Calls made in turn, on one thread, change the run in that order (the lock is fair): a later plan always replaces an earlier one.
@@ -116,6 +128,7 @@ internal class Scraper(
      */
     suspend fun lookFor(requests: List<ArtRequest>, again: Set<GameId> = emptySet(), since: Choices = store.choices()) {
         textures.newRun()
+        closedHosts.clear()
         val provisional = requests.filter { store.provisional(it.game).isSome() && !store.wants(it.game, it.version) }.map { it.game }
         val asked = again + if (textures.open) provisional else emptyList()
         // Under the lock: a game a worker stores meanwhile is either stored or still under way, and
@@ -139,19 +152,15 @@ internal class Scraper(
             unfound.filter { (game, version) ->
                 val stored =
                     store
-                        .markAbsent(
-                            game,
-                            version,
-                        ).onLeft { trace("art") { "${game.value}: not remembered as absent: ${it.message}" } }
+                        .markAbsent(game, version, store.asked(game))
+                        .onLeft { trace("art") { "${game.value}: not remembered as absent: ${it.message}" } }
                 stored.isRight { !it }
             }
         if (told.isNotEmpty()) lock.withLock { changed(run, Some(AbsentArt(told.keys.toList()))) }
     }
 
-    /** Waits until the run is over: every game in it looked for, its art found or not. */
-    suspend fun awaitOver() {
-        over.first { it }
-    }
+    /** Whether nothing is waiting or being looked for. */
+    suspend fun isOver(): Boolean = lock.withLock { run.isOver }
 
     /** Tries again at once if the run stalled for want of a network. */
     fun networkBack() {
@@ -160,10 +169,12 @@ internal class Scraper(
         }
     }
 
-    /** Starts no download until [start]; the ones under way end. */
+    /**
+     * Starts no download until [start]; the ones under way end. A retry due meanwhile starts none either, and is left
+     * to run: cancelling it from a coroutine of its own could cancel the one a [start] made since.
+     */
     fun stop() {
         stopped = true
-        scope.launch { lock.withLock { retrying.onSome(Job::cancel) } }
     }
 
     fun start() {
@@ -222,14 +233,14 @@ internal class Scraper(
                     }.onLeft { trace("art") { "${request.title}: label kept but not remembered so: ${it.message}" } }
                     update(None, over)
                 }
-                Outcome.Skipped -> update(None, over)
+                Outcome.Skipped, Outcome.Gone -> update(None, over)
                 Outcome.Absent -> {
                     // A label the user chose meanwhile stays, and shows.
                     val stored =
                         store
-                            .markAbsent(request.game, request.version)
+                            .markAbsent(request.game, request.version, seen)
                             .onLeft { trace("art") { "${request.title}: not remembered as absent: ${it.message}" } }
-                    update(stored.getOrNone().filter { !it }.map { AbsentArt(listOf(request.game)) }) { run.finished(request.game) }
+                    update(stored.getOrNone().filter { !it }.map { AbsentArt(listOf(request.game)) }, over)
                 }
                 Outcome.SetAside -> update(None) { run.returned(request.game) }
                 is Outcome.Stalled -> {
@@ -272,55 +283,91 @@ internal class Scraper(
                     is Tried.Next -> lookUp(request, candidates.drop(1), skipped || tried.skipped, seen, progress)
                     is Tried.Found -> Outcome.Found(tried.art)
                     is Tried.Stalled -> Outcome.Stalled(tried.why)
+                    Tried.Gone -> Outcome.Gone
                 }
             }
         }
     }
 
-    /** Anything unexpected only skips this image. Only the exception's class is logged: its message may hold a URL with the credentials. */
+    /**
+     * Anything unexpected only skips this image, the label still wanted. Only the exception's class is logged: its message may hold a
+     * URL with the credentials.
+     */
     private suspend fun attempt(
         request: ArtRequest,
         candidate: Candidate,
         shownFor: Option<Identity>,
         seen: Option<Ask>,
         progress: Progress,
-    ): Tried = if (
-        store.isMissing(candidate, request.version)
-    ) {
+    ): Tried = if (store.isMissing(candidate, request.version)) {
         Tried.Next(skipped = false)
+    } else if (hostOf(candidate).isSome { it in closedHosts }) {
+        Tried.Next(skipped = true)
     } else {
         Either
             .catch {
                 val started = TimeSource.Monotonic.markNow()
-                fetch.get(candidate, progress).fold({ failure ->
-                    trace("art") { "${request.title}: ${candidate.identity}: $failure" }
-                    when (failure) {
-                        FetchFailure.NotFound -> {
-                            store.markMissing(candidate, request.version).onLeft {
-                                trace("art") { "${request.title}: ${candidate.identity} not remembered as missing: ${it.message}" }
-                            }
-                            Tried.Next(skipped = false)
-                        }
-                        is FetchFailure.Skipped -> Tried.Next(skipped = true)
-                        is FetchFailure.Offline -> Tried.Stalled(Stall.OFFLINE)
-                        is FetchFailure.Refused -> Tried.Stalled(Stall.REFUSED)
-                    }
-                }) { image ->
-                    trace("art") { "front=${request.cut.medium.value} shell=${request.cut.shell.key}" }
-                    ArtImages.label(image, candidate, request.cut).fold({ Tried.Next(skipped = false) }) { label ->
-                        // An image chosen by the user meanwhile stays.
-                        store.saveIfAbsent(request.game, label, shownFor, seen).fold({ Tried.Stalled(Stall.STORAGE) }) { art ->
-                            trace("art") {
-                                "${request.title}: ${candidate.identity}: ${image.size / 1024} kB, stored in ${label.size / 1024} kB, in ${started.elapsedNow().inWholeMilliseconds} ms"
-                            }
-                            Tried.Found(art)
-                        }
-                    }
-                }
+                store
+                    .downloading { image -> fetched(request, candidate, shownFor, seen, progress, image, started) }
+                    .getOrElse { Tried.Stalled(Stall.STORAGE) }
             }.getOrElse { e ->
                 Log.e(TAG, "${request.title}: ${candidate.identity} skipped: ${e.javaClass.name}")
+                Tried.Next(skipped = true)
+            }
+    }
+
+    private suspend fun fetched(
+        request: ArtRequest,
+        candidate: Candidate,
+        shownFor: Option<Identity>,
+        seen: Option<Ask>,
+        progress: Progress,
+        image: File,
+        started: TimeMark,
+    ): Tried = fetch.get(candidate, progress, image).fold({ failure ->
+        trace("art") { "${request.title}: ${candidate.identity}: $failure" }
+        when (failure) {
+            FetchFailure.NotFound -> {
+                store.markMissing(candidate, request.version).onLeft {
+                    trace("art") { "${request.title}: ${candidate.identity} not remembered as missing: ${it.message}" }
+                }
                 Tried.Next(skipped = false)
             }
+            is FetchFailure.Skipped -> Tried.Next(skipped = true)
+            is FetchFailure.Offline -> unreachable(candidate, Stall.OFFLINE)
+            is FetchFailure.Refused -> unreachable(candidate, Stall.REFUSED)
+            FetchFailure.Unstored -> Tried.Stalled(Stall.STORAGE)
+        }
+    }) {
+        trace("art") { "front=${request.cut.medium.value} shell=${request.cut.shell.serialName}" }
+        // A page in place of the image (a network's sign-in) says nothing of the game: its label stays wanted.
+        ArtImages.label(image, candidate, request.cut, decoding).fold({ Tried.Next(skipped = it == Unusable.NOT_AN_IMAGE) }) { label ->
+            // An image chosen by the user meanwhile stays.
+            store.saveIfAbsent(request.game, label, shownFor, seen).fold({ Tried.Stalled(Stall.STORAGE) }) { kept ->
+                kept.fold({ Tried.Gone }) { art ->
+                    trace("art") {
+                        "${request.title}: ${candidate.identity}: ${image.length() / 1024} kB, stored in ${label.size / 1024} kB, in ${started.elapsedNow().inWholeMilliseconds} ms"
+                    }
+                    Tried.Found(art)
+                }
+            }
+        }
+    }
+
+    /**
+     * A server out of reach or failing stalls the run only when the device has no validated network; with one, its host
+     * alone is at fault (down, slow, a bad certificate): passed over for the run, the label still wanted.
+     */
+    private fun unreachable(candidate: Candidate, stall: Stall): Tried = if (online()) {
+        hostOf(candidate).onSome { closedHosts += it }
+        Tried.Next(skipped = true)
+    } else {
+        Tried.Stalled(stall)
+    }
+
+    private fun hostOf(candidate: Candidate): Option<String> = when (candidate) {
+        is Candidate.Web -> Some(candidate.url.value.substringAfter("://").substringBefore('/'))
+        is Candidate.Texture -> None
     }
 
     /** Schedules one retry: the workers that stall together wait for the same one. */
@@ -345,7 +392,6 @@ internal class Scraper(
         val next = change()
         if (next != run) {
             run = next
-            over.value = run.isOver
             changed(run, news)
             if (run.isOver && run.done > 0) trace("art") { "run over: ${run.done} games in ${began.elapsedNow().inWholeSeconds} s" }
         }

@@ -244,15 +244,7 @@
                 "title": "Crystal Knights 0",
                 "regions": [],
                 "medium": "xbox_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Crystal Knights 0.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/1",
@@ -260,15 +252,7 @@
                 "title": "Shadow Knights II 1",
                 "regions": [],
                 "medium": "xbox360_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Shadow Knights II 1.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/2",
@@ -276,15 +260,7 @@
                 "title": "Neon Knights: Director's Cut 2",
                 "regions": [],
                 "medium": "gb_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Neon Knights: Director's Cut 2.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/3",
@@ -292,15 +268,7 @@
                 "title": "Iron Knights 3 3",
                 "regions": [],
                 "medium": "gba_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Iron Knights 3 3.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/4",
@@ -308,15 +276,7 @@
                 "title": "Silent Knights 4",
                 "regions": [],
                 "medium": "gbc_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Silent Knights 4.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/5",
@@ -324,15 +284,7 @@
                 "title": "Solar Knights 5",
                 "regions": [],
                 "medium": "gc_mini_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Solar Knights 5.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/6",
@@ -340,15 +292,7 @@
                 "title": "Wild Knights II 6",
                 "regions": [],
                 "medium": "n64_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Wild Knights II 6.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/7",
@@ -356,15 +300,7 @@
                 "title": "Ōkami no Knights: Director's Cut 7",
                 "regions": [],
                 "medium": "nes_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Ōkami no Knights: Director's Cut 7.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/8",
@@ -372,15 +308,7 @@
                 "title": "Étoile Knights 3 8",
                 "regions": [],
                 "medium": "snes_pal_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Étoile Knights 3 8.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/9",
@@ -388,15 +316,7 @@
                 "title": "Last Knights 9",
                 "regions": [],
                 "medium": "wii_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Last Knights 9.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/10",
@@ -404,15 +324,7 @@
                 "title": "Crystal Racer 10",
                 "regions": [],
                 "medium": "ps1_cd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Crystal Racer 10.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/11",
@@ -420,15 +332,7 @@
                 "title": "Shadow Racer II 11",
                 "regions": [],
                 "medium": "ps2_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Shadow Racer II 11.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/12",
@@ -436,15 +340,7 @@
                 "title": "Neon Racer: Director's Cut 12",
                 "regions": [],
                 "medium": "xbox_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Neon Racer: Director's Cut 12.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/13",
@@ -452,15 +348,7 @@
                 "title": "Iron Racer 3 13",
                 "regions": [],
                 "medium": "xbox360_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Iron Racer 3 13.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/14",
@@ -468,15 +356,7 @@
                 "title": "Silent Racer 14",
                 "regions": [],
                 "medium": "gb_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Silent Racer 14.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/15",
@@ -484,15 +364,7 @@
                 "title": "Solar Racer 15",
                 "regions": [],
                 "medium": "gba_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Solar Racer 15.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/16",
@@ -500,15 +372,7 @@
                 "title": "Wild Racer II 16",
                 "regions": [],
                 "medium": "gbc_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Wild Racer II 16.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/17",
@@ -516,15 +380,7 @@
                 "title": "Ōkami no Racer: Director's Cut 17",
                 "regions": [],
                 "medium": "gc_mini_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Ōkami no Racer: Director's Cut 17.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/18",
@@ -532,15 +388,7 @@
                 "title": "Étoile Racer 3 18",
                 "regions": [],
                 "medium": "n64_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Étoile Racer 3 18.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/19",
@@ -548,15 +396,7 @@
                 "title": "Last Racer 19",
                 "regions": [],
                 "medium": "nes_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Last Racer 19.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/20",
@@ -564,15 +404,7 @@
                 "title": "Crystal Tactics 20",
                 "regions": [],
                 "medium": "snes_pal_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Crystal Tactics 20.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/21",
@@ -580,15 +412,7 @@
                 "title": "Shadow Tactics II 21",
                 "regions": [],
                 "medium": "wii_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Shadow Tactics II 21.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/22",
@@ -596,15 +420,7 @@
                 "title": "Neon Tactics: Director's Cut 22",
                 "regions": [],
                 "medium": "ps1_cd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Neon Tactics: Director's Cut 22.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/23",
@@ -612,15 +428,7 @@
                 "title": "Iron Tactics 3 23",
                 "regions": [],
                 "medium": "ps2_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Iron Tactics 3 23.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/24",
@@ -628,15 +436,7 @@
                 "title": "Silent Tactics 24",
                 "regions": [],
                 "medium": "xbox_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Silent Tactics 24.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/25",
@@ -644,15 +444,7 @@
                 "title": "Solar Tactics 25",
                 "regions": [],
                 "medium": "xbox360_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Solar Tactics 25.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/26",
@@ -660,15 +452,7 @@
                 "title": "Wild Tactics II 26",
                 "regions": [],
                 "medium": "gb_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Wild Tactics II 26.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/27",
@@ -676,15 +460,7 @@
                 "title": "Ōkami no Tactics: Director's Cut 27",
                 "regions": [],
                 "medium": "gba_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Ōkami no Tactics: Director's Cut 27.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/28",
@@ -692,15 +468,7 @@
                 "title": "Étoile Tactics 3 28",
                 "regions": [],
                 "medium": "gbc_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Étoile Tactics 3 28.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/29",
@@ -708,20 +476,9 @@
                 "title": "Last Tactics 29",
                 "regions": [],
                 "medium": "gc_mini_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Last Tactics 29.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             }
         ],
-        "not_games": {},
-        "ignored_counts": {},
-        "skipped_folders": {},
         "console_variants": {},
         "shelves": [
             {
@@ -839,15 +596,7 @@
                 "title": "Crystal Knights 0",
                 "regions": [],
                 "medium": "xbox_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Crystal Knights 0.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/1",
@@ -855,15 +604,7 @@
                 "title": "Shadow Knights II 1",
                 "regions": [],
                 "medium": "xbox360_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Shadow Knights II 1.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/2",
@@ -871,15 +612,7 @@
                 "title": "Neon Knights: Director's Cut 2",
                 "regions": [],
                 "medium": "nds_card",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Neon Knights: Director's Cut 2.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/3",
@@ -887,15 +620,7 @@
                 "title": "Iron Knights 3 3",
                 "regions": [],
                 "medium": "gb_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Iron Knights 3 3.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/4",
@@ -903,15 +628,7 @@
                 "title": "Silent Knights 4",
                 "regions": [],
                 "medium": "gba_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Silent Knights 4.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/5",
@@ -919,15 +636,7 @@
                 "title": "Solar Knights 5",
                 "regions": [],
                 "medium": "gbc_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Solar Knights 5.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/6",
@@ -935,15 +644,7 @@
                 "title": "Wild Knights II 6",
                 "regions": [],
                 "medium": "gc_mini_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Wild Knights II 6.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/7",
@@ -951,15 +652,7 @@
                 "title": "Ōkami no Knights: Director's Cut 7",
                 "regions": [],
                 "medium": "n64_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Ōkami no Knights: Director's Cut 7.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/8",
@@ -967,15 +660,7 @@
                 "title": "Étoile Knights 3 8",
                 "regions": [],
                 "medium": "nes_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Étoile Knights 3 8.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/9",
@@ -983,15 +668,7 @@
                 "title": "Last Knights 9",
                 "regions": [],
                 "medium": "snes_pal_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Last Knights 9.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/10",
@@ -999,15 +676,7 @@
                 "title": "Crystal Racer 10",
                 "regions": [],
                 "medium": "switch_card",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Crystal Racer 10.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/11",
@@ -1015,15 +684,7 @@
                 "title": "Shadow Racer II 11",
                 "regions": [],
                 "medium": "wii_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Shadow Racer II 11.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/12",
@@ -1031,15 +692,7 @@
                 "title": "Neon Racer: Director's Cut 12",
                 "regions": [],
                 "medium": "dreamcast_gd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Neon Racer: Director's Cut 12.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/13",
@@ -1047,15 +700,7 @@
                 "title": "Iron Racer 3 13",
                 "regions": [],
                 "medium": "master_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Iron Racer 3 13.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/14",
@@ -1063,15 +708,7 @@
                 "title": "Silent Racer 14",
                 "regions": [],
                 "medium": "genesis_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Silent Racer 14.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/15",
@@ -1079,15 +716,7 @@
                 "title": "Solar Racer 15",
                 "regions": [],
                 "medium": "ps1_cd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Solar Racer 15.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/16",
@@ -1095,15 +724,7 @@
                 "title": "Wild Racer II 16",
                 "regions": [],
                 "medium": "ps2_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Wild Racer II 16.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/17",
@@ -1111,15 +732,7 @@
                 "title": "Ōkami no Racer: Director's Cut 17",
                 "regions": [],
                 "medium": "psvita_card",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Ōkami no Racer: Director's Cut 17.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/18",
@@ -1127,15 +740,7 @@
                 "title": "Étoile Racer 3 18",
                 "regions": [],
                 "medium": "psp_umd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Étoile Racer 3 18.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/19",
@@ -1143,15 +748,7 @@
                 "title": "Last Racer 19",
                 "regions": [],
                 "medium": "xbox_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Last Racer 19.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/20",
@@ -1159,15 +756,7 @@
                 "title": "Crystal Tactics 20",
                 "regions": [],
                 "medium": "xbox360_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Crystal Tactics 20.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/21",
@@ -1175,15 +764,7 @@
                 "title": "Shadow Tactics II 21",
                 "regions": [],
                 "medium": "nds_card",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Shadow Tactics II 21.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/22",
@@ -1191,15 +772,7 @@
                 "title": "Neon Tactics: Director's Cut 22",
                 "regions": [],
                 "medium": "gb_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Neon Tactics: Director's Cut 22.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/23",
@@ -1207,15 +780,7 @@
                 "title": "Iron Tactics 3 23",
                 "regions": [],
                 "medium": "gba_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Iron Tactics 3 23.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/24",
@@ -1223,15 +788,7 @@
                 "title": "Silent Tactics 24",
                 "regions": [],
                 "medium": "gbc_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Silent Tactics 24.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/25",
@@ -1239,15 +796,7 @@
                 "title": "Solar Tactics 25",
                 "regions": [],
                 "medium": "gc_mini_dvd",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Solar Tactics 25.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/26",
@@ -1255,15 +804,7 @@
                 "title": "Wild Tactics II 26",
                 "regions": [],
                 "medium": "n64_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Wild Tactics II 26.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/27",
@@ -1271,15 +812,7 @@
                 "title": "Ōkami no Tactics: Director's Cut 27",
                 "regions": [],
                 "medium": "nes_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Ōkami no Tactics: Director's Cut 27.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/28",
@@ -1287,15 +820,7 @@
                 "title": "Étoile Tactics 3 28",
                 "regions": [],
                 "medium": "snes_pal_cart",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Étoile Tactics 3 28.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             },
             {
                 "id": "demo/29",
@@ -1303,20 +828,9 @@
                 "title": "Last Tactics 29",
                 "regions": [],
                 "medium": "switch_card",
-                "languages": [],
-                "serials": [],
-                "discs": [
-                    {
-                        "name": "Last Tactics 29.iso"
-                    }
-                ],
-                "last_disc": 0,
-                "identified": false
+                "last_disc": 0
             }
         ],
-        "not_games": {},
-        "ignored_counts": {},
-        "skipped_folders": {},
         "console_variants": {},
         "shelves": [
             {
@@ -1473,6 +987,7 @@
         "sound_level": 10,
         "backdrop": "light",
         "pixel_veil": true,
+        "games_in_line": false,
         "button_styles": [
             "xbox",
             "nintendo",
@@ -1517,6 +1032,164 @@
             "anthracite",
             "device"
         ]
+    },
+    "refresh_answer": {
+        "arrivals": {
+            "unseen": [
+                "demo/0"
+            ],
+            "announced": {
+                "xbox": [
+                    "demo/0"
+                ]
+            }
+        },
+        "library": {
+            "revision": 0,
+            "setups": {},
+            "games": [
+                {
+                    "id": "demo/0",
+                    "platform_id": "xbox",
+                    "title": "Crystal Knights 0",
+                    "regions": [],
+                    "medium": "xbox_dvd",
+                    "last_disc": 0
+                },
+                {
+                    "id": "demo/1",
+                    "platform_id": "xbox360",
+                    "title": "Shadow Knights II 1",
+                    "regions": [],
+                    "medium": "xbox360_dvd",
+                    "last_disc": 0
+                },
+                {
+                    "id": "demo/2",
+                    "platform_id": "gb",
+                    "title": "Neon Knights: Director's Cut 2",
+                    "regions": [],
+                    "medium": "gb_cart",
+                    "last_disc": 0
+                }
+            ],
+            "console_variants": {},
+            "shelves": [
+                {
+                    "platform_id": "xbox",
+                    "game_indexes": [
+                        0
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform_id": "xbox360",
+                    "game_indexes": [
+                        1
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform_id": "gb",
+                    "game_indexes": [
+                        2
+                    ],
+                    "selected": 0
+                }
+            ],
+            "selected_shelf": 0
+        }
+    },
+    "scan_answer": {
+        "library": {
+            "revision": 0,
+            "setups": {},
+            "games": [
+                {
+                    "id": "demo/0",
+                    "platform_id": "xbox",
+                    "title": "Crystal Knights 0",
+                    "regions": [],
+                    "medium": "xbox_dvd",
+                    "last_disc": 0
+                },
+                {
+                    "id": "demo/1",
+                    "platform_id": "xbox360",
+                    "title": "Shadow Knights II 1",
+                    "regions": [],
+                    "medium": "xbox360_dvd",
+                    "last_disc": 0
+                },
+                {
+                    "id": "demo/2",
+                    "platform_id": "gb",
+                    "title": "Neon Knights: Director's Cut 2",
+                    "regions": [],
+                    "medium": "gb_cart",
+                    "last_disc": 0
+                }
+            ],
+            "console_variants": {},
+            "shelves": [
+                {
+                    "platform_id": "xbox",
+                    "game_indexes": [
+                        0
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform_id": "xbox360",
+                    "game_indexes": [
+                        1
+                    ],
+                    "selected": 0
+                },
+                {
+                    "platform_id": "gb",
+                    "game_indexes": [
+                        2
+                    ],
+                    "selected": 0
+                }
+            ],
+            "selected_shelf": 0
+        },
+        "report": {
+            "games": 30,
+            "milliseconds": 840
+        },
+        "arrivals": {
+            "unseen": [
+                "demo/0"
+            ],
+            "announced": {
+                "xbox": [
+                    "demo/0"
+                ]
+            }
+        }
+    },
+    "art_change": {
+        "progress": {
+            "done": 1,
+            "total": 30
+        },
+        "found": {
+            "game_id": "demo/0",
+            "path": "/demo/demo/0.jpg"
+        },
+        "absent": [
+            "demo/1"
+        ]
+    },
+    "label_variant": {
+        "game_id": "demo/0",
+        "region": "Europe",
+        "source": "screenscraper",
+        "source_name": "ScreenScraper",
+        "path": "/demo/demo/0.jpg"
     },
     "battery": {
         "level_percent": 100,

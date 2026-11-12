@@ -14,8 +14,6 @@ const _RADIUS := 2.8 * FormPaint.CQW
 ## The Cancel button is a satin card: its corners are the card's, not the pill's.
 const _CARD_RADIUS := 1.1 * FormPaint.CQW
 const _NAME_PX := 2.1 * FormPaint.CQW
-## The name goes from muted to white over this long when the pill starts to act.
-const _LIT_S := 0.3
 ## How much higher than centred the name is drawn, in px.
 const _INK_RAISE := 1.0
 ## The red of a destructive pill's name and of the ring round it, on a light ground and on a dark one.
@@ -39,13 +37,12 @@ var rim := StudioTokens.NEUTRAL:
 		_recolor()
 		queue_redraw()
 
-var _body := FormPaint.Layer.new(self, StudioMaterial.new(StudioTokens.Look.SATIN))
+var _body := SatinPanel.Backing.of(self, StudioMaterial.new(StudioTokens.Look.SATIN))
 var _key := SatinPanel.Backing.new(self, StudioTokens.Look.KEY)
 ## What the pill was last dressed as: acting or not.
 var _acting := false
-## How far the name is lit, 0 (muted) to 1 (white).
-var _lit := 0.0
-var _lighting: Tween
+## The primary pill's name, muted until it acts.
+var _lit := FormPaint.Lit.new(self)
 
 
 func _init() -> void:
@@ -80,7 +77,7 @@ func _draw() -> void:
 		_draw_bin(lead_box, red())
 	elif not primary:
 		ButtonGlyph.draw_key(self, _key, lead_box, &"b")
-	var ink := red() if destructive else Backdrop.palette.mute.lerp(Color.WHITE, _lit) if primary \
+	var ink := red() if destructive else _lit.ink() if primary \
 		else Backdrop.palette.ink
 	label.draw(self, Vector2(left + lead.x + gap, (size.y - label.height) / 2.0 - _INK_RAISE), ink)
 
@@ -115,7 +112,7 @@ func _dress() -> void:
 	var was := _acting
 	_acting = primary and not disabled
 	if _acting != was:
-		_light(1.0 if _acting else 0.0)
+		_lit.light(1.0 if _acting else 0.0)
 	if not primary:
 		return
 	if _acting:
@@ -136,11 +133,3 @@ func _recolor() -> void:
 	_body.shown.colors.assign([StudioMaterial.whitened(gel, 0.78), gel])
 	_body.shown.shadows[1].color = StudioMaterial.shaded(gel, 0.7)
 	_body.repaint()
-
-
-func _light(to: float) -> void:
-	var from := _lit
-	_lighting = Motion.restart(self, _lighting)
-	_lighting.tween_method(func(t: float) -> void:
-		_lit = lerpf(from, to, Motion.eased(Motion.Easing.EASE, t))
-		queue_redraw(), 0.0, 1.0, _LIT_S)

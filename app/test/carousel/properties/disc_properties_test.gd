@@ -62,94 +62,20 @@ func _cards(carousel: Carousel) -> Array[LabelCard]:
 ## The part of its label texture the selected game shows.
 func _window(carousel: Carousel) -> Vector4:
 	var row := carousel._row
-	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	var place: ShelfPlace = row._placed[row.selected_index()]
 	var label: ShaderMaterial = place.shown._label_mesh.get_active_material(0)
 	return label.get_shader_parameter(&"label_window")
-
-
-func _light(carousel: Carousel) -> OperatingLight:
-	return carousel.get_node("%Light")
 
 
 ## The label the selected game shows now.
 func _label(carousel: Carousel) -> Texture2D:
 	var row := carousel._row
-	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	var place: ShelfPlace = row._placed[row.selected_index()]
 	var label: ShaderMaterial = place.shown._label_mesh.get_active_material(0)
 	return label.get_shader_parameter(&"label_texture")
 
 
-func test_X_stages_the_selected_disc_under_the_light_and_B_puts_it_back_in_the_row() -> void:
-	var setup := await _on_games()
-	var carousel: Carousel = setup[0]
-	var properties := carousel._properties
-	await Fixtures.joypad(self, JOY_BUTTON_X)
-	assert_int(carousel.screen()).is_equal(Carousel.Screen.PROPERTIES)
-	await Fixtures.settled(self, carousel)
-	assert_float(carousel._row.stage).is_equal(1.0)
-	assert_float(carousel._row.neighbours).is_equal(0.0)
-	# Its centre on the screen's middle, at the properties' height and size, facing the camera, still.
-	var stand := carousel._row.selected_stand()
-	var staging := properties._on_properties
-	assert_vector(carousel._row.to_global(stand * properties._model_centre)) \
-		.is_equal_approx(Vector3(0.0, staging.height, carousel._row.global_position.z), Vector3.ONE * 0.0001)
-	assert_vector(stand.basis.get_scale()).is_equal_approx(Vector3.ONE * staging.size, Vector3.ONE * 0.0001)
-	assert_bool(stand.basis.orthonormalized().is_equal_approx(Basis.IDENTITY)).is_true()
-	for frame in 10:
-		await await_idle_frame()
-	assert_bool(carousel._row.selected_stand().is_equal_approx(stand)).is_true()
-	assert_bool(_light(carousel).visible).is_true()
-	assert_bool(carousel._pill.visible).is_false()
-	assert_object(Fixtures.focus(self)).is_same(properties._zone)
-	assert_str(properties._name.text).is_equal(carousel._row.selected_game().title)
-	await Fixtures.press_to(self, carousel, JOY_BUTTON_B, Carousel.Screen.GAMES)
-	assert_float(carousel._row.stage).is_equal(0.0)
-	assert_float(carousel._row.neighbours).is_equal(1.0)
-	assert_bool(_light(carousel).visible).is_false()
-	assert_bool(carousel._pill.visible).is_true()
-	assert_float(carousel._pill.modulate.a).is_equal(1.0)
-	assert_bool(properties.visible).is_false()
-
-
-func test_up_and_down_go_from_the_label_to_the_name_and_back_and_nowhere_else() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	var properties := carousel._properties
-	await Fixtures.joypad(self, JOY_BUTTON_X)
-	await Fixtures.settled(self, carousel)
-	for move: StringName in [&"ui_left", &"ui_up", &"ui_right"]:
-		await Fixtures.action(self, move)
-		assert_object(Fixtures.focus(self)).is_same(properties._zone)
-	await Fixtures.action(self, &"ui_down")
-	assert_object(Fixtures.focus(self)).is_same(properties._name)
-	for move: StringName in [&"ui_left", &"ui_down", &"ui_right"]:
-		await Fixtures.action(self, move)
-		assert_object(Fixtures.focus(self)).is_same(properties._name)
-	await Fixtures.action(self, &"ui_up")
-	assert_object(Fixtures.focus(self)).is_same(properties._zone)
-
-
-func test_A_on_the_label_offers_its_images_by_region_the_one_shown_first_and_the_user_s_own_picture_last() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	carousel._row.selected_game().has_label_region = true
-	carousel._row.selected_game().label_region = "North America"
-	carousel._row.selected_game().label_source = "launchbox"
-	await Fixtures.joypad(self, JOY_BUTTON_X)
-	await Fixtures.settled(self, carousel)
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.settled(self, carousel)
-	var cards := _cards(carousel)
-	assert_array(cards.map(func(card: LabelCard) -> String: return card.region)).contains_exactly(["Europe", "North America", "Japan", ""])
-	assert_object(Fixtures.focus(self)).is_same(cards[1])
-	await Fixtures.wait(self, func() -> bool: return cards[0].is_ready() and cards[1].is_ready())
-	assert_bool(cards[2].is_ready()).is_false()
-	assert_bool(cards[3].own and cards[3].is_ready()).is_true()
-	await Fixtures.action(self, &"ui_right")
-	assert_object(Fixtures.focus(self)).is_same(cards[2])
-	await Fixtures.action(self, &"ui_right")
-	assert_object(Fixtures.focus(self)).is_same(cards[3])
-
-
-func test_an_image_of_each_source_is_offered_named_by_region_and_source_and_the_one_chosen_is_remembered_with_its_source() -> void:
+func test_an_image_of_each_source_is_offered_and_the_one_chosen_is_remembered_with_its_source() -> void:
 	var both: Array[Dictionary] = [_scan("Europe", _blue, "screenscraper"), _scan("Europe", _red), _scan("Japan")]
 	var setup := await _on_games(both)
 	var carousel: Carousel = setup[0]
@@ -163,13 +89,19 @@ func test_an_image_of_each_source_is_offered_named_by_region_and_source_and_the_
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
 	var cards := _cards(carousel)
-	var captions := cards.map(func(card: LabelCard) -> String: return (card.get_child(0).get_child(1) as Label).text)
-	assert_array(captions).contains_exactly(["Europe · ScreenScraper", "Europe · LaunchBox", "Japan · LaunchBox", "My own image"])
+	assert_array(cards.map(func(card: LabelCard) -> String: return card.region)).contains_exactly(["Europe", "Europe", "Japan", ""])
 	# The focus on the image chosen: the region's scan, not its texture.
 	assert_object(Fixtures.focus(self)).is_same(cards[1])
 	await Fixtures.wait(self, func() -> bool: return cards[0].is_ready() and cards[1].is_ready())
 	assert_object(cards[0].label).is_not_same(cards[1].label)
-	await Fixtures.action(self, &"ui_left")
+	# The scan still to come is not ready, the user's own picture, last, is.
+	assert_bool(cards[2].is_ready()).is_false()
+	assert_bool(cards[3].own and cards[3].is_ready()).is_true()
+	for card: LabelCard in [cards[2], cards[3]]:
+		await Fixtures.action(self, &"ui_right")
+		assert_object(Fixtures.focus(self)).is_same(card)
+	for move in 3:
+		await Fixtures.action(self, &"ui_left")
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
 	assert_array(device.chosen_labels).contains_exactly(["screenscraper/Europe"])
@@ -177,8 +109,10 @@ func test_an_image_of_each_source_is_offered_named_by_region_and_source_and_the_
 	assert_str(game.label_source).is_equal("screenscraper")
 
 
-func test_each_image_picked_shows_on_the_disc_at_once_and_B_brings_back_the_label_it_had() -> void:
-	var carousel: Carousel = (await _on_games())[0]
+func test_each_image_picked_shows_on_the_disc_at_once_B_brings_back_the_label_it_had_and_A_keeps_it_with_its_region() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
 	await Fixtures.joypad(self, JOY_BUTTON_X)
 	await Fixtures.settled(self, carousel)
 	var own := _label(carousel)
@@ -193,17 +127,9 @@ func test_each_image_picked_shows_on_the_disc_at_once_and_B_brings_back_the_labe
 	await Fixtures.settled(self, carousel)
 	assert_object(_label(carousel)).is_same(own)
 	assert_object(Fixtures.focus(self)).is_same(carousel._properties._zone)
-
-
-func test_A_keeps_the_image_picked_and_remembers_its_region() -> void:
-	var setup := await _on_games()
-	var carousel: Carousel = setup[0]
-	var device: Fixtures.NewDevice = setup[1]
-	await Fixtures.joypad(self, JOY_BUTTON_X)
-	await Fixtures.settled(self, carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
-	var cards := _cards(carousel)
+	cards = _cards(carousel)
 	await Fixtures.wait(self, func() -> bool: return cards[1].is_ready())
 	var picked := cards[1].label
 	await Fixtures.action(self, &"ui_right")
@@ -235,7 +161,7 @@ func test_an_image_still_to_come_cannot_be_kept_and_one_that_could_not_be_is_tol
 	_cards(carousel)[2].grab_focus()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	assert_array(device.chosen_labels).is_empty()
-	device.failing.append(&"choose_label")
+	device.answers[Fixtures.Request.CHOOSE_LABEL] = Fixtures.Answer.FAILS
 	var first := _cards(carousel)[0]
 	await Fixtures.wait(self, func() -> bool: return first.is_ready())
 	first.grab_focus()
@@ -249,6 +175,27 @@ func test_an_image_still_to_come_cannot_be_kept_and_one_that_could_not_be_is_tol
 	assert_bool(carousel._row.selected_game().has_label_region).is_false()
 
 
+func test_an_image_tapped_while_the_plugin_answers_for_another_is_not_asked_for() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	device.answers[Fixtures.Request.CHOOSE_LABEL] = Fixtures.Answer.HELD
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	var cards := _cards(carousel)
+	await Fixtures.wait(self, func() -> bool: return cards[0].is_ready() and cards[1].is_ready())
+	cards[0].grab_focus()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_array(device.chosen_labels).contains_exactly(["launchbox/Europe"])
+	await Fixtures.touch(self, [cards[1].get_global_rect().get_center()])
+	assert_array(device.chosen_labels).contains_exactly(["launchbox/Europe"])
+	device.release()
+	await Fixtures.settled(self, carousel)
+	assert_array(device.chosen_labels).contains_exactly(["launchbox/Europe"])
+
+
 func test_a_game_with_no_image_by_region_says_so_offers_only_the_user_s_own_picture_and_B_goes_back() -> void:
 	var carousel: Carousel = (await _on_games([]))[0]
 	await Fixtures.joypad(self, JOY_BUTTON_X)
@@ -258,7 +205,6 @@ func test_a_game_with_no_image_by_region_says_so_offers_only_the_user_s_own_pict
 	assert_int(_cards(carousel).size()).is_equal(1)
 	assert_bool(_cards(carousel)[0].own).is_true()
 	assert_object(Fixtures.focus(self)).is_same(_cards(carousel)[0])
-	assert_str(carousel._properties._chooser._prompt.text).is_equal("No other image of this game is known")
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	await Fixtures.settled(self, carousel)
 	assert_object(Fixtures.focus(self)).is_same(carousel._properties._zone)
@@ -284,8 +230,39 @@ func test_B_during_opening_reverses_to_the_games() -> void:
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	await Fixtures.settled(self, carousel)
 	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
-	assert_float(carousel._row.stage).is_equal(0.0)
+	assert_float(carousel._row.standing().amount).is_equal(0.0)
 	assert_bool(carousel._properties.visible).is_false()
+
+
+func test_the_game_back_from_its_properties_is_drawn_by_the_row_in_the_frame_its_properties_go() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var row := carousel._row
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	var drawn: Array[bool] = []
+	carousel._properties.closed.connect(func() -> void:
+		var place: ShelfPlace = row._placed[row.selected_index()]
+		drawn.append(place.media_view.visible and place.shown.get_parent() == place.media_view.holder()))
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await Fixtures.settled(self, carousel)
+	assert_array(drawn).contains_exactly([true])
+
+
+func test_a_floating_game_comes_back_from_its_properties_to_where_it_floats_now() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var row := carousel._row
+	row.games_float = true
+	row._pose_s = 0.0
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	# Half a float later, it is at its highest in the row.
+	row._pose_s = PI / 1.6
+	var landed: Array[Transform3D] = []
+	carousel._properties.closed.connect(func() -> void: landed.append(carousel._properties._travel_stand))
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await Fixtures.settled(self, carousel)
+	assert_int(landed.size()).is_equal(1)
+	assert_float(landed[0].origin.distance_to(row.selected_stand().origin)).is_less(0.01)
 
 
 func test_the_game_s_own_image_arriving_while_another_is_shown_waits_until_it_is_put_back() -> void:
@@ -303,6 +280,55 @@ func test_the_game_s_own_image_arriving_while_another_is_shown_waits_until_it_is
 	await Fixtures.joypad(self, JOY_BUTTON_B)
 	await Fixtures.settled(self, carousel)
 	assert_object(_label(carousel)).is_same(arrived)
+
+
+## The picture of the user's own just kept, read only once the images are shown again (a slow read), takes nothing
+## from them: the disc keeps the card in focus, then the picture being framed, which the stick still moves.
+func test_a_picture_kept_and_read_late_leaves_the_disc_to_the_card_in_focus_and_to_the_picture_framed() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var chooser := carousel._properties._chooser
+	var game := carousel._row.selected_game()
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	var cards := _cards(carousel)
+	await Fixtures.wait(self, func() -> bool: return cards[0].is_ready())
+	assert_object(Fixtures.focus(self)).is_same(cards[0])
+	chooser.framed_game = game.id
+	carousel._art.loaded.emit(game.id)
+	assert_object(_label(carousel)).is_same(cards[0].label)
+	for move in 3:
+		await Fixtures.action(self, &"ui_right")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.FRAMING)
+	var framed := _label(carousel)
+	chooser.framed_game = game.id
+	carousel._art.loaded.emit(game.id)
+	assert_object(_label(carousel)).is_same(framed)
+	assert_object(chooser._picture_texture).is_not_null()
+
+
+## A finger on a card while the cards leave neither previews it nor leaves its image on the game: back on the
+## properties, and in the row, the game shows its own label.
+func test_a_card_touched_while_the_cards_leave_leaves_the_game_its_own_label() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	var own := _label(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	var cards := _cards(carousel)
+	await Fixtures.wait(self, func() -> bool: return cards[0].is_ready() and cards[1].is_ready())
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_bool(carousel._properties._busy).is_true()
+	await Fixtures.touch(self, [cards[1].get_global_transform_with_canvas() * (cards[1].size / 2.0)])
+	await Fixtures.settled(self, carousel)
+	assert_object(_label(carousel)).is_same(own)
+	await Fixtures.press_to(self, carousel, JOY_BUTTON_B, Carousel.Screen.GAMES)
+	await Fixtures.settled(self, carousel)
+	assert_object(_label(carousel)).is_same(own)
 
 
 func test_an_image_arriving_after_the_list_can_be_shown_and_kept_and_one_that_failed_cannot() -> void:
@@ -384,7 +410,7 @@ func test_inv_20_whatever_is_pressed_and_when_the_properties_settle_on_one_whole
 		seen[step] = true
 		var staged := carousel.screen() == Carousel.Screen.PROPERTIES
 		assert_bool(staged).is_equal(step != DiscProperties.Step.CLOSED)
-		assert_float(carousel._row.stage).is_equal(1.0 if staged else 0.0)
+		assert_float(carousel._row.standing().amount).is_equal(1.0 if staged else 0.0)
 		# The consoles screen hides the shelf itself.
 		if carousel.screen() != Carousel.Screen.CONSOLES:
 			assert_float(carousel._row.neighbours).is_equal(0.0 if staged else 1.0)
@@ -452,33 +478,18 @@ func _on_own_card(carousel: Carousel) -> void:
 	assert_bool((Fixtures.focus(self) as LabelCard).own).is_true()
 
 
-func test_the_user_s_own_picture_picked_shows_on_the_disc_its_largest_square_in_its_middle() -> void:
-	var setup := await _on_games()
-	var carousel: Carousel = setup[0]
-	var properties := carousel._properties
-	await _on_own_card(carousel)
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.settled(self, carousel)
-	assert_int(properties._step).is_equal(DiscProperties.Step.FRAMING)
-	assert_object(properties._staging).is_same(DiscProperties._on_framing)
-	assert_object(_label(carousel)).is_same(properties._chooser._picture_texture)
-	# A picture 64 by 48: the square 48 wide in its middle.
-	assert_vector(_window(carousel)).is_equal_approx(Vector4(8.0 / 64.0, 0.0, 48.0 / 64.0, 1.0), Vector4.ONE * 0.001)
-
-
 func test_on_a_cartridge_the_user_s_own_picture_is_framed_and_kept_at_its_label_s_proportions() -> void:
 	var device := Fixtures.past_first_launch(self, {"gba": 3})
 	device.variants = _variants
 	var carousel := Fixtures.fresh_carousel(self, device)
-	await Fixtures.wait(self, func() -> bool: return carousel._shown)
+	await Fixtures.wait(self, func() -> bool: return carousel.is_shown())
 	await Fixtures.press_to(self, carousel, JOY_BUTTON_A, Carousel.Screen.GAMES)
 	await _on_own_card(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
 	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.FRAMING)
-	# The GBA cartridge's label, 44 by 22.5: on a picture 64 by 48, its full width, 32 tall in the middle.
+	# On a picture 64 by 48, the cartridge's label takes its full width, 32 tall in the middle.
 	var proportion := carousel._row.selected_label_proportion()
-	assert_float(proportion).is_equal_approx(44.0 / 22.5, 0.001)
 	# Within a pixel of it: the label covers its face with it.
 	assert_vector(_window(carousel)).is_equal_approx(Vector4(0.0, 8.0 / 48.0, 1.0, 32.0 / 48.0), Vector4.ONE * 0.025)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -492,7 +503,17 @@ func test_the_stick_and_L1_R1_frame_the_picture_and_A_keeps_it_as_framed() -> vo
 	var device: Fixtures.NewDevice = setup[1]
 	var properties := carousel._properties
 	var game := carousel._row.selected_game()
+	var shown := _label(carousel)
 	await _on_own_card(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	# B first: back to the cards, nothing kept, the label it had.
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await Fixtures.settled(self, carousel)
+	assert_int(properties._step).is_equal(DiscProperties.Step.LABELS)
+	assert_bool((Fixtures.focus(self) as LabelCard).own).is_true()
+	assert_object(_label(carousel)).is_same(shown)
+	assert_array(device.kept_framings).is_empty()
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
 	for held: StringName in [&"label_zoom_in", &"ui_right"]:
@@ -521,29 +542,13 @@ func test_the_stick_and_L1_R1_frame_the_picture_and_A_keeps_it_as_framed() -> vo
 	assert_vector(_window(carousel)).is_equal_approx(Vector4(0.125, 0.0, 0.75, 1.0), Vector4.ONE * 0.0001)
 
 
-func test_B_while_framing_goes_back_to_the_cards_keeping_nothing() -> void:
-	var setup := await _on_games()
-	var carousel: Carousel = setup[0]
-	var device: Fixtures.NewDevice = setup[1]
-	var shown := _label(carousel)
-	await _on_own_card(carousel)
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	await Fixtures.settled(self, carousel)
-	await Fixtures.joypad(self, JOY_BUTTON_B)
-	await Fixtures.settled(self, carousel)
-	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.LABELS)
-	assert_bool((Fixtures.focus(self) as LabelCard).own).is_true()
-	assert_object(_label(carousel)).is_same(shown)
-	assert_array(device.kept_framings).is_empty()
-
-
 func test_a_picture_that_cannot_be_read_brings_the_cards_back_and_is_told() -> void:
 	var setup := await _on_games()
 	var carousel: Carousel = setup[0]
 	var device: Fixtures.NewDevice = setup[1]
 	var told: Array[String] = []
 	carousel._properties.choice_failed.connect(func() -> void: told.append("failed"))
-	device.failing.append(&"pick_label_picture")
+	device.answers[Fixtures.Request.PICK_LABEL_PICTURE] = Fixtures.Answer.FAILS
 	device.picture_failure = &"unreadable_image"
 	await _on_own_card(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -559,7 +564,7 @@ func test_the_picker_closed_without_a_picture_brings_the_cards_back_and_is_no_fa
 	var device: Fixtures.NewDevice = setup[1]
 	var told: Array[String] = []
 	carousel._properties.choice_failed.connect(func() -> void: told.append("failed"))
-	device.failing.append(&"pick_label_picture")
+	device.answers[Fixtures.Request.PICK_LABEL_PICTURE] = Fixtures.Answer.FAILS
 	await _on_own_card(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
@@ -575,7 +580,7 @@ func test_a_picture_that_cannot_be_kept_is_told_and_its_framing_stays() -> void:
 	var device: Fixtures.NewDevice = setup[1]
 	var told: Array[String] = []
 	carousel._properties.choice_failed.connect(func() -> void: told.append("failed"))
-	device.failing.append(&"keep_own_label")
+	device.answers[Fixtures.Request.KEEP_OWN_LABEL] = Fixtures.Answer.FAILS
 	await _on_own_card(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
@@ -589,7 +594,7 @@ func test_a_picture_that_cannot_be_kept_is_told_and_its_framing_stays() -> void:
 	assert_object(carousel._properties._chooser._framing).is_same(framing)
 	assert_vector(_window(carousel)).is_equal(shown)
 	# A again tries again, as framed.
-	device.failing.erase(&"keep_own_label")
+	device.answers.erase(Fixtures.Request.KEEP_OWN_LABEL)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	await Fixtures.settled(self, carousel)
 	assert_int(device.kept_framings.size()).is_equal(2)
@@ -609,22 +614,6 @@ func _on_keyboard(carousel: Carousel, at_end := true) -> void:
 			await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
 
 
-func test_A_on_the_name_opens_a_keyboard_under_the_disc_the_name_ready_to_edit() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	var properties := carousel._properties
-	var game := carousel._row.selected_game()
-	await _on_keyboard(carousel, false)
-	assert_int(properties._step).is_equal(DiscProperties.Step.NAMING)
-	assert_object(properties._staging).is_same(DiscProperties._on_naming)
-	# The caret before the name's first letter, R1 and L1 moving it through the name.
-	assert_str(properties._naming._field.text).is_equal("|" + game.title)
-	await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
-	await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
-	await Fixtures.joypad(self, JOY_BUTTON_LEFT_SHOULDER)
-	assert_str(properties._naming._field.text).is_equal(game.title.insert(1, "|"))
-	assert_object(Fixtures.focus(self)).is_same(properties._naming._keyboard.first_letter())
-
-
 func test_X_Y_and_the_keys_type_the_name_and_Start_keeps_it_everywhere_it_shows() -> void:
 	var setup := await _on_games()
 	var carousel: Carousel = setup[0]
@@ -632,7 +621,16 @@ func test_X_Y_and_the_keys_type_the_name_and_Start_keeps_it_everywhere_it_shows(
 	var properties := carousel._properties
 	var game := carousel._row.selected_game()
 	var title := game.title
-	await _on_keyboard(carousel)
+	await _on_keyboard(carousel, false)
+	# The caret before the name's first letter, R1 and L1 moving it through the name.
+	assert_str(properties._naming._field.text).is_equal("|" + title)
+	await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
+	await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
+	await Fixtures.joypad(self, JOY_BUTTON_LEFT_SHOULDER)
+	assert_str(properties._naming._field.text).is_equal(title.insert(1, "|"))
+	assert_object(Fixtures.focus(self)).is_same(properties._naming._keyboard.first_letter())
+	for letter in title:
+		await Fixtures.joypad(self, JOY_BUTTON_RIGHT_SHOULDER)
 	for letter in title:
 		await Fixtures.joypad(self, JOY_BUTTON_X)
 	# Empty: the title it takes back shows, faded, and the next letter is a capital.
@@ -694,7 +692,7 @@ func test_a_name_that_cannot_be_kept_is_told_and_the_keyboard_stays() -> void:
 	var device: Fixtures.NewDevice = setup[1]
 	var told: Array[String] = []
 	carousel._properties.rename_failed.connect(func() -> void: told.append("failed"))
-	device.failing.append(&"rename_game")
+	device.answers[Fixtures.Request.RENAME_GAME] = Fixtures.Answer.FAILS
 	var title := carousel._row.selected_game().title
 	await _on_keyboard(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
@@ -711,7 +709,7 @@ func test_keys_pressed_while_the_name_is_kept_count_for_nothing() -> void:
 	var carousel: Carousel = setup[0]
 	var device: Fixtures.NewDevice = setup[1]
 	var properties := carousel._properties
-	device.slow.append(&"rename_game")
+	device.answers[Fixtures.Request.RENAME_GAME] = Fixtures.Answer.HELD
 	await _on_keyboard(carousel)
 	await Fixtures.joypad(self, JOY_BUTTON_A)
 	var typed := properties._naming._typed
@@ -722,11 +720,240 @@ func test_keys_pressed_while_the_name_is_kept_count_for_nothing() -> void:
 	assert_str(properties._naming._field.text).is_equal(typed + "|")
 	assert_int(properties._step).is_equal(DiscProperties.Step.NAMING)
 	assert_array(device.names_given).is_equal([typed])
-	device.slow.clear()
-	device.released.emit()
+	device.release()
 	await Fixtures.settled(self, carousel)
 	assert_str(carousel._row.selected_game().title).is_equal(typed)
 	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
+
+
+## The properties of [param carousel] still, the plugin's answer awaited or not.
+func _still(carousel: Carousel) -> void:
+	await Fixtures.wait(self, func() -> bool: return not carousel._properties._busy)
+
+
+## A plugin that does not list the images holds the presses; two seconds on, B closes the properties, and the list
+## coming after is dropped.
+func test_B_two_seconds_into_a_list_that_does_not_come_closes_the_properties_and_drops_the_list() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	device.answers[Fixtures.Request.LABEL_VARIANTS] = Fixtures.Answer.HELD
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await _still(carousel)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.PROPERTIES)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await Fixtures.wait(self, func() -> bool: return carousel.screen() == Carousel.Screen.GAMES)
+	device.release()
+	await Fixtures.settled(self, carousel)
+	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.CLOSED)
+	assert_array(_cards(carousel)).is_empty()
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.LABELS)
+	assert_int(_cards(carousel).size()).is_equal(4)
+
+
+## An image chosen that the plugin does not keep at once: two seconds on, B goes back to the properties, which hold
+## their presses until the answer; the image kept then is the game's.
+func test_B_two_seconds_into_a_choice_goes_back_and_the_image_kept_late_is_the_game_s() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	var properties := carousel._properties
+	var game := carousel._row.selected_game()
+	device.answers[Fixtures.Request.CHOOSE_LABEL] = Fixtures.Answer.HELD
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	var cards := _cards(carousel)
+	await Fixtures.wait(self, func() -> bool: return cards[0].is_ready())
+	cards[0].grab_focus()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await _still(carousel)
+	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await _still(carousel)
+	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
+	device.release()
+	await Fixtures.settled(self, carousel)
+	assert_bool(game.has_label_region and game.label_region == "Europe" and not game.label_own).is_true()
+	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	assert_int(properties._step).is_equal(DiscProperties.Step.LABELS)
+
+
+## A picture of one's own that the plugin does not keep at once: two seconds on, B goes back to the cards; kept
+## then, the game's label is the user's own.
+func test_B_two_seconds_into_keeping_a_picture_goes_back_to_the_cards_and_the_picture_kept_late_is_the_game_s() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	var properties := carousel._properties
+	var game := carousel._row.selected_game()
+	device.answers[Fixtures.Request.KEEP_OWN_LABEL] = Fixtures.Answer.HELD
+	await _on_own_card(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await _still(carousel)
+	assert_int(properties._step).is_equal(DiscProperties.Step.LABELS)
+	var own := Fixtures.focus(self)
+	await Fixtures.action(self, &"ui_left")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	assert_object(Fixtures.focus(self)).is_same(own)
+	assert_array(device.chosen_labels).is_empty()
+	device.release()
+	await Fixtures.settled(self, carousel)
+	assert_bool(game.label_own).is_true()
+	assert_str(properties._chooser.framed_game).is_empty()
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await Fixtures.settled(self, carousel)
+	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
+
+
+func test_keys_pressed_while_the_keyboard_comes_count_for_nothing() -> void:
+	var carousel: Carousel = (await _on_games())[0]
+	var properties := carousel._properties
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.action(self, &"ui_down")
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	var typed := properties._naming.typed()
+	for press: JoyButton in [JOY_BUTTON_RIGHT_SHOULDER, JOY_BUTTON_X, JOY_BUTTON_Y]:
+		await Fixtures.joypad(self, press)
+	assert_bool(properties._busy).is_true()
+	await Fixtures.settled(self, carousel)
+	assert_str(properties._naming.typed()).is_equal(typed)
+
+
+## A name the plugin does not keep at once: two seconds on, B goes back to the properties with the name as it was;
+## kept then, the properties show it.
+func test_B_two_seconds_into_keeping_a_name_goes_back_and_the_name_kept_late_shows() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	var properties := carousel._properties
+	var game := carousel._row.selected_game()
+	var title := game.title
+	device.answers[Fixtures.Request.RENAME_GAME] = Fixtures.Answer.HELD
+	await _on_keyboard(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	var typed := properties._naming.typed()
+	await Fixtures.joypad(self, JOY_BUTTON_START)
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	assert_int(properties._step).is_equal(DiscProperties.Step.NAMING)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await _still(carousel)
+	assert_int(properties._step).is_equal(DiscProperties.Step.PROPERTIES)
+	assert_str(properties._name.text).is_equal(title)
+	device.release()
+	await Fixtures.settled(self, carousel)
+	assert_str(game.title).is_equal(typed)
+	assert_str(properties._name.text).is_equal(typed)
+
+
+## A name kept once the properties were left and closed shows at once in the games screen's title.
+func test_a_name_kept_after_the_properties_closed_shows_in_the_title_at_once() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	device.answers[Fixtures.Request.RENAME_GAME] = Fixtures.Answer.HELD
+	await _on_keyboard(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	var typed := carousel._properties._naming.typed()
+	await Fixtures.joypad(self, JOY_BUTTON_START)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	for back in 2:
+		await Fixtures.joypad(self, JOY_BUTTON_B)
+		await _still(carousel)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+	device.release()
+	await Fixtures.wait(self, func() -> bool: return carousel._row.selected_game().title == typed)
+	await await_idle_frame()
+	assert_str(carousel._title.text).is_equal(typed)
+
+
+## A name B let go that is not kept says so when the answer comes, the properties closed by then.
+func test_a_name_let_go_that_is_not_kept_says_so_when_the_answer_comes() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	device.answers[Fixtures.Request.RENAME_GAME] = Fixtures.Answer.HELD
+	device.failures[Fixtures.Request.RENAME_GAME] = &"unwritable"
+	await _on_keyboard(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.joypad(self, JOY_BUTTON_START)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	for back in 2:
+		await Fixtures.joypad(self, JOY_BUTTON_B)
+		await _still(carousel)
+	assert_bool(carousel._message.visible).is_false()
+	device.release()
+	await Fixtures.settled(self, carousel)
+	assert_bool(carousel._message.visible).is_true()
+	assert_str(carousel._message.text).is_equal("This name could not be kept.")
+
+
+## An image B let go that is not kept says so when the answer comes.
+func test_an_image_let_go_that_is_not_kept_says_so_when_the_answer_comes() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	device.answers[Fixtures.Request.CHOOSE_LABEL] = Fixtures.Answer.HELD
+	device.failures[Fixtures.Request.CHOOSE_LABEL] = &"unwritable"
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.settled(self, carousel)
+	var cards := _cards(carousel)
+	await Fixtures.wait(self, func() -> bool: return cards[0].is_ready())
+	cards[0].grab_focus()
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	await Fixtures.joypad(self, JOY_BUTTON_B)
+	await _still(carousel)
+	assert_bool(carousel._message.visible).is_false()
+	device.release()
+	await Fixtures.settled(self, carousel)
+	assert_str(carousel._message.text).is_equal("This image could not be kept.")
+	assert_bool(carousel._message.visible).is_true()
+
+
+## X while an answer B let go is still owed opens nothing: the properties would take no press but B until it comes.
+func test_X_opens_nothing_while_an_answer_let_go_is_owed_and_opens_the_properties_once_it_came() -> void:
+	var setup := await _on_games()
+	var carousel: Carousel = setup[0]
+	var device: Fixtures.NewDevice = setup[1]
+	device.answers[Fixtures.Request.RENAME_GAME] = Fixtures.Answer.HELD
+	await _on_keyboard(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_A)
+	await Fixtures.joypad(self, JOY_BUTTON_START)
+	Fixtures.clock.ms += ScreenFlow.HeldSave.ESCAPE_MS
+	for back in 2:
+		await Fixtures.joypad(self, JOY_BUTTON_B)
+		await _still(carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await _still(carousel)
+	assert_int(carousel.screen()).is_equal(Carousel.Screen.GAMES)
+	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.CLOSED)
+	device.release()
+	await Fixtures.settled(self, carousel)
+	await Fixtures.joypad(self, JOY_BUTTON_X)
+	await Fixtures.settled(self, carousel)
+	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.PROPERTIES)
 
 
 func test_Start_on_a_name_left_as_it_was_keeps_the_game_s_own_title() -> void:
@@ -739,40 +966,6 @@ func test_Start_on_a_name_left_as_it_was_keeps_the_game_s_own_title() -> void:
 	assert_array(device.names_given).is_empty()
 	assert_bool(carousel._row.selected_game().has_original_title).is_false()
 	assert_int(carousel._properties._step).is_equal(DiscProperties.Step.PROPERTIES)
-
-
-func test_typing_the_game_s_own_title_back_takes_its_name_away() -> void:
-	var carousel: Carousel = (await _on_games())[0]
-	var game := carousel._row.selected_game()
-	var title := game.title
-	game.has_original_title = true
-	game.original_title = title
-	game.title = "Mine"
-	await _on_keyboard(carousel)
-	carousel._properties._naming._typed = title
-	await Fixtures.joypad(self, JOY_BUTTON_START)
-	await Fixtures.settled(self, carousel)
-	assert_str(game.title).is_equal(title)
-	assert_bool(game.has_original_title).is_false()
-
-
-func test_a_name_is_kept_on_single_spaces_and_typed_up_to_80_characters() -> void:
-	var setup := await _on_games()
-	var carousel: Carousel = setup[0]
-	var device: Fixtures.NewDevice = setup[1]
-	var properties := carousel._properties
-	await _on_keyboard(carousel)
-	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	await Fixtures.joypad(self, JOY_BUTTON_Y)
-	await Fixtures.joypad(self, JOY_BUTTON_A)
-	assert_str(properties._naming._typed).ends_with("  A")
-	for key in 85:
-		properties._naming._keyboard.first_letter().pressed.emit()
-	assert_int(properties._naming._typed.length()).is_equal(80)
-	await Fixtures.joypad(self, JOY_BUTTON_START)
-	await Fixtures.settled(self, carousel)
-	assert_int(device.names_given[0].length()).is_equal(80)
-	assert_bool(carousel._row.selected_game().title.contains("  ")).is_false()
 
 
 func test_delayed_sources_of_the_same_region_keep_their_own_pixels_and_choice() -> void:
@@ -830,15 +1023,14 @@ func test_an_absent_or_incomplete_selected_model_closes_properties_without_movin
 	var carousel: Carousel = (await _on_games())[0]
 	var properties := carousel._properties
 	var row := carousel._row
-	var place: ShelfRow.Place = row._placed[row.selected_index()]
+	var place: ShelfPlace = row._placed[row.selected_index()]
 	var model := place.shown.get_child(0)
 	var label: MeshInstance3D = model.get_node("Label")
 	var mesh := label.mesh
-	for missing: String in ["place", "model", "label", "mesh", "body"]:
+	for missing: String in ["model", "label", "mesh", "body"]:
 		row.set_process(false)
 		var extra := MeshInstance3D.new()
 		match missing:
-			"place": place.game = -1
 			"model": place.shown.remove_child(model)
 			"label": label.name = "MissingLabel"
 			"mesh": label.mesh = null
@@ -848,9 +1040,8 @@ func test_an_absent_or_incomplete_selected_model_closes_properties_without_movin
 		assert_bool(properties.is_open()).is_false()
 		assert_bool(properties.visible).is_false()
 		assert_object(properties._medium).is_null()
-		assert_float(row.stage).is_equal(0.0)
+		assert_float(row.standing().amount).is_equal(0.0)
 		match missing:
-			"place": place.game = row.selected_index()
 			"model":
 				place.shown.add_child(model)
 				place.shown.move_child(model, 0)

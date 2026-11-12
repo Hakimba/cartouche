@@ -39,32 +39,18 @@ extends Control
 signal screen_changed(screen: Screen)
 
 enum Screen { CONSOLES, ENTERING, GAMES, LEAVING, PROPERTIES, CONSOLE_EDIT, ORDER }
-## Who holds the presses, whatever the screen: the screens in front (and the start), the carousel, a press of the
-## carousel waiting for the row to stop ([method _after_settle]), or the form adding a console, asked by the "+" (the
-## screens not shown yet), coming in over the consoles still in view, covering them, or given up (leaving, the consoles
-## back). Changed only by [method _cover], [method _uncover], the settle and the form's steps.
-enum Holder { FLOW, CAROUSEL, SETTLING, FORM_ASKED, FORM_COMING, FORM_COVERING, FORM_GIVEN_UP }
-## What the carousel takes on a screen while it holds the presses (see [constant _TAKES]).
-enum Take { PRESS = 1, FINGER = 2, LIBRARY = 4 }
+## Who holds the presses, whatever the screen: the screens in front (and the start), the carousel, or the form adding
+## a console, asked by the "+" (the screens not shown yet), coming in over the rail and the frame still in view,
+## covering them, or given up (leaving, the consoles back once it is gone). Changed only by [method _cover],
+## [method _uncover] and the form's steps.
+enum Holder { FLOW, CAROUSEL, FORM_ASKED, FORM_COMING, FORM_COVERING, FORM_GIVEN_UP }
 
 const _APPEARANCE := "res://data/carousel/appearance.json"
 const _MESSAGE_S := 4.0
-const _MOVING: Array[Screen] = [Screen.ENTERING, Screen.LEAVING]
-const _CONSOLE_SCREENS: Array[Screen] = [Screen.CONSOLES, Screen.CONSOLE_EDIT]
-const _GAME_SCREENS: Array[Screen] = [Screen.GAMES, Screen.PROPERTIES]
-## Per screen, what the carousel takes itself: the pad's presses, a finger (on the properties, the game it turns), a
-## library read again. Elsewhere the edit form or the ring reads the presses, or a move into or out of a console plays.
-const _TAKES: Dictionary[Screen, int] = {
-	Screen.CONSOLES: Take.PRESS | Take.FINGER | Take.LIBRARY,
-	Screen.ENTERING: 0,
-	Screen.GAMES: Take.PRESS | Take.FINGER | Take.LIBRARY,
-	Screen.LEAVING: 0,
-	Screen.PROPERTIES: Take.FINGER,
-	Screen.CONSOLE_EDIT: 0,
-	Screen.ORDER: 0,
-}
 const _FORM: Array[Holder] = [Holder.FORM_ASKED, Holder.FORM_COMING, Holder.FORM_COVERING, Holder.FORM_GIVEN_UP]
 const _ARRIVAL_S := 0.45
+## The ring coming back once a form is gone, as after the settings: this long, from this size of the console's.
+const _RETURN_S := 0.2
 const _TITLE_ARRIVES_S := 0.3
 const _PILL_ARRIVES_S := 0.4
 ## The size the consoles come out of, as a part of theirs.
@@ -75,12 +61,11 @@ const _CONSOLES_LOWER_PX := 58.0
 ## How far down the screen the camera centres the selected console, in pixels.
 const _CONSOLE_Y := 420.0
 const _RING_LEAVE_S := 0.15
-## The ring's closing time the next three timings are set for; a shorter close (a rewind) plays them faster.
+## The ring's closing time the next three timings are set for; a close of another length plays them in proportion.
 const _RING_CLOSE_S := 0.62
 const _RING_RISE_AFTER_S := 0.31
 const _RING_BACK_AFTER_S := 0.341
 const _RING_BACK_S := 0.279
-const _FORM_BACK_RISE_AFTER_S := 0.07
 const _SEARCH_LIFT_PX := 54.0
 const _BEHIND_FADE_S := 0.3
 
@@ -110,15 +95,19 @@ var _holder := Holder.FLOW
 ## Whether the carousel shows, nothing of the screens flow in front of it.
 var _shown: bool:
 	get:
-		return _holder == Holder.CAROUSEL or _holder == Holder.SETTLING
+		return CarouselState.shows(_holder)
 var _direction := HeldDirection.new()
-var _up := HeldDirection.new({&"ui_up": 1})
+## The directions the screens' focus and the carousel follow: a stick held sends a stream of presses, and one wavering
+## about its dead zone presses again; only its push is a press.
+var _ways := HeldDirection.new({&"ui_left": -1, &"ui_right": 1, &"ui_up": -1, &"ui_down": 1})
 ## Whether the games row rested on the games screen last frame (see [method ShelfRow.read_pick]).
 var _row_resting := false
 var _downloading := false
 var _arrival: Tween
 var _title_fade: Tween
 var _form_entry: FormEntry
+## The form's opening waits on this, its parts in turn: a newer opening kills an older wait, which never resumes then.
+var _form_wait: Tween
 ## The platform edited until its form closes; none otherwise.
 var _edited_platform := ""
 ## The row's height, the ribbon closed, and how much it rises while it is open, in world units.
@@ -127,10 +116,12 @@ var _search_lift := 0.0
 var _lift: Tween
 var _title_position := 0
 var _games_hint_fade: Tween
+var _games_logo_fade: Tween
 ## The room's light last given: the environment keeps it in single precision, never equal to the double it was given.
 var _room_energy := NAN
-## Whether the row stepped to a console whose shelf is not shown behind it yet (see [method _show_waiting_shelf]).
-var _shelf_waiting := false
+## The platform whose shelf the games row shows; none before a library shows, nor once the consoles stepped: the row
+## is made again for the console stepped to, even the one it left.
+var _row_platform := ""
 ## The game in the middle of the games screen as last seen there; none elsewhere.
 var _middle: AndroidServices.Game
 
@@ -191,8 +182,11 @@ func _ready() -> void:
 	_screens.android = android
 	_screens.covering.connect(_on_screens_covering)
 	_screens.form_leaving.connect(_on_screens_form_leaving)
-	_screens.edit_leaving.connect(_stop_editing)
 	_screens.model_shown.connect(_show_variant)
+	_screens.row_switch_kept.connect(func(switch: StringName, on: bool) -> void:
+		assert(switch in _row, "%s is no switch of the games row" % switch)
+		_row.set(switch, on)
+		Diagnostics.trace("settings", "games row %s=%s" % [switch, str(on)]))
 	_screens.platform_chosen.connect(func(platform_id: String) -> void:
 		var platform := _platforms[platform_id]
 		_appearance.load_ahead(platform.medium, platform.media))
@@ -220,8 +214,9 @@ func _ready() -> void:
 	_resting.smooth_motion = func() -> bool:
 		return _screen == Screen.GAMES and _row.is_visible_in_tree() and _row.games_float and _row.pace > 0.0
 	_resting.moving = func() -> bool:
-		return _downloading or _game_launch.is_busy() or _toss.is_busy() or _screen in _MOVING or _screens.is_playing() \
-			or _order.is_open() or (_console_arrival and _console_arrival.is_playing())
+		return _downloading or not _can(CarouselState.Take.REST) or _screens.is_playing() or _order.is_open() \
+			or _properties.is_open() \
+			or (_console_arrival and _console_arrival.is_playing())
 	if Diagnostics.argument("welcome") == "skip":
 		_screens.welcome_waits = false
 	# The bar waits for the first launch's welcome to be passed.
@@ -256,6 +251,7 @@ func _ready() -> void:
 	_search.opened.connect(_on_search_opened)
 	_screens.place = _place_console
 	_touch.entered.connect(_enter)
+	_sequence.games_arrived.connect(_show_games_logo)
 	_touch.long_pressed.connect(_long_press)
 	_touch.lifted.connect(_let_go)
 	_touch.tossed.connect(_toss_selected)
@@ -278,7 +274,9 @@ func _ready() -> void:
 	_properties.closed.connect(_go.bind(Screen.GAMES))
 	_properties.choice_failed.connect(func() -> void:
 		_show_message(tr("This image could not be kept.")))
-	_properties.name_kept.connect(_show_title)
+	_properties.name_kept.connect(func() -> void:
+		if _row.has_games():
+			_show_title())
 	_order.android = android
 	_order.consoles = _consoles
 	_order.ordered.connect(_on_consoles_ordered)
@@ -286,6 +284,7 @@ func _ready() -> void:
 		_show_message(tr("This order could not be kept.")))
 	_order.closing.connect(_on_order_closing)
 	_order.closed.connect(_on_order_closed)
+	_order.form_wanted.connect(_screens.bring_back_form)
 	_row.turntable = Diagnostics.argument("turntable").to_float()
 	_on_clock_timeout()
 	_battery.show_battery(android.battery())
@@ -297,14 +296,20 @@ func _ready() -> void:
 	var settings: AndroidServices.SettingsAnswer = await asked_settings.taken()
 	var answered_ms := Time.get_ticks_msec()
 	_row.games_float = settings.games_float
+	_row.games_in_line = settings.games_in_line
 	if settings.has_button_style:
 		Controls.style = settings.button_style
-	get_viewport().msaa_3d = EdgeSmoothingScreen.MSAA[settings.edge_smoothing]
+	EdgeSmoothingScreen.smooth(get_viewport(), EdgeSmoothingScreen.MSAA[settings.edge_smoothing])
+	get_tree().call_group(&"edge_smoothing", &"smoothing_changed")
 	for art in answer.art:
 		_art.add(art)
 	for game_id in answer.absent:
 		_art.mark_absent(game_id)
 	_show_library(answer.library)
+	# The damaged file is kept aside, but the consoles it held are gone: they must be added again.
+	if answer.has_load_problem:
+		Diagnostics.trace("carousel", "library unreadable, started empty: %s" % answer.load_problem)
+		_show_message(tr("Your library could not be read. Add your consoles again."))
 	var library_shown_ms := Time.get_ticks_msec()
 	await _screens.run(settings)
 	var screens_ms := Time.get_ticks_msec()
@@ -316,9 +321,11 @@ func _ready() -> void:
 	get_tree().process_frame.connect(func() -> void:
 		for shelf in _shelves:
 			_appearance.load_models_of(_platforms[shelf.platform_id], shelf.games), CONNECT_ONE_SHOT)
-	if Diagnostics.enabled:
-		add_child(StartTrace.new(self, _row, _art, answer.library.games.size(), _shelves.size(),
-			[started, read_ms, awaited_ms, answered_ms, library_shown_ms, screens_ms]))
+	# By path: a release build leaves the dev scripts out, and a class name would make this script need them.
+	if Diagnostics.enabled and ResourceLoader.exists("res://dev/start_trace.gd"):
+		var trace: Node = (load("res://dev/start_trace.gd") as GDScript).new(self, _row, _art, answer.library.games.size(),
+			_shelves.size(), [started, read_ms, awaited_ms, answered_ms, library_shown_ms, screens_ms])
+		add_child(trace)
 
 
 func _notification(what: int) -> void:
@@ -329,7 +336,7 @@ func _notification(what: int) -> void:
 		# A button let go meanwhile never reaches the app: the row stops, the ball closes, the first press back is one.
 		_row.release(_direction.direction)
 		_direction.let_go()
-		_up.let_go()
+		_ways.let_go()
 		_add_ball.close(false)
 	elif what == NOTIFICATION_APPLICATION_RESUMED:
 		# Where the system tells no change of its theme, it is read again on the way back.
@@ -372,11 +379,11 @@ func _follow_system_theme() -> void:
 func _process(delta: float) -> void:
 	# Wherever a medium is drawn in this world (the games, their properties, an insertion), it is lit
 	# by its own room; the consoles by the backdrop's (the scene's resource is shared, and the games change it).
-	var room := _row.room_energy if _screen in _GAME_SCREENS and _row.visible else Backdrop.palette.room_light
+	var room := _row.room_energy if _front() == CarouselState.Front.GAMES and _row.visible else Backdrop.palette.room_light
 	if room != _room_energy:
 		_room_energy = room
 		_room.environment.ambient_light_energy = room
-	var gone := _screen in _GAME_SCREENS and not _game_launch.is_inserting()
+	var gone := _front() == CarouselState.Front.GAMES and not _game_launch.is_inserting()
 	# While a launch is checked, and as the black fades after the game, they stay away.
 	var behind := 0.0 if gone and _game_launch.is_busy() \
 		else move_toward(_sequence.behind_amount, 0.0 if gone else 1.0, delta / _BEHIND_FADE_S)
@@ -387,92 +394,87 @@ func _process(delta: float) -> void:
 		_sequence.behind_amount = behind
 	var now: int = clock.call()
 	_touch.hold(now, _touchable)
+	# Read once, after a long press may have opened a screen; nothing below changes it but the shelf made again, which
+	# stops the row's glide: a library read again asks anew.
+	var under_way := _busy()
+	var taken := CarouselState.takes(_screen, _holder, under_way)
 	var stick := Input.get_vector(&"inspect_left", &"inspect_right", &"inspect_up", &"inspect_down")
-	_consoles.inspect(stick if _screen in _CONSOLE_SCREENS and _shown else Vector2.ZERO)
-	if not (_game_launch.is_busy() or _toss.is_busy()):
-		_row.inspect(stick if _screen in _GAME_SCREENS else Vector2.ZERO)
+	_consoles.inspect(stick if (taken & CarouselState.Take.CONSOLE_STICK) != 0 else Vector2.ZERO)
+	if (under_way & CarouselState.FLYING) == 0:
+		_row.inspect(stick if _front() == CarouselState.Front.GAMES else Vector2.ZERO)
 	# Read as the row rests, not as it passes games nor at each letter of a search.
-	var resting := _screen == Screen.GAMES and _shown and not (_row.is_settling() or _search.is_open() or _toss.is_busy())
+	var resting := (taken & CarouselState.Take.PICK) != 0
 	if resting and not _row_resting:
 		_row.read_pick()
 	_row_resting = resting
-	if _shelf_waiting and _screen == Screen.CONSOLES and not _consoles.is_settling():
+	if _row_is_behind() and (taken & CarouselState.Take.SHELF) != 0:
 		_show_waiting_shelf()
-	if _new_games.has_library() and _is_free():
+	# A library read before a name or a label the properties still wait for would show without it.
+	if _new_games.has_library() and _can(CarouselState.Take.LIBRARY) and not _properties.awaits_answer():
 		var library := _new_games.take_library()
 		if library:
 			_refresh_library(library)
 	_follow_middle()
 
 
+# Before the screens' focus moves. Only a stick is held back: a button or a key pressed is always a new press, even when
+# a page took its release.
+func _input(event: InputEvent) -> void:
+	if not _ways.update(event) and event is InputEventJoypadMotion and _ways.presses(event):
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	var moved := _direction.update(event)
-	# Held up, a stick sends presses all along: only its first one is a press.
-	if not _up.update(event) and event.is_action_pressed(&"ui_up"):
-		return
-	if _holder == Holder.SETTLING or _toss.is_busy():
-		if event.is_pressed() and not event.is_echo():
-			Diagnostics.trace("carousel", "press during %s ignored: %s" % ["the toss" if _toss.is_busy() else "settle",
-				event.as_text()])
-		return
-	if _needs_settle(event):
-		_after_settle(event, moved)
+	if _toss.is_busy():
+		if event.is_pressed() and not event.is_echo() and Diagnostics.enabled:
+			Diagnostics.trace("carousel", "press during the toss ignored: %s" % event.as_text())
 		return
 	_handle_input(event, moved)
 
 
 func _handle_input(event: InputEvent, moved: bool) -> void:
-	# Nothing acts from A until the carousel shows again after the game, nor while the animation
-	# into or out of the console plays.
-	# The properties take their own presses.
-	if event.is_echo() or not _takes(Take.PRESS):
-		return
-	if not _row.has_games():
-		return
-	elif _screen == Screen.GAMES and _search.is_open():
-		_search.take(event, _direction, moved)
-	elif _screen in [Screen.CONSOLES, Screen.GAMES] and event.is_action_pressed(&"open_settings"):
-		_open_settings()
-	elif _screen == Screen.CONSOLES and moved and _direction.held:
-		_add_ball.close()
-		_consoles.step(_direction.direction)
-	elif _screen == Screen.CONSOLES and event.is_action(&"ui_up"):
-		# Up as the stick and the D-pad hold it together: either one held keeps the button.
-		if Input.is_action_pressed(&"ui_up"):
-			_add_ball.open()
-		else:
+	match CarouselState.command(_screen, _taken(), _facts(moved), event):
+		CarouselState.Command.NONE:
+			return
+		CarouselState.Command.TO_SEARCH:
+			_search.take(event, _direction, moved)
+		CarouselState.Command.SETTINGS:
+			_open_settings()
+		CarouselState.Command.STEP_CONSOLE:
 			_add_ball.close()
-	elif _screen == Screen.CONSOLES and event.is_action_pressed(&"open_properties"):
-		_edit_console()
-	elif _screen == Screen.CONSOLES and event.is_action_pressed(&"ui_down") and _shelves.size() > 1:
-		_open_order()
-	elif _screen == Screen.CONSOLES and event.is_action_pressed(&"ui_accept"):
-		if _add_ball.is_open:
+			_consoles.step(_direction.direction)
+		CarouselState.Command.OPEN_BALL:
+			_add_ball.open()
+		CarouselState.Command.CLOSE_BALL:
+			_add_ball.close()
+		CarouselState.Command.EDIT_CONSOLE:
+			_edit_console()
+		CarouselState.Command.ORDER:
+			_open_order()
+		CarouselState.Command.ADD_CONSOLE:
 			_add_console()
-		else:
+		CarouselState.Command.ENTER:
 			_enter()
-	elif _screen == Screen.GAMES and moved:
-		if _direction.held:
+		CarouselState.Command.HOLD_ROW:
 			_row.hold(_direction.direction)
-		else:
+		CarouselState.Command.RELEASE_ROW:
 			_row.release(_direction.direction)
-	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_accept"):
-		_launch()
-	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_up"):
-		_toss_selected()
-	elif _screen == Screen.GAMES and event.is_action_pressed(&"ui_down"):
-		_row.freeze()
-		Sounds.play(SoundEffects.Cue.OPEN)
-		_search.open()
-	elif _screen == Screen.GAMES and event.is_action_pressed(&"screen_back") and _search.is_filtered():
-		Sounds.play(SoundEffects.Cue.BACK)
-		_search.clear()
-	elif _screen == Screen.GAMES and event.is_action_pressed(&"screen_back"):
-		_leave()
-	elif _screen == Screen.GAMES and event.is_action_pressed(&"open_properties"):
-		_open_properties()
-	else:
-		return
+		CarouselState.Command.LAUNCH:
+			_launch()
+		CarouselState.Command.TOSS:
+			_toss_selected()
+		CarouselState.Command.OPEN_SEARCH:
+			_row.freeze()
+			Sounds.play(SoundEffects.Cue.OPEN)
+			_search.open()
+		CarouselState.Command.CLEAR_FILTER:
+			Sounds.play(SoundEffects.Cue.BACK)
+			_search.clear()
+		CarouselState.Command.LEAVE:
+			_leave()
+		CarouselState.Command.PROPERTIES:
+			_open_properties()
 	get_viewport().set_input_as_handled()
 
 
@@ -487,6 +489,11 @@ func _gui_input(event: InputEvent) -> void:
 ## The screen shown, or the one the animation goes to.
 func screen() -> Screen:
 	return _screen
+
+
+## Whether the carousel shows, nothing of the screens flow in front of it.
+func is_shown() -> bool:
+	return _shown
 
 
 ## The system's back, a gesture or a button, is B on every screen: pressed, then let go a frame
@@ -504,28 +511,50 @@ func _press_back() -> void:
 func _share_clock() -> void:
 	_order.clock = clock
 	_properties.clock = clock
+	_screens.clock = clock
 
 
-## Whether the carousel takes [param take] now: it holds the presses, its screen takes that ([constant _TAKES]), and
-## no game launches or flies.
-func _takes(take: Take) -> bool:
-	return _holder == Holder.CAROUSEL and (_TAKES[_screen] & take) != 0 and not (_game_launch.is_busy() or _toss.is_busy())
+## What is under way that stops the carousel taking something, read from the parts that own it: never kept here.
+func _busy() -> int:
+	return CarouselState.busy(_game_launch.is_busy(), _toss.is_busy(), _search.is_open(), _row.is_settling(),
+		_consoles.is_settling())
+
+
+## What the carousel takes now ([method CarouselState.takes]).
+func _taken() -> int:
+	return CarouselState.takes(_screen, _holder, _busy())
+
+
+## Whether the carousel takes [param take] now.
+func _can(take: CarouselState.Take) -> bool:
+	return (_taken() & take) != 0
+
+
+## What stands in front on the screen shown.
+func _front() -> CarouselState.Front:
+	return CarouselState.front(_screen)
+
+
+## What [method CarouselState.command] needs to know of a press, [param moved] when it pressed or released a
+## direction.
+func _facts(moved: bool) -> int:
+	return CarouselState.facts(_row.has_games(), _search.is_open(), _search.is_filtered(), moved, _direction.held,
+		_ways.holds(&"ui_up"), _add_ball.is_open, _shelves.size() > 1)
 
 
 ## Whether a finger acts on the carousel now: not on the search ribbon, nor with no game.
 func _touchable() -> bool:
-	return _takes(Take.FINGER) and _row.has_games() and not _search.is_open()
+	return _can(CarouselState.Take.FINGER) and _row.has_games()
 
 
-## Whether a library read again can show now: the carousel holds the presses on the consoles screen or the games screen,
-## still, the ribbon closed.
-func _is_free() -> bool:
-	return _takes(Take.LIBRARY) and not (_search.is_open() or _row.is_settling() or _consoles.is_settling())
+## Whether the games row does not show the selected console's shelf yet.
+func _row_is_behind() -> bool:
+	return not _shelves.is_empty() and _row_platform != _shelves[_shelf].platform_id
 
 
 ## The game left in the middle of the games screen is not new any more.
 func _follow_middle() -> void:
-	var middle: AndroidServices.Game = _row.selected_game() if _screen in _GAME_SCREENS and _row.has_games() else null
+	var middle: AndroidServices.Game = _row.selected_game() if _front() == CarouselState.Front.GAMES and _row.has_games() else null
 	if _middle and (not middle or middle.id != _middle.id):
 		_new_games.leave(_middle)
 	_middle = middle
@@ -582,7 +611,7 @@ func _toss_selected() -> void:
 ## Where the console or the game in the middle rests on the screen (not where it is passing
 ## through as it slides there).
 func _selected_point() -> Vector2:
-	if _screen in _CONSOLE_SCREENS:
+	if _front() == CarouselState.Front.CONSOLES:
 		return _screens.console_point
 	return _camera.unproject_position(_row.to_global(Vector3.ZERO))
 
@@ -625,7 +654,6 @@ func _long_press() -> void:
 func _show_library(library: AndroidServices.Library, shown := "", middles: Dictionary[String, String] = {}) -> void:
 	var started := Time.get_ticks_usec()
 	_screens.library = library
-	_shelf_waiting = false
 	_console_variants = library.console_variants
 	_appearance.use_variants(_console_variants)
 	_shelf = library.selected_shelf
@@ -707,7 +735,7 @@ func _stand(animation: Animation) -> void:
 ## once there. Every still pose is read from the screen, so that no library, model or screen shown again can leave the
 ## consoles of one screen under the controls of the other.
 func _pose() -> StringName:
-	return &"games" if _screen in _GAME_SCREENS else &""
+	return &"games" if _front() == CarouselState.Front.GAMES else &""
 
 
 ## The selected platform's shelf behind the consoles screen, ready for the games screen, and the launch
@@ -715,6 +743,7 @@ func _pose() -> StringName:
 func _show_shelf() -> void:
 	var started := Time.get_ticks_usec()
 	var shelf := _shelves[_shelf]
+	_row_platform = shelf.platform_id
 	var platform := _platforms[shelf.platform_id]
 	var models := _models_of(shelf)
 	for medium in models:
@@ -726,13 +755,13 @@ func _show_shelf() -> void:
 	_search.use_shelf(shelf.platform_id, shelf.games)
 	if Diagnostics.enabled:
 		Diagnostics.trace("carousel", "shelf %s prepared in %.1f ms, %d label viewports alive, %d holding a blank" % [shelf.platform_id,
-			(Time.get_ticks_usec() - started) / 1000.0, ShelfRow.LabelledModel.alive, ShelfRow.LabelledModel.held_views])
+			(Time.get_ticks_usec() - started) / 1000.0, LabelledModel.alive, LabelledModel.held_views])
 
 
 ## The shelf of the console stepped to, once the row stands still on it or as soon as something needs it,
 ## rather than at every step: the consoles passed on the way never make theirs.
 func _show_waiting_shelf() -> void:
-	if _shelf_waiting:
+	if _row_is_behind():
 		_remember()
 
 
@@ -740,11 +769,11 @@ func _enter() -> void:
 	Sounds.play(SoundEffects.Cue.SELECT)
 	_new_games.enter(_shelves[_shelf].platform_id)
 	_go(Screen.ENTERING)
+	# Before its pill fades in: it would name the game of the console left.
+	_show_title()
 	_consoles.face_front()
-	_play_logo(false)
 	_sequence.enter()
 	await _sequence.finished
-	_show_title()
 	_go(Screen.GAMES)
 
 
@@ -755,11 +784,18 @@ func _leave() -> void:
 	_remember()
 	# The rail comes back as the launch ends, the frame and the rest as it does.
 	_rail.rise(StudioTokens.TR_GAMES_RAIL_BACK_S, maxf(0.0, _sequence.trip_s() - StudioTokens.TR_GAMES_RAIL_BACK_S))
-	_play_logo(true)
 	_sequence.leave()
 	await _sequence.finished
 	_show_title()
 	_go(Screen.CONSOLES)
+
+
+## Going in, the games' logo comes with the games, fading in over them.
+func _show_games_logo() -> void:
+	_games_logo.visible = true
+	_games_logo.modulate.a = 0.0
+	_games_logo_fade = Motion.restart(self, _games_logo_fade)
+	_games_logo_fade.tween_property(_games_logo, ^"modulate:a", 1.0, StudioTokens.TR_GAMES_HINTS_S)
 
 
 func _show_title() -> void:
@@ -775,9 +811,11 @@ func _show_title() -> void:
 
 
 func _go(screen_to: Screen) -> void:
+	assert(CarouselState.follows(_screen, screen_to),
+		"%s cannot follow %s" % [Screen.keys()[screen_to], Screen.keys()[_screen]])
 	_toss.finish()
 	_show_waiting_shelf()
-	_games_logo.visible = screen_to in _GAME_SCREENS
+	_games_logo.visible = CarouselState.front(screen_to) == CarouselState.Front.GAMES
 	var games := screen_to == Screen.GAMES and _screen != Screen.PROPERTIES
 	var from := _screen
 	_screen = screen_to
@@ -797,6 +835,9 @@ func _go(screen_to: Screen) -> void:
 	# The games screen's hints come and go with it; its properties hide and show them themselves.
 	if games or screen_to in [Screen.LEAVING, Screen.CONSOLES]:
 		_games_hint_fade = Motion.restart(self, _games_hint_fade)
+		# Going out, they leave at once with the games, never over the console.
+		if screen_to == Screen.LEAVING:
+			_games_hints.modulate.a = 0.0
 		_games_hint_fade.tween_property(_games_hints, ^"modulate:a",
 			1.0 if screen_to == Screen.GAMES else 0.0, StudioTokens.TR_GAMES_HINTS_S)
 	Diagnostics.trace("carousel", "screen %s" % Screen.keys()[screen_to])
@@ -806,9 +847,8 @@ func _go(screen_to: Screen) -> void:
 func _launch() -> void:
 	Sounds.play(SoundEffects.Cue.LAUNCH)
 	var game := _row.selected_game()
-	# Pressed as the hints come, they arrive at once: the launch fades them from there and gives them back whole.
-	if _games_hint_fade and _games_hint_fade.is_running():
-		_games_hint_fade.custom_step(StudioTokens.TR_GAMES_HINTS_S)
+	# The launch fades the hints from there and gives them back whole.
+	_hints_arrived()
 	_remember()
 	var platform := _platforms[game.platform_id]
 	# The placeholder brings the game's own medium from its own length away.
@@ -819,8 +859,7 @@ func _launch() -> void:
 ## Stores the selected game and its platform, for the next start.
 func _remember() -> void:
 	# The selection saved is the game of the shelf stepped to.
-	if _shelf_waiting:
-		_shelf_waiting = false
+	if _row_is_behind():
 		_show_shelf()
 	if _shelves.is_empty() or not _row.has_games():
 		return
@@ -867,7 +906,7 @@ func _on_row_selection_changed(_game: AndroidServices.Game) -> void:
 func _on_search_changed() -> void:
 	# The row's positions are those of another list now: the pill does not slide by their difference.
 	_title_position = _row.selected_position()
-	if _screen in _GAME_SCREENS:
+	if _front() == CarouselState.Front.GAMES:
 		_show_title()
 
 
@@ -881,7 +920,7 @@ func _on_consoles_selection_changed(index: int) -> void:
 	_rail.go_to(_consoles.target())
 	_shelf = index
 	_use_platform()
-	_shelf_waiting = true
+	_row_platform = ""
 	Diagnostics.trace("carousel", "platform %s" % _shelves[_shelf].platform_id)
 
 
@@ -893,11 +932,11 @@ func _on_game_launch_failed(code: StringName) -> void:
 	Diagnostics.trace("carousel", "launch failed: %s" % code)
 	var platform := _platforms[_shelves[_shelf].platform_id].name
 	match code:
-		&"not_installed", &"no_player":
+		AndroidServices.Result.NOT_INSTALLED, AndroidServices.Result.NO_PLAYER:
 			_show_message(tr("No {platform} emulator is installed.").format({"platform": platform}))
-		&"game_missing":
+		AndroidServices.Result.GAME_MISSING:
 			_show_message(tr("This game's file cannot be found: is its SD card or folder still there?"))
-		&"rehearsed", &"too_late":
+		AndroidServices.Result.REHEARSED, AndroidServices.Result.TOO_LATE:
 			pass
 		_:
 			_show_message(tr("The game could not be launched."))
@@ -912,7 +951,7 @@ func _show_front(front: bool) -> void:
 		part.visible = not front
 	_console_title.visible = not front
 	_search.visible = not front
-	_games_logo.visible = not front and _screen in _GAME_SCREENS
+	_games_logo.visible = not front and _front() == CarouselState.Front.GAMES
 	_pill.visible = not front and not _shelves.is_empty()
 	_games_hints.visible = not front
 	_show_rail()
@@ -928,12 +967,27 @@ func _come_in() -> void:
 	_arrive()
 
 
-func _arrive(growing := true) -> void:
-	_consoles.arrival = _ARRIVAL_POINT if growing else 1.0
+## The ring back once a form is gone, as after the settings: the console whole, just under its size, easing to it
+## with no overshoot, the rail, the title and the hints coming with it.
+func _come_back(from := StudioTokens.TR_SETTINGS_RECEDE) -> void:
+	_resting.wake()
+	_show_front(false)
+	_consoles.arrival = from
+	_arrival = Motion.restart(self, _arrival)
+	_arrival.tween_property(_consoles, ^"arrival", 1.0, _RETURN_S).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_console_title.modulate.a = 0.0
+	_rail.ground_alpha = 0.0
+	_fade_title(1.0, 0.0, _RETURN_S)
+	_rail.sunk = 1.0
+	_rail.rise(_RETURN_S)
+
+
+func _arrive() -> void:
+	_consoles.arrival = _ARRIVAL_POINT
 	_console_title.modulate.a = 0.0
 	_rail.ground_alpha = 0.0
 	_pill.modulate.a = 0.0
-	_arrival = create_tween().set_parallel()
+	_arrival = Motion.restart(self, _arrival).set_parallel()
 	_arrival.tween_property(_consoles, ^"arrival", 1.0, _ARRIVAL_S).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	# The pill names a game: it shows only over the games; the console's name only over the consoles.
 	if _screen == Screen.GAMES:
@@ -944,8 +998,14 @@ func _arrive(growing := true) -> void:
 		_rail.rise(StudioTokens.TR_GAMES_RAIL_BACK_S, _TITLE_ARRIVES_S)
 
 
+## Pressed as the games screen's hints come or go, they arrive at once: what fades them next is their only writer.
+func _hints_arrived() -> void:
+	if _games_hint_fade and _games_hint_fade.is_running():
+		_games_hint_fade.custom_step(StudioTokens.TR_GAMES_HINTS_S)
+
+
 func _show_rail() -> void:
-	var shown := _console_title.visible and not _shelves.is_empty() and _screen not in _GAME_SCREENS
+	var shown := _console_title.visible and not _shelves.is_empty() and _front() != CarouselState.Front.GAMES
 	_rail.visible = shown
 
 
@@ -963,14 +1023,13 @@ func _fade_title(alpha: float, delay_s := 0.0, fade_s := StudioTokens.TR_GAMES_F
 func _open_settings() -> void:
 	Sounds.play(SoundEffects.Cue.SETTINGS)
 	_cover()
+	_hints_arrived()
 	var settings: SettingsMenu = _screens.get_node("%Settings")
 	settings.gel = _selected_gel()
 	var transition := SettingsTransition.new(settings, _screen == Screen.GAMES, _row, _consoles,
 		_console_title, _pill, _games_hints, _search, _sequence, _rail, _games_logo, [_arrival, _title_fade])
 	var emptied := await _screens.open_settings()
 	transition.restore(_screens.arrived)
-	_row.games_float = settings.switch_on(&"games_float")
-	Diagnostics.trace("settings", "games row games_float=%s" % str(settings.switch_on(&"games_float")))
 	_uncover(emptied and not _screens.arrived)
 	transition.resume([_arrival, _title_fade])
 
@@ -1000,21 +1059,18 @@ func _edit_console() -> void:
 	_edited_platform = _shelves[_shelf].platform_id
 	var emptied := await _screens.edit_console(_edited_platform)
 	_edited_platform = ""
-	# Still behind it: the form did not fade over the ring (a console removed).
+	# The form is gone: only now does the ring come in, never moving under it, unless a console added meanwhile
+	# already arrived on it.
 	if _screen == Screen.CONSOLE_EDIT:
-		_stop_editing()
-	_uncover(emptied and not _screens.arrived)
+		_go(Screen.CONSOLES)
+	if not (emptied and _screens.arrived):
+		_come_back()
+	_uncover()
 	_reopen_add_ball()
 
 
-## The form editing the selected console goes: the ring comes back behind it.
-func _stop_editing() -> void:
-	_show_front(false)
-	_go(Screen.CONSOLES)
-
-
 func _reopen_add_ball() -> void:
-	if Input.is_action_pressed(&"ui_up"):
+	if _ways.holds(&"ui_up"):
 		_add_ball.open()
 
 
@@ -1058,10 +1114,12 @@ func _on_consoles_ordered(order: Array[String]) -> void:
 ## pointed at glides to the middle.
 func _on_order_closing(duration: float) -> void:
 	var time_ratio := duration / _RING_CLOSE_S
+	# A console just added lands with the rail and its name, not after them.
+	var after := time_ratio if _holder == Holder.CAROUSEL else 0.0
 	_console_title.show()
 	_show_rail()
-	_rail.rise(StudioTokens.TR_GAMES_RAIL_BACK_S * time_ratio, _RING_RISE_AFTER_S * time_ratio)
-	_fade_title(1.0, _RING_BACK_AFTER_S * time_ratio, _RING_BACK_S * time_ratio)
+	_rail.rise(StudioTokens.TR_GAMES_RAIL_BACK_S * time_ratio, _RING_RISE_AFTER_S * after)
+	_fade_title(1.0, _RING_BACK_AFTER_S * after, _RING_BACK_S * time_ratio)
 
 
 func _on_order_closed() -> void:
@@ -1070,6 +1128,10 @@ func _on_order_closed() -> void:
 
 
 func _open_properties() -> void:
+	# They would take no press but B until the answer B let go comes.
+	if _properties.awaits_answer():
+		Diagnostics.trace("carousel", "properties refused: an answer let go is still awaited")
+		return
 	Sounds.play(SoundEffects.Cue.PROPERTIES)
 	_row.freeze()
 	_art_progress.hide()
@@ -1088,9 +1150,14 @@ func _add_console() -> void:
 	_rail.sink(StudioTokens.TR_RING_SINK_S)
 	_fade_title(0.0, 0.0, _RING_LEAVE_S)
 	_form_entry.open(_add_ball)
-	await get_tree().create_timer(StudioTokens.TR_FORM_AT_S).timeout
-	await _screens.add_console()
+	_form_wait = Motion.restart(self, _form_wait)
+	_form_wait.tween_interval(StudioTokens.TR_FORM_AT_S)
+	await _form_wait.finished
+	var added := await _screens.add_console()
 	_add_ball.close(false)
+	# Given up, the ring comes in once the form is gone, never under it; a console added arrived on it already.
+	if not added:
+		_come_back()
 	_uncover()
 	_reopen_add_ball()
 
@@ -1100,19 +1167,27 @@ func _on_screens_form_leaving() -> void:
 	if _holder not in _FORM:
 		return
 	_holder = Holder.FORM_GIVEN_UP
-	_show_front(false)
-	_rail.rise(StudioTokens.TR_GAMES_RAIL_BACK_S, _FORM_BACK_RISE_AFTER_S)
-	_fade_title(1.0, FormEntry.BALL_AT_S, StudioTokens.TR_FORM_BACK_S - FormEntry.BALL_AT_S)
-	_form_entry.close(_add_ball)
+	_form_entry.close(_add_ball, _screens.get_node(^"%AddConsole/%Type") as StepField)
 
 
-## The screens cover the carousel: at once, but for the form, which comes in over the consoles and hides them once it is
-## there.
+## The console goes as soon as a form shows over it: seen through the form, a 3D model reads as half transparent, its
+## insides showing. The ring comes in again once the form is gone ([method _uncover]).
+func _keep_console_away() -> void:
+	_consoles.hide()
+
+
+## The screens cover the carousel: at once, but for the form, which comes in over the rail and the frame and hides them
+## once it is there; the console goes as soon as the form shows.
 func _on_screens_covering() -> void:
 	if _holder == Holder.FORM_ASKED:
 		_holder = Holder.FORM_COMING
-		await get_tree().create_timer(StudioTokens.TR_FORM_OPEN_S - StudioTokens.TR_FORM_AT_S).timeout
-		# Given up, or gone, while the consoles stayed in view: they are not covered any more.
+		_form_wait = Motion.restart(self, _form_wait)
+		# The console goes at once as the form starts to show over it, never seen through it.
+		_form_wait.tween_interval(StudioTokens.TR_FORM_AT_S)
+		_form_wait.tween_callback(_keep_console_away)
+		_form_wait.tween_interval(StudioTokens.TR_FORM_OPEN_S - 2.0 * StudioTokens.TR_FORM_AT_S)
+		await _form_wait.finished
+		# Given up, or gone, meanwhile: they are not covered any more.
 		if _holder != Holder.FORM_COMING:
 			return
 		_holder = Holder.FORM_COVERING
@@ -1155,6 +1230,9 @@ func _uncover(coming_in := false) -> void:
 	else:
 		_show_front(false)
 	_holder = Holder.CAROUSEL
+	# The screens took the releases meanwhile.
+	_direction.read_again()
+	_ways.read_again()
 
 
 ## The added console glides to the middle with up to two shelves; otherwise the ring places it.
@@ -1175,14 +1253,13 @@ func _place_console(library: AndroidServices.Library, platform_id: String) -> bo
 		_console_arrival = null
 		if not arrived:
 			return false
-		_arrive(false)
+		# Landed whole: what stands around it comes with it.
+		_come_back(1.0)
 		return true
 	_consoles.show()
 	_console_title.modulate.a = 0.0
 	_rail.ground_alpha = 0.0
 	_rail.sunk = 1.0
-	if not _order.form_wanted.is_connected(_screens.bring_back_form):
-		_order.form_wanted.connect(_screens.bring_back_form)
 	var placed := await _order.place(_platform_ids(), platform_id)
 	if not placed:
 		_show_front(true)
@@ -1211,43 +1288,3 @@ func _on_art_focus_timeout() -> void:
 	_show_waiting_shelf()
 	if _row.has_games():
 		android.art_focus(_row.games_around(CarouselLayout.REACH))
-
-
-func _play_logo(back: bool) -> void:
-	var seconds := StudioTokens.TR_GAMES_LOGO_S
-	if seconds <= 0.0 or _shelf < 0 or _shelf >= _rail.tiles().size():
-		return
-	var tile := _rail.tiles()[_shelf].logo()
-	var flight := LogoFlight.new()
-	add_child(flight)
-	flight.play(_games_logo if back else tile, tile if back else _games_logo, seconds,
-		maxf(0.0, _sequence.trip_s() - seconds) if back else 0.0)
-
-
-func _start_moving() -> bool:
-	if _screen == Screen.CONSOLES:
-		return _consoles.is_settling()
-	return _screen == Screen.GAMES and _row.is_settling()
-
-
-func _needs_settle(event: InputEvent) -> bool:
-	if StudioTokens.TR_SETTLE_S <= 0.0 or not _takes(Take.PRESS) or event.is_echo() or not event.is_pressed():
-		return false
-	for action: StringName in [&"ui_accept", &"open_settings", &"open_properties", &"ui_up", &"ui_down", &"screen_back"]:
-		if event.is_action_pressed(action):
-			return _start_moving()
-	return false
-
-
-func _after_settle(event: InputEvent, moved: bool) -> void:
-	_holder = Holder.SETTLING
-	var before_screen := _screen
-	var started := Time.get_ticks_msec()
-	if _screen == Screen.GAMES:
-		_row.freeze()
-	while _start_moving() and Time.get_ticks_msec() - started < StudioTokens.TR_SETTLE_S * 1000.0:
-		await get_tree().process_frame
-	if _holder == Holder.SETTLING:
-		_holder = Holder.CAROUSEL
-	if _screen == before_screen and not _toss.is_busy():
-		_handle_input(event, moved)

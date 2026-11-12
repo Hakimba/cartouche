@@ -18,14 +18,13 @@ func before_test() -> void:
 	var data := PackedByteArray()
 	data.resize(48000 * 2 * 10)
 	silence.data = data
-	for cue: Cue in Cue.values():
+	for cue: Cue in Sounds._players:
 		_streams[cue] = Sounds._players[cue].stream
-		if _streams[cue]:
-			Sounds._players[cue].stream = silence
+		Sounds._players[cue].stream = silence
 
 
 func after_test() -> void:
-	for cue: Cue in Cue.values():
+	for cue: Cue in Sounds._players:
 		Sounds._players[cue].stream = _streams[cue]
 
 
@@ -51,14 +50,14 @@ func test_a_focus_given_by_a_screen_as_it_shows_plays_nothing() -> void:
 ## Every cue the `Sounds` autoload plays now.
 func _heard() -> Array[Cue]:
 	var heard: Array[Cue] = []
-	for cue: Cue in Cue.values():
+	for cue: Cue in Sounds._players:
 		if Sounds._players[cue].playing:
 			heard.append(cue)
 	return heard
 
 
 func _hush() -> void:
-	for cue: Cue in Cue.values():
+	for cue: Cue in Sounds._players:
 		Sounds._players[cue].stop()
 	# A repeated cue played just before must not be held back by its gap.
 	Sounds._played_ms.clear()

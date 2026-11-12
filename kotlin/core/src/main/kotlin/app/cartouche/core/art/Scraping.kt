@@ -49,20 +49,37 @@ public enum class Stall {
 @ConsistentCopyVisibility
 public data class Scraping private constructor(
     public val waiting: List<ArtRequest>,
-    public val underWay: List<ArtRequest>,
+    private val looking: List<UnderWay>,
     public val done: Int,
     public val stall: Option<Stall>,
     /** Stalls since the last request that finished, for [retryDelay]. */
     private val stalls: Int,
-    /**
-     * The requests the last [with] made of the games under way then, none for those it no longer asks for: they wait
-     * again so, never as they were taken.
-     */
-    private val replanned: Map<GameId, Option<ArtRequest>>,
 ) {
-    public val total: Int get() = done + waiting.size + underWay.size
+    /** A request handed out by [take], and what it waits again as if it stops before its end. */
+    private data class UnderWay(val taken: ArtRequest, val again: Again) {
+        val waitsAs: List<ArtRequest>
+            get() =
+                when (again) {
+                    Again.AsTaken -> listOf(taken)
+                    Again.Dropped -> emptyList()
+                    is Again.As -> listOf(again.request)
+                }
+    }
 
-    public val isOver: Boolean get() = waiting.isEmpty() && underWay.isEmpty()
+    /** Unless a [with] came since it was taken, as taken; else as the latest plan asks for it, or not at all. */
+    private sealed interface Again {
+        data object AsTaken : Again
+
+        data object Dropped : Again
+
+        data class As(val request: ArtRequest) : Again
+    }
+
+    public val underWay: List<ArtRequest> get() = looking.map { it.taken }
+
+    public val total: Int get() = done + waiting.size + looking.size
+
+    public val isOver: Boolean get() = waiting.isEmpty() && looking.isEmpty()
 
     /** How long to wait before trying again after a stall: 30 s, doubling with each stall in a row, up to 15 min. */
     public val retryDelay: Duration get() = (FIRST_RETRY * (1 shl (stalls - 1).coerceIn(0, 5))).coerceAtMost(LONGEST_RETRY)
@@ -71,30 +88,21 @@ public data class Scraping private constructor(
     public fun take(): Option<Pair<ArtRequest, Scraping>> = waiting
         .firstOrNone()
         .filter { stall.isNone() }
-        .map { it to copy(waiting = waiting.drop(1), underWay = underWay + it) }
+        .map { it to copy(waiting = waiting.drop(1), looking = looking + UnderWay(it, Again.AsTaken)) }
 
     /** [game]'s request is over: its art found, or none in any source. */
-    public fun finished(game: GameId): Scraping =
-        ifUnderWay(game) { _, others -> copy(underWay = others, done = done + 1, stalls = 0, replanned = replanned - game) }
+    public fun finished(game: GameId): Scraping = ifUnderWay(game) { _, others -> copy(looking = others, done = done + 1, stalls = 0) }
 
     /** [game]'s request stalled for [why]: it waits again, last. */
-    public fun stalled(game: GameId, why: Stall): Scraping = ifUnderWay(game) { request, others ->
-        copy(
-            waiting = waiting + again(game, request),
-            underWay = others,
-            stall = Some(why),
-            stalls = if (stall.isNone()) stalls + 1 else stalls,
-            replanned = replanned - game,
-        )
+    public fun stalled(game: GameId, why: Stall): Scraping = ifUnderWay(game) { again, others ->
+        copy(waiting = waiting + again, looking = others, stall = Some(why), stalls = if (stall.isNone()) stalls + 1 else stalls)
     }
 
     /**
      * [game]'s request was set aside before its end, as when the app stops, or its label was asked again while it was
      * under way: it waits again, first.
      */
-    public fun returned(game: GameId): Scraping = ifUnderWay(
-        game,
-    ) { request, others -> copy(waiting = again(game, request) + waiting, underWay = others, replanned = replanned - game) }
+    public fun returned(game: GameId): Scraping = ifUnderWay(game) { again, others -> copy(waiting = again + waiting, looking = others) }
 
     public fun resumed(): Scraping = copy(stall = None)
 
@@ -115,20 +123,19 @@ public data class Scraping private constructor(
         val run = if (isOver) copy(done = 0, stall = None, stalls = 0) else this
         val asked = requests.distinctBy { it.game }.associateBy { it.game }
         return run.copy(
-            waiting = asked.values.filter { request -> underWay.none { it.game == request.game } },
-            replanned = underWay.associate { it.game to asked.getOrNone(it.game) },
+            waiting = asked.values.filter { request -> looking.none { it.taken.game == request.game } },
+            looking = looking.map { it.copy(again = asked.getOrNone(it.taken.game).fold({ Again.Dropped }, Again::As)) },
         )
     }
 
-    /** [request] of [game], to wait again: the latest plan's, none when it no longer asks for it. */
-    private fun again(game: GameId, request: List<ArtRequest>): List<ArtRequest> =
-        replanned.getOrNone(game).fold({ request }) { it.toList() }
-
-    private fun ifUnderWay(game: GameId, change: (List<ArtRequest>, List<ArtRequest>) -> Scraping): Scraping =
-        underWay.partition { it.game == game }.let { (request, others) -> if (request.isEmpty()) this else change(request, others) }
+    /** [change] given what [game]'s request waits again as, and the others under way; nothing when it is not under way. */
+    private fun ifUnderWay(game: GameId, change: (List<ArtRequest>, List<UnderWay>) -> Scraping): Scraping =
+        looking.partition { it.taken.game == game }.let { (stopped, others) ->
+            if (stopped.isEmpty()) this else change(stopped.flatMap { it.waitsAs }, others)
+        }
 
     public companion object {
-        public val NONE: Scraping = Scraping(emptyList(), emptyList(), 0, None, 0, emptyMap())
+        public val NONE: Scraping = Scraping(emptyList(), emptyList(), 0, None, 0)
 
         private val FIRST_RETRY = 30.seconds
         private val LONGEST_RETRY = 15.minutes

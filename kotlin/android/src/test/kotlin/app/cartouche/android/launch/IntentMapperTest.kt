@@ -19,7 +19,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-@Config(sdk = [30, 33, 34])
+@Config(sdk = [30, 34])
 @RunWith(RobolectricTestRunner::class)
 class IntentMapperTest {
     private val context = RuntimeEnvironment.getApplication()

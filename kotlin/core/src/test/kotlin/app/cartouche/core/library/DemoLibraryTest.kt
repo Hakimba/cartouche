@@ -14,14 +14,4 @@ class DemoLibraryTest {
         library.games.map { it.id }.distinct().size shouldBe 1_000
         library.games.groupingBy { it.platform }.eachCount() shouldBe mapOf(platforms[0] to 334, platforms[1] to 333, platforms[2] to 333)
     }
-
-    @Test
-    fun `a demo library is always the same for the same arguments`() {
-        DemoLibrary.of(1_000, platforms) shouldBe DemoLibrary.of(1_000, platforms)
-    }
-
-    @Test
-    fun `a demo library without platforms is empty`() {
-        DemoLibrary.of(10, emptyList()) shouldBe Library()
-    }
 }

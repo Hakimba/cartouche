@@ -3,13 +3,14 @@ class_name Plinth
 extends Control
 ## A console's still picture standing on a plinth, its logo on the plinth's plate. The picture is the
 ## console's own model, upright and facing front at its start pose (`data/turntable.json`), lit by the light
-## designed for it there ([StudioLights], screen `plinth`); it is rendered once per model folder, in a
-## transparent view of its own world that is freed right after, and kept while the edge smoothing and the
-## window scale it was drawn with hold, until the plinth leaves the tree or the app is paused for any reason (a game
-## started, the system's folder picker, the home screen). Nothing is shown until the picture exists; it then rises
-## into place.
+## designed for it there ([StudioLights], screen `plinth`), drawn ahead by `scripts/bake_plinths.sh` into the
+## console's folder ([constant PICTURES]): showing one loads a picture, never a model. Nothing is shown until the
+## picture is loaded; it then rises into place.
 
 const TURNTABLE_FILE := "res://data/turntable.json"
+## A console's pictures in its folder, by how many times the size a 1280x960 window shows them at they are drawn:
+## a picture no larger than the window needs is the one a handheld sends to its graphics card as the cursor moves.
+const PICTURES: Dictionary[float, String] = {1.0: "plinth.png", 2.0: "plinth_2x.png"}
 ## The model fits a circle of this diameter and stays under this height, in world units.
 const _FIT_DIAMETER := 1.24
 const _HEIGHT := 1.05
@@ -19,25 +20,12 @@ const _CAMERA_TARGET := Vector3(0.0, 0.644, 0.0)
 ## The rise of a new picture: from this far down (px), in this time, by the curve `rise`.
 const _RISE_PX := 20.48
 const _RISE_S := 0.3
-## A picture asked for less than this after the one before (s), while the cursor runs down the list, is drawn
-## only once nothing else was asked for this long: a fast scroll draws where it stops, not each console it passes.
-const _REST_S := 0.12
 
 static var _starts: Dictionary = {}
-## Keyed by [method _key]: the smoothing and the window scale change the picture.
-static var _stills: Dictionary[String, Texture2D] = {}
-## The folders waiting for their picture, each with those asking for it (called with the picture).
-static var _waiting: Dictionary[String, Array] = {}
-static var _drawing := false
-## Running from the last request for [constant _REST_S].
-static var _quiet: SceneTreeTimer
-static var _generation := 0
-## Draws the picture of a folder; the tests put a stand-in where there is no renderer.
-static var _drawer := _render
 
 var _console := ""
-## The call waiting for the picture of [member _console], withdrawn when another console is shown.
-var _asked := Callable()
+## The pictures being loaded: the shown console's, and those of the consoles the cursor passed.
+var _loading: Dictionary[String, bool] = {}
 var _rise: Tween
 
 @onready var _base: SatinPanel = $Base
@@ -50,13 +38,9 @@ static func create() -> Plinth:
 	return (load("res://studio/views/plinth.tscn") as PackedScene).instantiate()
 
 
-## Drops the starts and pictures read or drawn so far, so that the next ones follow a file the debug bridge
-## reloaded; a picture still being drawn is thrown away.
+## Drops the starts read so far, so that the next ones follow a file the debug bridge reloaded.
 static func forget() -> void:
-	_generation += 1
 	_starts.clear()
-	_stills.clear()
-	_waiting.clear()
 
 
 ## The pose the model of the console in [param folder] starts at; a console the file gives only a yaw and a
@@ -104,127 +88,45 @@ static func bounds(root: Node3D, space: Node3D) -> AABB:
 	return box
 
 
-## The picture of the console in [param folder] if it was rendered already; none yet otherwise.
-static func still_of(folder: String) -> Texture2D:
-	return _stills.get(_key(folder))
+## The file of the picture of the console in [param folder] drawn [param times] the size of a 1280x960 window's;
+## by default the one the window needs, the larger in a window larger than that.
+static func picture_of(folder: String, times := 0.0) -> String:
+	if times == 0.0:
+		times = 2.0 if StudioTokens.window_scale((Engine.get_main_loop() as SceneTree).root) > 1.0 else 1.0
+	return ConsoleManifest.FOLDERS.path_join(folder).path_join(PICTURES[times])
 
 
-static func _key(folder: String) -> String:
-	var root := (Engine.get_main_loop() as SceneTree).root
-	return "%s|%d|%s" % [folder, root.msaa_3d, StudioTokens.window_scale(root)]
-
-
-## Calls [param done] with the picture of the console in [param folder], now when it exists, else once it
-## is rendered. One picture is rendered at a time, the most recently asked first, and while the asks follow each
-## other within [constant _REST_S], only once they stop; a [param done] whose object was freed meanwhile is skipped.
-static func request_still(folder: String, done: Callable) -> void:
-	var rested := _quiet == null or _quiet.time_left <= 0.0
-	_quiet = (Engine.get_main_loop() as SceneTree).create_timer(_REST_S)
-	var drawn := still_of(folder)
-	if drawn:
-		Diagnostics.trace("plinth", "still of %s cached" % folder)
-		done.call(drawn)
-		return
-	# Asked again, a folder moves to the front: the last key is the one drawn next.
-	var askers: Array = _waiting.get(folder, [])
-	_waiting.erase(folder)
-	askers.append(done)
-	_waiting[folder] = askers
-	if not _drawing:
-		_draw_waiting(rested)
-
-
-## [param done] no longer waits for the picture of [param folder]; one nobody waits for is not drawn.
-static func withdraw(folder: String, done: Callable) -> void:
-	var askers: Array = _waiting.get(folder, [])
-	askers.erase(done)
-	if askers.is_empty():
-		_waiting.erase(folder)
-
-
-## Drops the pictures kept, about a megabyte each, as the app is paused (a game, the folder picker, the home
-## screen); a picture shown lives on with what shows it.
-static func drop_stills() -> void:
-	if not _stills.is_empty():
-		Diagnostics.trace("plinth", "%d stills dropped" % _stills.size())
-	_stills.clear()
-
-
-## Draws the pictures asked for, the first one [param at_once], the others once the cursor rests.
-static func _draw_waiting(at_once: bool) -> void:
-	_drawing = true
-	while not _waiting.is_empty():
-		while not at_once and _quiet.time_left > 0.0:
-			await _quiet.timeout
-		at_once = false
-		# Withdrawn while the cursor moved.
-		if _waiting.is_empty():
-			break
-		var folder: String = _waiting.keys()[-1]
-		var askers: Array = _waiting[folder]
-		_waiting.erase(folder)
-		var live := askers.filter(func(ask: Callable) -> bool: return ask.is_valid())
-		if live.is_empty():
-			Diagnostics.trace("plinth", "still of %s skipped: no longer shown" % folder)
-			continue
-		var generation := _generation
-		var started := Time.get_ticks_msec()
-		var picture: Texture2D = await _drawer.call(folder)
-		if generation != _generation:
-			continue
-		if picture:
-			_stills[_key(folder)] = picture
-			Diagnostics.trace("plinth", "still of %s rendered in %d ms" % [folder, Time.get_ticks_msec() - started])
-		for ask: Callable in live:
-			if ask.is_valid():
-				ask.call(picture)
-	_drawing = false
-
-
-## The console in [param folder] drawn once in a view of its own, at the size the plinth shows it, then
-## the view freed; none where there is no renderer or it gives no picture.
-static func _render(folder: String) -> Texture2D:
-	if DisplayServer.get_name() == "headless":
-		return null
-	var scene := ConsoleManifest.of(folder).scene
-	# Loaded off the main thread, so a console's model never stalls the frame the user is scrolling in.
-	ResourceLoader.load_threaded_request(scene)
-	while ResourceLoader.load_threaded_get_status(scene) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-		await (Engine.get_main_loop() as SceneTree).process_frame
-	var packed := ResourceLoader.load_threaded_get(scene) as PackedScene
-	if not packed:
-		return null
-	var root := (Engine.get_main_loop() as SceneTree).root
+## The transparent view of its own world in which [param packed], the model of [param folder], stands lit and
+## framed as the plinth's picture shows it, added under [param parent]; [param source] gives the edge smoothing,
+## the window scale and the room.
+static func build_view(folder: String, packed: PackedScene, source: Node, parent: Node) -> View:
+	var rig := View.new()
 	var view := SubViewport.new()
+	rig.view = view
 	view.own_world_3d = true
 	view.transparent_bg = true
-	view.msaa_3d = root.msaa_3d
-	view.size = Vector2i((StudioTokens.TURNTABLE.size * StudioTokens.window_scale(root)).ceil())
-	view.render_target_update_mode = SubViewport.UPDATE_ONCE
-	var environment := WorldEnvironment.new()
-	environment.environment = StudioLights.environment_of(root)
-	# The view's canvas is empty: clearing to nothing gives the same picture without copying it in.
-	environment.environment.background_mode = Environment.BG_CLEAR_COLOR
-	view.add_child(environment)
-	var camera := Camera3D.new()
-	camera.fov = 29.5
-	camera.near = 0.05
-	camera.far = 50.0
-	view.add_child(camera)
-	var spin := Node3D.new()
-	var stand := Node3D.new()
-	var model := packed.instantiate() as Node3D
-	spin.add_child(stand)
-	stand.add_child(model)
-	view.add_child(spin)
-	StudioLights.new(view, StudioLights.rig_of(folder, &"plinth"), stand_at(spin, stand, model, start_of(folder)),
-		environment.environment)
-	root.add_child(view)
-	camera.look_at_from_position(_CAMERA, _CAMERA_TARGET)
-	await RenderingServer.frame_post_draw
-	var picture := Still.of(view)
-	view.queue_free()
-	return picture
+	view.msaa_3d = source.get_viewport().msaa_3d
+	view.size = Vector2i((StudioTokens.TURNTABLE.size * StudioTokens.window_scale(source.get_window())).ceil())
+	parent.add_child(view)
+	rig.environment = WorldEnvironment.new()
+	rig.environment.environment = StudioLights.environment_of(source)
+	view.add_child(rig.environment)
+	rig.camera = Camera3D.new()
+	rig.camera.fov = 29.5
+	rig.camera.near = 0.05
+	rig.camera.far = 50.0
+	view.add_child(rig.camera)
+	rig.spin = Node3D.new()
+	rig.stand = Node3D.new()
+	rig.model = packed.instantiate() as Node3D
+	rig.spin.add_child(rig.stand)
+	rig.stand.add_child(rig.model)
+	view.add_child(rig.spin)
+	rig.start = start_of(folder)
+	rig.lights = StudioLights.new(view, StudioLights.rig_of(folder, &"plinth"),
+		stand_at(rig.spin, rig.stand, rig.model, rig.start), rig.environment.environment)
+	rig.camera.look_at_from_position(_CAMERA, _CAMERA_TARGET)
+	return rig
 
 
 func _ready() -> void:
@@ -235,15 +137,31 @@ func _ready() -> void:
 	top.position = StudioTokens.PLINTH_TOP_SHADOW.position
 	top.size = StudioTokens.PLINTH_TOP_SHADOW.size
 	item_rect_changed.connect(_place_logo)
+	set_process(not _loading.is_empty())
+
+
+## Shows the shown console's picture once loaded; a picture loaded for a console the cursor left is let go.
+func _process(_delta: float) -> void:
+	for path: String in _loading.keys():
+		if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			continue
+		_loading.erase(path)
+		var picture := ResourceLoader.load_threaded_get(path) as Texture2D
+		if picture and path == picture_of(_console):
+			_turntable.texture = picture
+			_rise_in()
+	set_process(not _loading.is_empty())
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_THEME_CHANGED:
 		var shade := (($TopShadow as TextureRect).texture as GradientTexture2D).gradient
 		shade.colors = PackedColorArray([Backdrop.palette.plinth_top_shade, Color(Backdrop.palette.plinth_top_shade, 0.0)])
-	# Leaving the tree, at the latest as the app quits: the GPU's pictures are freed while the renderer still runs.
-	elif what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_EXIT_TREE:
-		drop_stills()
+	elif what == NOTIFICATION_EXIT_TREE:
+		# A picture asked for is kept by the loader until it is taken.
+		for path: String in _loading:
+			ResourceLoader.load_threaded_get(path)
+		_loading.clear()
 
 
 ## Shows the logo of the console in [param folder] (under res://carousel/consoles) on the plate and its
@@ -251,14 +169,15 @@ func _notification(what: int) -> void:
 func show_console(folder: String) -> void:
 	if folder == _console:
 		return
-	_withdraw()
 	_console = folder
 	_plate.show_logo(LogoView.Slot.PLINTH_PLATE, folder)
 	_place_logo()
 	_base.gel = ConsoleManifest.of(folder).gel()
 	_turntable.texture = null
-	_asked = _show_still.bind(folder)
-	request_still(folder, _asked)
+	# Loaded off the main thread, so a picture never stalls the frame the user is scrolling in.
+	if ResourceLoader.load_threaded_request(picture_of(folder)) == OK:
+		_loading[picture_of(folder)] = true
+		set_process(true)
 
 
 ## Presents the same picture again, as a chooser or form reopens.
@@ -271,7 +190,6 @@ func restart() -> void:
 
 ## Clears the presentation.
 func clear() -> void:
-	_withdraw()
 	_console = ""
 	_base.gel = StudioTokens.NEUTRAL
 	_turntable.texture = null
@@ -281,17 +199,6 @@ func clear() -> void:
 ## The console shown, its folder; none yet.
 func console() -> String:
 	return _console
-
-
-func _withdraw() -> void:
-	withdraw(_console, _asked)
-
-
-func _show_still(picture: Texture2D, folder: String) -> void:
-	if folder != _console or picture == null:
-		return
-	_turntable.texture = picture
-	_rise_in()
 
 
 ## The picture rises into place and appears.
@@ -326,3 +233,15 @@ class Start:
 		rotation = turns
 		position = move
 		size = scale
+
+
+## What [method build_view] builds.
+class View:
+	var view: SubViewport
+	var environment: WorldEnvironment
+	var camera: Camera3D
+	var spin: Node3D
+	var stand: Node3D
+	var model: Node3D
+	var start: Start
+	var lights: StudioLights

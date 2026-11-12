@@ -25,36 +25,36 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 	var title_alpha := title.modulate.a
 	var pill_alpha := pill.modulate.a
 	var rail_alpha := console_rail.ground_alpha
+	var rail_shown := console_rail.visible
 	var logo_alpha := games_logo.modulate.a
 	# The games screen's hints, laid where the consoles screen has its own: shown on the games screen only.
 	var hints_alpha := 1.0 if games else 0.0
-	var row_presence := Vector2(row.selected_presence, row.neighbours)
-	_sample = func(presence: float, rail: float, chrome: float) -> void:
-		var drawn := presence > 0.0 or chrome > 0.0
-		row.visible = drawn
-		consoles.visible = drawn
+	# The models are cut, never faded: a faded 3D model shows its insides. What stands around them goes and comes with
+	# them, never left alone on the backdrop.
+	_sample = func(presence: float, rail: float, chrome: float, cut: bool) -> void:
+		var shown := 0.0 if cut else chrome
+		var drawn := not cut and (presence > 0.0 or chrome > 0.0)
+		row.visible = not cut
+		consoles.visible = not cut
+		console_rail.visible = rail_shown and not cut
 		title.visible = drawn
 		pill.visible = drawn
 		search.visible = drawn
 		hints.visible = drawn
 		subject.scale = subject_scale * lerpf(StudioTokens.TR_SETTINGS_RECEDE, 1.0, presence)
-		if games:
-			row.selected_presence = row_presence.x * presence
-			row.neighbours = row_presence.y * presence
-		else:
-			consoles.fade_to(presence)
 		title.position.y = title_position.y + StudioTokens.TR_SETTINGS_DROP_PX * (1.0 - rail)
-		title.modulate.a = title_alpha * chrome
-		pill.modulate.a = pill_alpha * chrome
-		hints.modulate.a = hints_alpha * chrome
-		search.modulate.a = chrome
-		console_rail.ground_alpha = rail_alpha * chrome
-		games_logo.modulate.a = logo_alpha * chrome
+		title.modulate.a = title_alpha * shown
+		pill.modulate.a = pill_alpha * shown
+		hints.modulate.a = hints_alpha * shown
+		search.modulate.a = shown
+		console_rail.ground_alpha = rail_alpha * shown
+		games_logo.modulate.a = logo_alpha * shown
 		if not drawn:
 			sequence.behind_amount = 0.0
 	_restore = func(arrived: bool) -> void:
 		subject.scale = subject_scale
 		title.position = title_position
+		console_rail.visible = rail_shown
 		if not arrived:
 			title.modulate.a = title_alpha
 			console_rail.ground_alpha = rail_alpha
@@ -62,9 +62,6 @@ func _init(menu: SettingsMenu, games: bool, row: ShelfRow, consoles: ConsoleRow,
 		pill.modulate.a = pill_alpha
 		hints.modulate.a = hints_alpha
 		search.modulate.a = 1.0
-		row.selected_presence = row_presence.x
-		row.neighbours = row_presence.y
-		consoles.fade_to(1.0)
 	menu.transition_frame.connect(_sample)
 	menu.enter()
 

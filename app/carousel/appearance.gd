@@ -21,6 +21,8 @@ var _models: Dictionary[String, PackedScene] = {}
 var _loading: Dictionary[String, bool] = {}
 ## The medium loaded ahead for the console the form may add ([method load_ahead]); none.
 var _ahead := ""
+## Each platform's default console, as found at the start.
+var _bases: Dictionary[String, ConsoleManifest] = {}
 var _consoles: Dictionary[String, ConsoleManifest] = {}
 var _scenes: Dictionary[String, PackedScene] = {}
 var _animations: Dictionary[String, Animation] = {}
@@ -33,7 +35,8 @@ static func read(path: String) -> Appearance:
 	var kind_media: Dictionary = data["kind_media"]
 	appearance._kind_media.assign(kind_media)
 	appearance._media = shown_media(MediumManifest.found())
-	appearance._consoles = defaults(ConsoleManifest.found())
+	appearance._bases = defaults(ConsoleManifest.found())
+	appearance._consoles = appearance._bases.duplicate()
 	Diagnostics.trace("appearance", "consoles found: %s" % [appearance._consoles.keys()])
 	var bands_data: Dictionary = data["bands"]
 	appearance.bands.assign(bands_data)
@@ -53,8 +56,6 @@ static func read(path: String) -> Appearance:
 	var pose_data: Dictionary = data["pose"]
 	appearance.pose.tilt = pose_data["tilt_degrees"]
 	appearance.pose.turn = pose_data["turn_degrees"]
-	appearance.pose.sway = pose_data["sway_degrees"]
-	appearance.pose.bob = pose_data["bob_height"]
 	var period: float = pose_data["sway_period_s"]
 	appearance.pose.sway_period_s = maxf(period, 0.5)
 	return appearance
@@ -97,7 +98,7 @@ func console_of(platform_id: String) -> ConsoleManifest:
 
 ## The colour [param platform_id]'s console lights the screens with.
 func gel(platform_id: String) -> Color:
-	return console_of(platform_id).gel()
+	return ConsoleManifest.gel_of(ConsoleManifest.folder_of(_bases[platform_id]))
 
 
 ## How [param platform]'s labels look: its colour and band, its name; drawn as demo art when [param demo].
@@ -182,9 +183,8 @@ func let_go_ahead() -> void:
 
 ## Applies the library's model choices; omitted choices restore the base models.
 func use_variants(variants: Dictionary[String, String]) -> void:
-	var bases := defaults(ConsoleManifest.found())
-	for platform in bases:
-		var chosen := bases[platform]
+	for platform in _bases:
+		var chosen := _bases[platform]
 		var wanted: String = variants.get(platform, "")
 		for model in chosen.models():
 			if ConsoleManifest.folder_of(model) == wanted:
@@ -244,7 +244,7 @@ func model_of(medium: String, media: String) -> PackedScene:
 
 ## The box the model of [param medium] (see [method model_of]) fills, as it stands on a seat: in the
 ## seat's frame, at its real size (its root's scale is its size in the row only). Its parts are its
-## root's children, as [ShelfRow.LabelledModel] has them.
+## root's children, as [LabelledModel] has them.
 func medium_box(medium: String, media: String) -> AABB:
 	var shown: Node3D = model_of(medium, media).instantiate()
 	var box := AABB()

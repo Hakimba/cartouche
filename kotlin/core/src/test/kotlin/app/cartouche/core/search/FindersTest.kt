@@ -2,10 +2,12 @@
 package app.cartouche.core.search
 
 import app.cartouche.core.library.GameId
+import app.cartouche.core.library.LabelChoice
 import app.cartouche.core.library.Library
 import app.cartouche.core.library.game
 import app.cartouche.core.platforms.PlatformId
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.Test
 
 class FindersTest {
@@ -43,8 +45,9 @@ class FindersTest {
 
     @Test
     fun `finders are kept for a library that searches the same, and made anew when a title, a name, a region or a console changes`() {
-        val launched = library.copy(games = library.games.map { it.copy(lastDisc = 0) })
-        (finders.after(launched) === finders) shouldBe true
+        val relabelled = library.withLabel(library.games[0].id, LabelChoice.Own)
+        relabelled shouldNotBe library
+        (finders.after(relabelled) === finders) shouldBe true
         listOf(
             library.withDisplayName(library.games[0].id, app.cartouche.core.library.DisplayName.of("Okage: Shadow King")),
             library.copy(games = library.games.map { it.copy(regions = listOf("Europe")) }),
