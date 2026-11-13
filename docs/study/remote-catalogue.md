@@ -1,6 +1,6 @@
 # A remote catalogue: RomM, an *arr stack, and box art (study)
 
-**Status:** study only. Nothing here is implemented, no screen, no setting, no request. The branch is a working base
+**Status:** study only; continued in [remote-catalogue-plan.md](remote-catalogue-plan.md). Nothing here is implemented, no screen, no setting, no request. The branch is a working base
 for whoever picks the feature up; the numbers below were measured, not quoted.
 
 ## What the feature is
@@ -165,5 +165,5 @@ platform, about 2 MB each, and compares against the title lists in the repositor
 |---|---|
 | ScreenScraper's box fill rate per system | one evening with the developer key: search 200 titles per platform, count answers carrying a box |
 | RomM cover URL for the relative path, and resume | one afternoon against a real instance |
-| Does a RomM-only stack satisfy the user, or is the *arr half wanted first | ask him; the two features are independent |
+| Does a RomM-only stack satisfy the need, or is the *arr half wanted first | answered: RomM only, see [the plan](remote-catalogue-plan.md) |
 | Whether a box should be modelled or a photograph | two mockups, chosen by eye, before any model is made |
