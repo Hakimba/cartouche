@@ -48,16 +48,20 @@ that code.
   on the device.
 - **D4. No third-party metadata:** title, region, size, number of discs, where the game is.
 - **Scope: RomM only.**
+- **D3. A download is written into the console's own folder,** not into a second folder: a player keeps one tree.
+  At the first download for a console, Cartouche asks for write access and opens the system picker on that folder;
+  players who never download change nothing. A console with several folders: the first one, or chosen at download.
+- **D9. Every console of the server is listed** (`GET /api/platforms`, those holding at least one game). The ones
+  Cartouche cannot take yet are greyed, each with its own message when tried: a console Cartouche does not support
+  yet, or a supported console not added on the device (add it first). Only their games are never downloadable.
 
 **Open**
 
 | | What it changes | Options | Leaning |
 |---|---|---|---|
 | D1 | Where server games appear | (a) on the console's shelf with the local games, a filter choosing "on the device / on the server / all"; (b) a separate page per console | open |
-| D3 | Where a download is written | (a) a "Cartouche" folder picked once with write access, one sub-folder per console, read like any other folder; (b) into the console's own folder (needs write access to the player's folders, INV-02 dropped); (c) app-private storage (emulators cannot read it on Android 11+, uninstalling deletes the games) | (a) |
 | D5 | Plain HTTP to a home server | Android blocks cleartext by default; a network config can allow it by domain name but not by IP range | see §4.9 |
 | D7 | Downloads while playing | A multi-GB download must survive the emulator taking the screen; Android then shows a notification for as long as it runs | a foreground download, one game at a time, a queue |
-| D9 | Server consoles Cartouche does not support | not shown | not shown |
 | D10 | A server game no player of that console opens (say a `.chd`) | shown greyed and not downloadable, or hidden | greyed, with the reason |
 | D11 | A downloaded game counts as new (dot and +N) | yes / no | yes |
 
@@ -100,7 +104,7 @@ and filters move from `Game` to `ShelfEntry`: the widest change of the plan, to 
 
 Data, in `profiles.json` per platform: `"romm": ["ps2"]` (RomM's canonical `slug`), RomM's `ss_id` against our
 `screenScraperSystem` as a fallback. Never `fs_slug`, which is the server's folder name. A new console adds one line.
-Unmapped platforms are dropped at parse (D9).
+Unmapped platforms are kept as "not in Cartouche", never downloadable (D9).
 
 ### 4.4 Catalogue
 
@@ -130,7 +134,7 @@ Unmapped platforms are dropped at parse (D9).
   (`remote/queue.json`) and picked up again at start, a notification with progress and cancel; the download still runs
   if notifications are refused. WorkManager is not used: one more dependency, and it would still need a foreground
   service for multi-GB files.
-- **Writing (D3 a):** into `<Cartouche folder>/<platform>/`, first as `<name>.part`, which the scan skips. Bytes through
+- **Writing (D3):** into the console's folder (write access asked at its first download), first as `<name>.part`, which the scan skips. Bytes through
   `openOutputStream(uri, "wa")` so a stop can resume. Check: size, then CRC32 against the server's `crc_hash` (cheap
   on a weak CPU; SHA-1 of 4 GB is not). Then `renameDocument` to the final name. An existing name is never
   overwritten. Free space read from the document root first, a plain message when it is short.
@@ -171,13 +175,14 @@ Unmapped platforms are dropped at parse (D9).
 
 ### 4.10 Invariants (wording to agree)
 
-- INV-02 reworded: never writes into a folder picked for reading; writes only into the Cartouche folder.
+- INV-02 reworded: Cartouche only adds files it downloaded into a game folder, after the player gave write access to
+  that folder; it never modifies, overwrites or deletes a file there.
 - A partial or unverified download is never a game of the library.
 - A download never overwrites or deletes a file Cartouche did not create.
 - INV-19 extended: the server token is stored encrypted in private storage only, sent only as a header to the paired
   server, never in a URL, trace or wire.
 - Each game is listed once; a game on the device is never hidden.
-- A server game of a console Cartouche does not support is never shown.
+- A server game of a console Cartouche does not support, or has not added, is never downloaded.
 
 ### 4.11 Tests
 
@@ -197,7 +202,7 @@ Unmapped platforms are dropped at parse (D9).
 1. **Server games as entries, no network:** `ShelfEntry` (or the page, per D1) with a fake snapshot from the desktop
    stand-in, the template box.
 2. **Pairing and catalogue, read-only:** address, device flow, token, sync, offline states.
-3. **Download:** the Cartouche folder, the service, the queue, resume, zip, verification, landing.
+3. **Download:** the write access asked per console folder, the service, the queue, resume, zip, verification, landing.
 
 The first two can be seen before any file is written.
 
@@ -209,7 +214,7 @@ The first two can be seen before any file is written.
 | Catalogue, read-only | feasible, low risk | paged, incremental; the risk is API drift |
 | Server games among local ones | feasible, the largest change | `Game` needs a file: a new entry type across shelf, search, filters |
 | Template box per console | feasible, model work | one mesh per format, no art |
-| One-file downloads | feasible, medium risk | a write grant on a new folder, a foreground service; resume depends on Range |
+| One-file downloads | feasible, medium risk | a write grant per console folder, a foreground service; resume depends on Range |
 | Multi-file downloads | feasible, the riskiest | streamed zip with no length, server preparation in minutes, restart on stop |
 | Network | no blocker | cleartext policy and overlay networks covered in §4.9 |
 
