@@ -54,6 +54,9 @@ request view: {request_id, name, platform, status, assets[], error}
 - No match: status `failed`, `error` says why; ROMarr keeps the title as "wanted" and may find it later.
 - `available` means imported and verified under the library root; `assets` are paths **inside ROMarr's container**.
   Cartouche then finds the game in RomM (platform + file name, after RomM's scan) and offers or starts the download.
+- ROMarr imports into RomM's own folder names (`romm_fs_slug`: its `genesis-slash-megadrive` becomes `genesis`;
+  per-platform overrides possible, then it tells RomM which folder to scan), so the game lands in the RomM platform
+  Cartouche already maps; the asset's file name finds it there.
 - Upstream has no per-request route and no cancel; ROMarrNG has `requests/{id}`, `/cancel`, `/retry`, detected with
   `GET /api/integration/seerrng/v1/ping` (404 → upstream).
 - No push to clients (notifications go to ntfy, Gotify, webhooks…, i.e. the owner's phone): Cartouche polls while a
