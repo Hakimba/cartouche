@@ -1,6 +1,6 @@
 # A remote catalogue: RomM, an *arr stack, and box art (study)
 
-**Status:** study only; continued in [remote-catalogue-plan.md](remote-catalogue-plan.md). Nothing here is implemented, no screen, no setting, no request. The branch is a working base
+**Status:** study only; continued in [remote-catalogue-plan.md](remote-catalogue-plan.md) and, for what players are promised, [romm-behaviour.md](romm-behaviour.md). Nothing here is implemented, no screen, no setting, no request. The branch is a working base
 for whoever picks the feature up; the numbers below were measured, not quoted.
 
 ## What the feature is
