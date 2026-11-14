@@ -4,6 +4,11 @@
 where a primary source disagreed, and turns it into a first technical plan with the decisions it needs. Sources were
 read on 2026-11-12: RomM's repository and documentation (5.4.1 stable, 5.5.0-alpha.1), ROMarr, ROMarrNG, SeerrNG.
 
+**Newer:** [romm-lab-findings.md](romm-lab-findings.md) (RomM 5.4.1 run in a lab, 2026-11-13) supersedes this plan
+where they differ: multi-file games download file by file (no zip), save sync is decided by Cartouche (RomM's own
+answer falls back to clocks), and save sync plus BIOS ship with the first release of RomM support.
+[romm-behaviour.md](romm-behaviour.md) lists what players are promised.
+
 Scope decided: **RomM only.** The *arr half (ROMarr, ROMarrNG, SeerrNG) is kept as a note at the end, not a target.
 
 ## 1. The need
