@@ -5,6 +5,11 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+### Fixed
+
+- Every console now shows its official logo, on the consoles ring, the games screen and the console cards. Thanks to
+  everyone who asked for it.
+
 ## [0.5.0] - 2026-11-16
 
 **A third of the graphics memory, clean transitions, and Cartouche as your home screen.**

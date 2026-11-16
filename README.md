@@ -145,14 +145,29 @@ The consoles' 3D models are adapted from these downloads (CC-BY-4.0, licence tex
 - This work is based on "PS Vita" (https://sketchfab.com/3d-models/ps-vita-d0241d08cee04a169148c275cecc1a5b) by mxiv (https://sketchfab.com/mxiv) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 - This work is based on "Nintendo DS Lite" (https://sketchfab.com/3d-models/nintendo-ds-lite-ca529eb7208746e89b7a28fd2246659d) by Cianon (https://sketchfab.com/Cianon) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
 
-### 3D logos
+### Console logos
 
-The PlayStation 2, Xbox and GameCube logos are pictures rendered from these downloads (CC-BY-4.0):
-
-- This work is based on "Playstation 2 Logo" (https://sketchfab.com/3d-models/playstation-2-logo-266d26be2a6d47d58880bb723d1faf7a) by Anthony Yanez (https://sketchfab.com/paulyanez) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-- This work is based on "Xbox Logo" (https://sketchfab.com/3d-models/xbox-logo-6fedd757c2fe47b2850df4ab6e110670) by Anthony Yanez (https://sketchfab.com/paulyanez) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-- This work is based on "Gamecube Logo" (https://sketchfab.com/3d-models/gamecube-logo-f08be17bd3fc4a15ae35e00055d899bb) by Anthony Yanez (https://sketchfab.com/paulyanez) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-- This work is based on "GameCube Logo" (https://sketchfab.com/3d-models/gamecube-logo-98bbc36e66b5445da6eeb6b2eb5b36ff) by ExplainedLake (https://sketchfab.com/explainedlake98) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+The consoles' logos (`app/studio/logos/`) are the official ones, taken from Wikimedia Commons, where they are in the
+public domain as too simple for copyright; they remain trademarks of their owners (Sony, Microsoft, Nintendo, Sega):
+[PlayStation](https://commons.wikimedia.org/wiki/File:Playstation_logo_colour.svg),
+[PlayStation 2](https://commons.wikimedia.org/wiki/File:PlayStation_2_logo.svg),
+[PSP](https://commons.wikimedia.org/wiki/File:PSP_Logo.svg),
+[PS Vita](https://commons.wikimedia.org/wiki/File:PlayStation_Vita_logo.svg),
+[Xbox](https://commons.wikimedia.org/wiki/File:Xbox_2001_Stacked_Logo.svg),
+[Xbox 360](https://commons.wikimedia.org/wiki/File:Xbox_360_wordmark.svg),
+[NES](https://commons.wikimedia.org/wiki/File:NES_logo.svg),
+[Super Nintendo](https://commons.wikimedia.org/wiki/File:Super_Nintendo_Entertainment_System_logo.svg),
+[Nintendo 64](https://commons.wikimedia.org/wiki/File:Nintendo_64_wordmark.svg),
+[GameCube](https://commons.wikimedia.org/wiki/File:Nintendo_GameCube_Official_Logo.svg),
+[Wii](https://commons.wikimedia.org/wiki/File:Wii_logo_if_you_want_to_use_in_picture_quizzes.svg),
+[Switch](https://commons.wikimedia.org/wiki/File:Nintendo_Switch_logo.svg),
+[Game Boy](https://commons.wikimedia.org/wiki/File:Gameboy_logo.svg),
+[Game Boy Color](https://commons.wikimedia.org/wiki/File:Game_Boy_Color_logo.svg),
+[Game Boy Advance](https://commons.wikimedia.org/wiki/File:Game_Boy_Advance_logo.svg),
+[DS Lite](https://commons.wikimedia.org/wiki/File:Nintendo_DS_Lite_logo.svg),
+[Master System](https://commons.wikimedia.org/wiki/File:Master_System_Logo.svg),
+[Mega Drive](https://commons.wikimedia.org/wiki/File:Sega_genesis_logo.svg),
+[Dreamcast](https://commons.wikimedia.org/wiki/File:Dreamcast_logo_PAL.svg).
 
 ## License
 

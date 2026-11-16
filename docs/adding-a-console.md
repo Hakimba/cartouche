@@ -117,7 +117,7 @@ console comes as a glb.
 |---|---|---|
 | `ConsoleVariant.kt` | one entry per folder (the scaffold adds it) | `ConsoleVariantTest` fails |
 | `README.md` | its credit line (the scaffold adds it) and its name in the table of consoles | `scripts/check_docs.py` fails on the credit |
-| `app/studio/logos/<slot>/<folder>.png` | its logo in the five slots (`between-mini`, `games-top`, `plinth-plate`, `rail-tile`, `ring-middle`), drawn for the project, never copied | `scripts/check_docs.py` fails |
+| `app/studio/logos/<slot>/<folder>.png` | its logo in the five slots (`between-mini`, `games-top`, `plinth-plate`, `rail-tile`, `ring-middle`), its official logo from Wikimedia Commons (public domain as too simple for copyright), credited in the README | `scripts/check_docs.py` fails |
 | `StudioTokens.GEL` | the platform's colour. The file is generated: give the hex value in the pull request | `tokens_test.gd` fails |
 | `app/data/turntable.json`, `app/data/studio_lights.json` | its pose on the plinth and its lights, written by the maintainers' tuning tool through the [debug bridge](debug-bridge.md) | it stands as drawn, under the default light |
 | `app/carousel/consoles/<folder>/plinth.png`, `plinth_2x.png` | its picture on the plinth of the **Add a console** and Edit forms, drawn by `scripts/bake_plinths.sh` (needs a display); draw it again when the model, its pose or its plinth lights change, and commit it with `scripts/plinths.json` | `scripts/build.sh` fails (`scripts/plinths.py check`) |
