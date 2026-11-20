@@ -20,6 +20,9 @@ var _count := 0
 ## The console's gel as its manifest has it: the backdrop shown draws it ([method Palette.gel]).
 var _gel := StudioTokens.NEUTRAL
 var _line := StudioText.new("", StudioTokens.Face.JAKARTA_800, FONT_PX, 0.0, true)
+## The highlight along its top edge, and the shadow: the whole badge, under [member _style].
+var _rim := StyleBoxFlat.new()
+## The gel, one pixel below the top so the rim shows above it.
 var _style := StyleBoxFlat.new()
 var _fade: Tween
 
@@ -29,14 +32,16 @@ func _init() -> void:
 	# Over the selection frame, which the rail draws after its tiles.
 	z_index = 1
 	visible = false
-	_style.set_corner_radius_all(ceili(HEIGHT / 2.0))
-	_style.corner_detail = 12
-	_style.border_width_top = 1
-	_style.border_color = Color(1.0, 1.0, 1.0, 0.35)
-	_style.shadow_color = _SHADOW
-	_style.shadow_size = 6
-	_style.shadow_offset = Vector2(0.0, 3.0)
-	_style.anti_aliasing_size = 0.5
+	# Two borderless boxes rather than a top border: Godot draws an anti-aliased StyleBoxFlat bordered on some sides
+	# only with points far off the box at some screen sizes (bars up to the top of a 1280 x 720 screen).
+	for box: StyleBoxFlat in [_rim, _style]:
+		box.set_corner_radius_all(ceili(HEIGHT / 2.0))
+		box.corner_detail = 12
+		box.anti_aliasing_size = 0.5
+	_rim.bg_color = Color(1.0, 1.0, 1.0, 0.35)
+	_rim.shadow_color = _SHADOW
+	_rim.shadow_size = 6
+	_rim.shadow_offset = Vector2(0.0, 3.0)
 
 
 func _notification(what: int) -> void:
@@ -88,5 +93,6 @@ func count() -> int:
 
 
 func _draw() -> void:
-	draw_style_box(_style, Rect2(Vector2.ZERO, size))
+	draw_style_box(_rim, Rect2(Vector2.ZERO, size))
+	draw_style_box(_style, Rect2(Vector2(0.0, 1.0), size - Vector2(0.0, 1.0)))
 	_line.draw(self, Vector2((size.x - _line.width) / 2.0, (size.y - _line.height) / 2.0), _INK)

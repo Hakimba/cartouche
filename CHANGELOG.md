@@ -9,6 +9,8 @@ follows [Keep a Changelog](https://keepachangelog.com).
 
 - Every console now shows its official logo, on the consoles ring, the games screen and the console cards. Thanks to
   everyone who asked for it.
+- On a 1280 × 720 screen, such as a Switch running Android, the badge counting a console's new games no longer
+  draws two bars up to the top of the screen. Thanks to the player who reported it on Discord.
 
 ## [0.5.0] - 2026-11-16
 
